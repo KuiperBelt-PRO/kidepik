@@ -15,3 +15,14 @@ Documentar aquí la URL o puerto de desarrollo cuando exista runtime local (Dock
 ## Documentación de agentes
 
 Reglas Cursor, SDD y specs viven bajo `.cursor/`. Enlazar features maduras desde [CURRENT_SPECS.md](../CURRENT_SPECS.md).
+
+## CodeGraph
+
+Índice local en `.codegraph/` (gitignored). Inicializar o reindexar:
+
+```powershell
+codegraph init .
+codegraph status .
+```
+
+El MCP `codegraph` del hub `Vibe-Coding` indexa por `projectPath` cuando el workspace multi-root está abierto. Hasta que exista código fuente (PHP, Python, TS, etc.), el índice puede estar vacío.

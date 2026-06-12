@@ -1,3 +1,6 @@
+# CodeGraph: índice local por máquina (SQLite en .codegraph/)
+.codegraph/
+
 .env
 .env.*
 !.env.sample
