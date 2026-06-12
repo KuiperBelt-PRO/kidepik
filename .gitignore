@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.sample
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+node_modules/
+dist/
+build/
+
+tmp/playwright-output/
+.playwright-mcp/
+test-results/
+playwright-report/

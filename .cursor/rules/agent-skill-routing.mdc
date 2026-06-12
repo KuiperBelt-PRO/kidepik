@@ -1,0 +1,17 @@
+---
+description: Enrutar tareas de kidepik a las skills locales (SDD, Git).
+alwaysApply: true
+---
+
+# Enrutamiento de skills (kidepik)
+
+Si la petición encaja en una fila, **lee** el `SKILL.md` indicado y aplícalo antes de improvisar.
+
+| Petición | Skill |
+| --- | --- |
+| SDD, TDD, tests o feature en **este repo** | `.cursor/skills/spec-driven-dev-kidepik/SKILL.md` |
+| Commit, push, stage selectivo | `Vibe-Coding/.cursor/skills/git-workflow/SKILL.md` |
+| Revisar PR, rama o parche | `Vibe-Coding/.cursor/skills/code-review/SKILL.md` |
+| Crear o editar reglas `.mdc` | `Vibe-Coding/.cursor/skills/create-rule/SKILL.md` |
+
+**Otros repositorios del workspace:** para SDD/TDD o reglas específicas de `pda_website`, `kuiperbelt_website`, `kuiper-belt-automations`, `misc` o el hub **Vibe-Coding**, usa las skills y `.cursor/` **de ese repositorio**, no las de `kidepik`.

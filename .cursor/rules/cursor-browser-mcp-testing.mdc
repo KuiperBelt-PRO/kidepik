@@ -1,0 +1,12 @@
+---
+description: Pruebas UI kidepik vía MCP cursor-ide-browser (wrapper del hub)
+alwaysApply: true
+---
+
+# Pruebas en el MCP cursor browser (kidepik)
+
+**Regla canónica:** `Vibe-Coding/.cursor/rules/cursor-browser-mcp-testing-ide.mdc` — léela y aplícala.
+
+## URLs locales
+
+- Usar la URL documentada en `.cursor/plan/PROJECT_OVERVIEW.md` o el puerto expuesto por `docker compose` del repo.

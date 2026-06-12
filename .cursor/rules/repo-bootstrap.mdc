@@ -1,0 +1,9 @@
+---
+description: Reglas base para el repositorio kidepik
+alwaysApply: true
+---
+
+- Mantener el flujo spec → plan → implement para cambios funcionales relevantes (ver `.cursor/SDD.md`).
+- No commitear secretos ni credenciales (`.env`, claves, tokens).
+- Respetar el stack documentado en `.cursor/plan/PROJECT_OVERVIEW.md` y en la primera spec de producto; no asumir PHP, Python ni servicios no documentados.
+- Antes de cerrar cambios de empaquetado, CI o dependencias, validar instalación o checks documentados en el repo.
