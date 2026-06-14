@@ -61,13 +61,15 @@ Esperado: `aarch64`, ~6 Gi memoria.
 
 | Campo | Valor |
 | --- | --- |
-| Fecha | |
+| Fecha | 2026-06-14 |
 | Región | `eu-madrid-1` |
-| AD usado | |
-| Instancia OCID | |
-| IP pública | |
-| SSH OK | sí / no |
-| Notas (capacidad, límites) | |
+| AD usado | `bzjm:EU-MADRID-1-AD-1` (único AD en MAD) |
+| VCN OCID | `ocid1.vcn.oc1.eu-madrid-1.amaaaaaaznfgjeiap7vqitbmkzzgn5t6uasbfcrzpsy3u5hcyhju76xhdema` |
+| Subnet OCID | `ocid1.subnet.oc1.eu-madrid-1.aaaaaaaaaerm5oxptcboyam6jmu2ckkydab2klgfxoqq6y34mt2weo5hnvzq` |
+| Instancia OCID | — (pendiente: Out of host capacity) |
+| IP pública | — |
+| SSH OK | — |
+| Notas | Red creada OK. Launch ARM falló `OUT_OF_CAPACITY`. Reintentar con `oci_retry_launch_arm` o `provision_arm.py` en bucle. |
 
 ---
 
