@@ -1,7 +1,13 @@
 # Operativa: validación Oracle Always Free (KidepiK)
 
-> Spec: [../specify/SPEC_OCI_INFRA_ALWAYS_FREE.md](../specify/SPEC_OCI_INFRA_ALWAYS_FREE.md)  
+> Spec ARM: [../specify/SPEC_OCI_INFRA_ALWAYS_FREE.md](../specify/SPEC_OCI_INFRA_ALWAYS_FREE.md)  
+> Spec MVP hosting: [../specify/SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md)  
 > MCP: [../specify/SPEC_OCI_MCP_SERVER.md](../specify/SPEC_OCI_MCP_SERVER.md)
+
+## Contexto (junio 2026)
+
+- **MVP producción:** Modern Free Tier Stack — Supabase (DB + Auth) + Cloudflare R2 + FastAPI. Compute backend: **GCP Cloud Run** *o* **Oracle AMD Micro** (pendiente elegir). Ver [docs/kidepik.md](../../docs/kidepik.md) §10.5.
+- **North star OCI:** monolito ARM 6 GB cuando haya stock (`OUT_OF_CAPACITY` en MAD).
 
 ## Prerrequisitos (usuario)
 
@@ -30,7 +36,7 @@ py .cursor\mcp-oci\scripts\bootstrap_venv.py
 2. Reiniciar MCP / Cursor.
 3. Invocar tool `oci_status` desde el agente.
 
-## Fase 3 — Red + VM (agente o CLI)
+## Fase 3 — Red + VM ARM (objetivo largo plazo)
 
 Orden recomendado vía MCP:
 
@@ -47,7 +53,7 @@ oci iam availability-domain list --compartment-id <TENANCY_OCID>
 oci compute instance list --compartment-id <TENANCY_OCID>
 ```
 
-## Fase 4 — Validación SSH
+## Fase 4 — Validación SSH (ARM)
 
 ```powershell
 ssh -i $env:USERPROFILE\.ssh\kidepik_oci ubuntu@<IP_PUBLICA> "uname -m; free -h; df -h"
@@ -57,7 +63,7 @@ Esperado: `aarch64`, ~6 Gi memoria.
 
 ---
 
-## Resultado (rellenar tras validación)
+## Resultado ARM (rellenar tras validación)
 
 | Campo | Valor |
 | --- | --- |
@@ -69,41 +75,34 @@ Esperado: `aarch64`, ~6 Gi memoria.
 | Instancia OCID | — (pendiente: Out of host capacity) |
 | IP pública | — |
 | SSH OK | — |
-| Notas | Red creada OK. Launch ARM falló `OUT_OF_CAPACITY`. Reintentar con `oci_retry_launch_arm` o `provision_arm.py` en bucle. |
+| Notas | Red creada OK. Launch ARM falló `OUT_OF_CAPACITY`. Reintentar con scripts de bucle. |
 
 ---
 
-## Plan B — Sin stock ARM
+## MVP — Modern Free Tier Stack (activo)
 
-Mientras `VM.Standard.A1.Flex` devuelva `OUT_OF_CAPACITY`, no bloquear el producto. Detalle ampliado en [docs/kidepik.md](../../docs/kidepik.md) §10.5.1.
+Arquitectura fija: **Supabase** (Postgres + Auth) + **Cloudflare R2** (media) + **FastAPI**.
 
-### B1 — Oracle AMD Micro (misma cuenta, EU)
+### Compute backend (elegir uno)
 
-1. Crear `VM.Standard.E2.1.Micro` en `eu-madrid-1` (suele haber más stock que ARM).
-2. Desplegar **solo FastAPI** (sin Postgres en la VM).
-3. Postgres en **Supabase free** o **Neon free** (pgvector: comprobar límites del tier free).
+| Opción | Cuándo | Notas |
+| --- | --- | --- |
+| **GCP Cloud Run** | Preferido si no hay VM Oracle | `min-instances=0`, `max-instances=1-2`, región EU; alerta billing 0,01 € |
+| **Oracle AMD Micro** | Si hay stock en MAD | Solo FastAPI (~1 GB); misma VCN/red OCI ya creada |
 
-### B2 — GCP Cloud Run + BD gestionada
+**No usar:** Supabase Storage (egress 2 GB/mes). **No usar:** GCP e2-micro (1 GB, US only).
 
-1. Desplegar contenedor FastAPI en **Cloud Run** (Always Free ~2M req/mes).
-2. Postgres en Neon o Supabase.
-3. Vigilar cold starts y timeout en narrativas largas (LangGraph).
+### Checklist servicios (pendiente)
 
-### B3 — GCP e2-micro (solo US, 1 GB)
+- [ ] Proyecto Supabase (EU): DB + Auth + `DATABASE_URL`
+- [ ] Bucket Cloudflare R2 + claves API
+- [ ] Proyecto GCP + Cloud Run *o* instancia Oracle Micro
+- [ ] `Dockerfile` FastAPI desplegable en ambos destinos
+- [ ] Regla egress: API devuelve URLs R2, no binarios
 
-- Always Free en `us-west1`, `us-central1`, `us-east1`.
-- **No** albergar API + Postgres juntos; como mínimo BD externa.
-- Latencia desde España mayor que MAD.
+Detalle: [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
-### B4 — Puente temporal: crédito GCP $300 (90 días)
-
-- VM mayor en `europe-west*` con Docker Compose completo hasta conseguir ARM Oracle.
-
-### B5 — Desarrollo local
-
-- Docker Compose en el PC (§10.4 de `docs/kidepik.md`) + bucle de reintento ARM en paralelo.
-
-### Scripts de reintento ARM (objetivo final)
+### Scripts reintento ARM (paralelo al MVP)
 
 ```powershell
 cd kidepik
@@ -111,15 +110,17 @@ $env:KIDEPIK_REPO = (Get-Location).Path
 .cursor\.venv-mcp\Scripts\python.exe -u .cursor\mcp-oci\scripts\retry_provision_loop.py --max-hours 24 --attempts-per-minute 2
 ```
 
-Supervisor (relanza el proceso si termina antes del deadline):
+Supervisor:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .cursor\mcp-oci\scripts\retry_provision_supervisor.ps1 -MaxHours 24
 ```
 
-Log sugerido: `tmp/oci-provision/retry-provision.log` (gitignored).
+Log: `tmp/oci-provision/retry-provision.log` (gitignored).
 
+## Seguridad
 
-- No commitear `.secrets/`.
-- Rotar API key si se expone.
-- Restringir SSH a tu IP en security list cuando tengas IP fija.
+- No commitear `.secrets/` (OCI, Supabase, R2, GCP).
+- Rotar API keys si se exponen.
+- Restringir SSH a tu IP en security list cuando tengas IP fija (Oracle).
+- URLs firmadas o políticas R2 para media privada de menores.

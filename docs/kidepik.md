@@ -25,11 +25,11 @@ El aprendizaje no se presenta como temario escolar, sino como **retos cortos** i
 | **Píldoras / minijuegos** | No incluidos | Minijuegos táctiles tras N lecciones |
 | **IA** | OpenRouter (modelos free) + fallback Gemini/Grok free | Modelos de pago según volumen |
 | **Perfil y progreso** | Tablas relacionales en PostgreSQL | Informes para padres, analíticas |
-| **Infra producción** | Oracle Cloud Always Free (ARM) | Escalar instancia o migrar piezas si hace falta |
+| **Infra producción** | **Modern Free Tier Stack** (Supabase + R2 + FastAPI); backend en **GCP Cloud Run** *u* **Oracle AMD Micro** (TBD) | Monolito Oracle ARM 6 GB cuando haya stock |
 
 ### Contexto de negocio
 
-- **Coste operativo cero** en fase inicial: Oracle Always Free, Expo, OpenRouter free, modelos `:free`, Supabase Auth/Storage (*opcional*).
+- **Coste operativo cero** en fase inicial: Supabase (DB + Auth), Cloudflare R2 (media), GCP Cloud Run u Oracle Micro (API), OpenRouter free, modelos `:free`. Oracle ARM sigue como north star.
 - Escalado **proporcional al volumen**: cuando haya usuarios de pago, ampliar recursos o activar modelos de pago sin saltos desproporcionados.
 - Monetización por **volumen de usuarios** con ticket bajo (freemium, créditos, suscripción familiar).
 - Desarrollo asistido por IA; el cuello de botella no es el tiempo de código sino la **definición de producto y validación con padres**.
@@ -378,7 +378,11 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 - **Frontend** con `npx expo start`: emulador Android (AVD), **Expo Go** en móvil físico (Android o iPhone), o tecla **`w`** para vista web rápida.
 - Sin PHP ni runtime nativo en el host Windows más allá de Node/Docker; ver reglas del workspace.
 
-#### Producción (Oracle Cloud Always Free)
+#### Producción
+
+**MVP (activo):** Modern Free Tier Stack — diagrama en §10.5.1.
+
+**North star (Oracle ARM monolito):**
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -399,92 +403,108 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 └─────────────────┘
 ```
 
-**Ventaja clave:** API y Postgres en la **misma máquina** → consultas RAG con latencia de red ~1 ms frente a arquitecturas fragmentadas (backend en Koyeb + BD en Supabase).
+**Ventaja del monolito:** API y Postgres en la **misma máquina** → latencia RAG ~1 ms. El stack Supabase + R2 + Cloud Run sacrifica esa latencia a cambio de disponibilidad inmediata sin stock ARM.
 
-### 10.5 Oracle Cloud Always Free — decisión de hosting
+### 10.5 Hosting — dos vías (junio 2026)
 
-**Decisión: Oracle Cloud Infrastructure (OCI) Always Free** como host de producción.
+| Vía | Estado | Descripción |
+| --- | --- | --- |
+| **A — Modern Free Tier Stack** | **MVP activo** | Supabase (DB + Auth) + Cloudflare R2 + FastAPI; compute en **GCP Cloud Run** *o* **Oracle AMD Micro** (pendiente elegir) |
+| **B — Monolito Oracle ARM** | North star / bloqueado por stock | FastAPI + Postgres/pgvector en una VM `VM.Standard.A1.Flex` 6 GB, Docker Compose (§10.4) |
 
-#### Por qué Oracle y no solo Supabase / Cloud Run / Render
+Spec detallada: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
-| Opción | Veredicto |
-| --- | --- |
-| **Supabase Edge Functions** | Descartado como backend principal: insuficiente para LangGraph, timeouts cortos, sin Python robusto |
-| **Vercel** | Descartado para backend: serverless JS/TS, sin contenedores largos, sin Postgres propio |
-| **Google Cloud Run** | Válido (free tier generoso) pero fragmenta BD y API; cold starts |
-| **Koyeb / Render free** | 512 MB RAM, sleep tras inactividad → mala UX para un niño esperando historia |
-| **Replit** | Bueno para prototipos; caro y poco control para producción B2C |
-| **Oracle Always Free ARM** | **Elegido:** 0 € perpetuo, RAM configurable, sin sleep, Docker Compose completo |
+#### 10.5.1 Modern Free Tier Stack (arquitectura MVP)
 
-#### Tamaño de instancia recomendado
+```
+┌─────────────┐     JWT (Supabase)      ┌─────────────────────────────┐
+│  App Expo   │ ───────────────────────►│  FastAPI + LangGraph        │
+│  Android/iOS│     HTTPS               │  GCP Cloud Run  OR          │
+└──────┬──────┘                         │  Oracle AMD Micro (TBD)     │
+       │                                └───────┬──────────┬──────────┘
+       │ URLs de media (JSON)                  │          │
+       │ directo desde app                     │          │
+       ▼                                       ▼          ▼
+┌─────────────┐                         ┌──────────┐  ┌──────────┐
+│ Cloudflare  │                         │ Supabase │  │OpenRouter│
+│ R2          │                         │ Postgres │  │ (IA)     │
+│ avatares,   │                         │ + Auth   │  └──────────┘
+│ audios      │                         │ pgvector │
+└─────────────┘                         └──────────┘
+```
 
-Oracle ofrece una «bolsa» de recursos ARM (hasta 4 OCPU + 24 GB RAM gratis). **No hace falta usarlo todo desde el día uno.**
+**Piezas fijas:**
+
+- **Supabase:** Postgres (pgvector) + Auth. La app obtiene JWT; FastAPI lo valida y accede a la BD con `DATABASE_URL` solo en servidor.
+- **Cloudflare R2:** buckets S3-compatible (`boto3`). La BD guarda URLs; **no** usar Supabase Storage (límite egress 2 GB/mes en free).
+- **FastAPI:** agentes, RAG, subida a R2 (URLs firmadas si hace falta), **nunca** proxy de imágenes al cliente (protege egress de Cloud Run).
+
+**Backend (pendiente de elegir):**
+
+| Opción | Pros | Contras |
+| --- | --- | --- |
+| **GCP Cloud Run** | 2 GB+ RAM por contenedor, EU, cero sysadmin, Always Free generoso | Cold start; vigilar egress GCP (1 GB/mes free) |
+| **Oracle AMD Micro** | EU Madrid, sin cold start, misma cuenta OCI | 1 GB RAM ajustado; más stock que ARM pero no garantizado |
+
+Mismo `Dockerfile` para ambos destinos.
+
+#### 10.5.2 Neon vs Supabase
+
+Metáfora: **Neon = solo el motor** (Postgres serverless); **Supabase = el coche entero** (DB + Auth + Storage + APIs REST/GraphQL).
+
+| Característica | Neon | Supabase |
+| --- | --- | --- |
+| Producto | Postgres serverless | BaaS completo |
+| Escala a cero | Sí, rápido | Free: pausa ~7 días sin uso |
+| Auth | No | Sí (email, Google, Apple) |
+| Storage | No | Sí (no lo usamos — ver R2) |
+| Branching DB | Sí (clones instantáneos) | No nativo en free |
+| pgvector | Sí | Sí |
+
+**Decisión KidepiK:** **Supabase** (DB + Auth) para acelerar MVP. Neon como plan C si límites de Supabase free bloquean.
+
+#### 10.5.3 Cloudflare R2 (storage de media)
+
+- Rival de S3 con **egress gratuito** (crítico para app B2C con imágenes).
+- Free tier orientativo: 10 GB almacenamiento, 10M lecturas/mes, 1M escrituras/mes.
+- API **compatible S3** — `boto3` en FastAPI con endpoint R2.
+
+**Supabase Storage free (por qué no):** 1 GB disco, **2 GB egress/mes** (~10k vistas de avatar a 200 KB). Bloqueo o upgrade Pro (~25 $/mes) al superar. R2 evita ese cuello de botella.
+
+#### 10.5.4 GCP Cloud Run — coste 0 y candados
+
+Preferido frente a **Compute Engine e2-micro** (1 GB RAM, free solo en US, insuficiente para LangGraph).
+
+| Parámetro deploy | Valor | Motivo |
+| --- | --- | --- |
+| `min-instances` | `0` | Escala a cero |
+| `max-instances` | `1`–`2` | Evitar factura por picos / DDoS |
+| `concurrency` | `80` | FastAPI async; menos instancias |
+| Región | EU | Latencia con Supabase EU |
+
+**Regla de egress:** FastAPI solo devuelve JSON con URL de R2; el móvil descarga la imagen **directo** de Cloudflare.
+
+**Alerta billing GCP:** presupuesto **0,01 €** con emails al 50 % / 90 % / 100 %.
+
+#### 10.5.5 Monolito Oracle ARM (north star)
+
+Sigue siendo el diseño objetivo cuando haya stock en `eu-madrid-1`:
 
 | Perfil | OCPU | RAM | Uso |
 | --- | --- | --- | --- |
-| **Punto dulce (recomendado)** | 1 | **6 GB** | FastAPI + LangGraph + Postgres/pgvector con holgura |
-| Mínimo viable | 1 | 4 GB | Ajustado; monitorizar OOM |
-| AMD Micro (1 GB) | — | 1 GB | **Insuficiente** para API + Postgres juntos; solo API con BD externa |
-| Máximo free | 4 | 24 GB | Reservar para escala o otros proyectos |
+| **Punto dulce** | 1 | **6 GB** | FastAPI + LangGraph + Postgres/pgvector |
+| AMD Micro | — | 1 GB | Solo API en stack híbrido (con Supabase + R2) |
 
-#### Consideraciones Oracle
+- Stock ARM: `OUT_OF_CAPACITY` frecuente — `retry_provision_loop.py`.
+- Consideraciones: aarch64, security lists, backups propios.
 
-- **Arquitectura ARM (aarch64):** las imágenes Docker deben compilarse para ARM (`docker buildx`); el 99 % del ecosistema Python es compatible.
-- **Disponibilidad:** las instancias ARM gratuitas a veces están sin stock («Out of capacity»); elegir región EU (Madrid, Frankfurt, París) y tener script de reintento o aprovisionamiento vía Terraform.
-- **Sysadmin:** firewall OCI (Security Lists), `ufw` en Ubuntu, actualizaciones, backups de Postgres (cron + volumen o `pg_dump`). No es PaaS gestionado.
-- **Plan B si solo hay AMD 1 GB:** API en Oracle + Postgres en Supabase free + swap en disco (más lento, último recurso).
+#### 10.5.6 Referencias operativas
 
-#### 10.5.1 Alternativas a 0 € mientras no hay stock ARM (junio 2026)
+- Spec stack MVP: `.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md`
+- Reintento ARM: `.cursor/mcp-oci/scripts/retry_provision_loop.py`
+- Validación OCI: `.cursor/operations/OCI_ALWAYS_FREE_VALIDATION.md`
 
-El stock de `VM.Standard.A1.Flex` en `eu-madrid-1` puede tardar días o semanas (`OUT_OF_CAPACITY`). El objetivo de producción sigue siendo **Oracle ARM 6 GB + Docker Compose monolítico**; hasta conseguirlo, estas opciones permiten **seguir desarrollando o exponer un piloto** sin coste recurrente.
-
-**GCP no ofrece un equivalente perpetuo a Oracle ARM 6 GB en Europa.** Las opciones Always Free de Google Cloud son más limitadas en RAM y, en Compute Engine, solo en regiones US.
-
-| Opción | Coste | ¿Stack KidepiK completo? | Notas |
-| --- | --- | --- | --- |
-| **Oracle ARM A1** (objetivo) | 0 € perpetuo | **Sí** — FastAPI + Postgres/pgvector en la misma VM | Stock irregular en MAD; script `retry_provision_loop.py` |
-| **Oracle AMD Micro** (`VM.Standard.E2.1.Micro`) | 0 € perpetuo | **Parcial** — solo API (~1 GB); BD externa | Suele haber más stock que ARM; misma cuenta OCI |
-| **GCP Compute Engine e2-micro** | 0 € perpetuo | **No** — 1 GB RAM | Solo `us-west1`, `us-central1`, `us-east1`; no EU free |
-| **GCP Cloud Run** | 0 € perpetuo (~2M req/mes) | **Parcial** — API en contenedor; BD aparte | Cold starts; peticiones LLM largas → vigilar timeout/memoria |
-| **GCP crédito $300 / 90 días** | Gratis al inicio | **Sí** (VM mayor en EU) | Puente temporal, no perpetuo |
-| **Cloud Run + Neon / Supabase** | 0 € con límites | **Parcial** — híbrido | Recomendado para URL pública de prueba sin VM |
-| **Docker Compose local** | 0 € | **Sí** (dev) | Ya es el entorno de desarrollo documentado en §10.4 |
-| **Render / Koyeb free** | 0 € | Parcial | Sleep tras inactividad → mala UX infantil (descartado) |
-| **Cloud SQL (GCP)** | De pago | — | No encaja en coste cero |
-
-##### Arquitecturas híbridas recomendadas (orden práctico)
-
-1. **Seguir en local** con Docker Compose (§10.4) y el bucle de reintento ARM en segundo plano.
-2. **Oracle AMD Micro + Postgres gestionado gratis** (misma cuenta OCI, región MAD):
-   - API en la micro; Postgres en **Supabase free** o **Neon free**.
-   - Documentado como Plan B en [OCI_ALWAYS_FREE_VALIDATION.md](../.cursor/operations/OCI_ALWAYS_FREE_VALIDATION.md).
-3. **GCP Cloud Run + Neon** (o Supabase) para piloto con URL HTTPS sin depender de stock Oracle:
-   - Mismo `Dockerfile` de FastAPI desplegado en Cloud Run.
-   - Auth opcional vía Supabase Auth (§10.8).
-4. **Crédito GCP $300** si hace falta demo con usuarios reales antes de tener ARM: VM `e2-small` o superior en `europe-west*` durante ~90 días.
-
-##### Trade-offs frente al monolito Oracle
-
-| Aspecto | Monolito ARM (objetivo) | Híbrido (API PaaS + BD gestionada) |
-| --- | --- | --- |
-| Latencia RAG | ~1 ms (API ↔ Postgres local) | Red entre servicios (ms–decenas ms) |
-| RAM disponible | 4–6 GB configurables | Límites por servicio (512 MB–1 GB típico en free) |
-| Cold start | No | Sí en Cloud Run / Render |
-| Sysadmin | Mayor (VM, firewall, backups) | Menor (PaaS + BD gestionada) |
-| Coste perpetuo | 0 € en bolsa Always Free | 0 € si se respetan cuotas free |
-
-##### Qué descartar para MVP a 0 €
-
-- **e2-micro con API + Postgres + pgvector en la misma máquina** — RAM insuficiente.
-- **Supabase Edge Functions como backend principal** — sin LangGraph/FastAPI robusto (ya descartado arriba).
-- **Solo esperar Oracle ARM** sin Plan B — bloquea piloto y validación con usuarios.
-
-##### Referencias operativas
-
-- Reintento ARM: `.cursor/mcp-oci/scripts/retry_provision_loop.py` (`--max-hours 24`, `--attempts-per-minute 2`).
-- Supervisor (relanza si el proceso muere): `.cursor/mcp-oci/scripts/retry_provision_supervisor.ps1`.
-- Validación OCI: `.cursor/operations/OCI_ALWAYS_FREE_VALIDATION.md`.
-
+### 10.6 Motor de agentes, OpenRouter y RAG
 
 **OpenRouter** como **único gateway** hacia varios proveedores free, con fallback y gestión de límites.
 
@@ -508,8 +528,8 @@ Request narrativo (FastAPI)
 └────────┬────────┘
          ▼
 ┌─────────────────┐
-│ RAG             │  ← story_beats + summaries + pgvector (futuro)
-│ + subject levels│     todo en Postgres local
+│ RAG             │  ← story_beats + summaries + pgvector (Supabase Postgres)
+│ + subject levels│
 └────────┬────────┘
          ▼
 ┌─────────────────┐
@@ -537,17 +557,17 @@ Request narrativo (FastAPI)
 ### 10.7 API, credenciales y seguridad App ↔ API
 
 ```
-┌─────────────┐     JWT                 ┌──────────────────┐
+┌─────────────┐     JWT (Supabase)      ┌──────────────────┐
 │  App Expo   │ ───────────────────────►│  FastAPI         │
 │  Android/iOS│     HTTPS only          │  /api/v1/*       │
-└─────────────┘                         └────────┬─────────┘
-                                                 │
-                                    credenciales BD (solo servidor)
-                                                 ▼
-                                        ┌──────────────────┐
-                                        │  PostgreSQL      │
-                                        │  + pgvector      │
-                                        └──────────────────┘
+└──────┬──────┘                         └────────┬─────────┘
+       │                                         │
+       │ media URLs (directo)                    │ DATABASE_URL, R2 keys
+       ▼                                         ▼
+┌─────────────┐                         ┌──────────────────┐
+│ Cloudflare  │                         │  Supabase        │
+│ R2          │                         │  Postgres        │
+└─────────────┘                         └──────────────────┘
                                                  │
                                     OPENROUTER_API_KEY (solo servidor)
                                                  ▼
@@ -558,10 +578,11 @@ Request narrativo (FastAPI)
 
 | Secreto | Dónde vive | Quién lo usa |
 | --- | --- | --- |
-| Clave pública Supabase Auth (si aplica) | App (público por diseño) | App → login |
-| `DATABASE_URL` | Solo contenedor backend / `.env` servidor | FastAPI → Postgres |
+| Clave pública Supabase (anon) | App | App → Supabase Auth |
+| `DATABASE_URL` (Supabase) | Solo servidor / Cloud Run secrets | FastAPI → Postgres |
+| `SUPABASE_JWT_SECRET` o JWKS | Solo servidor | FastAPI valida JWT |
+| `R2_ACCESS_KEY` / `R2_SECRET` / bucket | Solo servidor | FastAPI → R2 (put, URLs firmadas) |
 | `OPENROUTER_API_KEY` | Solo servidor | Motor IA |
-| `JWT_SECRET` o validación Supabase JWT | Solo servidor | FastAPI valida cada request |
 | JWT del usuario | Memoria segura en app | Cada llamada a API |
 
 **Reglas:**
@@ -571,19 +592,29 @@ Request narrativo (FastAPI)
 - Rate limiting por usuario (p. ej. 30 req/min) para proteger cuotas free de IA.
 - Sin secretos de IA ni credenciales de BD en el bundle de la app.
 
-### 10.8 Papel de Supabase (opcional)
+### 10.8 Supabase y Cloudflare R2
 
-**Supabase** es PostgreSQL gestionado + Auth + Storage + API REST auto-generada (PostgREST) + RLS.
+#### Supabase (DB + Auth — sí; Storage — no)
 
 | Pieza Supabase | ¿Usarla en KidepiK? |
 | --- | --- |
-| PostgreSQL hospedado | **No** como BD principal — Postgres va en Docker (local y Oracle) por latencia RAG y control |
-| Auth (email, Google, Apple) | **Sí, recomendado MVP** — gratis, menos código que auth propio |
-| Storage (imágenes) | **Opcional** — útil *post-MVP* para avatares |
+| PostgreSQL hospedado (+ pgvector) | **Sí — BD principal en MVP** (Modern Free Tier Stack) |
+| Auth (email, Google, Apple) | **Sí** — JWT hacia FastAPI |
+| Storage | **No** — egress 2 GB/mes en free; usar **R2** |
 | Edge Functions | **No** — sustituidas por FastAPI |
-| API REST automática | **No** — la app habla solo con FastAPI |
+| API REST automática (PostgREST) | **No** — la app habla con FastAPI |
 
-Flujo híbrido: la app obtiene JWT de Supabase Auth → FastAPI valida ese JWT → lee/escribe en Postgres propio.
+Flujo: la app obtiene JWT de Supabase Auth → FastAPI valida JWT → lee/escribe en Postgres Supabase.
+
+En el **monolito Oracle ARM** (futuro), Postgres podría volver a ser local en Docker; Auth y R2 pueden mantenerse o migrarse según coste/latencia.
+
+#### Cloudflare R2 (media)
+
+- Avatares, audios narrados, PDFs imprimibles.
+- FastAPI sube objetos y persiste **URL** en Postgres; la app descarga **directo** de R2 (no pasar por Cloud Run).
+- Integración vía `boto3` (API S3-compatible).
+
+Ver [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
 ### 10.9 Papel de Vercel (opcional)
 
@@ -619,21 +650,26 @@ La infraestructura Oracle se provisionará y operará con **agentes de Cursor** 
 | --- | --- |
 | **Flutter** | Descartado por ahora; reservado si avatar 3D exige más control gráfico |
 | **Nativo duplicado (Swift + Kotlin)** | Descartado |
-| **Supabase como backend completo** | Descartado; solo Auth/Storage opcional |
+| **Supabase como backend completo** | Descartado; **DB + Auth sí**, Storage no |
+| **Supabase Storage** | Descartado (egress); **Cloudflare R2** para media |
+| **Neon** | Alternativa DB; Supabase elegido por Auth integrado |
 | **Vercel como backend** | Descartado |
 | **JSON monolítico como fuente de verdad** | Descartado |
 | **Llamada IA directa desde la app** | Descartado |
 | **Replit como producción** | Descartado |
 | **Render / Koyeb free como producción** | Descartado (RAM, sleep) |
-| **Cloud Run** | Alternativa válida; Oracle elegido por coste 0 sin cold start en instancia siempre activa |
+| **GCP Cloud Run** | **MVP activo** (candidato compute principal) |
+| **Oracle ARM monolito** | North star; bloqueado por stock |
+| **Oracle AMD Micro** | **MVP activo** (candidato compute alternativo) |
+| **GCP e2-micro** | Descartado (1 GB, solo US) |
 
 ### 10.12 Coste cero → escalado proporcional
 
 | Fase | Usuarios | Infra | IA |
 | --- | --- | --- | --- |
-| **0 — MVP** | < 500 | Oracle ARM 1 OCPU/6 GB + Docker local | Solo modelos `:free` vía OpenRouter |
-| **1 — Tracción** | 500–5k | Ampliar RAM Oracle (hasta bolsa free) o Supabase Pro solo para Auth | Mix free + modelos pago con techo |
-| **2 — Escala** | > 5k | Migrar piezas (BD gestionada, CDN, réplicas) según cuello de botella real | Router por tier (free vs premium) |
+| **0 — MVP** | < 500 | Supabase + R2 + Cloud Run *u* Oracle Micro; local Docker para dev | Solo modelos `:free` vía OpenRouter |
+| **1 — Tracción** | 500–5k | Ampliar cuotas / Supabase Pro si hace falta; evaluar ARM Oracle | Mix free + modelos pago con techo |
+| **2 — Escala** | > 5k | Monolito ARM o piezas gestionadas según cuello de botella | Router por tier (free vs premium) |
 
 ### 10.13 Principios de código
 

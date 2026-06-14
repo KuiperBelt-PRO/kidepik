@@ -5,7 +5,9 @@
 
 ## Objetivo
 
-Validar que la cuenta **eduserna** (home region **MAD** / `eu-madrid-1`) puede aprovisionar y operar la VM **ARM** Always Free prevista para KidepiK, antes de cerrar la decisión de hosting frente a alternativas híbridas (Supabase + PaaS).
+Validar que la cuenta **eduserna** (home region **MAD** / `eu-madrid-1`) puede aprovisionar la VM **ARM** Always Free prevista como **north star** de hosting monolítico.
+
+El **MVP de producción** (junio 2026) sigue el [SPEC_HOSTING_FREE_TIER_STACK.md](SPEC_HOSTING_FREE_TIER_STACK.md): Supabase + R2 + FastAPI en Cloud Run u Oracle Micro. Esta spec OCI sigue siendo necesaria para el objetivo ARM y para Oracle Micro como compute alternativo.
 
 ## Alcance MVP de la validación
 
@@ -63,7 +65,7 @@ Validar que la cuenta **eduserna** (home region **MAD** / `eu-madrid-1`) puede a
 
 - Si OCI devuelve error de capacidad, usar `.cursor/mcp-oci/scripts/retry_provision_loop.py` (backoff adaptativo, `--max-hours`, `--attempts-per-minute`).
 - Supervisor opcional: `retry_provision_supervisor.ps1` (relanza el proceso hasta el deadline).
-- Si el stock ARM no llega en días/semanas, aplicar **Plan B** (AMD Micro, Cloud Run + Neon, local): ver [docs/kidepik.md](../../docs/kidepik.md) §10.5.1 y [OCI_ALWAYS_FREE_VALIDATION.md](../operations/OCI_ALWAYS_FREE_VALIDATION.md).
+- Si el stock ARM no llega en días/semanas, el MVP usa **SPEC_HOSTING_FREE_TIER_STACK** (Supabase + R2 + Cloud Run u Oracle Micro). Seguir bucle ARM en paralelo.
 
 ## Errores
 

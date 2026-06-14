@@ -11,13 +11,14 @@
 
 ## Infraestructura Oracle Cloud (en curso)
 
-Validación Always Free + MCP para agentes. **Estado: MCP implementado; venv con uv; smoke test OCI OK; launch ARM pendiente (`OUT_OF_CAPACITY` en MAD).**
+Validar VM ARM Oracle + operar MCP. **MVP hosting:** [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) (Supabase + R2 + Cloud Run / Oracle Micro).
 
-**Plan B hosting (0 €):** [docs/kidepik.md](../docs/kidepik.md) §10.5.1 — Oracle AMD Micro, GCP Cloud Run + Neon/Supabase, local Docker; detalle operativo en [operations/OCI_ALWAYS_FREE_VALIDATION.md](operations/OCI_ALWAYS_FREE_VALIDATION.md) § Plan B.
+**Estado OCI:** MCP OK; launch ARM `OUT_OF_CAPACITY` en MAD. **Estado MVP:** stack free-tier documentado; compute backend TBD.
 
 | Spec | Descripción |
 | --- | --- |
-| [specify/SPEC_OCI_INFRA_ALWAYS_FREE.md](specify/SPEC_OCI_INFRA_ALWAYS_FREE.md) | Criterios validación VM ARM 1 OCPU/6 GB en `eu-madrid-1` |
+| [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) | **MVP activo:** Supabase, R2, FastAPI, Cloud Run u Oracle Micro |
+| [specify/SPEC_OCI_INFRA_ALWAYS_FREE.md](specify/SPEC_OCI_INFRA_ALWAYS_FREE.md) | North star: VM ARM 1 OCPU/6 GB en `eu-madrid-1` |
 | [specify/SPEC_OCI_MCP_SERVER.md](specify/SPEC_OCI_MCP_SERVER.md) | Servidor MCP FastMCP + OCI SDK (`oci-kidepik`) |
 
 | Operativa / skill | Uso |
