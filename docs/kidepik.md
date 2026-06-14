@@ -434,7 +434,57 @@ Oracle ofrece una «bolsa» de recursos ARM (hasta 4 OCPU + 24 GB RAM gratis). *
 - **Sysadmin:** firewall OCI (Security Lists), `ufw` en Ubuntu, actualizaciones, backups de Postgres (cron + volumen o `pg_dump`). No es PaaS gestionado.
 - **Plan B si solo hay AMD 1 GB:** API en Oracle + Postgres en Supabase free + swap en disco (más lento, último recurso).
 
-### 10.6 Motor de agentes, OpenRouter y RAG
+#### 10.5.1 Alternativas a 0 € mientras no hay stock ARM (junio 2026)
+
+El stock de `VM.Standard.A1.Flex` en `eu-madrid-1` puede tardar días o semanas (`OUT_OF_CAPACITY`). El objetivo de producción sigue siendo **Oracle ARM 6 GB + Docker Compose monolítico**; hasta conseguirlo, estas opciones permiten **seguir desarrollando o exponer un piloto** sin coste recurrente.
+
+**GCP no ofrece un equivalente perpetuo a Oracle ARM 6 GB en Europa.** Las opciones Always Free de Google Cloud son más limitadas en RAM y, en Compute Engine, solo en regiones US.
+
+| Opción | Coste | ¿Stack KidepiK completo? | Notas |
+| --- | --- | --- | --- |
+| **Oracle ARM A1** (objetivo) | 0 € perpetuo | **Sí** — FastAPI + Postgres/pgvector en la misma VM | Stock irregular en MAD; script `retry_provision_loop.py` |
+| **Oracle AMD Micro** (`VM.Standard.E2.1.Micro`) | 0 € perpetuo | **Parcial** — solo API (~1 GB); BD externa | Suele haber más stock que ARM; misma cuenta OCI |
+| **GCP Compute Engine e2-micro** | 0 € perpetuo | **No** — 1 GB RAM | Solo `us-west1`, `us-central1`, `us-east1`; no EU free |
+| **GCP Cloud Run** | 0 € perpetuo (~2M req/mes) | **Parcial** — API en contenedor; BD aparte | Cold starts; peticiones LLM largas → vigilar timeout/memoria |
+| **GCP crédito $300 / 90 días** | Gratis al inicio | **Sí** (VM mayor en EU) | Puente temporal, no perpetuo |
+| **Cloud Run + Neon / Supabase** | 0 € con límites | **Parcial** — híbrido | Recomendado para URL pública de prueba sin VM |
+| **Docker Compose local** | 0 € | **Sí** (dev) | Ya es el entorno de desarrollo documentado en §10.4 |
+| **Render / Koyeb free** | 0 € | Parcial | Sleep tras inactividad → mala UX infantil (descartado) |
+| **Cloud SQL (GCP)** | De pago | — | No encaja en coste cero |
+
+##### Arquitecturas híbridas recomendadas (orden práctico)
+
+1. **Seguir en local** con Docker Compose (§10.4) y el bucle de reintento ARM en segundo plano.
+2. **Oracle AMD Micro + Postgres gestionado gratis** (misma cuenta OCI, región MAD):
+   - API en la micro; Postgres en **Supabase free** o **Neon free**.
+   - Documentado como Plan B en [OCI_ALWAYS_FREE_VALIDATION.md](../.cursor/operations/OCI_ALWAYS_FREE_VALIDATION.md).
+3. **GCP Cloud Run + Neon** (o Supabase) para piloto con URL HTTPS sin depender de stock Oracle:
+   - Mismo `Dockerfile` de FastAPI desplegado en Cloud Run.
+   - Auth opcional vía Supabase Auth (§10.8).
+4. **Crédito GCP $300** si hace falta demo con usuarios reales antes de tener ARM: VM `e2-small` o superior en `europe-west*` durante ~90 días.
+
+##### Trade-offs frente al monolito Oracle
+
+| Aspecto | Monolito ARM (objetivo) | Híbrido (API PaaS + BD gestionada) |
+| --- | --- | --- |
+| Latencia RAG | ~1 ms (API ↔ Postgres local) | Red entre servicios (ms–decenas ms) |
+| RAM disponible | 4–6 GB configurables | Límites por servicio (512 MB–1 GB típico en free) |
+| Cold start | No | Sí en Cloud Run / Render |
+| Sysadmin | Mayor (VM, firewall, backups) | Menor (PaaS + BD gestionada) |
+| Coste perpetuo | 0 € en bolsa Always Free | 0 € si se respetan cuotas free |
+
+##### Qué descartar para MVP a 0 €
+
+- **e2-micro con API + Postgres + pgvector en la misma máquina** — RAM insuficiente.
+- **Supabase Edge Functions como backend principal** — sin LangGraph/FastAPI robusto (ya descartado arriba).
+- **Solo esperar Oracle ARM** sin Plan B — bloquea piloto y validación con usuarios.
+
+##### Referencias operativas
+
+- Reintento ARM: `.cursor/mcp-oci/scripts/retry_provision_loop.py` (`--max-hours 24`, `--attempts-per-minute 2`).
+- Supervisor (relanza si el proceso muere): `.cursor/mcp-oci/scripts/retry_provision_supervisor.ps1`.
+- Validación OCI: `.cursor/operations/OCI_ALWAYS_FREE_VALIDATION.md`.
+
 
 **OpenRouter** como **único gateway** hacia varios proveedores free, con fallback y gestión de límites.
 

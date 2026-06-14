@@ -61,8 +61,9 @@ Validar que la cuenta **eduserna** (home region **MAD** / `eu-madrid-1`) puede a
 
 ### F5 — Reintento «Out of capacity»
 
-- Si OCI devuelve error de capacidad, registrar AD fallido y reintentar cada **60 s** (configurable) en bucle hasta **N** intentos o éxito.
-- Opcional: VM AMD Micro temporal solo para ejecutar el bucle en background (plan B del producto).
+- Si OCI devuelve error de capacidad, usar `.cursor/mcp-oci/scripts/retry_provision_loop.py` (backoff adaptativo, `--max-hours`, `--attempts-per-minute`).
+- Supervisor opcional: `retry_provision_supervisor.ps1` (relanza el proceso hasta el deadline).
+- Si el stock ARM no llega en días/semanas, aplicar **Plan B** (AMD Micro, Cloud Run + Neon, local): ver [docs/kidepik.md](../../docs/kidepik.md) §10.5.1 y [OCI_ALWAYS_FREE_VALIDATION.md](../operations/OCI_ALWAYS_FREE_VALIDATION.md).
 
 ## Errores
 

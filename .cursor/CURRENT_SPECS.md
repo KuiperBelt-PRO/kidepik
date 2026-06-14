@@ -11,7 +11,9 @@
 
 ## Infraestructura Oracle Cloud (en curso)
 
-Validación Always Free + MCP para agentes. **Estado: MCP implementado; venv con uv; smoke test OCI OK.**
+Validación Always Free + MCP para agentes. **Estado: MCP implementado; venv con uv; smoke test OCI OK; launch ARM pendiente (`OUT_OF_CAPACITY` en MAD).**
+
+**Plan B hosting (0 €):** [docs/kidepik.md](../docs/kidepik.md) §10.5.1 — Oracle AMD Micro, GCP Cloud Run + Neon/Supabase, local Docker; detalle operativo en [operations/OCI_ALWAYS_FREE_VALIDATION.md](operations/OCI_ALWAYS_FREE_VALIDATION.md) § Plan B.
 
 | Spec | Descripción |
 | --- | --- |

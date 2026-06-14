@@ -14,7 +14,9 @@ venv/
 node_modules/
 dist/
 build/
+*.log
 
+tmp/
 tmp/playwright-output/
 .playwright-mcp/
 test-results/

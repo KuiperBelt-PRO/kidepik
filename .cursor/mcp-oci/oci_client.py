@@ -36,6 +36,25 @@ def _is_out_of_capacity(exc: Exception) -> bool:
     return "out of host capacity" in text or "out of capacity" in text
 
 
+def _is_rate_limited(exc: Exception) -> bool:
+    text = str(exc).lower()
+    return "toomanyrequests" in text or "too many requests" in text
+
+
+def _is_retryable_launch_error(result: dict[str, Any]) -> bool:
+    code = result.get("error_code")
+    if code == "OUT_OF_CAPACITY":
+        return True
+    if code == "LAUNCH_FAILED":
+        err = (result.get("error") or "").lower()
+        return _is_rate_limited_text(err)
+    return False
+
+
+def _is_rate_limited_text(text: str) -> bool:
+    return "toomanyrequests" in text or "too many requests" in text
+
+
 class OciKidepikClient:
     def __init__(self, settings: OciSettings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -378,7 +397,7 @@ class OciKidepikClient:
             if result["ok"]:
                 result["data"]["attempts"] = attempts
                 return result
-            if result.get("error_code") != "OUT_OF_CAPACITY":
+            if not _is_retryable_launch_error(result):
                 result["data"] = {"attempts": attempts}
                 return result
             if attempt < max_attempts:

@@ -75,10 +75,50 @@ Esperado: `aarch64`, ~6 Gi memoria.
 
 ## Plan B — Sin stock ARM
 
-1. Crear AMD Micro (`VM.Standard.E2.1.Micro`) para script de reintento.
-2. O temporalmente: API en Oracle AMD + Postgres Supabase (ver `docs/kidepik.md` §10.5).
+Mientras `VM.Standard.A1.Flex` devuelva `OUT_OF_CAPACITY`, no bloquear el producto. Detalle ampliado en [docs/kidepik.md](../../docs/kidepik.md) §10.5.1.
 
-## Seguridad
+### B1 — Oracle AMD Micro (misma cuenta, EU)
+
+1. Crear `VM.Standard.E2.1.Micro` en `eu-madrid-1` (suele haber más stock que ARM).
+2. Desplegar **solo FastAPI** (sin Postgres en la VM).
+3. Postgres en **Supabase free** o **Neon free** (pgvector: comprobar límites del tier free).
+
+### B2 — GCP Cloud Run + BD gestionada
+
+1. Desplegar contenedor FastAPI en **Cloud Run** (Always Free ~2M req/mes).
+2. Postgres en Neon o Supabase.
+3. Vigilar cold starts y timeout en narrativas largas (LangGraph).
+
+### B3 — GCP e2-micro (solo US, 1 GB)
+
+- Always Free en `us-west1`, `us-central1`, `us-east1`.
+- **No** albergar API + Postgres juntos; como mínimo BD externa.
+- Latencia desde España mayor que MAD.
+
+### B4 — Puente temporal: crédito GCP $300 (90 días)
+
+- VM mayor en `europe-west*` con Docker Compose completo hasta conseguir ARM Oracle.
+
+### B5 — Desarrollo local
+
+- Docker Compose en el PC (§10.4 de `docs/kidepik.md`) + bucle de reintento ARM en paralelo.
+
+### Scripts de reintento ARM (objetivo final)
+
+```powershell
+cd kidepik
+$env:KIDEPIK_REPO = (Get-Location).Path
+.cursor\.venv-mcp\Scripts\python.exe -u .cursor\mcp-oci\scripts\retry_provision_loop.py --max-hours 24 --attempts-per-minute 2
+```
+
+Supervisor (relanza el proceso si termina antes del deadline):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .cursor\mcp-oci\scripts\retry_provision_supervisor.ps1 -MaxHours 24
+```
+
+Log sugerido: `tmp/oci-provision/retry-provision.log` (gitignored).
+
 
 - No commitear `.secrets/`.
 - Rotar API key si se expone.
