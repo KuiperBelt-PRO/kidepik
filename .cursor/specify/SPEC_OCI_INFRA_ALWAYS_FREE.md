@@ -63,9 +63,9 @@ El **MVP de producción** (junio 2026) sigue el [SPEC_HOSTING_FREE_TIER_STACK.md
 
 ### F5 — Reintento «Out of capacity»
 
-- Si OCI devuelve error de capacidad, usar `.cursor/mcp-oci/scripts/retry_provision_loop.py` (backoff adaptativo, `--max-hours`, `--attempts-per-minute`).
-- Supervisor opcional: `retry_provision_supervisor.ps1` (relanza el proceso hasta el deadline).
-- Si el stock ARM no llega en días/semanas, el MVP usa **SPEC_HOSTING_FREE_TIER_STACK** (Supabase + R2 + Cloud Run u Oracle Micro). Seguir bucle ARM en paralelo.
+- ARM: `.cursor/mcp-oci/scripts/retry_provision_loop.py --profile arm`
+- Micro (backend): `provision_micro.py` o `retry_provision_loop.py --profile micro`
+- Supervisor opcional: `retry_provision_supervisor.ps1 -Profile arm|micro`
 
 ## Errores
 
@@ -87,8 +87,10 @@ El **MVP de producción** (junio 2026) sigue el [SPEC_HOSTING_FREE_TIER_STACK.md
 
 | Parámetro | Valor |
 | --- | --- |
-| Display name VM | `kidepik-mvp` |
-| Shape | `VM.Standard.A1.Flex` |
+| Display name VM ARM | `kidepik-mvp` |
+| Display name VM Micro (backend) | `kidepik-api-micro` |
+| Shape ARM | `VM.Standard.A1.Flex` |
+| Shape Micro | `VM.Standard.E2.1.Micro` |
 | OCPU / RAM | 1 / 6 GB |
 | Región | `eu-madrid-1` |
 | VCN CIDR | `10.0.0.0/16` |

@@ -14,7 +14,20 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from oci_client import OciKidepikClient
+from oci_client import INSTANCE_NAME, MICRO_INSTANCE_NAME, OciKidepikClient
+
+_PROFILES = {
+    "arm": {
+        "default_display_name": INSTANCE_NAME,
+        "capacity_label": "sin capacidad ARM",
+        "launch": lambda client: client.launch_arm_instance,
+    },
+    "micro": {
+        "default_display_name": MICRO_INSTANCE_NAME,
+        "capacity_label": "sin capacidad Micro",
+        "launch": lambda client: client.launch_micro_instance,
+    },
+}
 
 _FATAL_CODES = frozenset({"SSH_KEY_MISSING", "AUTH_FAILED"})
 
@@ -32,7 +45,7 @@ _TRANSIENT_MARKERS = (
 )
 
 _KIND_LABEL = {
-    "capacity": "sin capacidad ARM",
+    "capacity": "sin capacidad",
     "rate_limit": "rate limit OCI",
     "network": "error de red transitorio",
     "other": "error transitorio",
@@ -186,7 +199,13 @@ def _ensure_ready(client: OciKidepikClient, state: BackoffState, args: argparse.
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Reintenta launch ARM hasta hueco OCI")
+    parser = argparse.ArgumentParser(description="Reintenta launch OCI hasta hueco (ARM o Micro)")
+    parser.add_argument(
+        "--profile",
+        choices=tuple(_PROFILES),
+        default="arm",
+        help="Perfil de instancia: arm (A1 Flex 6GB) o micro (E2.1 Micro backend)",
+    )
     parser.add_argument(
         "--capacity-interval",
         type=float,
@@ -229,7 +248,7 @@ def main() -> int:
         default=24.0,
         help="Horas máximas de reintentos (0 = sin límite, default: 24)",
     )
-    parser.add_argument("--display-name", default="kidepik-mvp")
+    parser.add_argument("--display-name", default="")
     parser.add_argument(
         "--stats-every",
         type=int,
@@ -240,13 +259,19 @@ def main() -> int:
     if args.attempts_per_minute > 0:
         args.capacity_interval = 60.0 / args.attempts_per_minute
 
+    profile = _PROFILES[args.profile]
+    display_name = args.display_name or profile["default_display_name"]
+    _KIND_LABEL["capacity"] = profile["capacity_label"]
+
     client = OciKidepikClient()
+    launch_fn = profile["launch"](client)
     state = BackoffState()
     attempt = 0
 
     limit_msg = f"{args.max_hours}h" if args.max_hours > 0 else "sin límite"
     print(
-        f"[{_ts()}] Estrategia: capacity={args.capacity_interval}s, "
+        f"[{_ts()}] Perfil={args.profile} display_name={display_name} — "
+        f"capacity={args.capacity_interval}s, "
         f"rate_limit={args.rate_limit_interval}s (x2), "
         f"network={args.network_interval}s, other={args.other_interval}s, "
         f"max_backoff={args.max_backoff}s, duración={limit_msg}",
@@ -267,7 +292,7 @@ def main() -> int:
 
         attempt += 1
         print(f"\n[{_ts()}] === intento {attempt} ===", flush=True)
-        result = _call_step(client.launch_arm_instance, display_name=args.display_name)
+        result = _call_step(launch_fn, display_name=display_name)
         if result.get("ok"):
             print(json.dumps(result, indent=2, ensure_ascii=False), flush=True)
         else:
@@ -276,7 +301,7 @@ def main() -> int:
             print(f'{{"ok": false, "error_code": "{code}", "error": "{err}…"}}', flush=True)
 
         if result.get("ok"):
-            inst = _call_step(client.instance_get, display_name=args.display_name)
+            inst = _call_step(client.instance_get, display_name=display_name)
             if not inst.get("ok"):
                 print(f"[{_ts()}] Launch OK pero instance_get pendiente: {inst.get('error')}", flush=True)
             else:

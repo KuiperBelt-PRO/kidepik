@@ -14,10 +14,13 @@ VCN_NAME = "kidepik-vcn"
 SUBNET_NAME = "kidepik-subnet-public"
 IGW_NAME = "kidepik-igw"
 INSTANCE_NAME = "kidepik-mvp"
+MICRO_INSTANCE_NAME = "kidepik-api-micro"
 VCN_CIDR = "10.0.0.0/16"
 SUBNET_CIDR = "10.0.1.0/24"
 ARM_SHAPE = "VM.Standard.A1.Flex"
+MICRO_SHAPE = "VM.Standard.E2.1.Micro"
 BOOT_VOLUME_GB = 50
+MICRO_BOOT_VOLUME_GB = 47
 
 
 def _ok(data: Any) -> dict[str, Any]:
@@ -238,21 +241,29 @@ class OciKidepikClient:
         except Exception as exc:
             return _err(str(exc), code="NETWORK_FAILED")
 
-    def _find_arm_ubuntu_image(self) -> str:
-        images = self.compute.list_images(
-            compartment_id=self.compartment_id,
-            operating_system="Canonical Ubuntu",
-            operating_system_version="24.04",
-            shape=ARM_SHAPE,
-            sort_by="TIMECREATED",
-            sort_order="DESC",
-        ).data
-        for image in images:
-            if image.lifecycle_state == "AVAILABLE":
-                return image.id
+    def _find_ubuntu_image(self, *, shape: str, versions: tuple[str, ...]) -> str:
+        for version in versions:
+            images = self.compute.list_images(
+                compartment_id=self.compartment_id,
+                operating_system="Canonical Ubuntu",
+                operating_system_version=version,
+                shape=shape,
+                sort_by="TIMECREATED",
+                sort_order="DESC",
+            ).data
+            for image in images:
+                if image.lifecycle_state == "AVAILABLE":
+                    return image.id
+        versions_label = ", ".join(versions)
         raise RuntimeError(
-            "No se encontró imagen Ubuntu 24.04 para VM.Standard.A1.Flex en este compartment"
+            f"No se encontró imagen Ubuntu ({versions_label}) para {shape} en este compartment"
         )
+
+    def _find_arm_ubuntu_image(self) -> str:
+        return self._find_ubuntu_image(shape=ARM_SHAPE, versions=("24.04",))
+
+    def _find_amd_ubuntu_image(self) -> str:
+        return self._find_ubuntu_image(shape=MICRO_SHAPE, versions=("24.04", "22.04"))
 
     def _get_running_instance(self, display_name: str) -> Any | None:
         instances = self.compute.list_instances(compartment_id=self.compartment_id).data
@@ -299,12 +310,16 @@ class OciKidepikClient:
         except Exception as exc:
             return _err(str(exc), code="INSTANCE_GET_FAILED")
 
-    def launch_arm_instance(
+    def _launch_compute_instance(
         self,
-        display_name: str = INSTANCE_NAME,
-        ocpus: float = 1.0,
-        memory_gb: float = 6.0,
-        availability_domain: str = "",
+        *,
+        display_name: str,
+        shape: str,
+        image_id: str,
+        boot_volume_gb: int,
+        availability_domain: str,
+        shape_config: oci.core.models.LaunchInstanceShapeConfigDetails | None = None,
+        env_tag: str = "validation",
     ) -> dict[str, Any]:
         existing = self._get_running_instance(display_name)
         if existing is not None:
@@ -324,36 +339,32 @@ class OciKidepikClient:
         ssh_key = self.settings.ssh_public_key_file.read_text(encoding="utf-8").strip()
 
         try:
-            image_id = self._find_arm_ubuntu_image()
             ads = self.identity.list_availability_domains(self.compartment_id).data
             ad_names = [availability_domain] if availability_domain else [ad.name for ad in ads]
             last_error: Exception | None = None
 
             for ad_name in ad_names:
                 try:
-                    instance = self.compute.launch_instance(
-                        oci.core.models.LaunchInstanceDetails(
-                            availability_domain=ad_name,
-                            compartment_id=self.compartment_id,
-                            display_name=display_name,
-                            shape=ARM_SHAPE,
-                            shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(
-                                ocpus=ocpus,
-                                memory_in_gbs=memory_gb,
-                            ),
-                            source_details=oci.core.models.InstanceSourceViaImageDetails(
-                                image_id=image_id,
-                                boot_volume_size_in_gbs=BOOT_VOLUME_GB,
-                            ),
-                            create_vnic_details=oci.core.models.CreateVnicDetails(
-                                subnet_id=subnet_id,
-                                assign_public_ip=True,
-                                display_name=f"{display_name}-vnic",
-                            ),
-                            metadata={"ssh_authorized_keys": ssh_key},
-                            freeform_tags={"project": "kidepik", "env": "validation"},
-                        )
-                    ).data
+                    details = oci.core.models.LaunchInstanceDetails(
+                        availability_domain=ad_name,
+                        compartment_id=self.compartment_id,
+                        display_name=display_name,
+                        shape=shape,
+                        source_details=oci.core.models.InstanceSourceViaImageDetails(
+                            image_id=image_id,
+                            boot_volume_size_in_gbs=boot_volume_gb,
+                        ),
+                        create_vnic_details=oci.core.models.CreateVnicDetails(
+                            subnet_id=subnet_id,
+                            assign_public_ip=True,
+                            display_name=f"{display_name}-vnic",
+                        ),
+                        metadata={"ssh_authorized_keys": ssh_key},
+                        freeform_tags={"project": "kidepik", "env": env_tag},
+                    )
+                    if shape_config is not None:
+                        details.shape_config = shape_config
+                    instance = self.compute.launch_instance(details).data
                     return _ok(
                         {
                             "id": instance.id,
@@ -361,6 +372,7 @@ class OciKidepikClient:
                             "lifecycle_state": instance.lifecycle_state,
                             "availability_domain": ad_name,
                             "image_id": image_id,
+                            "shape": shape,
                         }
                     )
                 except ServiceError as exc:
@@ -374,8 +386,9 @@ class OciKidepikClient:
                         continue
                     return _err(str(exc), code="LAUNCH_FAILED", ad=ad_name)
 
+            shape_label = shape.split(".")[-1]
             return _err(
-                str(last_error or "Sin capacidad ARM en ningún AD"),
+                str(last_error or f"Sin capacidad {shape_label} en ningún AD"),
                 code="OUT_OF_CAPACITY",
                 ads_tried=ad_names,
             )
@@ -384,15 +397,65 @@ class OciKidepikClient:
                 return _err(str(exc), code="OUT_OF_CAPACITY")
             return _err(str(exc), code="LAUNCH_FAILED")
 
-    def retry_launch_arm(
+    def launch_arm_instance(
         self,
-        max_attempts: int = 5,
-        interval_seconds: int = 60,
         display_name: str = INSTANCE_NAME,
+        ocpus: float = 1.0,
+        memory_gb: float = 6.0,
+        availability_domain: str = "",
+    ) -> dict[str, Any]:
+        try:
+            image_id = self._find_arm_ubuntu_image()
+            return self._launch_compute_instance(
+                display_name=display_name,
+                shape=ARM_SHAPE,
+                image_id=image_id,
+                boot_volume_gb=BOOT_VOLUME_GB,
+                availability_domain=availability_domain,
+                shape_config=oci.core.models.LaunchInstanceShapeConfigDetails(
+                    ocpus=ocpus,
+                    memory_in_gbs=memory_gb,
+                ),
+                env_tag="validation",
+            )
+        except Exception as exc:
+            if _is_out_of_capacity(exc):
+                return _err(str(exc), code="OUT_OF_CAPACITY")
+            return _err(str(exc), code="LAUNCH_FAILED")
+
+    def launch_micro_instance(
+        self,
+        display_name: str = MICRO_INSTANCE_NAME,
+        availability_domain: str = "",
+    ) -> dict[str, Any]:
+        """Lanza VM AMD Always Free (VM.Standard.E2.1.Micro) para backend FastAPI."""
+        try:
+            image_id = self._find_amd_ubuntu_image()
+            return self._launch_compute_instance(
+                display_name=display_name,
+                shape=MICRO_SHAPE,
+                image_id=image_id,
+                boot_volume_gb=MICRO_BOOT_VOLUME_GB,
+                availability_domain=availability_domain,
+                env_tag="mvp-api",
+            )
+        except Exception as exc:
+            if _is_out_of_capacity(exc):
+                return _err(str(exc), code="OUT_OF_CAPACITY")
+            return _err(str(exc), code="LAUNCH_FAILED")
+
+    def _retry_launch(
+        self,
+        launch_fn: Any,
+        *,
+        max_attempts: int,
+        interval_seconds: int,
+        display_name: str,
+        profile_label: str,
     ) -> dict[str, Any]:
         attempts: list[dict[str, Any]] = []
         for attempt in range(1, max_attempts + 1):
-            result = self.launch_arm_instance(display_name=display_name)
+            result = launch_fn(display_name=display_name)
             attempts.append({"attempt": attempt, "ok": result["ok"], "error": result.get("error")})
             if result["ok"]:
                 result["data"]["attempts"] = attempts
@@ -403,7 +466,35 @@ class OciKidepikClient:
             if attempt < max_attempts:
                 time.sleep(interval_seconds)
         return _err(
-            f"Sin capacidad ARM tras {max_attempts} intentos",
+            f"Sin capacidad {profile_label} tras {max_attempts} intentos",
             code="OUT_OF_CAPACITY",
             attempts=attempts,
+        )
+
+    def retry_launch_arm(
+        self,
+        max_attempts: int = 5,
+        interval_seconds: int = 60,
+        display_name: str = INSTANCE_NAME,
+    ) -> dict[str, Any]:
+        return self._retry_launch(
+            self.launch_arm_instance,
+            max_attempts=max_attempts,
+            interval_seconds=interval_seconds,
+            display_name=display_name,
+            profile_label="ARM",
+        )
+
+    def retry_launch_micro(
+        self,
+        max_attempts: int = 5,
+        interval_seconds: int = 60,
+        display_name: str = MICRO_INSTANCE_NAME,
+    ) -> dict[str, Any]:
+        return self._retry_launch(
+            self.launch_micro_instance,
+            max_attempts=max_attempts,
+            interval_seconds=interval_seconds,
+            display_name=display_name,
+            profile_label="Micro",
         )

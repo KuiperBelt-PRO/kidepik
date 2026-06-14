@@ -102,21 +102,54 @@ Arquitectura fija: **Supabase** (Postgres + Auth) + **Cloudflare R2** (media) + 
 
 Detalle: [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
+### Oracle AMD Micro (backend FastAPI)
+
+Shape `VM.Standard.E2.1.Micro`, display name `kidepik-api-micro`. Reutiliza la VCN/subnet ya creada.
+
+**Un intento:**
+
+```powershell
+cd kidepik
+$env:KIDEPIK_REPO = (Get-Location).Path
+.cursor\.venv-mcp\Scripts\python.exe -u .cursor\mcp-oci\scripts\provision_micro.py
+```
+
+**Bucle con reintentos** (recomendado si hay `OUT_OF_CAPACITY`):
+
+```powershell
+cd kidepik
+$env:KIDEPIK_REPO = (Get-Location).Path
+.cursor\.venv-mcp\Scripts\python.exe -u .cursor\mcp-oci\scripts\retry_provision_loop.py --profile micro --max-hours 24 --attempts-per-minute 2
+```
+
+Supervisor Micro:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .cursor\mcp-oci\scripts\retry_provision_supervisor.ps1 -Profile micro -MaxHours 24
+```
+
+Validación SSH (esperado `x86_64`, ~1 GiB RAM):
+
+```powershell
+ssh -i $env:USERPROFILE\.ssh\kidepik_oci ubuntu@<IP_PUBLICA> "uname -m; free -h; df -h"
+```
+
 ### Scripts reintento ARM (paralelo al MVP)
 
 ```powershell
 cd kidepik
 $env:KIDEPIK_REPO = (Get-Location).Path
-.cursor\.venv-mcp\Scripts\python.exe -u .cursor\mcp-oci\scripts\retry_provision_loop.py --max-hours 24 --attempts-per-minute 2
+.cursor\.venv-mcp\Scripts\python.exe -u .cursor\mcp-oci\scripts\retry_provision_loop.py --profile arm --max-hours 24 --attempts-per-minute 2
 ```
 
 Supervisor:
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .cursor\mcp-oci\scripts\retry_provision_supervisor.ps1 -MaxHours 24
+powershell -NoProfile -ExecutionPolicy Bypass -File .cursor\mcp-oci\scripts\retry_provision_supervisor.ps1 -Profile arm -MaxHours 24
 ```
 
-Log: `tmp/oci-provision/retry-provision.log` (gitignored).
+Log ARM: `tmp/oci-provision/retry-provision-arm.log` (gitignored).  
+Log Micro: `tmp/oci-provision/retry-provision-micro.log`.
 
 ## Seguridad
 

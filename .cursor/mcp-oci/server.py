@@ -92,6 +92,32 @@ def oci_retry_launch_arm(
 
 
 @mcp.tool
+def oci_launch_micro_instance(
+    display_name: str = "kidepik-api-micro",
+    availability_domain: str = "",
+) -> dict[str, Any]:
+    """Lanza VM AMD Always Free (VM.Standard.E2.1.Micro) para backend FastAPI. Idempotente."""
+    return _client().launch_micro_instance(
+        display_name=display_name,
+        availability_domain=availability_domain,
+    )
+
+
+@mcp.tool
+def oci_retry_launch_micro(
+    max_attempts: int = 5,
+    interval_seconds: int = 60,
+    display_name: str = "kidepik-api-micro",
+) -> dict[str, Any]:
+    """Reintenta lanzamiento Micro ante Out of capacity."""
+    return _client().retry_launch_micro(
+        max_attempts=max_attempts,
+        interval_seconds=interval_seconds,
+        display_name=display_name,
+    )
+
+
+@mcp.tool
 def oci_instance_get(display_name: str = "kidepik-mvp", instance_id: str = "") -> dict[str, Any]:
     """Estado e IP pública de una instancia por nombre o OCID."""
     return _client().instance_get(display_name=display_name, instance_id=instance_id)

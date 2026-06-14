@@ -18,8 +18,9 @@ Usar cuando el usuario pida aprovisionar, validar o operar infraestructura **Ora
 
 1. `oci_status` — debe devolver `ok: true`.
 2. `oci_network_ensure` — VCN `kidepik-vcn`.
-3. `oci_launch_arm_instance` o `oci_retry_launch_arm` si Out of capacity.
-4. `oci_instance_get` — IP y estado.
+3. `oci_launch_arm_instance` / `oci_retry_launch_arm` — north star ARM.
+4. `oci_launch_micro_instance` / `oci_retry_launch_micro` — backend MVP FastAPI.
+5. `oci_instance_get` — IP y estado.
 5. Documentar en `operations/OCI_ALWAYS_FREE_VALIDATION.md` § Resultado.
 
 ## Reglas
@@ -27,7 +28,8 @@ Usar cuando el usuario pida aprovisionar, validar o operar infraestructura **Ora
 - **No** commitear `.secrets/`; plantillas en `.secrets.sample/` sí se versionan.
 - **No** terminar instancias ni volúmenes sin confirmación explícita del usuario.
 - Región fija: `eu-madrid-1` (home MAD).
-- Shape MVP: `VM.Standard.A1.Flex` 1 OCPU, 6 GB RAM, display name `kidepik-mvp`.
+- Shape north star: `VM.Standard.A1.Flex` 1 OCPU, 6 GB RAM, display name `kidepik-mvp`.
+- Shape backend MVP: `VM.Standard.E2.1.Micro`, display name `kidepik-api-micro`.
 - Tras cambios de infra, actualizar spec/operations si el comportamiento real difiere.
 
 ## Referencias
