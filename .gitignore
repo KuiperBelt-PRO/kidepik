@@ -9,6 +9,7 @@
 __pycache__/
 *.py[cod]
 .venv/
+.cursor/.venv-mcp/
 venv/
 node_modules/
 dist/

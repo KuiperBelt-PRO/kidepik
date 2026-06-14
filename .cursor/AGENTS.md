@@ -27,5 +27,7 @@ Guía operativa para agentes en `kidepik`.
 | [plan/PROJECT_OVERVIEW.md](plan/PROJECT_OVERVIEW.md) | Contexto del repo, stack y URLs locales. |
 | [specify/README.md](specify/README.md) | Convención para nuevas especificaciones. |
 | [operations/README.md](operations/README.md) | Convención para flujos operativos reproducibles. |
+| [operations/OCI_ALWAYS_FREE_VALIDATION.md](operations/OCI_ALWAYS_FREE_VALIDATION.md) | Validación Oracle Always Free (VM ARM). |
+| [skills/oci-mcp-ops/SKILL.md](skills/oci-mcp-ops/SKILL.md) | MCP `oci-kidepik` y aprovisionamiento OCI. |
 
 Convenciones del repo (`README.md`, dependencias, CI) viven fuera de `.cursor/`; este fichero centra la navegación **dentro** de `.cursor/`.

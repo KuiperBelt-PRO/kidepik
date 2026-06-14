@@ -1,0 +1,16 @@
+---
+description: Infra Oracle Cloud Always Free y MCP oci-kidepik en este repo.
+globs:
+  - .cursor/mcp-oci/**
+  - .cursor/specify/SPEC_OCI*.md
+  - .cursor/operations/OCI*.md
+  - infra/**
+---
+
+# Oracle Cloud (KidepiK)
+
+- Secretos solo en `kidepik/.secrets/` (gitignored). Plantillas versionadas: `kidepik/.secrets.sample/`.
+- Specs: `.cursor/specify/SPEC_OCI_*.md`. Operativa: `.cursor/operations/OCI_ALWAYS_FREE_VALIDATION.md`.
+- Para aprovisionar o validar VMs ARM Always Free, leer y aplicar `.cursor/skills/oci-mcp-ops/SKILL.md`.
+- Usar MCP `oci-kidepik` cuando esté configurado; región home `eu-madrid-1` (MAD).
+- No destruir recursos OCI sin confirmación explícita del usuario.
