@@ -1,0 +1,26 @@
+{
+  "name": "kidepik-mobile-poc",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start --host lan",
+    "start:lan": "expo start --host lan",
+    "qr": "node scripts/generate-qr.mjs",
+    "android": "expo start --android",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "expo": "~54.0.35",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-url-polyfill": "^2.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.17",
+    "qrcode": "^1.5.4",
+    "typescript": "~5.9.3"
+  }
+}

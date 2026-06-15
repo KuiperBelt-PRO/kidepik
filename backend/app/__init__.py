@@ -1,0 +1,1 @@
+"""KidepiK FastAPI application package."""

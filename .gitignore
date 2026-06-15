@@ -1,21 +1,42 @@
 # CodeGraph: índice local por máquina (SQLite en .codegraph/)
 .codegraph/
 
+# Secretos y env local
 .env
 .secrets/
 .env.*
 !.env.sample
+!.env.poc.sample
+.env.poc
+mobile/.env
 
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .venv/
+backend/.venv/
 .cursor/.venv-mcp/
 venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Node / Expo
 node_modules/
+.expo/
+mobile/.expo/
 dist/
 build/
 *.log
 
+# Supabase CLI (estado local; versionar config.toml + migrations/)
+supabase/.branches/
+supabase/.temp/
+
+# Playwright / artefactos temporales POC
 tmp/
 tmp/playwright-output/
 .playwright-mcp/

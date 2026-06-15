@@ -448,6 +448,8 @@ Spec detallada: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/spe
 
 Mismo `Dockerfile` para ambos destinos.
 
+**POC local (jun 2026):** stack validado en desarrollo con Docker Compose (FastAPI + MinIO) + Supabase CLI + app Expo Go. Guía: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md); spec: [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
+
 #### 10.5.2 Neon vs Supabase
 
 Metáfora: **Neon = solo el motor** (Postgres serverless); **Supabase = el coche entero** (DB + Auth + Storage + APIs REST/GraphQL).

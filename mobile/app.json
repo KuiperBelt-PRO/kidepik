@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "KidepiK POC",
+    "slug": "kidepik-poc",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "kidepik",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.kuiperbelt.kidepik.poc",
+      "usesCleartextTraffic": true
+    },
+    "plugins": []
+  }
+}
