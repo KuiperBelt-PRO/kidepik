@@ -24,6 +24,9 @@ Copy-Item .secrets.sample\oci.config.sample .secrets\oci.config
 | --- | --- |
 | `oci.env.sample` | `oci.env` |
 | `oci.config.sample` | `oci.config` |
+| `gcp.env.sample` | `gcp.env` |
+| `gcp-oauth-client.json` | Copiar JSON OAuth desde consola GCP (no versionar) |
+| `gcp-oauth.env` | Variables `GCP_OAUTH_CLIENT_ID` / `SECRET` (generar desde JSON) |
 | `ssh/README.md` | `ssh/kidepik_oci` + `kidepik_oci.pub` |
 
 ## ¿Y `~/.oci` o `~/.ssh`?

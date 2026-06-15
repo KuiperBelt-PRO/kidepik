@@ -102,6 +102,10 @@ Arquitectura fija: **Supabase** (Postgres + Auth) + **Cloudflare R2** (media) + 
 
 Detalle: [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
+### GCP Cloud Run MCP
+
+Ver [GCP_CLOUD_RUN_MCP.md](GCP_CLOUD_RUN_MCP.md) — OAuth client Cursor, `roles/mcp.toolUser`, APIs y `gcp-cloudrun-kidepik` en `mcp.json`.
+
 ### Oracle AMD Micro (backend FastAPI)
 
 Shape `VM.Standard.E2.1.Micro`, display name `kidepik-api-micro`. Reutiliza la VCN/subnet ya creada.

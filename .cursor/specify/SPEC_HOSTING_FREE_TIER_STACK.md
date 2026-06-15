@@ -13,7 +13,7 @@ Mientras no haya VM ARM Oracle disponible, el **MVP en producción** usa servici
 | **Autenticación** | **Supabase Auth** | Login email / Google / Apple; JWT hacia FastAPI |
 | **Almacenamiento** | **Cloudflare R2** | Avatares, audios, PDFs — **no** Supabase Storage |
 | **Backend** | **FastAPI + LangGraph** en contenedor | Agentes IA, orquestación, validación JWT |
-| **Compute backend** | **GCP Cloud Run** *o* **Oracle AMD Micro** | **Pendiente de elegir** (ver §Backend) |
+| **Compute backend** | **GCP Cloud Run** (`kidepik`, `europe-west1`) | Oracle AMD Micro como respaldo si hace falta |
 
 **North Star** (sin cambiar): monolito Oracle ARM 1 OCPU / 6 GB con Postgres local en Docker cuando haya stock. El stack free-tier es **paralelo**, no sustituto definitivo del diseño §10.4 producción ARM.
 
