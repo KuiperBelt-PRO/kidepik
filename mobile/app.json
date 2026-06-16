@@ -10,6 +10,8 @@
       "package": "com.kuiperbelt.kidepik.poc",
       "usesCleartextTraffic": true
     },
-    "plugins": []
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

@@ -9,6 +9,7 @@
 
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
 - **POC local arquitectura (validada jun 2026):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md) — FastAPI + Supabase local + MinIO (R2) + Expo Go (SDK 54). Guía: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md).
+- **Sistema visual app móvil (aprobada jun 2026):** [specify/SPEC_APP_VISUAL_DESIGN.md](specify/SPEC_APP_VISUAL_DESIGN.md) — design system dual fantasy/space opera, loader y galería de mockups.
 
 ## Infraestructura Oracle Cloud (en curso)
 

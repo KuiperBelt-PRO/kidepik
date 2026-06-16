@@ -15,7 +15,7 @@ function Get-LanIPv4 {
         Select-Object -First 1 -ExpandProperty IPAddress
 
     if (-not $ip) {
-        throw "No se detectó IP LAN. Conecta el PC a Wi‑Fi/Ethernet."
+        throw "No se detecto IP LAN. Conecta el PC a Wi-Fi/Ethernet."
     }
     return $ip
 }
@@ -30,7 +30,7 @@ function Invoke-Supabase {
     }
 }
 
-Write-Host "==> KidepiK POC — Expo Go" -ForegroundColor Cyan
+Write-Host "==> KidepiK POC - Expo Go" -ForegroundColor Cyan
 
 $lanIp = Get-LanIPv4
 Write-Host "IP LAN detectada: $lanIp" -ForegroundColor Green
@@ -84,7 +84,7 @@ if (Get-Command docker -ErrorAction SilentlyContinue) {
 
 Write-Host ""
 Write-Host "==> Pasos" -ForegroundColor Cyan
-Write-Host "  1. Móvil y PC en la misma Wi‑Fi"
+Write-Host "  1. Movil y PC en la misma Wi-Fi"
 Write-Host "  2. Instala Expo Go: https://expo.dev/go"
 Write-Host "  3. Comprueba desde el móvil (navegador): http://${lanIp}:8080/health"
 Write-Host "  4. Escanea el QR que aparecerá abajo"
@@ -100,6 +100,7 @@ Get-NetTCPConnection -LocalPort 8081 -ErrorAction SilentlyContinue |
 Remove-Item Env:CI -ErrorAction SilentlyContinue
 $env:REACT_NATIVE_PACKAGER_HOSTNAME = $lanIp
 $env:EXPO_DEVTOOLS_LISTEN_ADDRESS = "0.0.0.0"
+$env:EXPO_OFFLINE = "1"
 
 Set-Location (Join-Path $Root "mobile")
 if (-not (Test-Path "node_modules")) {
@@ -125,4 +126,4 @@ Write-Host "Escanea el PNG abierto (tmp/expo-go-qr.png) o el QR ASCII en esta te
 Write-Host "URL manual Expo Go: $expUrl" -ForegroundColor DarkGray
 Write-Host ""
 
-pnpm start --host lan
+pnpm start

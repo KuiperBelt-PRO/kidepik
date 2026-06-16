@@ -9,5 +9,6 @@ Las **reglas generales** del workspace (Playwright, Engram, Context7, eficiencia
 | [repo-bootstrap.mdc](../.cursor/rules/repo-bootstrap.mdc) | Reglas base del repositorio `kidepik` | `alwaysApply: true` |
 | [agent-skill-routing.mdc](../.cursor/rules/agent-skill-routing.mdc) | Enrutamiento a skills locales | `alwaysApply: true` |
 | [cursor-browser-mcp-testing.mdc](../.cursor/rules/cursor-browser-mcp-testing.mdc) | Pruebas UI vía MCP browser (wrapper del hub) | `alwaysApply: true` |
+| [expo-go-mobile-preview.mdc](../.cursor/rules/expo-go-mobile-preview.mdc) | Preparar Metro + QR para Expo Go en móvil físico | `globs: mobile/**` |
 
 Consulta [AGENTS.md](./AGENTS.md) para el contexto general del proyecto.

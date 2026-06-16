@@ -45,10 +45,10 @@ El aprendizaje no se presenta como temario escolar, sino como **retos cortos** i
 | Aspecto | Detalle |
 | --- | --- |
 | **Fonética** | Evoca *Kid Epic* (niño épico) y la raíz *Epi-* (epifanía, descubrimiento). |
-| **Ambigrama** | Casi palindrómico; al rotar 180° la **d** y la **p** se intercambian visualmente. |
-| **Logo** | La *d* y la *p* pueden ser los **ojos del avatar**; al girar el móvil el monstruito puede cambiar expresión (*post-MVP*). |
+| **Logo** | Wordmark tipográfico **KidepiK**; limpio y legible; sin gimmicks animados en el nombre. |
 | **Idiomas** | Pronunciable y memorable en español e inglés sin traducción. |
 | **Ambientación** | Agnóstico: sirve para fantasía, space opera o multiverso. |
+| **Sistema visual** | Spec: [.cursor/specify/SPEC_APP_VISUAL_DESIGN.md](../.cursor/specify/SPEC_APP_VISUAL_DESIGN.md) — temas dual fantasy / space opera. |
 
 ---
 
