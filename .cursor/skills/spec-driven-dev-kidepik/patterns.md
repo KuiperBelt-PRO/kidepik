@@ -1,29 +1,31 @@
-# Patrones Python para SDD + TDD
+# Patrones Python para SDD + TDD (kidepik)
 
-Referencia auxiliar con patrones concretos para pytest, estructura de archivos, fixtures, mocks y specs como tipo. El agente carga este archivo solo cuando necesita profundizar durante la implementación.
+Complemento local de [SKILL.md](SKILL.md). El **método** (fases, TDD, reglas) vive en `Vibe-Coding/.cursor/skills/spec-driven-dev/SKILL.md`; aquí solo convenciones y ejemplos acotados a **kidepik**.
+
+Patrones Python genéricos adicionales: `Vibe-Coding/.cursor/skills/python-engineering/patterns.md`.
 
 ---
 
 ## Estructura de archivos
 
-Seguir la convención del proyecto. Si no existe, usar esta estructura por defecto:
+Convención actual del backend POC:
 
 ```
-src/
-  modulo/
+backend/
+  app/
     __init__.py
-    core.py           # lógica de negocio
-    models.py         # dataclasses / pydantic models (spec como tipo)
-    exceptions.py     # excepciones del dominio
-tests/
-  test_modulo/
-    __init__.py
-    conftest.py       # fixtures compartidas del módulo
-    test_core.py      # tests de lógica
-    test_models.py    # tests de validación de modelos
+    main.py           # FastAPI app
+    routes/           # routers por dominio
+    config.py         # pydantic-settings
+    auth.py
+    storage.py
+  tests/
+    test_health.py
+    test_*.py         # un fichero por área o router
+  pyproject.toml
 ```
 
-Si el proyecto usa `tests/` plano (sin subdirectorios), mantener esa convención.
+Nuevos módulos de dominio: bajo `backend/app/`; tests espejo en `backend/tests/`. No introducir `src/` salvo refactor acordado.
 
 ---
 
