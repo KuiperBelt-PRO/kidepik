@@ -2,14 +2,14 @@
 
 ## Cuándo usar
 
-- El usuario quiere **ver la app en el móvil** (Expo Go), validar UI, galería de diseño, loader o mockups.
-- Tras cambios en `mobile/` que afecten comportamiento observable y haya que **dejar Metro listo** para el usuario.
+- El usuario quiere **ver la app en el móvil físico** (Expo Go), validar haptics, DPI o paridad nativa.
+- Tras cambios visuales **críticos** antes de cerrar (complemento de [expo-web-local-preview](../expo-web-local-preview/SKILL.md)).
 - El usuario pide «ábrelo en Expo Go», «prepara el QR», «quiero probarlo en el móvil».
 
 ## Cuándo NO usar
 
+- Desarrollo diario de UI en PC o pruebas de agentes → **Expo Web**: [expo-web-local-preview](../expo-web-local-preview/SKILL.md).
 - Solo backend/API sin superficie móvil.
-- Emulador Android con `10.0.2.2` (flujo distinto; ver `docs/POC_LOCAL.md`).
 
 ---
 
@@ -76,5 +76,6 @@ En el mensaje final incluir siempre:
 ## Referencias
 
 - Script: `scripts/poc-expo-go.ps1`
+- Web en PC: `.cursor/skills/expo-web-local-preview/SKILL.md`
 - Guía: `docs/POC_LOCAL.md` § App móvil con Expo Go
 - Regla: `.cursor/rules/expo-go-mobile-preview.mdc`

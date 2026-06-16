@@ -101,6 +101,7 @@ Remove-Item Env:CI -ErrorAction SilentlyContinue
 $env:REACT_NATIVE_PACKAGER_HOSTNAME = $lanIp
 $env:EXPO_DEVTOOLS_LISTEN_ADDRESS = "0.0.0.0"
 $env:EXPO_OFFLINE = "1"
+$env:CHOKIDAR_USEPOLLING = "1"
 
 Set-Location (Join-Path $Root "mobile")
 if (-not (Test-Path "node_modules")) {

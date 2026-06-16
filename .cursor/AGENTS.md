@@ -21,6 +21,7 @@ Guía operativa para agentes en `kidepik`.
 | [SDD.md](SDD.md) | Fases Specify → Plan → Task → Implement → Validate. |
 | [RULES.md](RULES.md) | Índice de `.cursor/rules/` de este repo y reglas generales en `Vibe-Coding`. |
 | [skills/spec-driven-dev-kidepik/SKILL.md](skills/spec-driven-dev-kidepik/SKILL.md) | SDD/TDD **solo** en este repositorio. |
+| [skills/expo-web-local-preview/SKILL.md](skills/expo-web-local-preview/SKILL.md) | **Expo Web** en PC (`localhost:8081`) y pruebas MCP browser. |
 | [skills/expo-go-mobile-preview/SKILL.md](skills/expo-go-mobile-preview/SKILL.md) | Arrancar Metro + QR para **Expo Go** en móvil físico. |
 | Git (commit, push, stage) | Hub: `Vibe-Coding/.cursor/skills/git-workflow/SKILL.md`. |
 | [COMPANY.md](COMPANY.md) | Alineación de marca con Kuiper Belt. |

@@ -12,6 +12,10 @@
     },
     "plugins": [
       "expo-font"
-    ]
+    ],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    }
   }
 }

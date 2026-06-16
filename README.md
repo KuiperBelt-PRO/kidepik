@@ -13,13 +13,13 @@ Validación **completada** (jun 2026) de FastAPI + Supabase + R2 (MinIO) + app m
 
 - Guía: [docs/POC_LOCAL.md](docs/POC_LOCAL.md)
 - Spec: [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md)
-- Arranque: `./scripts/poc-up.ps1` · App móvil: `./scripts/poc-expo-go.ps1`
+- Arranque: `./scripts/poc-up.ps1` · App web (PC): `./scripts/poc-expo-web.ps1` · Móvil: `./scripts/poc-expo-go.ps1`
 
 ## Sistema visual (galería de diseño)
 
 Spec: [.cursor/specify/SPEC_APP_VISUAL_DESIGN.md](.cursor/specify/SPEC_APP_VISUAL_DESIGN.md)
 
-Tras `./scripts/poc-expo-go.ps1`, la app abre con **loader** → **galería de mockups**. Usa el toggle Fantasía/Espacio para validar el dual theme. El POC de arquitectura sigue accesible desde la galería (dev).
+Tras `./scripts/poc-expo-web.ps1` (PC) o `./scripts/poc-expo-go.ps1` (móvil), la app abre con **loader** → **galería de mockups**. Usa el toggle Fantasía/Espacio para validar el dual theme. El POC de arquitectura sigue accesible desde la galería (dev).
 
 ## Agentes y SDD
 

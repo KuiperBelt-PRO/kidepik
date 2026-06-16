@@ -25,7 +25,7 @@ cd kidepik
 | `api` (Docker) | Cloud Run | 8080 |
 | `minio` (Docker) | R2 | 9000 |
 
-## App móvil con Expo Go (recomendado)
+## App móvil con Expo Go (móvil físico)
 
 Un solo comando detecta tu IP LAN, escribe `mobile/.env`, reinicia la API con URLs LAN para MinIO y abre Metro:
 
@@ -33,7 +33,23 @@ Un solo comando detecta tu IP LAN, escribe `mobile/.env`, reinicia la API con UR
 ./scripts/poc-expo-go.ps1
 ```
 
-Luego:
+## Expo Web (PC y agentes Cursor) — recomendado para desarrollo UI
+
+Navegador local, capturas MCP / Playwright, sin Wi‑Fi ni QR:
+
+```powershell
+./scripts/poc-expo-web.ps1
+```
+
+Abre **`http://localhost:8081`** (loader → galería). Con POC arquitectura:
+
+```powershell
+./scripts/poc-expo-web.ps1 -Backend
+```
+
+Capturas de agentes: `tmp/playwright-output/`. Spec: [.cursor/specify/SPEC_EXPO_WEB_LOCAL_PREVIEW.md](../.cursor/specify/SPEC_EXPO_WEB_LOCAL_PREVIEW.md).
+
+### Expo Go — pasos tras `poc-expo-go.ps1`
 
 1. Instala **Expo Go** en el móvil ([Android](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS](https://apps.apple.com/app/expo-go/id982107779)).
 2. Escanea el QR: se abre `tmp/expo-go-qr.png` y también aparece ASCII en la terminal.

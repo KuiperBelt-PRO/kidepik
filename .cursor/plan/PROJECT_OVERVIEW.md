@@ -10,14 +10,15 @@ Repositorio **kidepik** — producto en fase de arranque bajo la org GitHub `Kui
 
 ## URLs locales (POC)
 
-| Servicio | Host (PC) | Móvil físico (Expo Go) | Emulador Android |
-| --- | --- | --- | --- |
-| FastAPI | `http://localhost:8080` | `http://<IP-LAN>:8080` | `http://10.0.2.2:8080` |
-| Supabase API | `http://localhost:54321` | `http://<IP-LAN>:54321` | `http://10.0.2.2:54321` |
-| MinIO (R2 sim) | `http://localhost:9000` · consola `:9001` | `http://<IP-LAN>:9000` | `http://10.0.2.2:9000` |
-| Expo Metro | — | `exp://<IP-LAN>:8081` | `exp://10.0.2.2:8081` |
+| Servicio | Host (PC) | Expo Web (PC / agentes) | Móvil físico (Expo Go) | Emulador Android |
+| --- | --- | --- | --- | --- |
+| App Expo | — | `http://localhost:8081` | `exp://<IP-LAN>:8081` | `exp://10.0.2.2:8081` |
+| FastAPI | `http://localhost:8080` | `http://localhost:8080` | `http://<IP-LAN>:8080` | `http://10.0.2.2:8080` |
+| Supabase API | `http://localhost:54321` | `http://localhost:54321` | `http://<IP-LAN>:54321` | `http://10.0.2.2:54321` |
+| MinIO (R2 sim) | `http://localhost:9000` · consola `:9001` | `http://localhost:9000` | `http://<IP-LAN>:9000` | `http://10.0.2.2:9000` |
+| Expo Metro | — | `:8081` (web) | `:8081` (nativo) | `:8081` |
 
-Arranque backend: `./scripts/poc-up.ps1` · App móvil: `./scripts/poc-expo-go.ps1` (genera QR en `tmp/expo-go-qr.png`).
+Arranque backend: `./scripts/poc-up.ps1` · App web (dev/agentes): `./scripts/poc-expo-web.ps1` · Móvil físico: `./scripts/poc-expo-go.ps1` (QR en `tmp/expo-go-qr.png`).
 
 ## Documentación de agentes
 

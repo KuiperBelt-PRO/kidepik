@@ -7,7 +7,7 @@
 
 Definir un **sistema de diseño dual** (fantasía / space opera) con estética de **aventura gráfica moderna para móvil**: marcos narrativos, elecciones y retos legibles en pantallas táctiles, con un toque retro mínimo como gancho visual — no réplica SCUMM de los 90.
 
-Validación inicial: **pantalla de carga (loader)** y **galería de mockups** navegable en Expo Go.
+Validación inicial: **pantalla de carga (loader)** y **galería de mockups** en Expo Web (`localhost:8081`) y smoke en Expo Go.
 
 ## Decisiones de producto (cerradas)
 
@@ -35,7 +35,7 @@ Validación inicial: **pantalla de carga (loader)** y **galería de mockups** na
 - Navegación de producto real (onboarding, auth, API).
 - Ilustraciones raster custom o pipeline IA (solo anotado como fase posterior).
 - i18n, accesibilidad formal WCAG (objetivo legibilidad 7–9 años, sin auditoría completa).
-- Tests automatizados de UI (validación manual en Expo Go).
+- Tests automatizados de UI (validación **Expo Web** en PC + smoke **Expo Go** nativo).
 
 ## Arquitectura de tokens
 

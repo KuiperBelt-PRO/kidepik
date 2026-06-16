@@ -10,7 +10,8 @@ Si la petición encaja en una fila, **lee** el `SKILL.md` indicado y aplícalo a
 | Petición | Skill |
 | --- | --- |
 | SDD, TDD, tests o feature en **este repo** | `.cursor/skills/spec-driven-dev-kidepik/SKILL.md` |
-| Ver app en móvil, Expo Go, QR, validar `mobile/` en dispositivo | `.cursor/skills/expo-go-mobile-preview/SKILL.md` |
+| Probar app en PC/navegador, Expo Web, capturas MCP, validar UI `mobile/` | `.cursor/skills/expo-web-local-preview/SKILL.md` |
+| Ver app en móvil físico, Expo Go, QR, validación nativa | `.cursor/skills/expo-go-mobile-preview/SKILL.md` |
 | Oracle Always Free, OCI CLI/MCP, VM ARM, validación hosting | `.cursor/skills/oci-mcp-ops/SKILL.md` |
 | Commit, push, stage selectivo | `Vibe-Coding/.cursor/skills/git-workflow/SKILL.md` |
 | Revisar PR, rama o parche | `Vibe-Coding/.cursor/skills/code-review/SKILL.md` |

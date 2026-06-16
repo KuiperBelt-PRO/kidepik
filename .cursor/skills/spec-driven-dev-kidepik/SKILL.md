@@ -100,8 +100,8 @@ python -m pytest tests/
 
 1. Cruzar requisitos de spec ↔ tests (tabla del hub y [patterns.md](patterns.md#checklist-de-cruce-spec-tests)).
 2. **API:** `GET http://localhost:8080/health` y rutas de la spec con stack levantado.
-3. **UI / demos:** reglas en [cursor-browser-mcp-testing.mdc](../../rules/cursor-browser-mcp-testing.mdc) y canónica `Vibe-Coding/.cursor/rules/cursor-browser-mcp-testing-ide.mdc`. Capturas solo bajo `tmp/playwright-output/`.
-4. **Móvil:** `./scripts/poc-expo-go.ps1` (QR en `tmp/expo-go-qr.png`); URLs LAN vs emulador (`10.0.2.2`) según [PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md).
+3. **UI / demos:** reglas en [cursor-browser-mcp-testing.mdc](../../rules/cursor-browser-mcp-testing.mdc) y canónica `Vibe-Coding/.cursor/rules/cursor-browser-mcp-testing-ide.mdc`. **Preferir Expo Web** (`./scripts/poc-expo-web.ps1` → `http://localhost:8081`) vía skill [expo-web-local-preview](../expo-web-local-preview/SKILL.md). Capturas solo bajo `tmp/playwright-output/`.
+4. **Móvil nativo:** `./scripts/poc-expo-go.ps1` (QR en `tmp/expo-go-qr.png`); URLs LAN vs emulador (`10.0.2.2`) según [PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md).
 
 ### Fase 5 — Cerrar
 
