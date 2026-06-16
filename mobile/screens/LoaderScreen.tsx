@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
-  FadeIn,
+  FadeInDown,
+  FadeInUp,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -16,14 +17,14 @@ import { tokens } from "../theme/tokens";
 
 const LOADER_PHRASES: Record<string, string[]> = {
   fantasy: [
-    "Despertando las runas del reino…",
-    "Preparando tu pergamino de aventuras…",
-    "Los bosques susurran tu nombre…",
+    "Despertando las runas del bosque…",
+    "Las luciérnagas doradas guían el camino…",
+    "El reino verde te espera…",
   ],
   spaceOpera: [
     "Calibrando motores de curvatura…",
     "Sincronizando mapa estelar…",
-    "La Academia Espacial te espera…",
+    "Bienvenido a la flota azul…",
   ],
 };
 
@@ -63,27 +64,30 @@ export function LoaderScreen({ onComplete }: Props) {
     <ThemeBackground>
       <ParticleField />
       <Pressable style={styles.container} onPress={onComplete}>
-        <Animated.View entering={FadeIn.duration(600)} style={styles.center}>
+        <Animated.View entering={FadeInUp.duration(800)} style={styles.center}>
           <Wordmark subtitle={theme.labels.worldName} />
-          <View style={styles.ring}>
+          <Animated.View entering={FadeInDown.delay(300).duration(700)} style={styles.ring}>
             <ProgressRing progress={displayProgress} />
-          </View>
-          <Text
+          </Animated.View>
+          <Animated.Text
+            entering={FadeInDown.delay(500).duration(600)}
             style={[
               styles.phrase,
               {
-                color: theme.palette.surface,
+                color: theme.palette.secondary,
                 fontFamily: typo.body,
+                textShadowColor: theme.palette.retroGlow,
+                textShadowRadius: 10,
               },
             ]}
           >
             {phrases[phraseIndex]}
-          </Text>
+          </Animated.Text>
           <Text
             style={[
               styles.tapHint,
               {
-                color: theme.palette.narrativeMuted,
+                color: theme.palette.primary,
                 fontFamily: typo.body,
               },
             ]}
@@ -115,10 +119,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     minHeight: 52,
     paddingHorizontal: tokens.spacing.md,
+    fontWeight: "600",
   },
   tapHint: {
     fontSize: tokens.typography.bodySm,
     marginTop: tokens.spacing.xl,
-    opacity: 0.6,
+    opacity: 0.75,
   },
 });

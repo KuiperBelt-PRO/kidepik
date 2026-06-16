@@ -1,5 +1,15 @@
+import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
-import Svg, { Circle, G } from "react-native-svg";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
+import Svg, { Circle, Defs, G, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 
 import { useAppTheme } from "../theme";
 import { tokens } from "../theme/tokens";
@@ -9,10 +19,12 @@ type Props = {
   size?: number;
 };
 
-/** Anillo de progreso SVG — sin Skia/Reanimated para máxima compatibilidad en Expo Go. */
+const AnimatedView = Animated.createAnimatedComponent(View);
+
 export function ProgressRing({ progress, size = tokens.loader.ringSize }: Props) {
   const { theme } = useAppTheme();
   const clamped = Math.min(1, Math.max(0, progress));
+  const pulse = useSharedValue(1);
 
   const stroke = tokens.loader.ringStroke;
   const radius = (size - stroke) / 2;
@@ -20,9 +32,43 @@ export function ProgressRing({ progress, size = tokens.loader.ringSize }: Props)
   const circumference = 2 * Math.PI * radius;
   const offset = circumference * (1 - clamped);
 
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1.08, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      true,
+    );
+  }, [pulse]);
+
+  const wrapStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: pulse.value }],
+  }));
+
+  const { primary, secondary } = theme.palette;
+
   return (
-    <View style={[styles.wrap, { width: size, height: size }]}>
+    <AnimatedView style={[styles.wrap, wrapStyle, { width: size, height: size }]}>
+      <View
+        style={[
+          styles.glow,
+          {
+            width: size * 1.2,
+            height: size * 1.2,
+            borderRadius: size,
+            backgroundColor: theme.palette.accentGlow,
+          },
+        ]}
+      />
       <Svg width={size} height={size}>
+        <Defs>
+          <SvgGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={primary} />
+            <Stop offset="100%" stopColor={secondary} />
+          </SvgGradient>
+        </Defs>
         <Circle
           cx={center}
           cy={center}
@@ -36,7 +82,7 @@ export function ProgressRing({ progress, size = tokens.loader.ringSize }: Props)
             cx={center}
             cy={center}
             r={radius}
-            stroke={theme.palette.primary}
+            stroke="url(#ringGrad)"
             strokeWidth={stroke}
             fill="none"
             strokeLinecap="round"
@@ -47,12 +93,16 @@ export function ProgressRing({ progress, size = tokens.loader.ringSize }: Props)
         <Circle
           cx={center}
           cy={center}
-          r={radius * 0.65}
+          r={radius * 0.55}
           fill={theme.palette.accentGlow}
-          opacity={0.35}
+          opacity={0.4}
         />
       </Svg>
-    </View>
+      <LinearGradient
+        colors={[primary, secondary]}
+        style={[styles.core, { width: size * 0.28, height: size * 0.28, borderRadius: size }]}
+      />
+    </AnimatedView>
   );
 }
 
@@ -60,5 +110,13 @@ const styles = StyleSheet.create({
   wrap: {
     alignItems: "center",
     justifyContent: "center",
+  },
+  glow: {
+    position: "absolute",
+    opacity: 0.45,
+  },
+  core: {
+    position: "absolute",
+    opacity: 0.85,
   },
 });

@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path, Rect } from "react-native-svg";
 
 import { useAppTheme } from "../theme";
+import { useTypography } from "../theme/useTypography";
 import { tokens } from "../theme/tokens";
 
 type Props = {
@@ -50,6 +52,7 @@ function RewardIcon() {
 
 export function RewardSlot({ itemName, description }: Props) {
   const { theme } = useAppTheme();
+  const typo = useTypography();
 
   return (
     <View
@@ -57,10 +60,20 @@ export function RewardSlot({ itemName, description }: Props) {
         styles.slot,
         {
           borderColor: theme.palette.surfaceBorder,
-          backgroundColor: theme.palette.surface,
+          shadowColor: theme.palette.retroGlow,
         },
       ]}
     >
+      <LinearGradient
+        colors={[theme.palette.primary, theme.palette.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={["transparent", "rgba(255,255,255,0.25)"]}
+        style={StyleSheet.absoluteFill}
+      />
       <View style={styles.icon}>
         <RewardIcon />
       </View>
@@ -69,8 +82,8 @@ export function RewardSlot({ itemName, description }: Props) {
           style={[
             styles.name,
             {
-              color: theme.palette.narrative,
-              fontFamily: theme.typography.displayFamily,
+              color: theme.palette.onPrimary,
+              fontFamily: typo.display,
             },
           ]}
         >
@@ -80,8 +93,9 @@ export function RewardSlot({ itemName, description }: Props) {
           style={[
             styles.desc,
             {
-              color: theme.palette.narrativeMuted,
-              fontFamily: theme.typography.bodyFamily,
+              color: theme.palette.onPrimary,
+              fontFamily: typo.body,
+              opacity: 0.88,
             },
           ]}
         >
@@ -100,6 +114,11 @@ const styles = StyleSheet.create({
     padding: tokens.spacing.md,
     gap: tokens.spacing.md,
     alignItems: "center",
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
   },
   icon: {
     width: 48,

@@ -6,8 +6,13 @@ export type ThemePalette = {
   primary: string;
   primaryMuted: string;
   secondary: string;
+  onPrimary: string;
   backgroundTop: string;
+  backgroundMid: string;
   backgroundBottom: string;
+  /** Tres paradas para degradados de fondo y paneles. */
+  gradientStops: readonly [string, string, string];
+  buttonGradient: readonly [string, string];
   surface: string;
   surfaceBorder: string;
   narrative: string;
@@ -19,6 +24,8 @@ export type ThemePalette = {
   accentGlow: string;
   frameStroke: string;
   frameFill: string;
+  /** Brillo retro en bordes y HUD. */
+  retroGlow: string;
 };
 
 export type ThemeTypography = {

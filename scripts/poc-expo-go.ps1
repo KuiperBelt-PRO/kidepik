@@ -92,7 +92,7 @@ Write-Host ""
 Write-Host "Firewall Windows: permite Node/Expo y puertos 8080, 54321, 9000 en red privada." -ForegroundColor Yellow
 Write-Host ""
 
-# Liberar Metro previo (evita "port 8081 is being used")
+# Liberar puerto 8081 si quedó ocupado por un arranque anterior
 Get-NetTCPConnection -LocalPort 8081 -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty OwningProcess -Unique |
     ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
@@ -122,7 +122,7 @@ if (Test-Path $qrPath) {
 }
 
 Write-Host ""
-Write-Host "NOTA: http://localhost:8081 muestra JSON (manifiesto), no es un fallo." -ForegroundColor DarkGray
+Write-Host "NOTA: http://localhost:8081 sin --web muestra JSON del manifiesto Expo, no es un fallo." -ForegroundColor DarkGray
 Write-Host "Escanea el PNG abierto (tmp/expo-go-qr.png) o el QR ASCII en esta terminal." -ForegroundColor Cyan
 Write-Host "URL manual Expo Go: $expUrl" -ForegroundColor DarkGray
 Write-Host ""

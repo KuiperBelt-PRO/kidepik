@@ -1,4 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { GameButton } from "../components/GameButton";
 import { ThemeBackground } from "../components/ThemeBackground";
@@ -6,6 +8,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { Wordmark } from "../components/Wordmark";
 import { MOCKUP_CATALOG, type MockupId } from "../mockups/catalog";
 import { useAppTheme } from "../theme";
+import { useTypography } from "../theme/useTypography";
 import { tokens } from "../theme/tokens";
 
 type Props = {
@@ -20,6 +23,7 @@ export function DesignGalleryScreen({
   onOpenPoc,
 }: Props) {
   const { theme } = useAppTheme();
+  const typo = useTypography();
 
   return (
     <ThemeBackground>
@@ -32,81 +36,93 @@ export function DesignGalleryScreen({
           style={[
             styles.hint,
             {
-              color: theme.palette.narrativeMuted,
-              fontFamily: theme.typography.bodyFamily,
+              color: theme.palette.secondary,
+              fontFamily: typo.body,
             },
           ]}
         >
-          Tema activo: {theme.labels.worldName}. Cambia arriba para validar
-          fantasía ↔ espacio.
+          Tema: {theme.labels.worldName} — cambia arriba para validar el look.
         </Text>
 
-        <Pressable
-          onPress={onOpenWorldPicker}
-          style={[
-            styles.featured,
-            { borderColor: theme.palette.surfaceBorder },
-          ]}
-        >
-          <Text
-            style={[
-              styles.featuredTitle,
-              {
-                color: theme.palette.surface,
-                fontFamily: theme.typography.displayFamily,
-              },
-            ]}
+        <Pressable onPress={onOpenWorldPicker}>
+          <LinearGradient
+            colors={[theme.palette.primary, theme.palette.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.featured}
           >
-            Selector de mundo
-          </Text>
-          <Text
-            style={[
-              styles.featuredDesc,
-              {
-                color: theme.palette.narrativeMuted,
-                fontFamily: theme.typography.bodyFamily,
-              },
-            ]}
-          >
-            Pantalla completa de onboarding visual
-          </Text>
+            <Text
+              style={[
+                styles.featuredTitle,
+                {
+                  color: theme.palette.onPrimary,
+                  fontFamily: typo.display,
+                },
+              ]}
+            >
+              Selector de mundo
+            </Text>
+            <Text
+              style={[
+                styles.featuredDesc,
+                {
+                  color: theme.palette.onPrimary,
+                  fontFamily: typo.body,
+                  opacity: 0.85,
+                },
+              ]}
+            >
+              Pantalla completa de onboarding visual
+            </Text>
+          </LinearGradient>
         </Pressable>
 
-        {MOCKUP_CATALOG.filter((m) => m.id !== "worldPicker").map((item) => (
-          <Pressable
-            key={item.id}
-            onPress={() => onOpenMockup(item.id)}
-            style={[
-              styles.card,
-              {
-                backgroundColor: theme.palette.surface,
-                borderColor: theme.palette.surfaceBorder,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.cardTitle,
-                {
-                  color: theme.palette.narrative,
-                  fontFamily: theme.typography.displayFamily,
-                },
-              ]}
-            >
-              {item.title}
-            </Text>
-            <Text
-              style={[
-                styles.cardDesc,
-                {
-                  color: theme.palette.narrativeMuted,
-                  fontFamily: theme.typography.bodyFamily,
-                },
-              ]}
-            >
-              {item.description}
-            </Text>
-          </Pressable>
+        {MOCKUP_CATALOG.filter((m) => m.id !== "worldPicker").map((item, i) => (
+          <Animated.View key={item.id} entering={FadeInDown.delay(80 * i).duration(400)}>
+            <Pressable onPress={() => onOpenMockup(item.id)}>
+              <View
+                style={[
+                  styles.card,
+                  {
+                    borderColor: theme.palette.surfaceBorder,
+                    shadowColor: theme.palette.retroGlow,
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={[
+                    theme.palette.surface,
+                    theme.id === "fantasy"
+                      ? "rgba(230, 255, 240, 0.95)"
+                      : "rgba(230, 245, 255, 0.95)",
+                  ]}
+                  style={StyleSheet.absoluteFill}
+                />
+                <Text
+                  style={[
+                    styles.cardTitle,
+                    {
+                      color: theme.palette.narrative,
+                      fontFamily: typo.display,
+                    },
+                  ]}
+                >
+                  {item.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.cardDesc,
+                    {
+                      color: theme.palette.narrativeMuted,
+                      fontFamily: typo.body,
+                    },
+                  ]}
+                >
+                  {item.description}
+                </Text>
+              </View>
+            </Pressable>
+          </Animated.View>
         ))}
 
         <GameButton
@@ -136,11 +152,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   featured: {
-    borderWidth: 2,
     borderRadius: tokens.radius.lg,
     padding: tokens.spacing.lg,
     marginBottom: tokens.spacing.md,
-    backgroundColor: "rgba(0,0,0,0.25)",
   },
   featuredTitle: {
     fontSize: tokens.typography.title,
@@ -156,6 +170,11 @@ const styles = StyleSheet.create({
     marginBottom: tokens.spacing.sm,
     minHeight: tokens.touchMin,
     justifyContent: "center",
+    overflow: "hidden",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardTitle: {
     fontSize: tokens.typography.bodyLg,

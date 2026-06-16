@@ -7,9 +7,11 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { FrameCorners } from "./FrameCorners";
 import { useAppTheme } from "../theme";
+import { useTypography } from "../theme/useTypography";
 import { tokens } from "../theme/tokens";
 
 type Props = {
@@ -18,9 +20,9 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-/** Marco estilo aventura gráfica para paneles de contenido. */
 export function GamePanel({ children, title, style }: Props) {
   const { theme } = useAppTheme();
+  const typo = useTypography();
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -31,46 +33,88 @@ export function GamePanel({ children, title, style }: Props) {
   return (
     <View
       style={[
-        styles.panel,
+        styles.outer,
         {
-          backgroundColor: theme.palette.surface,
           borderColor: theme.palette.surfaceBorder,
+          shadowColor: theme.palette.retroGlow,
         },
         style,
       ]}
       onLayout={onLayout}
     >
+      <LinearGradient
+        colors={[
+          theme.palette.surface,
+          theme.id === "fantasy"
+            ? "rgba(255, 248, 220, 0.98)"
+            : "rgba(240, 248, 255, 0.98)",
+        ]}
+        style={StyleSheet.absoluteFill}
+      />
+      <LinearGradient
+        colors={["transparent", theme.palette.frameFill]}
+        style={styles.sheen}
+      />
       {size.width > 0 ? (
         <FrameCorners width={size.width} height={size.height} />
       ) : null}
       {title ? (
-        <Text
-          style={[
-            styles.title,
-            {
-              color: theme.palette.narrative,
-              fontFamily: theme.typography.displayFamily,
-            },
-          ]}
-        >
-          {title}
-        </Text>
+        <View style={styles.titleRow}>
+          <LinearGradient
+            colors={[theme.palette.primary, theme.palette.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.titleBadge}
+          >
+            <Text
+              style={[
+                styles.title,
+                {
+                  color: theme.palette.onPrimary,
+                  fontFamily: typo.display,
+                },
+              ]}
+            >
+              {title}
+            </Text>
+          </LinearGradient>
+        </View>
       ) : null}
-      {children}
+      <View style={styles.content}>{children}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  panel: {
-    borderWidth: tokens.frame.borderWidth,
-    borderRadius: tokens.radius.md,
-    padding: tokens.spacing.md,
+  outer: {
+    borderWidth: 2,
+    borderRadius: tokens.radius.lg,
     overflow: "hidden",
     minHeight: tokens.touchMin,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  sheen: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.5,
+  },
+  titleRow: {
+    paddingTop: tokens.spacing.md,
+    paddingHorizontal: tokens.spacing.md,
+  },
+  titleBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.xs,
+    borderRadius: tokens.radius.pill,
   },
   title: {
-    fontSize: tokens.typography.title,
-    marginBottom: tokens.spacing.sm,
+    fontSize: tokens.typography.bodySm,
+    letterSpacing: 1,
+  },
+  content: {
+    padding: tokens.spacing.md,
   },
 });

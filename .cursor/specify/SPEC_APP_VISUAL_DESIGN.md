@@ -13,7 +13,7 @@ Validación inicial: **pantalla de carga (loader)** y **galería de mockups** en
 
 | # | Decisión |
 | --- | --- |
-| 1 | **Opción D — híbrido:** base ilustrada/vectorial + acentos GPU (Skia) en loader, transiciones y mapa. |
+| 1 | **Opción D — híbrido:** base ilustrada/vectorial + animaciones (Reanimated, SVG). Sin Skia en runtime: incompatible con Expo Go sin build nativo. |
 | 2 | **UX móvil primero:** sin panel de verbos; diálogo inferior, botones grandes, hotspots implícitos. Retro sutil (bordes, tipografía display, scanlines opcionales en space). |
 | 3 | **Assets actuales:** vectoriales/SVG generados en código. **Futuro:** material gráfico producido con modelos de IA; los componentes deben aceptar sustitución por PNG/SVG externos sin reescribir layout. |
 | 4 | **Marca:** sin gimmicks del logotipo (no “ojos” en d/p ni interacciones por giro del dispositivo). Logo = wordmark tipográfico limpio. |
@@ -28,7 +28,7 @@ Validación inicial: **pantalla de carga (loader)** y **galería de mockups** en
 - `LoaderScreen`: animación de arranque temática.
 - `DesignGalleryScreen`: lista de mockups para validar el sistema.
 - Mockups: selector de mundo, diálogo, elección de ruta, reto, mapa, HUD, recompensa, shell minijuego.
-- Dependencias: Reanimated, SVG, LinearGradient, Skia (acentos), fuentes Google.
+- Dependencias: Reanimated, SVG, LinearGradient, fuentes Google (sin Skia en runtime).
 
 ### Excluido
 
@@ -50,6 +50,41 @@ tokens (spacing, radius, touchMin, typography.body)
 
 **Variable por tema:** paleta, gradientes de fondo, estilo de marco SVG, partículas Skia, fuente display, microcopy de UI (“Runa” / “Módulo”).
 
+## Paletas (v2 — predominantes)
+
+### Fantasía — verde + dorado
+
+| Token | Valor | Uso |
+| --- | --- | --- |
+| `primary` | `#3DDB7E` | Acentos, botones, brillo retro |
+| `secondary` | `#F0C14A` | Dorado, subtítulos sobre fondo oscuro |
+| `gradientStops` | verde bosque oscuro → medio → profundo | Fondo procedural |
+| `buttonGradient` | `#2ECC71` → `#1A9B52` | CTAs |
+| `surface` | crema verdoso semitransparente | Paneles narrativos |
+| `retroGlow` | verde semitransparente | Sombras y HUD |
+
+### Space opera — azul + blanco
+
+| Token | Valor | Uso |
+| --- | --- | --- |
+| `primary` | `#4DA3FF` | Acentos, nebulosas, grid |
+| `secondary` | `#FFFFFF` | Estrellas, texto sobre fondo oscuro |
+| `gradientStops` | azul noche → azul medio → azul profundo | Fondo procedural |
+| `buttonGradient` | `#5BB5FF` → `#1E88E5` | CTAs |
+| `surface` | blanco azulado semitransparente | Paneles narrativos |
+| `retroScanlines` | `true` | Overlay CRT sutil en space |
+
+## Capas visuales (v2)
+
+| Capa | Componente | Descripción |
+| --- | --- | --- |
+| Degradado base | `ProceduralBackground` | Tres paradas + overlay temático (Expo LinearGradient) |
+| Procedural Skia | `ProceduralBackground` | Fantasía: colinas + luciérnagas; Space: estrellas + grid retro |
+| Scanlines / viñeta | `RetroOverlay` | Solo space opera (retro sutil) |
+| Partículas animadas | `ParticleField` | Reanimated — sparkles (fantasía) / estrellas (space) |
+| Marcos | `GamePanel` + `FrameCorners` | Gradiente en panel, badge de título con degradado |
+| Botones | `GameButton` | LinearGradient + escala al pulsar + haptics |
+
 ## Tipografía
 
 | Rol | Fantasía | Space Opera | Ambos |
@@ -61,7 +96,10 @@ tokens (spacing, radius, touchMin, typography.body)
 
 | Componente | Uso |
 | --- | --- |
-| `ThemeBackground` | Gradiente + decoración SVG de fondo |
+| `ThemeBackground` | Degradado + fondo procedural + overlay retro |
+| `ProceduralBackground` | Colinas/estrellas/grid Skia + degradados |
+| `RetroOverlay` | Scanlines y viñeta (space) |
+| `ParticleField` | Partículas animadas temáticas |
 | `GamePanel` | Marco de aventura (esquinas ornamentales por tema) |
 | `GameButton` | CTA y elecciones de ruta |
 | `DialogueBox` | Texto narrativo + avatar placeholder |

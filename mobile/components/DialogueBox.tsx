@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
 
 import { GameButton } from "./GameButton";
 import { GamePanel } from "./GamePanel";
 import { useAppTheme } from "../theme";
+import { useTypography } from "../theme/useTypography";
 import { tokens } from "../theme/tokens";
 
 type Props = {
@@ -17,12 +19,17 @@ function PortraitPlaceholder() {
   const { theme } = useAppTheme();
 
   return (
-    <View
-      style={[
-        styles.portrait,
-        { borderColor: theme.palette.surfaceBorder },
-      ]}
-    >
+    <View style={styles.portraitWrap}>
+      <LinearGradient
+        colors={[theme.palette.primary, theme.palette.secondary]}
+        style={styles.portraitBorder}
+      >
+        <View
+          style={[
+            styles.portrait,
+            { backgroundColor: theme.palette.primaryMuted },
+          ]}
+        >
       <Svg width={56} height={56} viewBox="0 0 56 56">
         <Circle cx={28} cy={28} r={26} fill={theme.palette.primaryMuted} />
         <Circle cx={22} cy={24} r={4} fill={theme.palette.surface} />
@@ -34,12 +41,15 @@ function PortraitPlaceholder() {
           fill="none"
         />
       </Svg>
+        </View>
+      </LinearGradient>
     </View>
   );
 }
 
 export function DialogueBox({ speaker, text, onContinue }: Props) {
   const { theme } = useAppTheme();
+  const typo = useTypography();
 
   return (
     <GamePanel>
@@ -52,7 +62,7 @@ export function DialogueBox({ speaker, text, onContinue }: Props) {
                 styles.speaker,
                 {
                   color: theme.palette.primary,
-                  fontFamily: theme.typography.displayFamily,
+                  fontFamily: typo.display,
                 },
               ]}
             >
@@ -64,7 +74,7 @@ export function DialogueBox({ speaker, text, onContinue }: Props) {
               styles.text,
               {
                 color: theme.palette.narrative,
-                fontFamily: theme.typography.bodyFamily,
+                fontFamily: typo.body,
               },
             ]}
           >
@@ -88,14 +98,20 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: tokens.spacing.md,
   },
-  portrait: {
-    width: 64,
-    height: 64,
+  portraitWrap: {
+    width: 68,
+    height: 68,
+  },
+  portraitBorder: {
+    flex: 1,
     borderRadius: tokens.radius.sm,
-    borderWidth: 2,
+    padding: 2,
+  },
+  portrait: {
+    flex: 1,
+    borderRadius: tokens.radius.sm - 2,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.08)",
   },
   content: {
     flex: 1,

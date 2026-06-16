@@ -1,7 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 import { GameButton } from "./GameButton";
 import { useAppTheme } from "../theme";
+import { useTypography } from "../theme/useTypography";
 import { tokens } from "../theme/tokens";
 
 type Props = {
@@ -11,20 +13,28 @@ type Props = {
 
 export function ChoiceList({ choices, onSelect }: Props) {
   const { theme } = useAppTheme();
+  const typo = useTypography();
 
   return (
     <View style={styles.list}>
-      <Text
-        style={[
-          styles.prompt,
-          {
-            color: theme.palette.narrativeMuted,
-            fontFamily: theme.typography.bodyFamily,
-          },
-        ]}
+      <LinearGradient
+        colors={[theme.palette.primary, theme.palette.secondary]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.promptBar}
       >
-        ¿Qué camino eliges?
-      </Text>
+        <Text
+          style={[
+            styles.prompt,
+            {
+              color: theme.palette.onPrimary,
+              fontFamily: typo.display,
+            },
+          ]}
+        >
+          ¿Qué camino eliges?
+        </Text>
+      </LinearGradient>
       {choices.map((choice, index) => (
         <GameButton
           key={choice}
@@ -42,9 +52,16 @@ const styles = StyleSheet.create({
   list: {
     gap: tokens.spacing.sm,
   },
+  promptBar: {
+    borderRadius: tokens.radius.pill,
+    paddingHorizontal: tokens.spacing.md,
+    paddingVertical: tokens.spacing.sm,
+    marginBottom: tokens.spacing.xs,
+  },
   prompt: {
     fontSize: tokens.typography.bodySm,
-    marginBottom: tokens.spacing.xs,
+    textAlign: "center",
+    letterSpacing: 0.5,
   },
   choice: {
     width: "100%",

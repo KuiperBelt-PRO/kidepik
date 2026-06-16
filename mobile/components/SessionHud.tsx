@@ -29,7 +29,7 @@ export function SessionHud({ subject, zone, progress }: Props) {
           style={[
             styles.subject,
             {
-              color: theme.palette.surface,
+              color: theme.palette.secondary,
               fontFamily: theme.typography.displayFamily,
             },
           ]}

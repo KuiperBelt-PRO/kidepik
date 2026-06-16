@@ -62,7 +62,7 @@ export function MapNode({
         style={[
           styles.label,
           {
-            color: theme.palette.surface,
+              color: theme.palette.secondary,
             fontFamily: theme.typography.displayFamily,
           },
         ]}

@@ -69,7 +69,7 @@ if ($Backend) {
     Write-Host "  API health:  http://localhost:8080/health"
 }
 Write-Host ""
-Write-Host "NOTA: con Metro nativo (sin --web), localhost:8081 muestra JSON de manifiesto." -ForegroundColor DarkGray
+Write-Host "NOTA: con expo start nativo (sin --web), localhost:8081 muestra JSON del manifiesto Expo." -ForegroundColor DarkGray
 Write-Host ""
 
 pnpm web
