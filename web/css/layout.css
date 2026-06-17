@@ -1,0 +1,87 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: #000;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--color-secondary);
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  position: relative;
+  min-height: 100dvh;
+  max-width: 430px;
+  margin: 0 auto;
+  overflow-x: hidden;
+}
+
+.scene {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.scene-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-md);
+  padding-top: max(var(--space-xl), env(safe-area-inset-top));
+  padding-bottom: max(96px, env(safe-area-inset-bottom));
+}
+
+.scene-bg {
+  position: fixed;
+  inset: 0;
+  max-width: 430px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.scene-content {
+  position: relative;
+  z-index: 1;
+}
+
+.offline-banner {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  z-index: 100;
+  background: var(--color-danger);
+  color: #fff;
+  text-align: center;
+  padding: var(--space-sm);
+  font-size: 0.85rem;
+}
+
+.offline-banner.is-visible {
+  display: block;
+}
+
+@media (min-width: 431px) {
+  body {
+    background: #111;
+  }
+
+  #app {
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+  }
+}

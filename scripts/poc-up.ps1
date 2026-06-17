@@ -50,6 +50,5 @@ Write-Host "  FastAPI:   http://10.0.2.2:8080/health"
 Write-Host "  Supabase:  http://10.0.2.2:54321"
 Write-Host "  MinIO:     http://10.0.2.2:9000  (consola :9001)"
 Write-Host ""
-Write-Host "Siguiente paso — mobile:" -ForegroundColor Green
-Write-Host "  1. supabase status  → copiar anon key a mobile/.env"
-Write-Host "  2. ./scripts/poc-expo-go.ps1   (Expo Go, móvil físico)"
+Write-Host "Siguiente paso — cliente web:" -ForegroundColor Green
+Write-Host "  ./scripts/poc-web-dev.ps1   → http://localhost:8082"

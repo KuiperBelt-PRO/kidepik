@@ -1,0 +1,48 @@
+/* Design tokens — overridden per theme in themes/*.css */
+:root {
+  --touch-min: 48px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --font-display: "Cinzel", Georgia, serif;
+  --font-body: "Nunito", system-ui, sans-serif;
+  --color-primary: #3ddb7e;
+  --color-secondary: #f0c14a;
+  --color-on-primary: #062112;
+  --color-bg-deep: #03180a;
+  --color-bg-mid: #1a6b3f;
+  --color-bg-bottom: #0c3d22;
+  --color-surface: rgba(255, 248, 230, 0.94);
+  --color-surface-border: #d4af37;
+  --color-on-surface: #0f3320;
+  --color-on-surface-muted: #3d6b4f;
+  --color-glow: rgba(61, 219, 126, 0.35);
+  --color-hint: #b8860b;
+  --color-danger: #c94a4a;
+  --color-overlay: rgba(3, 24, 10, 0.82);
+  --color-frame-fill: rgba(61, 219, 126, 0.18);
+}
+
+[data-theme="spaceOpera"] {
+  --font-display: "Orbitron", system-ui, sans-serif;
+  --color-primary: #4da3ff;
+  --color-secondary: #ffffff;
+  --color-on-primary: #001233;
+  --color-bg-deep: #000510;
+  --color-bg-mid: #0d47a1;
+  --color-bg-bottom: #001a4d;
+  --color-surface: rgba(248, 251, 255, 0.94);
+  --color-surface-border: #90caf9;
+  --color-on-surface: #051428;
+  --color-on-surface-muted: #5c7a9e;
+  --color-glow: rgba(77, 163, 255, 0.4);
+  --color-hint: #ffd54f;
+  --color-overlay: rgba(0, 5, 16, 0.85);
+  --color-frame-fill: rgba(77, 163, 255, 0.14);
+}

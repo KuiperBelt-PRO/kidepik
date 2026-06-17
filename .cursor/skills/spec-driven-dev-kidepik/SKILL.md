@@ -23,16 +23,16 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 ## Ámbito del repositorio
 
-- Código bajo **kidepik**: `backend/` (FastAPI), `mobile/` (Expo), `supabase/`, `docker/`, scripts `scripts/poc-*.ps1`.
+- Código bajo **kidepik**: `backend/` (FastAPI), `web/` (cliente HTML/CSS/JS), `supabase/`, `docker/`, scripts `scripts/poc-*.ps1`.
 - Specs formales en [.cursor/specify/](../../specify/) y enlazadas desde [CURRENT_SPECS.md](../../CURRENT_SPECS.md).
 - Fases del repo documentadas en [.cursor/SDD.md](../../SDD.md) (Specify → Plan → Task → Implement → Validate).
-- Respeta versiones en `backend/pyproject.toml`, `mobile/package.json` y manifiestos del stack POC.
+- Respeta versiones en `backend/pyproject.toml`, `web/package.json` y manifiestos del stack POC.
 
 ---
 
 ## Cuándo usar (además de los criterios del hub)
 
-- Implementar o extender el **POC local** (FastAPI + Supabase CLI + MinIO + Expo Go).
+- Implementar o extender el **POC local** (FastAPI + Supabase CLI + MinIO + cliente `web/`).
 - Añadir rutas API, auth JWT Supabase, storage S3-compatible, migraciones SQL o pantallas móvil con contrato en spec.
 - El usuario pide SDD/TDD y el cambio vive claramente en este repo.
 
@@ -51,7 +51,8 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 | API | FastAPI, Pydantic, pytest | `backend/app/`, `backend/tests/` |
 | Datos / auth | Supabase (Postgres, Auth, PostgREST) | `supabase/migrations/`, `supabase/config.toml` |
 | Object storage (POC) | MinIO (S3-compatible) | `docker/compose.yaml`, `backend/app/storage.py` |
-| Cliente móvil | Expo SDK 54, React Native | `mobile/` |
+| Cliente producto | **HTML + CSS + JS** (ES modules); Capacitor fase posterior | `web/` |
+| Preview dev móvil | Electron + Playwright viewport 390×844 | `tools/preview-electron/`, scripts `poc-web-*` |
 | Orquestación local | Docker Compose + Supabase CLI | `docker/compose.yaml`, `scripts/poc-up.ps1` |
 
 **Spec de referencia del POC:** [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../../specify/SPEC_POC_LOCAL_ARCHITECTURE.md).  
@@ -74,7 +75,7 @@ Tras leer cada fase en `spec-driven-dev`, aplica estos matices:
 | --- | --- |
 | API | `backend/tests/test_*.py` junto a `backend/app/` |
 | SQL | Nueva migración en `supabase/migrations/` con nombre timestamp |
-| Móvil | `mobile/` — si no hay suite automatizada, definir criterios reproducibles en la spec (pantalla POC, llamadas a API) |
+| Web / UI | `web/` — Playwright viewport 390×844 o checklist en spec |
 | Compose / env | Cambios en `docker/compose.yaml`, `.env.poc.sample` — documentar impacto en `docs/POC_LOCAL.md` si afecta al arranque |
 
 Estructura backend actual: paquete `app/` bajo `backend/`, tests en `backend/tests/` (ver [patterns.md](patterns.md#estructura-de-archivos)).
@@ -94,14 +95,14 @@ python -m pytest tests/
 
 **Supabase:** validar migraciones con `supabase db reset` / stack local antes de dar por cerrada la fase.
 
-**Móvil:** si no hay Jest/Detox en el repo, la “prueba” de la fase 3 puede ser el checklist de la spec ejecutado en Expo Go; la fase 4 confirma en dispositivo o emulador.
+**Web:** validación con `./scripts/poc-web-dev.ps1` y MCP browser según [web-mobile-preview](../web-mobile-preview/SKILL.md).
 
 ### Fase 4 — Validar cobertura y superficie observable
 
 1. Cruzar requisitos de spec ↔ tests (tabla del hub y [patterns.md](patterns.md#checklist-de-cruce-spec-tests)).
 2. **API:** `GET http://localhost:8080/health` y rutas de la spec con stack levantado.
-3. **UI / demos:** reglas en [cursor-browser-mcp-testing.mdc](../../rules/cursor-browser-mcp-testing.mdc) y canónica `Vibe-Coding/.cursor/rules/cursor-browser-mcp-testing-ide.mdc`. **Preferir Expo Web** (`./scripts/poc-expo-web.ps1` → `http://localhost:8081`) vía skill [expo-web-local-preview](../expo-web-local-preview/SKILL.md). Capturas solo bajo `tmp/playwright-output/`.
-4. **Móvil nativo:** `./scripts/poc-expo-go.ps1` (QR en `tmp/expo-go-qr.png`); URLs LAN vs emulador (`10.0.2.2`) según [PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md).
+3. **UI / demos:** reglas en [cursor-browser-mcp-testing.mdc](../../rules/cursor-browser-mcp-testing.mdc) y canónica `Vibe-Coding/.cursor/rules/cursor-browser-mcp-testing-ide.mdc`. **Cliente web** (`./scripts/poc-web-dev.ps1` → `http://localhost:8082`) vía skill [web-mobile-preview](../web-mobile-preview/SKILL.md). Capturas solo bajo `tmp/playwright-output/`.
+4. **Preview móvil PC:** `./scripts/poc-web-preview.ps1` (Electron 390×844) cuando haga falta validar viewport.
 
 ### Fase 5 — Cerrar
 

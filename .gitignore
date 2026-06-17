@@ -8,7 +8,7 @@
 !.env.sample
 !.env.poc.sample
 .env.poc
-mobile/.env
+web/js/config.js
 
 # Python
 __pycache__/
@@ -24,10 +24,8 @@ venv/
 htmlcov/
 .coverage
 
-# Node / Expo
+# Node
 node_modules/
-.expo/
-mobile/.expo/
 dist/
 build/
 *.log

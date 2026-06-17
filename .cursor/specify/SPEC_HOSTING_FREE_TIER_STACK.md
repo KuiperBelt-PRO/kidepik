@@ -62,7 +62,7 @@ Con ~200 KB por avatar, 2 GB egress ≈ 10k visualizaciones/mes — insuficiente
 ## Flujo de datos (egress a coste 0)
 
 ```
-App Expo ──JWT──► FastAPI (Cloud Run u Oracle Micro)
+App web / Capacitor ──JWT──► FastAPI (Cloud Run u Oracle Micro)
                       │
          ┌────────────┼────────────┐
          ▼            ▼            ▼

@@ -8,8 +8,7 @@ Las **reglas generales** del workspace (Playwright, Engram, Context7, eficiencia
 | :--- | :--- | :--- |
 | [repo-bootstrap.mdc](../.cursor/rules/repo-bootstrap.mdc) | Reglas base del repositorio `kidepik` | `alwaysApply: true` |
 | [agent-skill-routing.mdc](../.cursor/rules/agent-skill-routing.mdc) | Enrutamiento a skills locales | `alwaysApply: true` |
-| [cursor-browser-mcp-testing.mdc](../.cursor/rules/cursor-browser-mcp-testing.mdc) | Pruebas UI vía MCP browser — **Expo Web `localhost:8081`** | `alwaysApply: true` |
-| [expo-web-local-preview.mdc](../.cursor/rules/expo-web-local-preview.mdc) | Arrancar Expo Web en PC para dev y agentes | `globs: mobile/**` |
-| [expo-go-mobile-preview.mdc](../.cursor/rules/expo-go-mobile-preview.mdc) | Preparar Metro + QR para Expo Go en móvil físico | `globs: mobile/**` |
+| [cursor-browser-mcp-testing.mdc](../.cursor/rules/cursor-browser-mcp-testing.mdc) | Pruebas UI vía MCP browser — **`localhost:8082`** | `alwaysApply: true` |
+| [web-mobile-preview.mdc](../.cursor/rules/web-mobile-preview.mdc) | Preview web móvil (Electron, Playwright 390×844) | `globs: web/**` |
 
 Consulta [AGENTS.md](./AGENTS.md) para el contexto general del proyecto.

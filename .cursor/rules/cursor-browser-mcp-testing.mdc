@@ -11,10 +11,8 @@ alwaysApply: true
 
 | Superficie | URL | Arranque |
 | --- | --- | --- |
-| **App móvil (Expo Web)** | `http://localhost:8081` | `./scripts/poc-expo-web.ps1` |
-| FastAPI (POC) | `http://localhost:8080` | `./scripts/poc-up.ps1` o `poc-expo-web.ps1 -Backend` |
+| **App web (cliente producto)** | `http://localhost:8082` | `./scripts/poc-web-dev.ps1` |
+| FastAPI (POC) | `http://localhost:8080` | `./scripts/poc-up.ps1` o `poc-web-dev.ps1 -Backend` |
 | Supabase API | `http://localhost:54321` | `./scripts/poc-up.ps1` |
 
-Para UI en `mobile/`, **preferir Expo Web** y skill `.cursor/skills/expo-web-local-preview/SKILL.md`. Capturas en `tmp/playwright-output/`.
-
-Expo Go en móvil físico no es automatizable por MCP; usar solo para validación nativa (`expo-go-mobile-preview`).
+Para UI en `web/`, usar skill `.cursor/skills/web-mobile-preview/SKILL.md`. Viewport móvil **390×844**. Capturas en `tmp/playwright-output/`.

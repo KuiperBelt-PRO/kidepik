@@ -8,9 +8,12 @@
 ## Producto
 
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
-- **POC local arquitectura (validada jun 2026):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md) — FastAPI + Supabase local + MinIO (R2) + Expo Go (SDK 54). Guía: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md).
-- **Sistema visual app móvil (aprobada jun 2026):** [specify/SPEC_APP_VISUAL_DESIGN.md](specify/SPEC_APP_VISUAL_DESIGN.md) — design system dual fantasy/space opera, loader y galería de mockups.
-- **Expo Web local (jun 2026):** [specify/SPEC_EXPO_WEB_LOCAL_PREVIEW.md](specify/SPEC_EXPO_WEB_LOCAL_PREVIEW.md) — preview en `http://localhost:8081` para PC y agentes MCP.
+- **POC local arquitectura (validada jun 2026):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md) — FastAPI + Supabase local + MinIO (R2) + cliente `web/`.
+- **Pivot frontend web-first (implementado jun 2026):** [specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md](specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md) — `web/` HTML/CSS/JS, puerto **8082**.
+- **Sistema visual v3 web premium:** [specify/SPEC_APP_VISUAL_DESIGN_V3.md](specify/SPEC_APP_VISUAL_DESIGN_V3.md)
+- **Preview dev móvil:** [specify/SPEC_WEB_DEV_PREVIEW.md](specify/SPEC_WEB_DEV_PREVIEW.md) — Electron 390×844 + Playwright.
+- **Capacitor shell (fase posterior):** [specify/SPEC_CAPACITOR_MOBILE_SHELL.md](specify/SPEC_CAPACITOR_MOBILE_SHELL.md).
+- **Plan de ejecución pivot:** [tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md](tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md).
 
 ## Infraestructura Oracle Cloud (en curso)
 

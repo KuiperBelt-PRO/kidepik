@@ -1,0 +1,28 @@
+---
+description: Preview web KidepiK en viewport movil fijo (8082, Playwright, Electron)
+alwaysApply: false
+globs:
+  - web/**
+---
+
+# Preview web movil (kidepik)
+
+**Canónico:** validar `web/` con viewport **390×844**.
+
+## URLs
+
+- App: `http://localhost:8082`
+- Arranque: `./scripts/poc-web-dev.ps1`
+- Electron: `./scripts/poc-web-preview.ps1`
+
+## Agente (Playwright MCP)
+
+1. `browser_navigate` → `http://localhost:8082`
+2. Viewport móvil 390×844 (config del MCP o emulación)
+3. Flujo: loader (tap o espera) → galería → toggle tema → mockup
+4. Capturas solo en `tmp/playwright-output/`
+
+## Anti-patrones
+
+- Probar UI en viewport desktop ancho sin marco móvil.
+- Commitear capturas de prueba fuera de `tmp/`.

@@ -45,6 +45,8 @@ El aprendizaje no se presenta como temario escolar, sino como **retos cortos** i
 | Aspecto | Detalle |
 | --- | --- |
 | **Fonética** | Evoca *Kid Epic* (niño épico) y la raíz *Epi-* (epifanía, descubrimiento). |
+| **Ambigrama** | Casi palindrómico; al rotar 180° la **d** y la **p** se 
+intercambian visualmente sin perder legibilidad. |
 | **Logo** | Wordmark tipográfico **KidepiK**; limpio y legible; sin gimmicks animados en el nombre. |
 | **Idiomas** | Pronunciable y memorable en español e inglés sin traducción. |
 | **Ambientación** | Agnóstico: sirve para fantasía, space opera o multiverso. |
@@ -323,25 +325,24 @@ interface PlayerState {
 | **Android** | Sí — Google Play |
 | **iOS** | Sí — App Store |
 
-Una sola base de código con **React Native + Expo** compila para ambas tiendas.
+Una sola base de código **web** (`web/`) sirve navegador y, en fase posterior, **Capacitor** para Google Play y App Store.
 
-### 10.2 Elección del framework móvil
+### 10.2 Elección del cliente
 
-| Característica | React Native + Expo ✓ | Flutter |
+| Característica | Web HTML/CSS/JS + Capacitor ✓ | React Native + Expo |
 | --- | --- | --- |
-| Lenguaje | JavaScript / TypeScript | Dart |
-| Curva de arranque | Mínima con ecosistema web/React | Moderada (árbol de Widgets) |
-| Rendimiento UI | Muy bueno (puente a componentes nativos) | Excelente (render propio; ideal para animaciones 60 fps) |
-| Ecosistema | NPM gigantesco | pub.dev muy completo |
-| Desarrollo | Expo Go, hot reload, EAS Build en la nube | Flutter tooling propio |
+| Calidad visual premium | Ilustración, Rive/Lottie, CSS en capas | UI programática limitada sin pipeline de arte |
+| Iteración diseño | Navegador + Electron viewport móvil | Expo Go / Metro |
+| Tiendas | Capacitor empaqueta los mismos estáticos | EAS Build nativo |
+| Complejidad MVP | Baja (sin bundler obligatorio) | Media-alta |
 
-**Decisión: React Native + Expo.** Prioriza velocidad de iteración, familiaridad con React/TypeScript e integración rápida con APIs REST. Flutter queda como alternativa valorada para la fase de avatar 3D gamificado (*post-MVP*) si el rendimiento visual lo exige.
+**Decisión (jun 2026): web-first.** Cliente en `web/` (HTML + CSS + JavaScript). Capacitor para distribución móvil cuando corresponda. Spec: [.cursor/specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md](../.cursor/specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md).
 
 ### 10.3 Stack acordado
 
 | Capa | Tecnología | Notas |
 | --- | --- | --- |
-| **App móvil** | **React Native + Expo** (TypeScript) | Android + iOS; EAS Build para tiendas |
+| **App cliente** | **HTML + CSS + JS** en `web/`; **Capacitor** (fase posterior) | Android + iOS vía WebView nativo |
 | **Backend / API** | **FastAPI** (Python 3.11+) | Asíncrono; Pydantic; streaming de respuestas IA |
 | **Agentes y RAG** | **LangGraph** (+ LangChain según necesidad) | Flujos multi-agente: narrativa, validación pedagógica, formato |
 | **Base de datos** | **PostgreSQL + pgvector** | Relacional + vectorial en el mismo motor |
@@ -351,7 +352,7 @@ Una sola base de código con **React Native + Expo** compila para ambas tiendas.
 | **Proxy / TLS** | **Traefik** o **Nginx Proxy Manager** | Solo en producción (Oracle) |
 | **Contenedores** | **Docker + Docker Compose** | Local y producción con el mismo modelo |
 | **TTS (opcional)** | API de voz del proveedor elegido | *Post-MVP* |
-| **CI/CD** | GitHub Actions | Tests, build imagen Docker, EAS Build móvil |
+| **CI/CD** | GitHub Actions | Tests, build imagen Docker; Capacitor build móvil (fase posterior) |
 | **Web comercial** | **Vercel + Next.js** (*opcional*) | Solo landing/marketing; no aloja backend ni app móvil |
 | **Pagos** | Stripe (*futuro*) | Sin coste fijo |
 
@@ -366,16 +367,16 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 │  PC de desarrollo (Windows)                              │
 │                                                          │
 │  ┌──────────────┐    ┌─────────────────────────────┐   │
-│  │ Expo (app)   │    │  Docker Compose (local)      │   │
-│  │ emulador /   │───►│  • FastAPI (backend)         │   │
-│  │ Expo Go / web│    │  • PostgreSQL + pgvector     │   │
-│  └──────────────┘    │    (volumen persistente)   │   │
+│  │ web/ (app)   │    │  Docker Compose (local)      │   │
+│  │ navegador /  │───►│  • FastAPI (backend)         │   │
+│  │ Electron dev │    │  • MinIO (R2 sim)            │   │
+│  └──────────────┘    │  • Supabase CLI (54321)      │   │
 │                      └─────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-- **Backend y BD** corren en Docker en el PC; los datos persisten en volumen local entre reinicios.
-- **Frontend** con `npx expo start`: emulador Android (AVD), **Expo Go** en móvil físico (Android o iPhone), o tecla **`w`** para vista web rápida.
+- **Backend y storage** corren en Docker + Supabase CLI en el PC.
+- **Frontend:** `./scripts/poc-web-dev.ps1` → `http://localhost:8082`; preview móvil PC con `./scripts/poc-web-preview.ps1` (Electron 390×844).
 - Sin PHP ni runtime nativo en el host Windows más allá de Node/Docker; ver reglas del workspace.
 
 #### Producción
@@ -398,8 +399,8 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
          ▲
          │ HTTPS
 ┌────────┴────────┐
-│  App Expo       │  Android / iOS
-│  (tiendas)      │
+│  App web /    │  Android / iOS (Capacitor)
+│  Capacitor    │
 └─────────────────┘
 ```
 
@@ -418,8 +419,8 @@ Spec detallada: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/spe
 
 ```
 ┌─────────────┐     JWT (Supabase)      ┌─────────────────────────────┐
-│  App Expo   │ ───────────────────────►│  FastAPI + LangGraph        │
-│  Android/iOS│     HTTPS               │  GCP Cloud Run  OR          │
+│  App web    │ ───────────────────────►│  FastAPI + LangGraph        │
+│  Capacitor  │     HTTPS               │  GCP Cloud Run  OR          │
 └──────┬──────┘                         │  Oracle AMD Micro (TBD)     │
        │                                └───────┬──────────┬──────────┘
        │ URLs de media (JSON)                  │          │
@@ -448,7 +449,7 @@ Spec detallada: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/spe
 
 Mismo `Dockerfile` para ambos destinos.
 
-**POC local (jun 2026):** stack validado en desarrollo con Docker Compose (FastAPI + MinIO) + Supabase CLI + app Expo Go. Guía: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md); spec: [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
+**POC local (jun 2026):** stack validado con Docker Compose (FastAPI + MinIO) + Supabase CLI + cliente `web/`. Guía: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md); spec: [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
 
 #### 10.5.2 Neon vs Supabase
 
@@ -560,8 +561,8 @@ Request narrativo (FastAPI)
 
 ```
 ┌─────────────┐     JWT (Supabase)      ┌──────────────────┐
-│  App Expo   │ ───────────────────────►│  FastAPI         │
-│  Android/iOS│     HTTPS only          │  /api/v1/*       │
+│  App web    │ ───────────────────────►│  FastAPI         │
+│  Capacitor  │     HTTPS only          │  /api/v1/*       │
 └──────┬──────┘                         └────────┬─────────┘
        │                                         │
        │ media URLs (directo)                    │ DATABASE_URL, R2 keys
@@ -694,27 +695,26 @@ La infraestructura Oracle se provisionará y operará con **agentes de Cursor** 
 
 ## 12. Entorno de desarrollo y pruebas
 
-### Emuladores y dispositivos
+### Entornos de preview
 
 | Entorno | Herramienta | Requisitos / notas |
 | --- | --- | --- |
-| **Android (emulador)** | Android Studio → Virtual Device Manager (AVD) | Windows/macOS/Linux; ~16 GB RAM recomendados; simula cámara, GPS, rotación |
-| **iOS (simulador)** | Simulador de Xcode | **Solo macOS** — no hay simulador oficial de iOS en Windows |
-| **Móvil físico** | **Expo Go** (Play Store / App Store) | Escanear QR tras `npx expo start`; hot reload en ~medio segundo |
-| **Maquetado rápido** | Tecla **`w`** en Expo | Render en navegador; no sustituye pruebas nativas |
+| **PC — desarrollo** | `./scripts/poc-web-dev.ps1` → `http://localhost:8082` | Node 20+, pnpm |
+| **PC — viewport móvil** | `./scripts/poc-web-preview.ps1` (Electron 390×844) | Misma app web, marco fijo |
+| **Agentes / E2E** | MCP Playwright, viewport 390×844 | Capturas en `tmp/playwright-output/` |
+| **Móvil físico (fase Capacitor)** | Build Capacitor en dispositivo | Posterior al MVP web |
 
 ### Flujo de desarrollo día a día
 
-1. Levantar stack local: `docker compose up` (API + Postgres persistente).
-2. En otra terminal: `npx expo start` en el proyecto móvil.
-3. Probar en emulador Android, Expo Go (Android/iPhone) o web.
-4. Builds de tienda: **EAS Build** (Expo Application Services) en la nube para APK/AAB e IPA.
+1. Levantar stack local: `./scripts/poc-up.ps1` (Supabase CLI + API + MinIO).
+2. En otra terminal: `./scripts/poc-web-dev.ps1` → cliente en `http://localhost:8082`.
+3. Validar UI en navegador o Electron preview; agentes con Playwright viewport móvil.
+4. Builds de tienda: **Capacitor** (fase posterior) empaquetando `web/`.
 
 ### Matriz de pruebas mínima (MVP)
 
-- **Android:** emulador o dispositivo físico.
-- **iOS:** dispositivo físico con Expo Go, o simulador en Mac cuando esté disponible.
-- **Backend:** tests contra API local en Docker.
+- **Web:** flujo loader → galería → POC arquitectura en `localhost:8082`.
+- **Backend:** tests `pytest` contra API local en Docker.
 - **Casos funcionales:** registro padre, alta de niño, elección de mundo, examen de acceso narrativo, una lección, elección narrativa, verificación de que el siguiente beat **no repite** el anterior, persistencia tras cerrar app.
 
 ---
