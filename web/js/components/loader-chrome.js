@@ -1,4 +1,5 @@
 import { assetUrl } from "../lib/assets.manifest.js";
+import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 
 export const LOADER_SLOGAN = "Dos mundos. Un viaje épico.";
 
@@ -220,19 +221,7 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
   const accentSpace = document.createElement("div");
   accentSpace.className = "loader-layer loader-layer--accent loader-layer--space";
 
-  const particles = document.createElement("div");
-  particles.className = "loader-particles";
-  if (!reducedMotion) {
-    particles.setAttribute("aria-hidden", "true");
-    for (let i = 0; i < 12; i++) {
-      const p = document.createElement("span");
-      p.className = `loader-particle loader-particle--${i % 2 === 0 ? "space" : "fantasy"}`;
-      p.style.setProperty("--i", String(i));
-      particles.appendChild(p);
-    }
-  }
-
-  layers.append(bg, accentFantasy, accentSpace, particles);
+  layers.append(bg, accentFantasy, accentSpace);
 
   const chrome = document.createElement("div");
   chrome.className = "loader-chrome";
@@ -275,6 +264,8 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
   scene.append(layers, chrome);
   app.appendChild(scene);
 
+  let spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
+
   let destroyed = false;
   let progress = 0;
   let rafId = 0;
@@ -293,7 +284,7 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
   };
 
   void (async () => {
-    const bgOk = await mountOptionalImage(bg, "loader.bg.dual", {
+    const bgOk = await mountOptionalImage(bg, "loader.bg.plain", {
       fit: "contain",
       onLoad: () => scene.classList.add("is-bg-ready"),
     });
@@ -393,6 +384,7 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
   return {
     destroy() {
       destroyed = true;
+      spaceOrbitTeardown.destroy();
       if (rafId) cancelAnimationFrame(rafId);
       scene.removeEventListener("click", trySkip);
     },

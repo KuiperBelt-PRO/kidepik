@@ -33,6 +33,11 @@ body {
   flex-direction: column;
 }
 
+.scene.scene-loader {
+  display: block;
+  min-height: 0;
+}
+
 .scene-scroll {
   flex: 1;
   overflow-y: auto;

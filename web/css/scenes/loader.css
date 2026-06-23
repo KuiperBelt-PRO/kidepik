@@ -10,10 +10,13 @@
   background: #000;
 }
 
-.scene-loader {
+.scene.scene-loader {
   position: relative;
+  aspect-ratio: 9 / 16;
   width: min(100vw, calc(100dvh * 9 / 16));
-  height: min(100dvh, calc(100vw * 16 / 9));
+  height: auto;
+  max-height: 100dvh;
+  min-height: 0;
   overflow: hidden;
   cursor: pointer;
   flex-shrink: 0;
@@ -40,10 +43,11 @@
 .loader-layer--bg {
   background: linear-gradient(
     180deg,
-    #0a1628 0%,
-    #1a3a6e 38%,
-    #1a4d2e 62%,
-    #0c2818 100%
+    #0b1530 0%,
+    #1a3d5c 28%,
+    #2d6b4a 58%,
+    #3a8f3a 78%,
+    #c9a83a 100%
   );
 }
 
@@ -98,45 +102,125 @@
   clip-path: inset(50% 0 0 0);
 }
 
-.loader-particles {
+/* Planetas blancos 2D + arcos orbitales (franja superior ~40 %, sin cruzar el anillo) */
+.loader-layer.loader-layer--space-orbit {
+  inset: auto;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48%;
+  bottom: auto;
+  z-index: 1;
+  overflow: visible;
+  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
+  mask-image: radial-gradient(
+    circle at 50% calc(100% + 40px),
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 50% calc(100% + 40px),
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+}
+
+.loader-orbit-paths {
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
 }
 
-.loader-particle {
+.loader-orbit-track {
   position: absolute;
-  width: 6px;
-  height: 6px;
+  inset: 0;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.loader-orbit-path__stroke,
+.loader-orbit-path--planet {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1;
+}
+
+.loader-moon-orbit-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--moon-orbit-r) * 2);
+  height: calc(var(--moon-orbit-r) * 2);
+  margin: calc(-1 * var(--moon-orbit-r)) 0 0 calc(-1 * var(--moon-orbit-r));
+  border: 1px solid #fff;
   border-radius: 50%;
-  opacity: 0;
-  animation: loader-float 4s ease-in-out infinite;
-  animation-delay: calc(var(--i) * 0.35s);
+  box-sizing: border-box;
 }
 
-.loader-particle--space {
+.loader-orbit-runner {
+  position: absolute;
+  width: 0;
+  height: 0;
+  margin: 0;
+  pointer-events: none;
+}
+
+.loader-orbit-cluster {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--cluster-r) * 2 + 12px);
+  height: calc(var(--cluster-r) * 2 + 12px);
+  transform: translate(-50%, -50%);
+}
+
+.loader-planet {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--planet-size);
+  height: var(--planet-size);
+  min-width: var(--planet-size);
+  min-height: var(--planet-size);
+  margin: calc(var(--planet-size) / -2) 0 0 calc(var(--planet-size) / -2);
+  border-radius: 50%;
   background: #fff;
-  box-shadow: 0 0 10px var(--loader-space);
-  top: calc(8% + (var(--i) * 5%));
-  left: calc(10% + (var(--i) * 7%));
+  flex-shrink: 0;
+  z-index: 2;
 }
 
-.loader-particle--fantasy {
-  background: var(--loader-fantasy-gold);
-  box-shadow: 0 0 12px var(--loader-fantasy);
-  bottom: calc(8% + (var(--i) * 4%));
-  right: calc(12% + (var(--i) * 6%));
+.loader-planet--gas {
+  box-shadow: 0 0 0 1px #fff;
 }
 
-@keyframes loader-float {
-  0%,
-  100% {
-    opacity: 0;
-    transform: translateY(0) scale(0.6);
+.loader-moon-arm {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  animation: loader-moon-arm-spin var(--moon-duration, 8s) linear infinite;
+}
+
+.loader-moon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--moon-size);
+  height: var(--moon-size);
+  margin: calc(var(--moon-size) / -2) 0 0 calc(var(--moon-size) / -2);
+  border-radius: 50%;
+  background: #fff;
+  transform: translateY(calc(-1 * var(--moon-orbit-r)));
+}
+
+@keyframes loader-moon-arm-spin {
+  from {
+    transform: rotate(calc(var(--moon-phase, 0) * 360deg));
   }
-  50% {
-    opacity: 0.9;
-    transform: translateY(-12px) scale(1);
+  to {
+    transform: rotate(calc(var(--moon-phase, 0) * 360deg + 360deg));
   }
 }
 
@@ -284,9 +368,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loader-particle,
   .loader-logo-wrap.is-ambi-active,
-  .loader-ring-spin.is-orbiting {
+  .loader-ring-spin.is-orbiting,
+  .loader-moon-arm {
     animation: none;
   }
 

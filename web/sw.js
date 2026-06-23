@@ -1,4 +1,4 @@
-const CACHE = "kidepik-web-v4";
+const CACHE = "kidepik-web-v27";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -15,12 +15,13 @@ const PRECACHE = [
   "/js/data/catalog.js",
   "/js/components/ui.js",
   "/js/components/loader-chrome.js",
+  "/js/components/loader-space-orbit.js",
   "/js/scenes/loader.js",
   "/js/scenes/gallery.js",
   "/js/scenes/world-picker.js",
   "/js/scenes/mockup.js",
   "/js/scenes/poc.js",
-  "/assets/shared/screens/loader-bg-dual.png",
+  "/assets/shared/screens/loader-bg-plain.png",
   "/assets/shared/logo/wordmark-ambigram-light.png",
 ];
 
@@ -48,7 +49,7 @@ self.addEventListener("fetch", (event) => {
   const isAssetImage =
     url.pathname.startsWith("/assets/") && url.pathname.match(/\.(png|webp|jpg|jpeg|svg)$/i);
 
-  if (isJs) {
+  if (isJs || url.pathname.startsWith("/css/scenes/")) {
     event.respondWith(
       fetch(request)
         .then((response) => {
