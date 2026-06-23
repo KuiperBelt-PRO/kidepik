@@ -39,15 +39,26 @@ export function navigate(path) {
   window.location.hash = path.startsWith("/") ? path : `/${path}`;
 }
 
+/** @type {(() => void) | null} */
+let routeTeardown = null;
+
 export function startRouter() {
   const run = () => {
+    if (routeTeardown) {
+      routeTeardown();
+      routeTeardown = null;
+    }
+
     const hash = window.location.hash || "#/loader";
     const match = matchRoute(hash);
     const app = document.getElementById("app");
     if (!app) return;
     app.innerHTML = "";
     if (match) {
-      void match.handler(match.params);
+      const out = match.handler(match.params);
+      if (out && typeof out.destroy === "function") {
+        routeTeardown = out.destroy;
+      }
     } else {
       navigate("/gallery");
     }

@@ -1,22 +1,27 @@
-const CACHE = "kidepik-web-v1";
+const CACHE = "kidepik-web-v4";
 const PRECACHE = [
   "/",
   "/index.html",
   "/css/tokens.css",
   "/css/layout.css",
   "/css/components.css",
+  "/css/scenes/loader.css",
   "/js/main.js",
   "/js/config.js",
   "/js/config.sample.js",
   "/js/lib/router.js",
   "/js/lib/theme.js",
+  "/js/lib/assets.manifest.js",
   "/js/data/catalog.js",
   "/js/components/ui.js",
+  "/js/components/loader-chrome.js",
   "/js/scenes/loader.js",
   "/js/scenes/gallery.js",
   "/js/scenes/world-picker.js",
   "/js/scenes/mockup.js",
   "/js/scenes/poc.js",
+  "/assets/shared/screens/loader-bg-dual.png",
+  "/assets/shared/logo/wordmark-ambigram-light.png",
 ];
 
 self.addEventListener("install", (event) => {
@@ -39,11 +44,46 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  const isJs = url.pathname.startsWith("/js/");
+  const isAssetImage =
+    url.pathname.startsWith("/assets/") && url.pathname.match(/\.(png|webp|jpg|jpeg|svg)$/i);
+
+  if (isJs) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE).then((c) => c.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request)),
+    );
+    return;
+  }
+
+  if (isAssetImage) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE).then((c) => c.put(request, clone));
+          }
+          return response;
+        });
+      }),
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(request).then((cached) => {
       if (cached) return cached;
       return fetch(request).then((response) => {
-        if (response.ok && url.pathname.match(/\.(css|js|webp|woff2?)$/)) {
+        if (response.ok && url.pathname.match(/\.(css|woff2?)$/)) {
           const clone = response.clone();
           caches.open(CACHE).then((c) => c.put(request, clone));
         }

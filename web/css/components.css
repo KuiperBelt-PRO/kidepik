@@ -199,41 +199,6 @@
   z-index: 50;
 }
 
-.loader-ring {
-  width: 120px;
-  height: 120px;
-  margin: var(--space-xl) auto;
-  border-radius: 50%;
-  border: 6px solid var(--color-frame-fill);
-  border-top-color: var(--color-primary);
-  border-right-color: var(--color-secondary);
-  animation: spin 1.2s linear infinite;
-  box-shadow: 0 0 32px var(--color-glow);
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.loader-phrase {
-  text-align: center;
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--color-secondary);
-  text-shadow: 0 0 10px var(--color-glow);
-  min-height: 3rem;
-}
-
-.loader-tap {
-  text-align: center;
-  margin-top: var(--space-xl);
-  color: var(--color-primary);
-  opacity: 0.8;
-  font-size: 0.9rem;
-}
-
 .dialogue-row {
   display: flex;
   gap: var(--space-md);
