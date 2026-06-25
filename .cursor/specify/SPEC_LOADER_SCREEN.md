@@ -121,6 +121,13 @@ Hasta tener arte final: gradiente + `PLACEHOLDER` badge discreto en dev (no en p
 6. Sin errores consola en flujo feliz.
 7. Playwright: captura en `tmp/playwright-output/loader-dual.png`.
 
+### Capa orbital — naves procedurales (jun 2026)
+
+- Siluetas **modulares hard sci-fi** (`loader-ship-procedural.js`), inspiradas en concept art industrial (espina segmentada, pods, bloques asimétricos, greebles, antenas). **Sin fuselaje continuo tipo pepino.**
+- Archetypes → layouts: **fighter** (caza falcata / torre), **interceptor** (fragata de espina), **gunship** (bulk capital), **shuttle** (rig modular / torre). **14+ capas** SVG por nave.
+- Carriles **paralelos** a arcos orbitales; blanco puro `#fff`; sin propulsión/flama.
+- Tamaño ~38–44 px; tests en `web/tests/loader-ship-procedural.test.js`.
+
 ## Fuera de alcance
 
 - Selección de mundo (pantalla P1 separada).

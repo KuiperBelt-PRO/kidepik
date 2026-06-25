@@ -1,3 +1,5 @@
+import { mountSpaceShips } from "./loader-space-ships.js";
+
 /**
  * Arco circular (radio igual en X e Y). Centro fuera de pantalla.
  */
@@ -345,6 +347,7 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
       );
       motionHandles.get(spec.id)?.sync();
     }
+    motionHandles.get("__ships__")?.sync();
   }
 
   const resizeObserver = new ResizeObserver(() => layoutOrbit());
@@ -357,6 +360,18 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
   for (const { track } of systems) {
     cleanups.push(track.startMotion());
   }
+
+  const shipsTeardown = mountSpaceShips(layer, {
+    reducedMotion,
+    orbits: systems.map(({ spec, path }) => ({
+      id: spec.id,
+      path,
+      durationMs: spec.duration * 1000,
+      delayMs: spec.delay * 1000,
+    })),
+  });
+  cleanups.push(() => shipsTeardown.destroy());
+  motionHandles.set("__ships__", { sync: () => shipsTeardown.sync() });
 
   return {
     destroy() {
