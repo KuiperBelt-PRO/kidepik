@@ -270,6 +270,7 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
   chrome.appendChild(focal);
   scene.append(layers, chrome);
   app.appendChild(scene);
+  document.body.classList.add("is-loader-active");
 
   let spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
 
@@ -292,7 +293,7 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
 
   void (async () => {
     const bgOk = await mountOptionalImage(bg, "loader.bg.plain", {
-      fit: "contain",
+      fit: "cover",
       onLoad: () => scene.classList.add("is-bg-ready"),
     });
     if (!bgOk) markMissingBg();
@@ -391,6 +392,7 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
   return {
     destroy() {
       destroyed = true;
+      document.body.classList.remove("is-loader-active");
       spaceOrbitTeardown.destroy();
       if (rafId) cancelAnimationFrame(rafId);
       scene.removeEventListener("click", trySkip);

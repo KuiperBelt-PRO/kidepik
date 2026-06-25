@@ -1,31 +1,32 @@
-/* Loader splash — marco 9:16, anillo blanco + logo centrado */
+/* Loader splash — viewport móvil completo, anillo blanco + logo centrado */
 
 #app:has(.scene-loader) {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
+  display: block;
   width: 100%;
   max-width: none;
+  min-height: 100dvh;
+  height: 100dvh;
   background: #000;
 }
 
 .scene.scene-loader {
   position: relative;
-  aspect-ratio: 9 / 16;
-  width: min(100vw, calc(100dvh * 9 / 16));
-  height: auto;
-  max-height: 100dvh;
-  min-height: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
   overflow: hidden;
   cursor: pointer;
-  flex-shrink: 0;
   background: #000;
   --loader-fantasy: #3ddb7e;
   --loader-fantasy-gold: #f0c14a;
   --loader-space: #4da3ff;
   --loader-space-cyan: #7ec8ff;
-  --loader-ring-size: min(72vw, 276px);
+  --loader-ring-size: clamp(200px, 66vmin, min(76vw, 320px));
+}
+
+/* Sin scanlines retro del tema space opera sobre el splash */
+[data-theme="spaceOpera"] body.is-loader-active.scanlines::after {
+  display: none;
 }
 
 .loader-layers {
@@ -78,7 +79,7 @@
 .loader-layer__img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   object-position: center center;
   display: block;
   opacity: 0;
