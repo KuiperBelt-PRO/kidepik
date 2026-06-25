@@ -158,10 +158,10 @@ function createLoaderRingTextSvg() {
       <text
         class="loader-ring__text loader-ring__text--sci"
         fill="currentColor"
-        font-family="Orbitron, sans-serif"
-        font-size="5.8"
-        font-weight="700"
-        letter-spacing="0.2em"
+        font-family="Bruno Ace, Orbitron, sans-serif"
+        font-size="5.2"
+        font-weight="600"
+        letter-spacing="0.08em"
       >
         <textPath
           href="#${pathSciId}"

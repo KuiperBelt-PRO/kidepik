@@ -374,7 +374,9 @@
 }
 
 .loader-ring__text--sci {
-  font-family: "Orbitron", sans-serif;
+  font-family: "Bruno Ace", "Orbitron", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.08em;
 }
 
 .loader-ring__text--fantasy {
