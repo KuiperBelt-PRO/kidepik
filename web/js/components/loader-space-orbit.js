@@ -56,6 +56,21 @@ const ORBIT_SYSTEMS = [
       { orbitR: 34, dur: 12, moons: [{ size: 7, phase: 0.35 }, { size: 5, phase: 0.72 }] },
     ],
   },
+  {
+    id: "tertiary",
+    anchor: "custom",
+    entryXPad: 36,
+    entryY: 172,
+    exitX: 0.5,
+    exitY: -88,
+    openness: 2.15,
+    planet: 16,
+    gas: false,
+    duration: 40,
+    delay: -12,
+    still: 0.42,
+    moonBands: [{ orbitR: 21, dur: 11, moons: [{ size: 14, phase: 0.25 }] }],
+  },
 ];
 
 /**
@@ -126,11 +141,73 @@ function computeLogoAnchoredOrbit(w, logoY, entryAbove, exitAbove, edgePad, open
 }
 
 /**
+ * Punto intermedio sobre un arco circular.
+ */
+function arcPointAt(cx, cy, r, startDeg, endDeg, sweep, t) {
+  const sd = (startDeg * Math.PI) / 180;
+  const ed = (endDeg * Math.PI) / 180;
+  let delta = ed - sd;
+  if (sweep === 1 && delta < 0) delta += Math.PI * 2;
+  if (sweep === 0 && delta > 0) delta -= Math.PI * 2;
+  const ang = sd + delta * t;
+  return { x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) };
+}
+
+/**
+ * Arco entre dos puntos arbitrarios, curvado hacia un foco (centro de imagen).
+ */
+function computeCustomArc(x1, y1, x2, y2, openness, bulgeTarget) {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const chord = Math.hypot(dx, dy) || 1;
+  const radius = chord * openness;
+  const distMtoC = Math.sqrt(Math.max(radius * radius - (chord / 2) ** 2, 0));
+  const px = -dy / chord;
+  const py = dx / chord;
+
+  const centers = [
+    { cx: mx + px * distMtoC, cy: my + py * distMtoC },
+    { cx: mx - px * distMtoC, cy: my - py * distMtoC },
+  ];
+
+  let bestGeom = /** @type {{ cx: number; cy: number; r: number; startDeg: number; endDeg: number; sweep: number } | null} */ (null);
+  let bestDist = Infinity;
+
+  for (const { cx, cy } of centers) {
+    const startDeg = (Math.atan2(y1 - cy, x1 - cx) * 180) / Math.PI;
+    const endDeg = (Math.atan2(y2 - cy, x2 - cx) * 180) / Math.PI;
+    for (const sweep of [0, 1]) {
+      const mid = arcPointAt(cx, cy, radius, startDeg, endDeg, sweep, 0.5);
+      const d = Math.hypot(mid.x - bulgeTarget.x, mid.y - bulgeTarget.y);
+      if (d < bestDist) {
+        bestDist = d;
+        bestGeom = { cx, cy, r: radius, startDeg, endDeg, sweep };
+      }
+    }
+  }
+
+  return bestGeom ?? { cx: mx, cy: my, r: radius, startDeg: 0, endDeg: 0, sweep: 0 };
+}
+
+/**
  * @param {typeof ORBIT_SYSTEMS[number]} spec
  * @param {number} w
+ * @param {number} h
  * @param {number} logoY
  */
-function orbitGeometry(spec, w, logoY) {
+function orbitGeometry(spec, w, h, logoY) {
+  if (spec.anchor === "custom") {
+    return computeCustomArc(
+      -spec.entryXPad,
+      spec.entryY,
+      w * spec.exitX,
+      spec.exitY,
+      spec.openness,
+      { x: w / 2, y: h * 0.52 },
+    );
+  }
   if (spec.anchor === "absolute") {
     return computeOpenOrbitFromPoints(w, spec.entryY, spec.exitY, spec.edgePad, spec.openness);
   }
@@ -189,7 +266,7 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
     const logoY = measureLogoCenterY(layer);
 
     for (const { spec, path } of systems) {
-      const g = orbitGeometry(spec, w, logoY);
+      const g = orbitGeometry(spec, w, h, logoY);
       path.setAttribute(
         "d",
         orbitArc(g.cx, g.cy, g.r, g.startDeg, g.endDeg, g.sweep),
