@@ -141,8 +141,8 @@
   overflow: visible;
 }
 
-.loader-orbit-path__stroke,
-.loader-orbit-path--planet {
+.loader-orbit-path,
+.loader-orbit-path__stroke {
   fill: none;
   stroke: #fff;
   stroke-width: 1;

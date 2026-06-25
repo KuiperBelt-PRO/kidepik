@@ -17,26 +17,46 @@ function orbitArc(cx, cy, r, startDeg, endDeg, sweep = 1) {
   return `M ${fmt(x1)} ${fmt(y1)} A ${r} ${r} 0 ${large} ${sweep} ${fmt(x2)} ${fmt(y2)}`;
 }
 
-/** Única órbita: izquierda → derecha, anclada al logo. */
-const ORBIT = {
-  id: "main",
-  entryAboveLogo: 50,
-  exitAboveLogo: 150,
-  blockRaisePx: 200,
-  edgePad: 40,
-  openness: 3.2,
-  planet: 52,
-  gas: true,
-  duration: 56,
-  delay: 0,
-  still: 0.5,
-  moonBands: [
-    { orbitR: 34, dur: 8, moons: [{ size: 5, phase: 0 }, { size: 3, phase: 0.5 }] },
-    { orbitR: 48, dur: 10, moons: [{ size: 6, phase: 0.15 }, { size: 4, phase: 0.65 }] },
-    { orbitR: 62, dur: 12, moons: [{ size: 3, phase: 0.35 }, { size: 5, phase: 0.85 }] },
-    { orbitR: 76, dur: 14, moons: [{ size: 2, phase: 0.55 }, { size: 4, phase: 0.05 }] },
-  ],
-};
+/** @type {const} */
+const ORBIT_SYSTEMS = [
+  {
+    id: "main",
+    anchor: "logo",
+    entryAboveLogo: 50,
+    exitAboveLogo: 150,
+    blockRaisePx: 200,
+    edgePad: 40,
+    openness: 3.2,
+    planet: 52,
+    gas: true,
+    duration: 56,
+    delay: 0,
+    still: 0.5,
+    moonBands: [
+      { orbitR: 34, dur: 8, moons: [{ size: 5, phase: 0 }, { size: 3, phase: 0.5 }] },
+      { orbitR: 48, dur: 10, moons: [{ size: 6, phase: 0.15 }, { size: 4, phase: 0.65 }] },
+      { orbitR: 62, dur: 12, moons: [{ size: 3, phase: 0.35 }, { size: 5, phase: 0.85 }] },
+      { orbitR: 76, dur: 14, moons: [{ size: 2, phase: 0.55 }, { size: 4, phase: 0.05 }] },
+    ],
+  },
+  {
+    id: "secondary",
+    anchor: "absolute",
+    entryY: 16,
+    exitY: 178,
+    edgePad: 36,
+    openness: 2.35,
+    planet: 30,
+    gas: false,
+    duration: 44,
+    delay: -18,
+    still: 0.35,
+    moonBands: [
+      { orbitR: 22, dur: 9, moons: [{ size: 6, phase: 0.1 }] },
+      { orbitR: 34, dur: 12, moons: [{ size: 7, phase: 0.35 }, { size: 5, phase: 0.72 }] },
+    ],
+  },
+];
 
 /**
  * Centro del logo en coords Y de la capa orbital (px desde arriba de la capa).
@@ -57,18 +77,14 @@ function measureLogoCenterY(layer) {
 /**
  * Arco circular abierto entre dos puntos (entrada izq, salida dcha).
  * @param {number} w
- * @param {number} logoY
- * @param {number} entryAbove
- * @param {number} exitAbove
+ * @param {number} y1
+ * @param {number} y2
  * @param {number} edgePad
- * @param {number} openness multiplicador del radio respecto a la cuerda
- * @param {number} raisePx desplazamiento vertical en bloque (px hacia arriba)
+ * @param {number} openness
  */
-function computeOpenOrbit(w, logoY, entryAbove, exitAbove, edgePad, openness, raisePx = 0) {
+function computeOpenOrbitFromPoints(w, y1, y2, edgePad, openness) {
   const x1 = -edgePad;
-  const y1 = logoY - entryAbove - raisePx;
   const x2 = w + edgePad;
-  const y2 = logoY - exitAbove - raisePx;
 
   const mx = (x1 + x2) / 2;
   const my = (y1 + y2) / 2;
@@ -95,12 +111,30 @@ function computeOpenOrbit(w, logoY, entryAbove, exitAbove, edgePad, openness, ra
 }
 
 /**
- * @param {typeof ORBIT} spec
+ * @param {number} w
+ * @param {number} logoY
+ * @param {number} entryAbove
+ * @param {number} exitAbove
+ * @param {number} edgePad
+ * @param {number} openness
+ * @param {number} raisePx
+ */
+function computeLogoAnchoredOrbit(w, logoY, entryAbove, exitAbove, edgePad, openness, raisePx = 0) {
+  const y1 = logoY - entryAbove - raisePx;
+  const y2 = logoY - exitAbove - raisePx;
+  return computeOpenOrbitFromPoints(w, y1, y2, edgePad, openness);
+}
+
+/**
+ * @param {typeof ORBIT_SYSTEMS[number]} spec
  * @param {number} w
  * @param {number} logoY
  */
 function orbitGeometry(spec, w, logoY) {
-  return computeOpenOrbit(
+  if (spec.anchor === "absolute") {
+    return computeOpenOrbitFromPoints(w, spec.entryY, spec.exitY, spec.edgePad, spec.openness);
+  }
+  return computeLogoAnchoredOrbit(
     w,
     logoY,
     spec.entryAboveLogo,
@@ -112,7 +146,7 @@ function orbitGeometry(spec, w, logoY) {
 }
 
 /**
- * Capa única: un arco superior izq→dcha y un planeta con 8 lunas.
+ * Capa orbital: arcos izq→dcha y planetas con lunas.
  * @param {HTMLElement} container
  * @param {{ reducedMotion?: boolean }} [options]
  */
@@ -128,15 +162,22 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
   svg.setAttribute("class", "loader-orbit-paths");
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   svg.setAttribute("aria-hidden", "true");
-
-  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-  path.setAttribute("id", "loader-orbit-path-main");
-  path.setAttribute("class", "loader-orbit-path loader-orbit-path--planet");
-  path.setAttribute("vector-effect", "non-scaling-stroke");
-  svg.appendChild(path);
   layer.appendChild(svg);
 
-  const track = createPlanetTrack(layer, ORBIT, path, reducedMotion, motionHandles);
+  /** @type {{ spec: typeof ORBIT_SYSTEMS[number]; path: SVGPathElement; track: ReturnType<typeof createPlanetTrack> }[]} */
+  const systems = [];
+
+  for (const spec of ORBIT_SYSTEMS) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("id", `loader-orbit-path-${spec.id}`);
+    path.setAttribute("class", `loader-orbit-path loader-orbit-path--${spec.id}`);
+    path.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(path);
+
+    const track = createPlanetTrack(layer, spec, path, reducedMotion, motionHandles);
+    systems.push({ spec, path, track });
+  }
+
   container.appendChild(layer);
 
   function layoutOrbit() {
@@ -146,14 +187,15 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
 
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     const logoY = measureLogoCenterY(layer);
-    const g = orbitGeometry(ORBIT, w, logoY);
-    path.setAttribute(
-      "d",
-      orbitArc(g.cx, g.cy, g.r, g.startDeg, g.endDeg, g.sweep),
-    );
 
-    const handle = motionHandles.get(ORBIT.id);
-    handle?.sync();
+    for (const { spec, path } of systems) {
+      const g = orbitGeometry(spec, w, logoY);
+      path.setAttribute(
+        "d",
+        orbitArc(g.cx, g.cy, g.r, g.startDeg, g.endDeg, g.sweep),
+      );
+      motionHandles.get(spec.id)?.sync();
+    }
   }
 
   const resizeObserver = new ResizeObserver(() => layoutOrbit());
@@ -163,7 +205,9 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
   cleanups.push(() => resizeObserver.disconnect());
 
   layoutOrbit();
-  cleanups.push(track.startMotion());
+  for (const { track } of systems) {
+    cleanups.push(track.startMotion());
+  }
 
   return {
     destroy() {
@@ -175,14 +219,14 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
 
 /**
  * @param {HTMLElement} layer
- * @param {typeof ORBIT} spec
+ * @param {typeof ORBIT_SYSTEMS[number]} spec
  * @param {SVGPathElement} path
  * @param {boolean} reducedMotion
  * @param {Map<string, { sync: () => void }>} motionHandles
  */
 function createPlanetTrack(layer, spec, path, reducedMotion, motionHandles) {
   const track = document.createElement("div");
-  track.className = "loader-orbit-track loader-orbit-track--main";
+  track.className = `loader-orbit-track loader-orbit-track--${spec.id}`;
   track.style.setProperty("--planet-size", `${spec.planet}px`);
 
   const runner = document.createElement("div");
@@ -207,7 +251,7 @@ function createPlanetTrack(layer, spec, path, reducedMotion, motionHandles) {
 }
 
 /**
- * @param {typeof ORBIT} spec
+ * @param {typeof ORBIT_SYSTEMS[number]} spec
  * @param {boolean} reducedMotion
  */
 function buildPlanetCluster(spec, reducedMotion) {
