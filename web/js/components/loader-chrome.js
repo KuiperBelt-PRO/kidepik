@@ -176,10 +176,10 @@ function createLoaderRingTextSvg() {
       <text
         class="loader-ring__text loader-ring__text--fantasy"
         fill="currentColor"
-        font-family="Cinzel, Georgia, serif"
-        font-size="5.6"
+        font-family="Uncial Antiqua, Cinzel, Georgia, serif"
+        font-size="5.8"
         font-weight="700"
-        letter-spacing="0.12em"
+        letter-spacing="0.06em"
       >
         <textPath
           href="#${pathFantasyId}"

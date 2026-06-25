@@ -378,7 +378,9 @@
 }
 
 .loader-ring__text--fantasy {
-  font-family: "Cinzel", Georgia, serif;
+  font-family: "Uncial Antiqua", "Cinzel", Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.06em;
 }
 
 .loader-ring__reveal {
