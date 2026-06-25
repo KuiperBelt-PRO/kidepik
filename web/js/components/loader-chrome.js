@@ -10,6 +10,13 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 const RING_TEXT_SCI = "DOS MUNDOS";
 const RING_TEXT_FANTASY = "UN VIAJE ÉPICO";
 const RING_TEXT_ARC = Math.PI * RING_RADIUS;
+const RING_TEXT_SCI_LENGTH = Math.round(RING_TEXT_ARC * 0.88);
+/** Fracción del arco superior donde empieza «DOS MUNDOS» (textPath centrado al 50 %). */
+const RING_TEXT_SCI_START_FRACTION = 0.5 - RING_TEXT_SCI_LENGTH / 2 / RING_TEXT_ARC;
+/** Grados SVG (0° = 3 h, sentido horario) donde arrancan progreso y revelado del texto. */
+const RING_TEXT_REVEAL_LEAD_DEG = 6;
+const RING_REVEAL_START_DEG =
+  180 + RING_TEXT_SCI_START_FRACTION * 180 - RING_TEXT_REVEAL_LEAD_DEG;
 
 /**
  * @param {string} src
@@ -95,7 +102,7 @@ function createLoaderRingBaseSvg() {
       stroke="currentColor"
       stroke-width="${RING_STROKE}"
       stroke-linecap="round"
-      transform="rotate(-90 60 60)"
+      transform="rotate(${RING_REVEAL_START_DEG} 60 60)"
       stroke-dasharray="${RING_CIRCUMFERENCE}"
       stroke-dashoffset="${RING_CIRCUMFERENCE}"
     />
@@ -141,7 +148,7 @@ function createLoaderRingTextSvg() {
           stroke="white"
           stroke-width="20"
           stroke-linecap="butt"
-          transform="rotate(-90 60 60)"
+          transform="rotate(${RING_REVEAL_START_DEG} 60 60)"
           stroke-dasharray="${RING_CIRCUMFERENCE}"
           stroke-dashoffset="${RING_CIRCUMFERENCE}"
         />
@@ -161,7 +168,7 @@ function createLoaderRingTextSvg() {
           startOffset="50%"
           text-anchor="middle"
           lengthAdjust="spacing"
-          textLength="${Math.round(RING_TEXT_ARC * 0.88)}"
+          textLength="${RING_TEXT_SCI_LENGTH}"
         >
           ${RING_TEXT_SCI}
         </textPath>
