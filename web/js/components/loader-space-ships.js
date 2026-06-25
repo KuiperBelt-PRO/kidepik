@@ -1,4 +1,14 @@
 import { generateShipForSlot, randomRollSeed } from "./loader-ship-procedural.js";
+import {
+  collectPlanetPositions,
+  createProximityLinesLayer,
+  createShipProximityHud,
+  HUD_SCREEN_ROTATION_DEG,
+  HUD_SIZE_SCALE,
+  nearestPlanetProximity,
+  PROXIMITY_VISUAL_OPACITY,
+  rectCenterInLayer,
+} from "./loader-ship-proximity-hud.js";
 
 /**
  * @typedef {'fighter' | 'interceptor' | 'gunship' | 'shuttle'} ShipArchetype
@@ -122,6 +132,9 @@ function createShipElement(spec, rollSeed) {
   ship.dataset.style = generated.style;
   ship.dataset.orbitId = spec.orbitId;
 
+  const body = document.createElement("div");
+  body.className = "loader-spaceship__body";
+
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", generated.viewBox);
   svg.setAttribute("class", "loader-spaceship__svg");
@@ -134,7 +147,8 @@ function createShipElement(spec, rollSeed) {
     svg.appendChild(path);
   }
 
-  ship.appendChild(svg);
+  body.appendChild(svg);
+  ship.appendChild(body);
   return ship;
 }
 
@@ -204,27 +218,118 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
   const orbitById = new Map(orbits.map((o) => [o.id, o]));
   const rollSeed = randomRollSeed();
 
-  const ships = SPACESHIPS.map((spec) => ({
-    spec,
-    el: createShipElement(spec, rollSeed),
-    lastProgress: spec.phase,
-  }));
+  const ships = SPACESHIPS.map((spec) => {
+    const el = createShipElement(spec, rollSeed);
+    const hud = createShipProximityHud(spec.id);
+    hud.style.setProperty("--ship-w", el.style.getPropertyValue("--ship-w"));
+    hud.style.setProperty("--ship-h", el.style.getPropertyValue("--ship-h"));
+    hud.style.setProperty("--ship-size", el.style.getPropertyValue("--ship-size"));
+    hud.style.setProperty("--hud-scale", String(HUD_SIZE_SCALE));
+    return {
+      spec,
+      el,
+      body: /** @type {HTMLElement} */ (el.querySelector(".loader-spaceship__body")),
+      hud,
+      lastProgress: spec.phase,
+    };
+  });
 
-  for (const { el } of ships) {
-    el.style.opacity = "0";
-    layer.appendChild(el);
+  const proximityLines = createProximityLinesLayer(layer);
+
+  for (const ship of ships) {
+    ship.el.style.opacity = "0";
+    ship.hud.style.opacity = "0";
+    layer.appendChild(ship.hud);
+    layer.appendChild(ship.el);
   }
 
   if (reducedMotion) {
-    return { destroy() {}, sync() {} };
+    return {
+      destroy() {
+        proximityLines.destroy();
+        for (const ship of ships) {
+          ship.hud.remove();
+        }
+      },
+      sync() {},
+    };
   }
 
   let rafId = 0;
 
+  /**
+   * @param {HTMLElement} shipEl
+   * @param {HTMLElement} layerEl
+   */
+  function shipCenterInLayer(shipEl, layerEl) {
+    const layerRect = layerEl.getBoundingClientRect();
+    const rect = shipEl.getBoundingClientRect();
+    return {
+      ...rectCenterInLayer(rect, layerRect),
+      radius: Math.max(rect.width, rect.height) / 2,
+    };
+  }
+
+  /**
+   * @param {typeof ships[number]} ship
+   * @param {number} shipOpacity
+   */
+  function updateProximityHud(ship, shipOpacity) {
+    const hud = ship.hud;
+    if (!hud) return;
+
+    if (shipOpacity <= 0.02) {
+      hud.style.opacity = "0";
+      proximityLines.hideLine(ship.spec.id);
+      return;
+    }
+
+    const center = shipCenterInLayer(ship.el, layer);
+    const planets = collectPlanetPositions(layer);
+    const match = nearestPlanetProximity(center, planets);
+
+    if (!match) {
+      hud.style.opacity = "0";
+      proximityLines.hideLine(ship.spec.id);
+      return;
+    }
+
+    const fade = match.fade * shipOpacity * PROXIMITY_VISUAL_OPACITY;
+    hud.style.opacity = String(fade);
+    proximityLines.updateLine(
+      ship.spec.id,
+      center,
+      { x: match.planet.x, y: match.planet.y },
+      fade,
+    );
+  }
+
+  /**
+   * @param {typeof ships[number]} ship
+   * @param {{ left: string; top: string; angle: number }} pos
+   */
+  function placeShip(ship, pos) {
+    ship.el.style.left = pos.left;
+    ship.el.style.top = pos.top;
+    ship.el.style.transform = "translate(-50%, -50%)";
+    ship.body.style.transform = `rotate(${pos.angle}deg)`;
+    ship.hud.style.left = pos.left;
+    ship.hud.style.top = pos.top;
+    ship.hud.style.transform = `translate(-50%, -50%) rotate(${HUD_SCREEN_ROTATION_DEG}deg)`;
+  }
+
   function sync() {
+    const w = layer.clientWidth;
+    const h = layer.clientHeight;
+    if (w && h) proximityLines.resize(w, h);
+
     for (const ship of ships) {
       const orbit = orbitById.get(ship.spec.orbitId);
-      if (!orbit) continue;
+      if (!orbit) {
+        ship.el.style.opacity = "0";
+        updateProximityHud(ship, 0);
+        continue;
+      }
       const pos = placeOnParallelPath(
         orbit.path,
         layer,
@@ -232,23 +337,29 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
         ship.spec.parallelOffset,
       );
       if (!pos) continue;
-      ship.el.style.left = pos.left;
-      ship.el.style.top = pos.top;
-      ship.el.style.transform = `translate(-50%, -50%) rotate(${pos.angle}deg)`;
+      placeShip(ship, pos);
+      const opacity = parseFloat(ship.el.style.opacity) || 0;
+      updateProximityHud(ship, opacity);
     }
   }
 
   function frame(now) {
+    const w = layer.clientWidth;
+    const h = layer.clientHeight;
+    if (w && h) proximityLines.resize(w, h);
+
     for (const ship of ships) {
       const orbit = orbitById.get(ship.spec.orbitId);
       if (!orbit) {
         ship.el.style.opacity = "0";
+        updateProximityHud(ship, 0);
         continue;
       }
 
       const state = shipProgress(ship.spec, now);
       if (!state) {
         ship.el.style.opacity = "0";
+        updateProximityHud(ship, 0);
         continue;
       }
 
@@ -259,12 +370,14 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
         state.t,
         ship.spec.parallelOffset,
       );
-      if (!pos) continue;
+      if (!pos) {
+        updateProximityHud(ship, 0);
+        continue;
+      }
 
-      ship.el.style.left = pos.left;
-      ship.el.style.top = pos.top;
+      placeShip(ship, pos);
       ship.el.style.opacity = String(state.opacity);
-      ship.el.style.transform = `translate(-50%, -50%) rotate(${pos.angle}deg)`;
+      updateProximityHud(ship, state.opacity);
     }
     rafId = requestAnimationFrame(frame);
   }
@@ -276,6 +389,10 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
     sync,
     destroy() {
       if (rafId) cancelAnimationFrame(rafId);
+      proximityLines.destroy();
+      for (const ship of ships) {
+        ship.hud.remove();
+      }
     },
   };
 }

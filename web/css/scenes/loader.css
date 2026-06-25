@@ -233,8 +233,17 @@
   pointer-events: none;
   z-index: 4;
   opacity: 0;
-  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.45));
+  transform: translate(-50%, -50%);
   will-change: transform, opacity, left, top;
+}
+
+.loader-spaceship__body {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  transform-origin: center center;
+  filter: drop-shadow(0 0 1px rgba(255, 255, 255, 0.45));
+  will-change: transform;
 }
 
 .loader-spaceship__svg {
@@ -242,6 +251,54 @@
   width: 100%;
   height: 100%;
   overflow: visible;
+}
+
+/* HUD hexagonal — capa orbital, tamaño según nave, rotación fija en pantalla */
+.loader-ship-hud {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--ship-w, var(--ship-size)) * var(--hud-scale, 1.755));
+  height: calc(var(--ship-h, var(--ship-size)) * var(--hud-scale, 1.755));
+  transform: translate(-50%, -50%) rotate(60deg);
+  transform-origin: center center;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 3;
+  transition: opacity 0.12s ease-out;
+}
+
+.loader-ship-hud__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.loader-ship-hud__hex {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.loader-proximity-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.loader-proximity-line {
+  stroke: #fff;
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
 }
 
 /* Chrome UI sobre el arte */
