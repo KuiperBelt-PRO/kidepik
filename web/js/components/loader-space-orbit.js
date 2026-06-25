@@ -71,6 +71,22 @@ const ORBIT_SYSTEMS = [
     still: 0.42,
     moonBands: [{ orbitR: 21, dur: 11, moons: [{ size: 14, phase: 0.25 }] }],
   },
+  {
+    id: "quaternary",
+    anchor: "custom",
+    entryXF: 0.6,
+    entryY: -52,
+    exitSide: "right",
+    exitXPad: 36,
+    exitY: 232,
+    openness: 2.25,
+    planet: 28,
+    gas: false,
+    duration: 48,
+    delay: -8,
+    still: 0.48,
+    moonBands: [],
+  },
 ];
 
 /**
@@ -192,6 +208,25 @@ function computeCustomArc(x1, y1, x2, y2, openness, bulgeTarget) {
 }
 
 /**
+ * Resuelve extremos de órbitas custom (izq, dcha, arriba, etc.).
+ * @param {typeof ORBIT_SYSTEMS[number]} spec
+ * @param {number} w
+ */
+function resolveCustomEndpoints(spec, w) {
+  const pad = spec.exitXPad ?? spec.edgePad ?? 36;
+  const x1 = spec.entryXF != null ? w * spec.entryXF : -(spec.entryXPad ?? pad);
+  const y1 = spec.entryY;
+  const x2 =
+    spec.exitSide === "right"
+      ? w + pad
+      : spec.exitXF != null
+        ? w * spec.exitXF
+        : w * (spec.exitX ?? 0.5);
+  const y2 = spec.exitY;
+  return { x1, y1, x2, y2 };
+}
+
+/**
  * @param {typeof ORBIT_SYSTEMS[number]} spec
  * @param {number} w
  * @param {number} h
@@ -199,14 +234,8 @@ function computeCustomArc(x1, y1, x2, y2, openness, bulgeTarget) {
  */
 function orbitGeometry(spec, w, h, logoY) {
   if (spec.anchor === "custom") {
-    return computeCustomArc(
-      -spec.entryXPad,
-      spec.entryY,
-      w * spec.exitX,
-      spec.exitY,
-      spec.openness,
-      { x: w / 2, y: h * 0.52 },
-    );
+    const { x1, y1, x2, y2 } = resolveCustomEndpoints(spec, w);
+    return computeCustomArc(x1, y1, x2, y2, spec.openness, { x: w / 2, y: h * 0.52 });
   }
   if (spec.anchor === "absolute") {
     return computeOpenOrbitFromPoints(w, spec.entryY, spec.exitY, spec.edgePad, spec.openness);
@@ -332,7 +361,9 @@ function createPlanetTrack(layer, spec, path, reducedMotion, motionHandles) {
  * @param {boolean} reducedMotion
  */
 function buildPlanetCluster(spec, reducedMotion) {
-  const maxR = Math.max(...spec.moonBands.map((b) => b.orbitR));
+  const maxR = spec.moonBands.length
+    ? Math.max(...spec.moonBands.map((b) => b.orbitR))
+    : Math.ceil(spec.planet / 2);
   const cluster = document.createElement("div");
   cluster.className = "loader-orbit-cluster";
   cluster.style.setProperty("--cluster-r", `${maxR}px`);
