@@ -87,6 +87,28 @@ const ORBIT_SYSTEMS = [
     still: 0.48,
     moonBands: [],
   },
+  {
+    id: "quinary",
+    anchor: "custom",
+    entryXPad: 36,
+    entryY: 215,
+    exitSide: "right",
+    exitXPad: 36,
+    exitY: 172,
+    blockOffsetY: 100,
+    openness: 1.9,
+    bulgeYF: 0.035,
+    planet: 32,
+    gas: false,
+    duration: 52,
+    delay: -14,
+    still: 0.45,
+    moonBands: [
+      { orbitR: 22, dur: 8, moons: [{ size: 3, phase: 0 }, { size: 5, phase: 0.5 }] },
+      { orbitR: 32, dur: 10, moons: [{ size: 4, phase: 0.15 }, { size: 2, phase: 0.62 }] },
+      { orbitR: 42, dur: 13, moons: [{ size: 6, phase: 0.28 }, { size: 3, phase: 0.75 }, { size: 4, phase: 0.4 }] },
+    ],
+  },
 ];
 
 /**
@@ -230,12 +252,33 @@ function resolveCustomEndpoints(spec, w) {
  * @param {typeof ORBIT_SYSTEMS[number]} spec
  * @param {number} w
  * @param {number} h
+ */
+function resolveBulgeTarget(spec, w, h) {
+  return {
+    x: w * (spec.bulgeXF ?? 0.5),
+    y: spec.bulgeY != null ? spec.bulgeY : h * (spec.bulgeYF ?? 0.52),
+  };
+}
+
+/**
+ * @param {typeof ORBIT_SYSTEMS[number]} spec
+ * @param {number} w
+ * @param {number} h
  * @param {number} logoY
  */
 function orbitGeometry(spec, w, h, logoY) {
   if (spec.anchor === "custom") {
+    const offsetY = spec.blockOffsetY ?? 0;
     const { x1, y1, x2, y2 } = resolveCustomEndpoints(spec, w);
-    return computeCustomArc(x1, y1, x2, y2, spec.openness, { x: w / 2, y: h * 0.52 });
+    const bulge = resolveBulgeTarget(spec, w, h);
+    return computeCustomArc(
+      x1,
+      y1 + offsetY,
+      x2,
+      y2 + offsetY,
+      spec.openness,
+      { x: bulge.x, y: bulge.y + offsetY },
+    );
   }
   if (spec.anchor === "absolute") {
     return computeOpenOrbitFromPoints(w, spec.entryY, spec.exitY, spec.edgePad, spec.openness);
