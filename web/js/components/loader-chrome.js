@@ -1,4 +1,5 @@
 import { assetUrl } from "../lib/assets.manifest.js";
+import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 
 export const LOADER_SLOGAN = "Dos mundos. Un viaje épico.";
@@ -273,6 +274,8 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   document.body.classList.add("is-loader-active");
 
   let spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
+  const meteorDemo = new URLSearchParams(window.location.search).get("meteorDemo") === "1";
+  let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
 
   let destroyed = false;
   let progress = 0;
@@ -378,6 +381,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       destroyed = true;
       document.body.classList.remove("is-loader-active");
       spaceOrbitTeardown.destroy();
+      meteorTeardown.destroy();
       if (rafId) cancelAnimationFrame(rafId);
     },
   };

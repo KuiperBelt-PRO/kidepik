@@ -126,6 +126,60 @@
   );
 }
 
+/* Estelas fugaces horizontales — franja superior space */
+.loader-layer.loader-layer--meteor-shower {
+  inset: auto;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48%;
+  bottom: auto;
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
+  mask-image: radial-gradient(
+    circle at 50% calc(100% + 40px),
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 50% calc(100% + 40px),
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+}
+
+.loader-meteor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: var(--meteor-len, 24px);
+  height: var(--meteor-thick, 1px);
+  margin: calc(var(--meteor-thick, 1px) / -2) 0 0 0;
+  border-radius: 999px;
+  pointer-events: none;
+  will-change: transform, opacity;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(126, 200, 255, 0.06) 18%,
+    rgba(126, 200, 255, 0.14) 42%,
+    rgba(255, 255, 255, calc(var(--meteor-tail, 0.7) * 0.55)) 68%,
+    rgba(255, 255, 255, var(--meteor-tail, 0.7)) 86%,
+    #fff 100%
+  );
+}
+
+.loader-meteor--micro {
+  filter: blur(0.3px);
+}
+
+.loader-meteor--medium,
+.loader-meteor--bright {
+  box-shadow: 2px 0 6px rgba(126, 200, 255, 0.35);
+}
+
 .loader-orbit-paths {
   position: absolute;
   inset: 0;
