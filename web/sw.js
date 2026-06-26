@@ -1,4 +1,4 @@
-const CACHE = "kidepik-web-v48";
+const CACHE = "kidepik-web-v50";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -12,18 +12,12 @@ const PRECACHE = [
   "/js/lib/router.js",
   "/js/lib/theme.js",
   "/js/lib/assets.manifest.js",
-  "/js/data/catalog.js",
-  "/js/components/ui.js",
   "/js/components/loader-chrome.js",
   "/js/components/loader-space-orbit.js",
   "/js/components/loader-space-ships.js",
   "/js/components/loader-ship-procedural.js",
   "/js/components/loader-ship-rng.js",
   "/js/scenes/loader.js",
-  "/js/scenes/gallery.js",
-  "/js/scenes/world-picker.js",
-  "/js/scenes/mockup.js",
-  "/js/scenes/poc.js",
   "/assets/shared/screens/loader-bg-plain.png",
   "/assets/shared/logo/wordmark-ambigram-light.png",
 ];

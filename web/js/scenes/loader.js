@@ -1,4 +1,3 @@
-import { navigate } from "../lib/router.js";
 import { mountLoaderChrome } from "../components/loader-chrome.js";
 
 /**
@@ -23,8 +22,5 @@ export function renderLoader() {
   const app = document.getElementById("app");
   if (!app) return { destroy() {} };
 
-  return mountLoaderChrome(app, {
-    onComplete: () => navigate("/gallery"),
-    pingHealth,
-  });
+  return mountLoaderChrome(app, { pingHealth });
 }

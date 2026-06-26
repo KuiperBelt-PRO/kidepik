@@ -60,7 +60,7 @@ export function startRouter() {
         routeTeardown = out.destroy;
       }
     } else {
-      navigate("/gallery");
+      navigate("/loader");
     }
   };
   window.addEventListener("hashchange", run);

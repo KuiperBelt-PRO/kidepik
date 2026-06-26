@@ -1,10 +1,6 @@
 import { registerRoute, startRouter } from "./lib/router.js";
 import { initTheme } from "./lib/theme.js";
 import { renderLoader } from "./scenes/loader.js";
-import { renderGallery } from "./scenes/gallery.js";
-import { renderWorldPicker } from "./scenes/world-picker.js";
-import { renderMockup } from "./scenes/mockup.js";
-import { renderPoc } from "./scenes/poc.js";
 
 function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");
@@ -26,10 +22,6 @@ function boot() {
   initTheme();
 
   registerRoute("loader", () => renderLoader());
-  registerRoute("gallery", () => renderGallery());
-  registerRoute("world-picker", () => renderWorldPicker());
-  registerRoute("mockup/:id", ({ id }) => renderMockup(id));
-  registerRoute("poc", () => renderPoc());
 
   startRouter();
 

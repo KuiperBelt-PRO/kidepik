@@ -201,10 +201,10 @@ function createLoaderRingTextSvg() {
 /**
  * Monta la escena loader (fondo dual + logo ambigrama + anillo de carga).
  * @param {HTMLElement} app
- * @param {{ onComplete: () => void; pingHealth?: () => Promise<boolean> }} options
+ * @param {{ pingHealth?: () => Promise<boolean> }} [options]
  * @returns {{ destroy: () => void }}
  */
-export function mountLoaderChrome(app, { onComplete, pingHealth }) {
+export function mountLoaderChrome(app, { pingHealth } = {}) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const scene = document.createElement("div");
@@ -329,22 +329,6 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
     void pingHealth();
   }
 
-  function finish() {
-    if (destroyed) return;
-    destroyed = true;
-    if (rafId) cancelAnimationFrame(rafId);
-    onComplete();
-  }
-
-  function trySkip() {
-    finish();
-  }
-
-  scene.addEventListener("click", trySkip);
-  scene.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" || e.key === " ") trySkip();
-  });
-
   function easeOutCubic(t) {
     return 1 - (1 - t) ** 3;
   }
@@ -395,7 +379,6 @@ export function mountLoaderChrome(app, { onComplete, pingHealth }) {
       document.body.classList.remove("is-loader-active");
       spaceOrbitTeardown.destroy();
       if (rafId) cancelAnimationFrame(rafId);
-      scene.removeEventListener("click", trySkip);
     },
   };
 }

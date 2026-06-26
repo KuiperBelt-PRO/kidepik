@@ -6,6 +6,7 @@ import {
   generateShip,
   generateShipForSlot,
   isValidGeneratedShip,
+  PROPULSION_STYLES,
 } from "../js/components/loader-ship-procedural.js";
 import { createRng, hashSeed } from "../js/components/loader-ship-rng.js";
 
@@ -88,5 +89,15 @@ describe("loader-ship-procedural", () => {
     const gunship = generateShip({ seed: 999, archetype: "gunship", styleHint: "heavyCruiser" });
     const fighter = generateShip({ seed: 999, archetype: "fighter", styleHint: "needleScout" });
     assert.notEqual(gunship.width, fighter.width);
+  });
+
+  it("aplica variaciones de propulsión en la popa", () => {
+    const seen = new Set();
+    for (let i = 0; i < 80; i += 1) {
+      const ship = generateShip({ seed: hashSeed(`propulsion-${i}`), archetype: "interceptor" });
+      assert.ok(PROPULSION_STYLES.includes(ship.propulsionStyle));
+      seen.add(ship.propulsionStyle);
+    }
+    assert.ok(seen.size >= 4, `expected propulsion spread, got ${[...seen].join(", ")}`);
   });
 });

@@ -8,7 +8,7 @@ import { createRng, hashSeed, randPick, randRange } from "./loader-ship-rng.js";
 
 /** @typedef {{ seed: number; archetype: ShipArchetype; lengthScale?: number; widthScale?: number; styleHint?: string }} ShipGenOptions */
 
-/** @typedef {{ viewBox: string; paths: string[]; width: number; height: number; archetype: ShipArchetype; style: string; lengthScale: number; widthScale: number }} GeneratedShip */
+/** @typedef {{ viewBox: string; paths: string[]; width: number; height: number; archetype: ShipArchetype; style: string; propulsionStyle: string; lengthScale: number; widthScale: number }} GeneratedShip */
 
 const DISPLAY_SCALE = 1.5;
 
@@ -306,12 +306,12 @@ function attachCapsulePod(layers, rng, along, hullW, side) {
 }
 
 /**
- * Bloque de motores AFT integrado (múltiples toberas).
+ * Bloque de motores AFT integrado (múltiples toberas) — variante clásica.
  * @param {ABPoint[][]} layers
  * @param {() => number} rng
  * @param {number} [scale]
  */
-function addEngineBlock(layers, rng, scale = 1) {
+function addPropulsionClassicBlock(layers, rng, scale = 1) {
   const s = scale;
   addRect(layers, 7 * s, 0, 12 * s, randRange(rng, 10, 14) * s);
   for (const side of [-1, 1]) {
@@ -319,6 +319,170 @@ function addEngineBlock(layers, rng, scale = 1) {
     addRect(layers, 2 * s, side * randRange(rng, 5, 8) * s, 3 * s, 4 * s);
   }
   addPod(layers, 10 * s, 0, 2 * s, 2 * s);
+}
+
+/**
+ * Doble tobera anular simétrica en los flancos traseros.
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ */
+function addPropulsionTwinRing(layers, rng, scale = 1) {
+  const s = scale;
+  addRect(layers, 6 * s, 0, 9 * s, randRange(rng, 10, 14) * s);
+  for (const side of [-1, 1]) {
+    const offset = side * randRange(rng, 5.5, 7.5) * s;
+    addPod(layers, 3.5 * s, offset, randRange(rng, 2.8, 3.6) * s, randRange(rng, 2.4, 3.2) * s);
+    addPod(layers, 5.5 * s, offset, randRange(rng, 1.6, 2.2) * s, randRange(rng, 1.4, 1.9) * s);
+    addRect(layers, 1.8 * s, offset, randRange(rng, 2.2, 3.2) * s, randRange(rng, 1.1, 1.7) * s);
+    addTruss(layers, 6 * s, side * 3.5 * s, 3.5 * s, offset, 0.85);
+  }
+}
+
+/**
+ * Trío de motores: central principal + dos auxiliares elevados.
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ */
+function addPropulsionTripleCluster(layers, rng, scale = 1) {
+  const s = scale;
+  addRect(layers, 7 * s, 0, 11 * s, randRange(rng, 9, 12) * s);
+  addPod(layers, 2.5 * s, 0, randRange(rng, 3, 3.8) * s, randRange(rng, 2.8, 3.4) * s);
+  addRect(layers, 4.5 * s, 0, randRange(rng, 4, 5.5) * s, randRange(rng, 2.5, 3.5) * s);
+  for (const side of [-1, 1]) {
+    const offset = side * randRange(rng, 6, 8.5) * s;
+    addPod(layers, 4 * s, offset, randRange(rng, 2, 2.8) * s, randRange(rng, 2, 2.6) * s);
+    addRect(layers, 6.5 * s, offset * 0.55, randRange(rng, 3, 4) * s, randRange(rng, 2.5, 3.5) * s);
+    addTruss(layers, 7 * s, side * 4 * s, 4 * s, offset, 0.75);
+  }
+}
+
+/**
+ * Nacelas de propulsión separadas del casco sobre brazos estructurales.
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ */
+function addPropulsionNacelles(layers, rng, scale = 1) {
+  const s = scale;
+  addRect(layers, 8 * s, 0, 8 * s, randRange(rng, 8, 11) * s);
+  for (const side of [-1, 1]) {
+    const reach = randRange(rng, 7, 10) * s;
+    const offset = side * reach;
+    addTruss(layers, 9 * s, side * 3.5 * s, 5 * s, offset * 0.72, 1.1);
+    addTruss(layers, 5 * s, offset * 0.72, 2.5 * s, offset, 0.95);
+    addRect(layers, 3 * s, offset, randRange(rng, 5, 7) * s, randRange(rng, 3.5, 4.8) * s);
+    addPod(layers, 1.2 * s, offset, randRange(rng, 2.2, 3) * s, randRange(rng, 2, 2.8) * s);
+    addRect(layers, 0.6 * s, offset, randRange(rng, 1.5, 2.5) * s, randRange(rng, 1.2, 1.8) * s);
+  }
+}
+
+/**
+ * Propulsores vectoriales inclinados en bloques angulares.
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ */
+function addPropulsionVectored(layers, rng, scale = 1) {
+  const s = scale;
+  addRect(layers, 7 * s, 0, 10 * s, randRange(rng, 9, 13) * s);
+  for (const side of [-1, 1]) {
+    const offset = side * randRange(rng, 4.5, 6.5) * s;
+    const tilt = side * randRange(rng, 14, 24);
+    addRect(layers, 3.5 * s, offset, randRange(rng, 4, 5.5) * s, randRange(rng, 3, 4) * s, tilt);
+    addRect(layers, 1.8 * s, offset * 1.08, randRange(rng, 2.5, 3.5) * s, randRange(rng, 2, 2.8) * s, tilt * 0.6);
+    addPod(layers, 5.5 * s, offset * 0.65, randRange(rng, 1.8, 2.4) * s, randRange(rng, 1.6, 2.1) * s);
+  }
+  addRect(layers, 2.2 * s, 0, randRange(rng, 3, 4) * s, randRange(rng, 2.5, 3.5) * s);
+}
+
+/**
+ * Campana de plasma ancha con anillo interior de escape.
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ */
+function addPropulsionPlasmaBell(layers, rng, scale = 1) {
+  const s = scale;
+  const bellW = randRange(rng, 13, 17) * s;
+  addPod(layers, 5 * s, 0, randRange(rng, 5, 6.5) * s, bellW * 0.45);
+  addRect(layers, 8 * s, 0, randRange(rng, 7, 9) * s, bellW);
+  addPod(layers, 2.8 * s, 0, randRange(rng, 2.2, 3) * s, randRange(rng, 2, 2.6) * s);
+  for (const side of [-1, 1]) {
+    addRect(layers, 6 * s, side * bellW * 0.38, randRange(rng, 2.5, 3.5) * s, randRange(rng, 1.8, 2.6) * s);
+  }
+}
+
+/**
+ * Batería de micro-toberas alineadas sobre la espina trasera.
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ */
+function addPropulsionSpineArray(layers, rng, scale = 1) {
+  const s = scale;
+  addRect(layers, 7 * s, 0, 10 * s, randRange(rng, 8, 11) * s);
+  const count = Math.round(randRange(rng, 4, 7));
+  const span = randRange(rng, 5, 8) * s;
+  for (let i = 0; i < count; i += 1) {
+    const along = randRange(rng, 1.5, 4.5) * s;
+    const beam = (i - (count - 1) / 2) * (span / Math.max(1, count - 1));
+    addPod(layers, along, beam, randRange(rng, 1.2, 1.8) * s, randRange(rng, 1.1, 1.6) * s);
+    addRect(layers, along - 0.8 * s, beam, randRange(rng, 1.2, 1.8) * s, randRange(rng, 0.8, 1.2) * s);
+  }
+  addSpineDetail(layers, rng, 5 * s, 11 * s, Math.round(randRange(rng, 3, 5)));
+}
+
+/** @type {const} */
+const PROPULSION_STYLES = [
+  "classicBlock",
+  "twinRing",
+  "tripleCluster",
+  "nacelles",
+  "vectored",
+  "plasmaBell",
+  "spineArray",
+];
+
+/** @type {Record<string, (layers: ABPoint[][], rng: () => number, scale?: number) => void>} */
+const PROPULSION_BUILDERS = {
+  classicBlock: addPropulsionClassicBlock,
+  twinRing: addPropulsionTwinRing,
+  tripleCluster: addPropulsionTripleCluster,
+  nacelles: addPropulsionNacelles,
+  vectored: addPropulsionVectored,
+  plasmaBell: addPropulsionPlasmaBell,
+  spineArray: addPropulsionSpineArray,
+};
+
+/** @type {string | undefined} */
+let lastPropulsionStyle;
+
+/**
+ * Monta un sistema de propulsión procedural en la popa (along ≈ 0).
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ * @returns {string}
+ */
+function addPropulsionSystem(layers, rng, scale = 1) {
+  const style = randPick(rng, PROPULSION_STYLES);
+  const builder = PROPULSION_BUILDERS[style] ?? addPropulsionClassicBlock;
+  builder(layers, rng, scale);
+  lastPropulsionStyle = style;
+  return style;
+}
+
+/**
+ * Bloque de motores AFT integrado (múltiples toberas).
+ * @deprecated Usar addPropulsionSystem — conservado como alias.
+ * @param {ABPoint[][]} layers
+ * @param {() => number} rng
+ * @param {number} [scale]
+ */
+function addEngineBlock(layers, rng, scale = 1) {
+  addPropulsionClassicBlock(layers, rng, scale);
 }
 
 /**
@@ -547,7 +711,7 @@ function buildFromProfile(rng, stations, prow) {
   const layers = [];
 
   layers.push(buildSteppedHull(rng, stations));
-  addEngineBlock(layers, rng, randRange(rng, 0.85, 1.1));
+  addPropulsionSystem(layers, rng, randRange(rng, 0.98, 1.22));
   addProw(layers, rng, prow);
 
   return layers;
@@ -800,7 +964,9 @@ function pickStyle(rng, archetype) {
 function buildShipLayers(archetype, rng, styleHint) {
   const style = styleHint ?? pickStyle(rng, archetype);
   const builder = STYLE_BUILDERS[style] ?? buildPatrolFrigate;
-  return { layers: builder(rng), style };
+  lastPropulsionStyle = undefined;
+  const layers = builder(rng);
+  return { layers, style, propulsionStyle: lastPropulsionStyle ?? "classicBlock" };
 }
 
 /**
@@ -810,7 +976,7 @@ function buildShipLayers(archetype, rng, styleHint) {
  */
 export function generateShip({ seed, archetype, lengthScale = 1, widthScale = 1, styleHint }) {
   const rng = createRng(seed);
-  const { layers: raw, style } = buildShipLayers(archetype, rng, styleHint);
+  const { layers: raw, style, propulsionStyle } = buildShipLayers(archetype, rng, styleHint);
   const scaled = scaleLayers(raw, lengthScale, widthScale);
   const layers = scaled.filter((pts) => pts.length >= 3);
   const normalized = normalizeGroups(layers);
@@ -824,6 +990,7 @@ export function generateShip({ seed, archetype, lengthScale = 1, widthScale = 1,
     height: maxY - minY,
     archetype,
     style,
+    propulsionStyle,
     lengthScale,
     widthScale,
   };
@@ -888,7 +1055,7 @@ export function randomRollSeed() {
   return (Date.now() ^ (Math.random() * 0xffffffff)) >>> 0;
 }
 
-export { ARCHETYPES };
+export { ARCHETYPES, PROPULSION_STYLES };
 
 /**
  * @param {GeneratedShip} ship
