@@ -1,4 +1,5 @@
 import { assetUrl } from "../lib/assets.manifest.js";
+import { mountFantasyTerrainLayer } from "./loader-fantasy-terrain.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 
@@ -276,6 +277,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   let spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
   const meteorDemo = new URLSearchParams(window.location.search).get("meteorDemo") === "1";
   let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
+  let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
 
   let destroyed = false;
   let progress = 0;
@@ -382,6 +384,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       document.body.classList.remove("is-loader-active");
       spaceOrbitTeardown.destroy();
       meteorTeardown.destroy();
+      fantasyTerrainTeardown.destroy();
       if (rafId) cancelAnimationFrame(rafId);
     },
   };
