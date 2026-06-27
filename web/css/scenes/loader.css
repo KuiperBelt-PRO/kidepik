@@ -203,6 +203,46 @@
   fill: #fff;
 }
 
+/* ── Fantasy scene (elementos procedurales: castillos, bloques, etc.) ───── */
+
+.loader-layer.loader-layer--fantasy-scene {
+  /* Cubre la mitad inferior del loader (zona fantasía) */
+  inset: 50% 0 0 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+  /* Reserva el espacio del terreno mediante variable (misma altura que --fantasy-terrain) */
+  --fantasy-terrain-h: clamp(36px, 7vh, 66px);
+}
+
+/* Contenedor de un elemento de fantasía individual */
+.loader-fantasy-el {
+  position: absolute;
+  bottom: 0;
+  /* left se asigna en JS; translateX centra, translateY hunde la base en el terreno */
+  transform: translateX(-50%) translateY(10px);
+  pointer-events: none;
+  will-change: contents;
+}
+
+/* SVG del elemento */
+.loader-fantasy-el__svg {
+  display: block;
+  overflow: visible;
+}
+
+/* Grupo de partes: recibe la máscara de erosión cuando corresponde */
+.loader-fantasy-el__parts {
+  /* sin transform aquí; los subgrupos llevan el transform de construcción */
+}
+
+/* Cada pieza del elemento (muro, torre, tejado…) */
+.loader-fantasy-part {
+  /* El transform de construcción se aplica en JS vía atributo SVG transform */
+}
+
+/* ── Fin sección Fantasy scene ─────────────────────────────────────────── */
+
 .loader-orbit-paths {
   position: absolute;
   inset: 0;

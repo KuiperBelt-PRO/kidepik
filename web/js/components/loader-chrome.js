@@ -1,5 +1,6 @@
 import { assetUrl } from "../lib/assets.manifest.js";
 import { mountFantasyTerrainLayer } from "./loader-fantasy-terrain.js";
+import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 
@@ -279,6 +280,14 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
   let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
 
+  const fantasyDev = new URLSearchParams(window.location.search).get("fantasyDev") || undefined;
+  const fantasyTerrainH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fantasy-terrain-h")) || 48;
+  let fantasySceneTeardown = mountFantasyScene(layers, {
+    reducedMotion,
+    terrainHeightPx: fantasyTerrainH,
+    devKind: fantasyDev,
+  });
+
   let destroyed = false;
   let progress = 0;
   let rafId = 0;
@@ -385,6 +394,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       spaceOrbitTeardown.destroy();
       meteorTeardown.destroy();
       fantasyTerrainTeardown.destroy();
+      fantasySceneTeardown.destroy();
       if (rafId) cancelAnimationFrame(rafId);
     },
   };
