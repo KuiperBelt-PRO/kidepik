@@ -14,8 +14,8 @@
 
 | Fase | Nombre | Depende de | `kind`(s) | Estado |
 | --- | --- | --- | --- | --- |
-| 0 | Núcleo del motor | — | (`block` de prueba) | ⏳ no iniciada |
-| 1 | Castillos y palacios | 0 | `castle`, `palace` | ⏳ no iniciada |
+| 0 | Núcleo del motor | — | (`block` de prueba) | ✅ aprobada |
+| 1 | Castillos y palacios | 0 | `castle`, `palace` | 🔧 implementada (pendiente visto bueno) |
 | 2 | Torres aisladas | 1 | `tower` | ⏳ no iniciada |
 | 3 | Aldeas, pueblos, posadas | 1 | `village`, `town`, `inn` | ⏳ no iniciada |
 | 4 | Megalitos | 0 | `menhir`, `dolmen`, `stoneCircle` | ⏳ no iniciada |
@@ -93,8 +93,8 @@ Leyenda estado: ⏳ no iniciada · 🔧 en curso · ✅ aprobada por el usuario.
 **Validación navegador:** castillo distinto por recarga; build ascendente; erosión global; palacio más señorial.
 
 **Gate — Fase 1**
-- [ ] Tests en verde + validación visual.
-- [ ] Cumple criterios de aceptación de la spec del castillo.
+- [x] Tests en verde + validación visual. (`loader-fantasy-castle.test.js` 21/21; suite fantasy 85/85; Playwright iPhone 13 390×844: catálogo de 6 castillos y 6 palacios, build ascendente, erosión global de arriba a abajo, anclaje al suelo).
+- [x] Cumple criterios de aceptación de la spec del castillo (base + 2–5 torres con remates variados, puertas/ventanas como sustracción, arcos redondeados, almenas, cúpulas, pináculos, asimetría e imperfección por `tiltDeg`).
 - [ ] **Visto bueno del usuario** → habilita Fases 2 y 3.
 
 ---

@@ -13,6 +13,7 @@
  * @module loader-fantasy-element
  */
 
+import { generateCastle } from "./loader-fantasy-castle.js";
 import {
   aperture,
   buildPartPath,
@@ -288,9 +289,10 @@ function buildBlock(seed) {
  */
 export const FANTASY_BUILDERS = {
   block: buildBlock,
-  // Phase 1+:
-  castle: null,
-  palace: null,
+  // Phase 1 — castillos y palacios (mismo builder, palace sesga estilo)
+  castle: (seed, opts = {}) => generateCastle({ ...opts, seed, palace: false }),
+  palace: (seed, opts = {}) => generateCastle({ ...opts, seed, palace: true }),
+  // Phase 2+:
   tower: null,
   village: null,
   town: null,
@@ -313,10 +315,10 @@ export const FANTASY_BUILDERS = {
  * @param {{ seed: number }} options
  * @returns {FantasyElement | null}  null si el builder no está registrado
  */
-export function generateFantasyElement(kind, { seed }) {
+export function generateFantasyElement(kind, options = {}) {
   const builder = FANTASY_BUILDERS[kind];
   if (!builder) return null;
-  return builder(seed);
+  return builder(options.seed, options);
 }
 
 // ---------------------------------------------------------------------------

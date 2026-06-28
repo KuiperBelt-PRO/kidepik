@@ -19,12 +19,12 @@ const PLACE_LEFT_MAX = 92;
 
 // Fracción de la altura del contenedor de la escena que puede ocupar un elemento.
 // Mantiene los elementos pequeños y lejos del anillo del logo.
-const HEIGHT_FRACTION_MIN = 0.16;
-const HEIGHT_FRACTION_MAX = 0.30;
+const HEIGHT_FRACTION_MIN = 0.18;
+const HEIGHT_FRACTION_MAX = 0.34;
 
 // Límites de altura del elemento en px.
-const MIN_ELEMENT_HEIGHT_PX = 40;
-const MAX_ELEMENT_HEIGHT_PX = 130;
+const MIN_ELEMENT_HEIGHT_PX = 60;
+const MAX_ELEMENT_HEIGHT_PX = 150;
 
 // Semilla de sesión para posiciones aleatorias distintas en cada carga.
 let _sessionSeedCounter = Date.now() & 0x7fffffff;
@@ -87,8 +87,10 @@ export function mountFantasyScene(container, opts = {}) {
   function runCycle() {
     if (destroyed) return;
 
-    // En Phase 0 siempre 'block'; devKind reservado para forzar tipo
-    const kind = /** @type {import('./loader-fantasy-element.js').FantasyKind} */ ("block");
+    // Phase 1: castillos y palacios. devKind (?fantasyDev=) fuerza un tipo.
+    const kind = /** @type {import('./loader-fantasy-element.js').FantasyKind} */ (
+      devKind || (cycleRng() < 0.32 ? "palace" : "castle")
+    );
     const seed = sessionSeed();
     const element = generateFantasyElement(kind, { seed });
     if (!element) {

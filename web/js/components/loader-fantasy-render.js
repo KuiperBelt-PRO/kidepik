@@ -30,18 +30,24 @@ function easeOutBack(t) {
 }
 
 /**
- * Aplica `transform` SVG de escala desde el punto (pivotX, pivotY) en user units.
- * scaleY=0 colapsa el elemento hacia abajo (hacia baseY).
+ * Aplica `transform` SVG de escala (y opcional inclinación) desde el pivote
+ * (pivotX, pivotY) en user units. scaleY=0 colapsa el elemento hacia su base.
  * @param {SVGElement} g
  * @param {number} pivotX
  * @param {number} pivotY
  * @param {number} sy
+ * @param {number} [tiltDeg]  rotación residual de imperfección alrededor del pivote
  */
-function applyPartScale(g, pivotX, pivotY, sy) {
+function applyPartScale(g, pivotX, pivotY, sy, tiltDeg = 0) {
   const s = Math.max(0, sy);
+  // La rotación de imperfección usa y=100 como pivote (suelo del viewBox),
+  // igual para todas las piezas — torre y remate giran alrededor del mismo
+  // punto y permanecen alineados aunque el eje de escala de cada pieza sea
+  // su propio baseY.
+  const rot = tiltDeg ? ` rotate(${fmt(tiltDeg)} ${fmt(pivotX)} 100)` : "";
   g.setAttribute(
     "transform",
-    `translate(${fmt(pivotX)} ${fmt(pivotY)}) scale(1 ${fmt(s)}) translate(${fmt(-pivotX)} ${fmt(-pivotY)})`,
+    `translate(${fmt(pivotX)} ${fmt(pivotY)}) scale(1 ${fmt(s)}) translate(${fmt(-pivotX)} ${fmt(-pivotY)})${rot}`,
   );
 }
 
@@ -213,8 +219,15 @@ export function mountFantasyElement(container, element, opts) {
   const el = document.createElement("div");
   el.className = "loader-fantasy-el";
   el.style.left = `${xPercent}%`;
-  // Anclado al suelo del viewport (integrado con la franja de terreno)
-  el.style.bottom = "0";
+  // Posiciona el elemento encima de la franja de terreno:
+  // el borde inferior del SVG (donde está el plinth, y=100) queda al nivel
+  // de la cima del terreno.  El plinth queda enterrado bajo el terreno y los
+  // muros del castillo emergen por encima.
+  // Posiciona el elemento encima del terreno, pero ligeramente hundido para que
+  // el plinth se mezcle visualmente con la franja de suelo.
+  // Con el translateY(22px) del CSS, el resultado neto es ~60 % del terreno visible.
+  const terrainH = Math.round((terrainHeightPx ?? 48) * 0.55);
+  el.style.bottom = `${terrainH}px`;
 
   // El viewBox es cuadrado (0 0 100 100) con el contenido anclado abajo (y=100).
   // Caja cuadrada + preserveAspectRatio xMidYMax: el borde inferior dibujado
@@ -233,7 +246,7 @@ export function mountFantasyElement(container, element, opts) {
 
   // ─── Inicializar partes con escala 0 ──────────────────────────────────────
   element.parts.forEach((part, i) => {
-    applyPartScale(partGs[i], part.centerX, part.baseY, 0);
+    applyPartScale(partGs[i], part.centerX, part.baseY, 0, part.tiltDeg ?? 0);
   });
 
   // ─── Función de limpieza ──────────────────────────────────────────────────
@@ -249,7 +262,7 @@ export function mountFantasyElement(container, element, opts) {
     el.style.transition = "opacity 400ms ease";
     el.style.opacity = "0";
     element.parts.forEach((part, i) => {
-      applyPartScale(partGs[i], part.centerX, part.baseY, 1);
+      applyPartScale(partGs[i], part.centerX, part.baseY, 1, part.tiltDeg ?? 0);
     });
     // Force reflow
     void el.offsetHeight;
@@ -316,10 +329,11 @@ export function mountFantasyElement(container, element, opts) {
       }
       const t = Math.min(1, elapsed / info.durationMs);
       const sy = easeOutBack(t);
-      applyPartScale(info.g, info.part.centerX, info.part.baseY, sy);
+      const tilt = (info.part.tiltDeg ?? 0) * t;
+      applyPartScale(info.g, info.part.centerX, info.part.baseY, sy, tilt);
       if (t >= 1) {
         info.done = true;
-        applyPartScale(info.g, info.part.centerX, info.part.baseY, 1);
+        applyPartScale(info.g, info.part.centerX, info.part.baseY, 1, info.part.tiltDeg ?? 0);
       } else {
         allDone = false;
       }

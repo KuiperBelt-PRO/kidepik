@@ -219,8 +219,8 @@
 .loader-fantasy-el {
   position: absolute;
   bottom: 0;
-  /* left se asigna en JS; translateX centra, translateY hunde la base en el terreno */
-  transform: translateX(-50%) translateY(10px);
+  /* left se asigna en JS; translateX centra, translateY hunde la base más en el terreno */
+  transform: translateX(-50%) translateY(22px);
   pointer-events: none;
   will-change: contents;
 }
