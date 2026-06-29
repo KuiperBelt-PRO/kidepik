@@ -216,6 +216,9 @@ export function generateCastle(options) {
     towerXs[i] += recenterShift;
   }
 
+  // Un solo tipo de remate para todas las torres (coherencia de estilo).
+  const towerRemate = pickRemate(rng, palace);
+
   towerXs.forEach((tcx, idx) => {
     const towerW = randRange(rng, 10, 16);
     let hMul = randRange(rng, 1.2, 2.0);
@@ -250,8 +253,8 @@ export function generateCastle(options) {
     const tilt = (rng() - 0.5) * 3 * imperfection;
     asm.addPart("tower", towerOuter, towerHoles, { tiltDeg: tilt });
 
-    // Remate de la torre
-    const remate = pickRemate(rng, palace);
+    // Remate de la torre (mismo tipo en todo el edificio)
+    const remate = towerRemate;
     towersMeta.push({ remate });
     if (remate === "roof") {
       const coneH = towerW * randRange(rng, 1.0, 1.7);
@@ -273,9 +276,9 @@ export function generateCastle(options) {
       const domeRy = towerW * randRange(rng, 0.65, 1.0);
       const d = dome(tcx, towerTop - SEAM, towerW * 0.56, domeRy + SEAM);
       asm.addPart("dome", d, [], { tiltDeg: tilt });
-      // Remate (esfera/cruz) sobre la cúpula (más en palacio)
+      // Remate decorativo sobre la cúpula (esfera o aguja, sin símbolos religiosos)
       if (rng() < (palace ? 0.7 : 0.4)) {
-        const fk = palace ? randPick(rng, ["ball", "cross"]) : "ball";
+        const fk = randPick(rng, ["ball", "needle"]);
         for (const ring of finial(tcx, towerTop + domeRy - SEAM, towerW * 0.5, fk)) {
           asm.addPart("decoration", ring);
         }
@@ -290,11 +293,9 @@ export function generateCastle(options) {
     towerHeights.reduce((s, h) => s + (h - meanH) ** 2, 0) / (towerHeights.length || 1),
   );
   const heightVar = Math.min(1, std / (baseH * 0.8));
-  const remateKinds = new Set(towersMeta.map((t) => t.remate)).size;
-  const remateVar = (remateKinds - 1) / 2; // 0..1
   const asymmetry = Math.min(
     1,
-    axisOffset * 0.5 + heightVar * 0.5 + remateVar * 0.35 + (ruined ? 0.15 : 0),
+    axisOffset * 0.5 + heightVar * 0.5 + (ruined ? 0.15 : 0),
   );
 
   const meta = {
@@ -303,6 +304,7 @@ export function generateCastle(options) {
     towerCount,
     blockCount,
     towers: towersMeta,
+    towerRemate,
     doorCount,
     windowCount,
     slitCount,

@@ -105,6 +105,22 @@ describe("loader-fantasy-geom / merlons", () => {
     assert.ok(Math.min(...ys) >= 10 - 0.01);
     assert.ok(Math.max(...ys) <= 10 + 6 + 0.01);
   });
+
+  it("merlón en el extremo izquierdo y derecho del ancho", () => {
+    const cx = 50;
+    const w = 40;
+    const hw = w / 2;
+    const n = 4;
+    const merW = (w / n) * 0.55;
+    const pts = merlons(cx, 0, w, n, 6);
+    const xs = pts.map((p) => p.x);
+    const leftEdge = cx - hw;
+    const rightEdge = cx + hw;
+    assert.ok(xs.some((x) => Math.abs(x - leftEdge) < 0.01), "falta merlón izquierdo");
+    assert.ok(xs.some((x) => Math.abs(x - (leftEdge + merW)) < 0.01), "falta cima merlón izquierdo");
+    assert.ok(xs.some((x) => Math.abs(x - rightEdge) < 0.01), "falta merlón derecho");
+    assert.ok(xs.some((x) => Math.abs(x - (rightEdge - merW)) < 0.01), "falta cima merlón derecho");
+  });
 });
 
 // ---------------------------------------------------------------------------

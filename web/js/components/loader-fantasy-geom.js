@@ -99,17 +99,17 @@ export function dome(cx, baseY, rx, ry, segments = 10) {
  */
 export function merlons(cx, baseY, w, count, merH) {
   const hw = w / 2;
-  const step = w / count;
-  const merW = step * 0.55;
-  const gapW = step - merW;
+  const n = Math.max(2, count);
+  const merW = (w / n) * 0.55;
+  const span = w - merW;
 
   /** @type {FPoint[]} */
   const pts = [];
 
   pts.push({ x: cx - hw, y: baseY });
 
-  for (let i = 0; i < count; i++) {
-    const left = cx - hw + i * step;
+  for (let i = 0; i < n; i++) {
+    const left = (cx - hw) + (n === 1 ? 0 : (i / (n - 1)) * span);
     const right = left + merW;
     pts.push(
       { x: left, y: baseY },
@@ -117,8 +117,8 @@ export function merlons(cx, baseY, w, count, merH) {
       { x: right, y: baseY + merH },
       { x: right, y: baseY },
     );
-    if (i < count - 1) {
-      const nextLeft = right + gapW;
+    if (i < n - 1) {
+      const nextLeft = (cx - hw) + ((i + 1) / (n - 1)) * span;
       pts.push({ x: nextLeft, y: baseY });
     }
   }
@@ -258,22 +258,13 @@ export function aperture(cx, baseY, w, h, kind = "rect") {
  * @param {number} cx
  * @param {number} baseY
  * @param {number} h
- * @param {'needle'|'ball'|'cross'} [kind]
+ * @param {'needle'|'ball'} [kind]
  * @returns {FPoint[][]}
  */
 export function finial(cx, baseY, h, kind = "needle") {
   if (kind === "ball") {
     const r = h / 2;
     return [dome(cx, baseY, r, r * 0.85)];
-  }
-  if (kind === "cross") {
-    const vW = h * 0.15;
-    const hW = h * 0.45;
-    const hH = h * 0.15;
-    return [
-      rect(cx, baseY, vW, h),          // palo vertical
-      rect(cx, baseY + h * 0.55, hW, hH), // travesaño horizontal
-    ];
   }
   // needle (default)
   return [[

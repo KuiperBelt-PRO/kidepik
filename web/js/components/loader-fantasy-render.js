@@ -118,9 +118,10 @@ function createErosionMask(svg, partsGroup, seed) {
   stopB.setAttribute("offset", "0");
   stopB.setAttribute("stop-color", "black");
 
-  // stop dinámico: inicio del área blanca (intacta)
+  // stop dinámico: inicio del área blanca (intacta) — mismo offset que stopB
+  // para un frente duro sin difuminado.
   const stopC = /** @type {SVGStopElement} */ (document.createElementNS(SVG_NS, "stop"));
-  stopC.setAttribute("offset", "0.001");
+  stopC.setAttribute("offset", "0");
   stopC.setAttribute("stop-color", "white");
 
   // stop final: blanco fijo en bottom
@@ -358,9 +359,9 @@ export function mountFantasyElement(container, element, opts) {
     const { stopB, stopC } = createErosionMask(svg, partsGroup, element.seed);
 
     let erodeStartMs = 0;
-    // Banda de transición estrecha → frente nítido; la ondulación la aporta el
-    // desplazamiento de baja frecuencia (estable), que mantiene el frente conexo.
-    const delta = 0.02;
+    // delta=0 → frente duro (sin banda de difuminado); la irregularidad
+    // la aporta solo el feDisplacementMap de baja frecuencia.
+    const delta = 0;
 
     function tickErode(now) {
       if (destroyed) return;
@@ -370,9 +371,8 @@ export function mountFantasyElement(container, element, opts) {
       const tRaw = Math.min(1, elapsed / timing.erodeMs);
       const threshold = erosionThresholdAt(tRaw);
 
-      // El frente baja de forma continua de arriba a abajo
-      stopB.setAttribute("offset", String(Math.max(0, threshold - delta)));
-      stopC.setAttribute("offset", String(Math.min(1, threshold + delta)));
+      stopB.setAttribute("offset", String(threshold));
+      stopC.setAttribute("offset", String(threshold));
 
       if (tRaw >= 1) {
         destroy();

@@ -120,6 +120,15 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
+  it("todas las torres comparten el mismo tipo de remate", () => {
+    for (let s = 0; s < 40; s++) {
+      const el = generateCastle({ seed: s * 13 + 7 });
+      const remates = new Set(el.meta.towers.map((t) => t.remate));
+      assert.equal(remates.size, 1, `seed ${s}: mezcla de remates ${[...remates].join(",")}`);
+      assert.equal(el.meta.towerRemate, el.meta.towers[0].remate);
+    }
+  });
+
   it("≥1 puerta y ≥1 ventana", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 3 + 4 });
