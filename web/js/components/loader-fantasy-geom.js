@@ -40,6 +40,22 @@ export function rect(cx, baseY, w, h) {
 }
 
 /**
+ * Marco hueco: rectángulo exterior con hueco interior (torres élficas abiertas).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} wallT  grosor de pared
+ * @returns {{ outer: FPoint[]; holes: FPoint[][] }}
+ */
+export function hollowRect(cx, baseY, w, h, wallT) {
+  const wt = Math.min(Math.max(wallT, 0.9), w * 0.42, h * 0.42);
+  const outer = rect(cx, baseY, w, h);
+  const inner = rect(cx, baseY + wt * 0.4, w - 2 * wt, h - wt * 0.55);
+  return { outer, holes: [inner] };
+}
+
+/**
  * Rectángulo con esquinas achaflanadas (piedra tallada enana / angular).
  * @param {number} cx
  * @param {number} baseY
@@ -373,11 +389,49 @@ export function buttress(wallCx, wallEdgeX, baseY, w, h) {
  * @returns {FPoint[]}
  */
 export function gothicArchCap(cx, baseY, w, h) {
-  return arch(cx, baseY, w, h, "gothic", 6);
+  return arch(cx, baseY, w * 0.9, h * 1.15, "gothic", 7);
 }
 
 /**
- * Remate en forma de flecha/chevron apuntando hacia arriba.
+ * Remate en forma de flecha/chevron con pinchos laterales (corona de agujas).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[][]}
+ */
+export function elfSpireCluster(cx, baseY, w, h) {
+  /** @type {FPoint[][]} */
+  const spikes = [];
+  const mainH = h * 1.22;
+  const halfMain = Math.max(w * 0.1, 1.0);
+  spikes.push([
+    { x: cx - halfMain, y: baseY },
+    { x: cx, y: baseY + mainH },
+    { x: cx + halfMain, y: baseY },
+  ]);
+  const sides = [
+    [-0.44, 0.78],
+    [-0.24, 0.62],
+    [0.24, 0.62],
+    [0.44, 0.78],
+  ];
+  for (const [frac, hFrac] of sides) {
+    const sx = cx + frac * w;
+    const sh = h * hFrac;
+    const sw = Math.max(w * 0.08, 0.7);
+    const lean = frac > 0 ? sw * 0.35 : -sw * 0.35;
+    spikes.push([
+      { x: sx - sw, y: baseY },
+      { x: sx + lean, y: baseY + sh },
+      { x: sx + sw, y: baseY },
+    ]);
+  }
+  return spikes;
+}
+
+/**
+ * Remate en forma de flecha/chevron simple (alias del pico central).
  * @param {number} cx
  * @param {number} baseY
  * @param {number} w
@@ -391,6 +445,123 @@ export function invertedArrowCap(cx, baseY, w, h) {
     { x: cx, y: baseY + h },
     { x: cx + hw, y: baseY },
   ];
+}
+
+/**
+ * Podio elevado: pilares laterales, arcadas de sustentación y terraza superior.
+ * Los vanos entre arcos dejan ver el fondo (separación del terreno blanco).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} stiltH
+ * @param {number} slabH
+ * @param {number} archCount
+ * @returns {{ piers: FPoint[][]; arches: FPoint[][]; slab: FPoint[] }}
+ */
+export function elfPodium(cx, baseY, w, stiltH, slabH, archCount) {
+  const pierW = w * 0.06;
+  const totalH = stiltH + slabH;
+  const piers = [
+    rect(cx - w / 2 + pierW / 2, baseY, pierW, totalH),
+    rect(cx + w / 2 - pierW / 2, baseY, pierW, totalH),
+  ];
+  /** @type {FPoint[][]} */
+  const arches = [];
+  const n = Math.max(3, archCount);
+  const innerW = w - pierW * 2.4;
+  const step = innerW / n;
+  const startX = cx - innerW / 2 + step / 2;
+  for (let i = 0; i < n; i++) {
+    const ax = startX + i * step;
+    arches.push(arch(ax, baseY, step * 0.72, stiltH * 0.96, "gothic", 8));
+  }
+  const slab = rect(cx, baseY + stiltH, w, slabH);
+  return { piers, arches, slab };
+}
+
+/**
+ * Corona de costillas: arcos góticos finos que se cruzan (cúpula abierta élfica).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[][]}
+ */
+export function elfRibCrown(cx, baseY, w, h) {
+  /** @type {FPoint[][]} */
+  const rings = [];
+  const ribs = 6;
+  for (let i = 0; i < ribs; i++) {
+    const t = ribs > 1 ? i / (ribs - 1) : 0.5;
+    const ox = (t - 0.5) * w * 0.68;
+    const ribW = w * (0.16 + Math.abs(t - 0.5) * 0.1);
+    rings.push(arch(cx + ox, baseY, ribW, h, "gothic", 6));
+  }
+  rings.push(...crossingArches(cx, baseY + h * 0.04, w * 0.52, h * 0.88));
+  rings.push(...crossingArches(cx, baseY + h * 0.18, w * 0.38, h * 0.62));
+  return rings;
+}
+
+/**
+ * Pétalos decorativos que abren desde el fuste de la torre.
+ * @param {number} cx
+ * @param {number} midY
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[][]}
+ */
+export function elfPetalFlare(cx, midY, w, h) {
+  const spread = w * 0.64;
+  const tipY = midY + h;
+  const curl = h * 0.14;
+  return [
+    [
+      { x: cx - spread, y: midY },
+      { x: cx - w * 0.1, y: midY - curl },
+      { x: cx - w * 0.02, y: tipY },
+      { x: cx - spread * 0.7, y: midY + h * 0.1 },
+    ],
+    [
+      { x: cx + spread, y: midY },
+      { x: cx + w * 0.1, y: midY - curl },
+      { x: cx + w * 0.02, y: tipY },
+      { x: cx + spread * 0.7, y: midY + h * 0.1 },
+    ],
+  ];
+}
+
+/**
+ * Arbotante curvo (arco exterior entre torre y muro).
+ * @param {number} x0
+ * @param {number} y0
+ * @param {number} x1
+ * @param {number} y1
+ * @param {number} thick
+ * @returns {FPoint[]}
+ */
+export function elfFlyingButtress(x0, y0, x1, y1, thick) {
+  const mx = (x0 + x1) / 2;
+  const span = Math.hypot(x1 - x0, y1 - y0);
+  const my = Math.min(y0, y1) - span * 0.24;
+  const samples = 8;
+  /** @type {FPoint[]} */
+  const upper = [];
+  /** @type {FPoint[]} */
+  const lower = [];
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const omt = 1 - t;
+    const bx = omt * omt * x0 + 2 * omt * t * mx + t * t * x1;
+    const by = omt * omt * y0 + 2 * omt * t * my + t * t * y1;
+    const dx = 2 * omt * (mx - x0) + 2 * t * (x1 - mx);
+    const dy = 2 * omt * (my - y0) + 2 * t * (y1 - my);
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = (-dy / len) * thick * 0.5;
+    const ny = (dx / len) * thick * 0.5;
+    upper.push({ x: bx + nx, y: by + ny });
+    lower.unshift({ x: bx - nx, y: by - ny });
+  }
+  return [...upper, ...lower];
 }
 
 /**
@@ -453,11 +624,35 @@ export function elfArcadeCluster(cx, baseY, w, h, rows = 2) {
   const rowH = h / rows;
   for (let r = 0; r < rows; r++) {
     const cols = 2 + r;
-    const rowY = baseY + r * rowH * 0.85;
-    rings.push(...arcadeRow(cx, rowY, w * 0.95, w / (cols + 1), rowH * 0.92, cols));
+    const rowY = baseY + r * rowH * 0.82;
+    const archW = w / (cols + 1.2);
+    rings.push(...arcadeRow(cx, rowY, w * 0.96, archW * 0.86, rowH * 0.95, cols));
+    const step = (w * 0.96) / cols;
+    const startX = cx - (w * 0.96) / 2 + step / 2;
+    for (let c = 1; c < cols; c++) {
+      const colX = startX + c * step - step * 0.5;
+      rings.push(rect(colX, rowY, archW * 0.1, rowH * 0.32));
+    }
+    if (r > 0) {
+      rings.push(...crossingArches(cx, rowY + rowH * 0.18, w * 0.42, rowH * 0.58));
+    }
   }
-  rings.push(...crossingArches(cx, baseY + h * 0.15, w * 0.7, h * 0.75));
+  rings.push(...crossingArches(cx, baseY + h * 0.1, w * 0.74, h * 0.8));
+  rings.push(...crossingArches(cx, baseY + h * 0.26, w * 0.52, h * 0.52));
   return rings;
+}
+
+/**
+ * Puente o basamento con arcadas altas (entrada élfica).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} totalW
+ * @param {number} archH
+ * @param {number} count
+ * @returns {FPoint[][]}
+ */
+export function elfBridgeArcade(cx, baseY, totalW, archH, count) {
+  return arcadeRow(cx, baseY, totalW, totalW / (count + 2.2), archH, count);
 }
 
 /**
@@ -518,26 +713,27 @@ export function boundsOfFantasyGroups(groups) {
  * Normaliza grupos de puntos en espacio local y-up al espacio SVG (y-down) 0..100.
  * Por defecto ancla el suelo local (minY) al borde inferior del viewBox (y=100).
  * @param {FPoint[][]} groups
- * @param {{ anchorY?: 'bottom' | 'center' }} [opts]
+ * @param {{ anchorY?: 'bottom' | 'center'; scaleBy?: 'max' | 'height'; bottomInset?: number }} [opts]
  * @returns {FPoint[][]}
  */
 export function normalizeFantasyGroups(groups, opts = {}) {
-  const { anchorY = "bottom" } = opts;
+  const { anchorY = "bottom", scaleBy = "max", bottomInset = 0 } = opts;
   if (groups.length === 0 || groups.every((g) => g.length === 0)) return [];
 
   const { minX, minY, maxX, maxY } = boundsOfFantasyGroups(groups);
   const contentW = maxX - minX || 1;
   const contentH = maxY - minY || 1;
-  const size = Math.max(contentW, contentH);
-  const scale = 100 / size;
+  const size = scaleBy === "height" ? contentH : Math.max(contentW, contentH);
+  const usable = Math.max(1, 100 - bottomInset);
+  const scale = usable / size;
   const padX = (100 - contentW * scale) / 2;
+  const floorY = 100 - bottomInset;
 
   if (anchorY === "bottom") {
     return groups.map((pts) =>
       pts.map((p) => ({
         x: (p.x - minX) * scale + padX,
-        // minY (suelo local) → y=100; sube hacia arriba en SVG
-        y: 100 - (p.y - minY) * scale,
+        y: floorY - (p.y - minY) * scale,
       })),
     );
   }

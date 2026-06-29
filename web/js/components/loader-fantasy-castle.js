@@ -13,6 +13,7 @@
  */
 
 import { ElementAssembler } from "./loader-fantasy-element.js";
+import { generateElfCastleFromGraph } from "./loader-fantasy-elf-graph.js";
 import {
   getFactionProfile,
   pickArchForFaction,
@@ -31,11 +32,15 @@ import {
   crossingArches,
   dome,
   elfArcadeCluster,
+  elfBridgeArcade,
+  elfFlyingButtress,
+  elfPetalFlare,
+  elfRibCrown,
+  elfSpireCluster,
   finial,
   flyingButtress,
   gableRoof,
   gothicArchCap,
-  invertedArrowCap,
   jitterRing,
   merlons,
   rect,
@@ -94,7 +99,7 @@ function addMerlons(asm, tcx, topY, w, rng, jitterAmt, tilt, merCount) {
  * @param {ElementAssembler} asm
  * @param {{
  *   profile: import('./loader-fantasy-castle-factions.js').FactionProfile;
- *   elfCapKind: 'gothic_arch'|'inverted_arrow'|null;
+ *   elfCapKind: import('./loader-fantasy-castle-factions.js').ElfCapKind|null;
  *   remate: string;
  *   tcx: number;
  *   towerTop: number;
@@ -102,21 +107,42 @@ function addMerlons(asm, tcx, topY, w, rng, jitterAmt, tilt, merCount) {
  *   tilt: number;
  *   rng: () => number;
  *   jitterAmt: number;
+ *   isCentral?: boolean;
  * }} opts
  */
 function applyTowerCrown(asm, opts) {
-  const { profile, elfCapKind, remate, tcx, towerTop, towerW, tilt, rng, jitterAmt } = opts;
+  const {
+    profile, elfCapKind, remate, tcx, towerTop, towerW, tilt, rng, jitterAmt,
+    isCentral = false,
+  } = opts;
 
   if (profile.remateMode === "none") return;
 
   if (profile.remateMode === "elf_cap" && elfCapKind) {
-    const capH = towerW * randRange(rng, 1.1, 1.65);
-    const capW = towerW * 1.08;
-    let cap = elfCapKind === "gothic_arch"
-      ? gothicArchCap(tcx, towerTop - SEAM, capW, capH + SEAM)
-      : invertedArrowCap(tcx, towerTop - SEAM, capW, capH + SEAM);
-    cap = jitterRing(cap, rng, jitterAmt * 0.45, { lockY: [towerTop - SEAM], freezeSeams: true });
-    asm.addPart("decoration", cap, [], { tiltDeg: tilt });
+    const baseCapY = towerTop - SEAM;
+    const capH = towerW * randRange(rng, isCentral ? 1.75 : 1.35, isCentral ? 2.75 : 2.15);
+    const capW = towerW * randRange(rng, 0.9, 1.14);
+
+    /** @type {import('./loader-fantasy-geom.js').FPoint[][]} */
+    let rings = [];
+
+    if (elfCapKind === "rib_crown") {
+      rings = elfRibCrown(tcx, baseCapY, capW, capH);
+      rings.push(...finial(tcx, baseCapY + capH * 0.32, capH * randRange(rng, 0.75, 1.05), "needle"));
+    } else if (elfCapKind === "spire_cluster" || elfCapKind === "inverted_arrow") {
+      rings = elfSpireCluster(tcx, baseCapY, capW, capH);
+    } else {
+      const archH = capH * 1.08;
+      rings = [gothicArchCap(tcx, baseCapY, capW, archH)];
+      rings.push(...crossingArches(tcx, baseCapY + archH * 0.12, capW * 0.52, archH * 0.62));
+      rings.push(...finial(tcx, baseCapY + archH * 0.68, capH * randRange(rng, 0.7, 0.95), "needle"));
+    }
+
+    for (const ring of rings) {
+      if (!ring || ring.length < 3) continue;
+      const j = jitterRing(ring, rng, jitterAmt * 0.32, { lockY: [baseCapY], freezeSeams: true });
+      asm.addPart("decoration", j, [], { tiltDeg: tilt });
+    }
     return;
   }
 
@@ -207,6 +233,14 @@ export function generateCastle(options) {
   const profile = getFactionProfile(faction);
   const style = options.style ?? pickStyle(rng, palace);
   const imperfection = options.imperfection ?? 0.55;
+
+  if (faction === "elf") {
+    return generateElfCastleFromGraph(
+      { seed, palace, style, imperfection },
+      rng,
+    );
+  }
+
   const ruined = style === "ruinedKeep";
 
   const asym = randRange(rng, 0.3, 0.8);
@@ -304,12 +338,19 @@ export function generateCastle(options) {
 
   // Fachada élfica: arcadas orgánicas y arcos cruzados
   if (profile.remateMode === "elf_cap" && profile.arcadeRows > 0) {
-    const clusterH = baseH * randRange(rng, 0.48, 0.68);
-    const clusterW = baseW * randRange(rng, 0.72, 0.92);
-    const clusterY = baseH * randRange(rng, 0.22, 0.32);
+    const clusterH = baseH * randRange(rng, 0.52, 0.72);
+    const clusterW = baseW * randRange(rng, 0.78, 0.96);
+    const clusterY = baseH * randRange(rng, 0.18, 0.28);
     for (const ring of elfArcadeCluster(axis, clusterY, clusterW, clusterH, profile.arcadeRows)) {
-      asm.addPart("decoration", jitterRing(ring, rng, jitterAmt * 0.28));
+      asm.addPart("decoration", jitterRing(ring, rng, jitterAmt * 0.22));
     }
+    const bridgeW = baseW * randRange(rng, 0.58, 0.82);
+    const bridgeH = baseH * randRange(rng, 0.4, 0.55);
+    const bridgeCount = 2 + Math.floor(rng() * 2);
+    for (const ring of elfBridgeArcade(doorCx, 0, bridgeW, bridgeH, bridgeCount)) {
+      asm.addPart("decoration", jitterRing(ring, rng, jitterAmt * 0.2));
+    }
+    arches.gothic += bridgeCount;
   } else if (rng() < profile.crossingArchChance) {
     const decoH = baseH * randRange(rng, 0.42, 0.58);
     const decoW = baseW * randRange(rng, 0.38, 0.52);
@@ -333,8 +374,9 @@ export function generateCastle(options) {
   const blockCount = Math.floor(rng() * (profile.blockMax + 1));
   for (let b = 0; b < blockCount; b++) {
     const side = b % 2 === 0 ? -1 : 1;
-    const blockW = baseW * randRange(rng, 0.22, 0.34);
-    const blockH = baseH * randRange(rng, 0.5, 0.82);
+    const isElf = profile.remateMode === "elf_cap";
+    const blockW = baseW * randRange(rng, isElf ? 0.18 : 0.22, isElf ? 0.28 : 0.34);
+    const blockH = baseH * randRange(rng, isElf ? 0.55 : 0.5, isElf ? 0.9 : 0.82);
     const blockCx = axis + side * (baseW / 2 + blockW * randRange(rng, 0.1, 0.4));
     const blockTop = blockH;
     let blockOuter = bodyShell(blockCx, 0, blockW, blockTop, profile);
@@ -342,17 +384,34 @@ export function generateCastle(options) {
 
     /** @type {import('./loader-fantasy-geom.js').FPoint[][]} */
     const blockHoles = [];
-    if (rng() > 0.4) {
+    if (isElf) {
+      const archN = 2 + Math.floor(rng() * 2);
+      for (let a = 0; a < archN; a++) {
+        const ax = blockCx + (a - (archN - 1) / 2) * blockW * 0.26;
+        blockHoles.push(aperture(ax, blockH * 0.32, blockW * 0.2, blockH * 0.5, "gothic"));
+        arches.gothic += 1;
+        windowCount += 1;
+      }
+    } else if (rng() > 0.4) {
       blockHoles.push(aperture(blockCx, blockH * 0.45, blockW * 0.3, blockH * 0.26, winKind));
       if (arches[winKind] !== undefined) arches[winKind] += 1;
       windowCount += 1;
     }
-    asm.addPart("block", blockOuter, blockHoles, {
-      tiltDeg: (rng() - 0.5) * 2.4 * imperfection * profile.tiltScale,
-    });
+    const blockTilt = (rng() - 0.5) * 2.4 * imperfection * profile.tiltScale;
+    asm.addPart("block", blockOuter, blockHoles, { tiltDeg: blockTilt });
 
-    // Tejado del bloque (humanos y malignos)
-    if (profile.blockRoof) {
+    if (isElf) {
+      const broofH = blockH * randRange(rng, 0.58, 0.85);
+      let broof = gableRoof(blockCx, blockTop - SEAM, blockW * 0.86, broofH + SEAM);
+      broof = jitterRing(broof, rng, jitterAmt * 0.45, { lockY: [blockTop - SEAM], freezeSeams: true });
+      asm.addPart("roof", broof, [], { tiltDeg: blockTilt });
+      for (const ring of finial(blockCx, blockTop + broofH - SEAM, broofH * 0.5, "needle")) {
+        asm.addPart("decoration", ring);
+      }
+      for (const ring of elfArcadeCluster(blockCx, blockH * 0.18, blockW * 0.88, blockH * 0.5, 2)) {
+        asm.addPart("decoration", jitterRing(ring, rng, jitterAmt * 0.18));
+      }
+    } else if (profile.blockRoof) {
       const broofH = blockH * randRange(rng, 0.32, 0.5);
       let broof = gableRoof(blockCx, blockTop - SEAM, blockW * 1.06, broofH + SEAM);
       broof = jitterRing(broof, rng, jitterAmt * 0.7, { lockY: [blockTop - SEAM], freezeSeams: true });
@@ -376,7 +435,7 @@ export function generateCastle(options) {
 
   // Ordenar las torres de izquierda a derecha y garantizar que no se solapan.
   // MIN_TOWER_SPACING = max(towerW) + margen visual = 16 + 4 = 20 unidades locales.
-  const MIN_TOWER_SPACING = 20;
+  const MIN_TOWER_SPACING = profile.remateMode === "elf_cap" ? 13 : 20;
   towerXs.sort((a, b) => a - b);
   for (let i = 1; i < towerXs.length; i++) {
     if (towerXs[i] - towerXs[i - 1] < MIN_TOWER_SPACING) {
@@ -394,9 +453,12 @@ export function generateCastle(options) {
   const elfCapKind = profile.remateMode === "elf_cap" ? pickElfTowerCap(rng) : null;
   const towerRemate = profile.remateMode === "uniform" ? pickRemateForFaction(rng, profile) : null;
 
+  const centralTowerIdx = Math.floor(towerCount / 2);
+
   towerXs.forEach((tcx, idx) => {
     const towerW = randRange(rng, profile.towerW[0], profile.towerW[1]);
     let hMul = randRange(rng, profile.hMul[0], profile.hMul[1]);
+    if (profile.remateMode === "elf_cap" && idx === centralTowerIdx) hMul *= randRange(rng, 1.12, 1.22);
     // En ruinas, una torre queda truncada
     if (ruined && idx === towerCount - 1) hMul *= 0.55;
     const towerH = baseH * hMul;
@@ -408,21 +470,35 @@ export function generateCastle(options) {
 
     /** @type {import('./loader-fantasy-geom.js').FPoint[][]} */
     const towerHoles = [];
-    // Saeteras (1–2) verticales estrechas
-    const slits = 1 + Math.floor(rng() * 2);
-    for (let s = 0; s < slits; s++) {
-      const sy = towerH * (0.4 + s * 0.25);
-      if (sy + towerW * 0.5 > towerH) break;
-      towerHoles.push(aperture(tcx, sy, towerW * 0.16, towerH * 0.14, "flat"));
-      arches.flat += 1;
-      slitCount += 1;
-    }
-    // Ventana superior ocasional
-    if (rng() > 0.5) {
-      const wy = towerH * 0.68;
-      towerHoles.push(aperture(tcx, wy, towerW * 0.34, towerH * 0.12, winKind));
-      if (arches[winKind] !== undefined) arches[winKind] += 1;
-      windowCount += 1;
+    if (profile.remateMode === "elf_cap") {
+      const lancets = 2 + Math.floor(rng() * 2);
+      for (let s = 0; s < lancets; s++) {
+        const sy = towerH * (0.32 + s * 0.2);
+        if (sy + towerH * 0.22 > towerH * 0.88) break;
+        towerHoles.push(aperture(tcx, sy, towerW * 0.2, towerH * 0.26, "gothic"));
+        arches.gothic += 1;
+        windowCount += 1;
+      }
+      const belfryY = towerH * randRange(rng, 0.72, 0.8);
+      towerHoles.push(aperture(tcx, belfryY, towerW * 0.78, towerH * 0.14, "gothic"));
+      arches.gothic += 1;
+    } else {
+      // Saeteras (1–2) verticales estrechas
+      const slits = 1 + Math.floor(rng() * 2);
+      for (let s = 0; s < slits; s++) {
+        const sy = towerH * (0.4 + s * 0.25);
+        if (sy + towerW * 0.5 > towerH) break;
+        towerHoles.push(aperture(tcx, sy, towerW * 0.16, towerH * 0.14, "flat"));
+        arches.flat += 1;
+        slitCount += 1;
+      }
+      // Ventana superior ocasional
+      if (rng() > 0.5) {
+        const wy = towerH * 0.68;
+        towerHoles.push(aperture(tcx, wy, towerW * 0.34, towerH * 0.12, winKind));
+        if (arches[winKind] !== undefined) arches[winKind] += 1;
+        windowCount += 1;
+      }
     }
 
     const tilt = (rng() - 0.5) * 3 * imperfection * profile.tiltScale;
@@ -455,7 +531,16 @@ export function generateCastle(options) {
       tilt,
       rng,
       jitterAmt,
+      isCentral: idx === centralTowerIdx,
     });
+
+    if (profile.remateMode === "elf_cap" && rng() < 0.78) {
+      const midY = towerH * randRange(rng, 0.44, 0.56);
+      const petalH = towerW * randRange(rng, 0.85, 1.35);
+      for (const petal of elfPetalFlare(tcx, midY, towerW, petalH)) {
+        asm.addPart("decoration", jitterRing(petal, rng, jitterAmt * 0.25), [], { tiltDeg: tilt });
+      }
+    }
 
     // Contrafuertes en torres (humanos)
     if (profile.remateMode === "human_mixed" && rng() < 0.55) {
@@ -471,13 +556,16 @@ export function generateCastle(options) {
 
   // Arbotantes élficos (torre ↔ muro)
   if (profile.flyingButtressChance > 0 && rng() < profile.flyingButtressChance) {
-    towerXs.forEach((tcx) => {
+    towerXs.forEach((tcx, ti) => {
       const side = tcx < axis ? -1 : 1;
       const wallX = axis + side * (baseW / 2);
-      const y0 = baseH * randRange(rng, 0.5, 0.68);
-      const y1 = towerHeights[towerXs.indexOf(tcx)] * randRange(rng, 0.48, 0.62);
-      const thick = 1.4 + rng() * 1.2;
-      asm.addPart("decoration", flyingButtress(wallX, y0, tcx, y1, thick));
+      const y0 = baseH * randRange(rng, 0.48, 0.66);
+      const y1 = towerHeights[ti] * randRange(rng, 0.42, 0.58);
+      const thick = 0.9 + rng() * 0.9;
+      const butt = profile.remateMode === "elf_cap"
+        ? elfFlyingButtress(wallX, y0, tcx, y1, thick)
+        : flyingButtress(wallX, y0, tcx, y1, thick);
+      asm.addPart("decoration", butt);
     });
   }
 

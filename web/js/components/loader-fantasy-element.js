@@ -90,12 +90,19 @@ export class ElementAssembler {
    * @param {number} seed
    * @param {string} style
    * @param {Record<string, unknown>} [meta]
+   * @param {{ scaleBy?: 'max' | 'height' }} [normalizeOpts]
    * @returns {FantasyElement}
    */
-  build(kind, seed, style = "white", meta = {}) {
+  build(kind, seed, style = "white", meta = {}, normalizeOpts = {}) {
     if (this._parts.length === 0) {
       return { kind, style, seed, viewBox: "0 0 100 100", parts: [], width: 0, height: 0, footprint: 0, meta };
     }
+
+    const scaleBy = /** @type {'max'|'height'} */ (
+      normalizeOpts.scaleBy
+      ?? (meta.normalizeScaleBy === "height" ? "height" : "max")
+    );
+    const bottomInset = Number(meta.normalizeBottomInset) || normalizeOpts.bottomInset || 0;
 
     // Recoger todos los anillos para normalización conjunta
     /** @type {import('./loader-fantasy-geom.js').FPoint[][]} */
@@ -114,7 +121,7 @@ export class ElementAssembler {
       partMeta.push({ outerIdx, holeIdxs, role: p.role, tiltDeg: p.tiltDeg });
     }
 
-    const normalized = normalizeFantasyGroups(allRings);
+    const normalized = normalizeFantasyGroups(allRings, { anchorY: "bottom", scaleBy, bottomInset });
 
     /** @type {FantasyPart[]} */
     const parts = partMeta.map((pm, partIdx) => {

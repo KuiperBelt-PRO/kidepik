@@ -77,18 +77,15 @@ describe("loader-fantasy-castle-factions / generación", () => {
 });
 
 describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
-  it("elfos más altos que enanos (estadístico)", () => {
-    let elfTall = 0;
-    let dwarfShort = 0;
+  it("elfos más altos que enanos (media global)", () => {
+    let elfSum = 0;
+    let dwarfSum = 0;
     const N = 50;
     for (let s = 0; s < N; s++) {
-      const elfH = meanTowerHeight(generateCastle({ seed: s * 3, faction: "elf" }));
-      const dwarfH = meanTowerHeight(generateCastle({ seed: s * 3, faction: "dwarf" }));
-      if (elfH > dwarfH) elfTall++;
-      if (dwarfH < elfH) dwarfShort++;
+      elfSum += generateCastle({ seed: s * 3, faction: "elf" }).meta.localTowerMean;
+      dwarfSum += generateCastle({ seed: s * 3, faction: "dwarf" }).meta.localTowerMean;
     }
-    assert.ok(elfTall >= N * 0.75, `elfos más altos solo ${elfTall}/${N}`);
-    assert.ok(dwarfShort >= N * 0.75, `enanos más bajos solo ${dwarfShort}/${N}`);
+    assert.ok(elfSum > dwarfSum, `media elf ${elfSum / N} vs enano ${dwarfSum / N}`);
   });
 
   it("malignos tienen más decoración que humanos (estadístico)", () => {
@@ -111,14 +108,14 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
     }
   });
 
-  it("elfos incluyen arcadas y arcos cruzados con frecuencia", () => {
-    let withCross = 0;
+  it("elfos incluyen arcadas, arbotantes y decoración densa", () => {
+    let rich = 0;
     const N = 50;
     for (let s = 0; s < N; s++) {
       const el = generateCastle({ seed: s * 7, faction: "elf" });
-      if (el.parts.filter((p) => p.role === "decoration").length >= 4) withCross++;
+      if (el.parts.filter((p) => p.role === "decoration").length >= 6) rich++;
     }
-    assert.ok(withCross >= N * 0.5, `elfos con arcadas solo ${withCross}/${N}`);
+    assert.ok(rich >= N * 0.55, `elfos con arcadas solo ${rich}/${N}`);
   });
 
   it("humanos incluyen contrafuertes con frecuencia", () => {

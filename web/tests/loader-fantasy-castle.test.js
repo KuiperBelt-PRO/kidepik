@@ -14,8 +14,12 @@ const REMATE_KINDS = [
   "dome_battlement",
   "gothic_arch",
   "inverted_arrow",
+  "rib_crown",
+  "spire_cluster",
   "carved",
 ];
+
+const ELF_CAP_KINDS = ["gothic_arch", "inverted_arrow", "rib_crown", "spire_cluster"];
 
 /** Roles que coronan torres/bloques. */
 const CAP_ROLES = new Set(["roof", "battlement", "dome"]);
@@ -111,7 +115,7 @@ describe("loader-fantasy-castle / invariantes", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 17 + 2 });
       const towers = el.parts.filter((p) => p.role === "tower");
-      assert.ok(towers.length >= 2 && towers.length <= 5, `seed ${s}: ${towers.length} torres`);
+      assert.ok(towers.length >= 2 && towers.length <= 6, `seed ${s}: ${towers.length} torres`);
       assert.equal(el.meta.towerCount, towers.length);
       assert.equal(el.meta.towers.length, towers.length);
     }
@@ -138,12 +142,12 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
-  it("elfos: mismo cap gótico o flecha en todas las torres", () => {
+  it("elfos: mismo cap en todas las torres (gótico, agujas o costillas)", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 19 + 3, faction: "elf" });
       const remates = new Set(el.meta.towers.map((t) => t.remate));
       assert.equal(remates.size, 1, `seed ${s}: caps mezclados ${[...remates].join(",")}`);
-      assert.ok(["gothic_arch", "inverted_arrow"].includes(el.meta.towerRemate));
+      assert.ok(ELF_CAP_KINDS.includes(el.meta.towerRemate));
     }
   });
 

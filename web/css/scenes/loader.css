@@ -208,7 +208,7 @@
 .loader-layer.loader-layer--fantasy-scene {
   /* Cubre la mitad inferior del loader (zona fantasía) */
   inset: 50% 0 0 0;
-  z-index: 1;
+  z-index: 2;
   pointer-events: none;
   overflow: visible;
   /* Reserva el espacio del terreno mediante variable (misma altura que --fantasy-terrain) */
@@ -219,10 +219,11 @@
 .loader-fantasy-el {
   position: absolute;
   bottom: 0;
-  /* left se asigna en JS; translateX centra, translateY hunde la base más en el terreno */
-  transform: translateX(-50%) translateY(22px);
+  /* left se asigna en JS; translateX centra el SVG sobre el punto de anclaje */
+  transform: translateX(-50%);
   pointer-events: none;
   will-change: contents;
+  filter: drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.12));
 }
 
 /* SVG del elemento */

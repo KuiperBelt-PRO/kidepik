@@ -220,14 +220,8 @@ export function mountFantasyElement(container, element, opts) {
   const el = document.createElement("div");
   el.className = "loader-fantasy-el";
   el.style.left = `${xPercent}%`;
-  // Posiciona el elemento encima de la franja de terreno:
-  // el borde inferior del SVG (donde está el plinth, y=100) queda al nivel
-  // de la cima del terreno.  El plinth queda enterrado bajo el terreno y los
-  // muros del castillo emergen por encima.
-  // Posiciona el elemento encima del terreno, pero ligeramente hundido para que
-  // el plinth se mezcle visualmente con la franja de suelo.
-  // Con el translateY(22px) del CSS, el resultado neto es ~60 % del terreno visible.
-  const terrainH = Math.round((terrainHeightPx ?? 48) * 0.55);
+  // El borde inferior del viewBox queda sobre la cresta del terreno (no enterrado).
+  const terrainH = Math.round(terrainHeightPx ?? 48);
   el.style.bottom = `${terrainH}px`;
 
   // El viewBox es cuadrado (0 0 100 100) con el contenido anclado abajo (y=100).

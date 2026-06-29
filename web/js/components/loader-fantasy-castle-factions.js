@@ -77,12 +77,12 @@ export const FACTION_PROFILES = {
   elf: {
     id: "elf",
     label: "Elf",
-    baseW: [38, 52],
-    baseH: [36, 54],
-    towerW: [6, 10],
-    hMul: [2.15, 2.9],
-    jitterScale: 1.12,
-    archBias: { gothic: 0.88, romanesque: 0.12 },
+    baseW: [30, 44],
+    baseH: [34, 50],
+    towerW: [4.5, 7.5],
+    hMul: [4.5, 6.5],
+    jitterScale: 0.95,
+    archBias: { gothic: 0.95, romanesque: 0.05 },
     winKinds: ["gothic", "trefoil", "gothic"],
     remateWeights: { battlement: 0, roof: 0, dome: 0 },
     blockMax: 2,
@@ -92,14 +92,14 @@ export const FACTION_PROFILES = {
     spikeChance: 0,
     spikeDensity: [0, 0],
     finialKinds: ["needle"],
-    finialChance: 0.2,
-    tiltScale: 0.65,
+    finialChance: 0.85,
+    tiltScale: 0.45,
     remateMode: "elf_cap",
     buttressChance: 0,
-    flyingButtressChance: 0.78,
+    flyingButtressChance: 0.92,
     centralCrownChance: 0,
     blockRoof: false,
-    arcadeRows: 3,
+    arcadeRows: 4,
   },
   dwarf: {
     id: "dwarf",
@@ -242,9 +242,17 @@ export function pickHumanCentralCrown(rng) {
 }
 
 /**
+ * @typedef {'gothic_arch'|'inverted_arrow'|'rib_crown'|'spire_cluster'} ElfCapKind
+ */
+
+/**
  * @param {() => number} rng
- * @returns {'gothic_arch'|'inverted_arrow'}
+ * @returns {ElfCapKind}
  */
 export function pickElfTowerCap(rng) {
-  return rng() < 0.55 ? "gothic_arch" : "inverted_arrow";
+  const r = rng();
+  if (r < 0.28) return "rib_crown";
+  if (r < 0.5) return "spire_cluster";
+  if (r < 0.74) return "gothic_arch";
+  return "inverted_arrow";
 }

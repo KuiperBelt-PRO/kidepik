@@ -43,6 +43,7 @@ function sessionSeed() {
  *   terrainHeightPx?: number;
  *   devKind?: string;
  *   devFaction?: import('./loader-fantasy-castle-factions.js').CastleFaction;
+ *   devSeed?: number;
  * }} [opts]
  * @returns {{ destroy: () => void }}
  */
@@ -52,6 +53,7 @@ export function mountFantasyScene(container, opts = {}) {
     terrainHeightPx = 48,
     devKind,
     devFaction,
+    devSeed,
   } = opts;
 
   const layer = document.createElement("div");
@@ -93,7 +95,7 @@ export function mountFantasyScene(container, opts = {}) {
     const kind = /** @type {import('./loader-fantasy-element.js').FantasyKind} */ (
       devKind || (cycleRng() < 0.32 ? "palace" : "castle")
     );
-    const seed = sessionSeed();
+    const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
     const element = generateFantasyElement(kind, { seed, faction: devFaction });
     if (!element) {
       scheduleNext(2000);

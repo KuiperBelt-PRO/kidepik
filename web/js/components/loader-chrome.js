@@ -283,12 +283,17 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
 
   const fantasyDev = new URLSearchParams(window.location.search).get("fantasyDev") || undefined;
   const fantasyFaction = parseDevFaction(new URLSearchParams(window.location.search).get("fantasyFaction"));
+  const fantasySeedRaw = new URLSearchParams(window.location.search).get("fantasySeed");
+  const fantasySeed = fantasySeedRaw != null && fantasySeedRaw !== ""
+    ? Number.parseInt(fantasySeedRaw, 10)
+    : undefined;
   const fantasyTerrainH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fantasy-terrain-h")) || 48;
   let fantasySceneTeardown = mountFantasyScene(layers, {
     reducedMotion,
     terrainHeightPx: fantasyTerrainH,
     devKind: fantasyDev,
     devFaction: fantasyFaction,
+    devSeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,
   });
 
   let destroyed = false;
