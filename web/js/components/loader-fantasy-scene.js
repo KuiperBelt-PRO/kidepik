@@ -42,6 +42,7 @@ function sessionSeed() {
  *   reducedMotion?: boolean;
  *   terrainHeightPx?: number;
  *   devKind?: string;
+ *   devFaction?: import('./loader-fantasy-castle-factions.js').CastleFaction;
  * }} [opts]
  * @returns {{ destroy: () => void }}
  */
@@ -50,6 +51,7 @@ export function mountFantasyScene(container, opts = {}) {
     reducedMotion = false,
     terrainHeightPx = 48,
     devKind,
+    devFaction,
   } = opts;
 
   const layer = document.createElement("div");
@@ -92,7 +94,7 @@ export function mountFantasyScene(container, opts = {}) {
       devKind || (cycleRng() < 0.32 ? "palace" : "castle")
     );
     const seed = sessionSeed();
-    const element = generateFantasyElement(kind, { seed });
+    const element = generateFantasyElement(kind, { seed, faction: devFaction });
     if (!element) {
       scheduleNext(2000);
       return;
@@ -100,7 +102,7 @@ export function mountFantasyScene(container, opts = {}) {
 
     // Tiempos: en devMode acelera el hold para ciclar rápido
     const baseTiming = planLifecycleTiming(seed, kind, element.parts.length);
-    const timing = devKind
+    const timing = devKind || devFaction
       ? { ...baseTiming, holdMs: 2200, gapMs: 500 }
       : baseTiming;
 
@@ -123,7 +125,7 @@ export function mountFantasyScene(container, opts = {}) {
   }
 
   // Arranca tras una breve pausa inicial para que el loader esté visible
-  scheduleNext(devKind ? 200 : 900);
+  scheduleNext(devKind || devFaction ? 200 : 900);
 
   return { destroy };
 }

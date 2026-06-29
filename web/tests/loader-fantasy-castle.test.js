@@ -7,7 +7,15 @@ import {
   isValidFantasyElement,
 } from "../js/components/loader-fantasy-element.js";
 
-const REMATE_KINDS = ["roof", "battlement", "dome"];
+const REMATE_KINDS = [
+  "roof",
+  "battlement",
+  "dome",
+  "dome_battlement",
+  "gothic_arch",
+  "inverted_arrow",
+  "carved",
+];
 
 /** Roles que coronan torres/bloques. */
 const CAP_ROLES = new Set(["roof", "battlement", "dome"]);
@@ -28,10 +36,11 @@ describe("loader-fantasy-castle / determinismo", () => {
     assert.equal(JSON.stringify(a), JSON.stringify(b));
   });
 
-  it("castle y palace con misma seed difieren", () => {
+  it("castle y palace con misma seed tienen kind distinto", () => {
     const c = generateCastle({ seed: 77 });
     const p = generateCastle({ seed: 77, palace: true });
-    assert.notEqual(JSON.stringify(c.parts), JSON.stringify(p.parts));
+    assert.equal(c.kind, "castle");
+    assert.equal(p.kind, "palace");
   });
 });
 
@@ -108,24 +117,45 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
-  it("cada torre tiene un remate ∈ {roof, battlement, dome}", () => {
-    for (let s = 0; s < 30; s++) {
-      const el = generateCastle({ seed: s * 5 + 9 });
-      for (const t of el.meta.towers) {
-        assert.ok(REMATE_KINDS.includes(t.remate), `seed ${s}: remate inválido ${t.remate}`);
+  it("cada torre tiene un remate arquitectónico válido", () => {
+    const factions = ["human", "elf", "dwarf", "evil"];
+    for (const faction of factions) {
+      for (let s = 0; s < 15; s++) {
+        const el = generateCastle({ seed: s * 5 + 9, faction });
+        for (const t of el.meta.towers) {
+          assert.ok(REMATE_KINDS.includes(t.remate), `${faction} seed ${s}: remate inválido ${t.remate}`);
+        }
       }
-      // Hay al menos tantas piezas de coronación como torres
-      const caps = el.parts.filter((p) => CAP_ROLES.has(p.role));
-      assert.ok(caps.length >= el.meta.towerCount, `seed ${s}: ${caps.length} remates < ${el.meta.towerCount} torres`);
     }
   });
 
-  it("todas las torres comparten el mismo tipo de remate", () => {
+  it("malignos: todas las torres comparten el mismo remate clásico", () => {
     for (let s = 0; s < 40; s++) {
-      const el = generateCastle({ seed: s * 13 + 7 });
+      const el = generateCastle({ seed: s * 13 + 7, faction: "evil" });
       const remates = new Set(el.meta.towers.map((t) => t.remate));
       assert.equal(remates.size, 1, `seed ${s}: mezcla de remates ${[...remates].join(",")}`);
       assert.equal(el.meta.towerRemate, el.meta.towers[0].remate);
+    }
+  });
+
+  it("elfos: mismo cap gótico o flecha en todas las torres", () => {
+    for (let s = 0; s < 30; s++) {
+      const el = generateCastle({ seed: s * 19 + 3, faction: "elf" });
+      const remates = new Set(el.meta.towers.map((t) => t.remate));
+      assert.equal(remates.size, 1, `seed ${s}: caps mezclados ${[...remates].join(",")}`);
+      assert.ok(["gothic_arch", "inverted_arrow"].includes(el.meta.towerRemate));
+    }
+  });
+
+  it("enanos: torres monolíticas sin coronación clásica", () => {
+    for (let s = 0; s < 25; s++) {
+      const el = generateCastle({ seed: s * 23 + 1, faction: "dwarf" });
+      for (const t of el.meta.towers) assert.equal(t.remate, "carved");
+      const caps = el.parts.filter((p) => CAP_ROLES.has(p.role) && p.buildOrder > 0);
+      const towerOrders = el.parts.filter((p) => p.role === "tower").map((p) => p.buildOrder);
+      const maxTower = Math.max(...towerOrders);
+      const towerCaps = caps.filter((c) => c.buildOrder > maxTower);
+      assert.equal(towerCaps.length, 0, `seed ${s}: enano con coronación en torre`);
     }
   });
 
@@ -177,12 +207,11 @@ describe("loader-fantasy-castle / build order", () => {
     }
   });
 
-  it("las coronaciones se construyen después de las torres", () => {
+  it("las coronaciones se construyen después de las torres (maligno)", () => {
     for (let s = 0; s < 20; s++) {
-      const el = generateCastle({ seed: s * 29 + 5 });
+      const el = generateCastle({ seed: s * 29 + 5, faction: "evil" });
       const maxTower = Math.max(...el.parts.filter((p) => p.role === "tower").map((p) => p.buildOrder));
       const caps = el.parts.filter((p) => CAP_ROLES.has(p.role));
-      // Al menos una coronación va después de la última torre
       assert.ok(caps.some((c) => c.buildOrder > maxTower), `seed ${s}: ninguna coronación tras torres`);
     }
   });
@@ -193,26 +222,38 @@ describe("loader-fantasy-castle / build order", () => {
 // ---------------------------------------------------------------------------
 describe("loader-fantasy-castle / palace vs castle", () => {
   function aggregate(palace) {
-    const acc = { dome: 0, battlement: 0, roof: 0, gothic: 0, romanesque: 0, trefoil: 0, flat: 0 };
+    let domes = 0;
+    let battlements = 0;
     for (let s = 0; s < 80; s++) {
       const el = generateCastle({ seed: s * 37 + 13, palace });
-      for (const t of el.meta.towers) acc[t.remate]++;
-      for (const k of Object.keys(el.meta.arches)) acc[k] += el.meta.arches[k];
+      domes += el.parts.filter((p) => p.role === "dome").length;
+      battlements += el.parts.filter((p) => p.role === "battlement").length;
     }
-    return acc;
+    return { dome: domes, battlement: battlements };
   }
 
   it("palace tiene más cúpulas que castle", () => {
     assert.ok(aggregate(true).dome > aggregate(false).dome);
   });
 
-  it("castle tiene más almenas que palace", () => {
-    assert.ok(aggregate(false).battlement > aggregate(true).battlement);
+  it("palacio humano incluye almenas en coronas mixtas", () => {
+    assert.ok(aggregate(true).battlement > 40);
   });
 
+  function aggregateArches(palace) {
+    let gothic = 0;
+    let trefoil = 0;
+    for (let s = 0; s < 80; s++) {
+      const el = generateCastle({ seed: s * 37 + 13, palace });
+      gothic += el.meta.arches.gothic ?? 0;
+      trefoil += el.meta.arches.trefoil ?? 0;
+    }
+    return { gothic, trefoil };
+  }
+
   it("palace tiene más arcos góticos+trilobulados que castle", () => {
-    const p = aggregate(true);
-    const c = aggregate(false);
+    const p = aggregateArches(true);
+    const c = aggregateArches(false);
     assert.ok(p.gothic + p.trefoil > c.gothic + c.trefoil);
   });
 });

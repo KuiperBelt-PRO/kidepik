@@ -6,6 +6,8 @@ import {
   aperture,
   boundsOfFantasyGroups,
   buildPartPath,
+  chamferRect,
+  crossingArches,
   dome,
   gableRoof,
   jitterRing,
@@ -14,6 +16,7 @@ import {
   pointsToPath,
   polygon,
   rect,
+  spikeRow,
 } from "../js/components/loader-fantasy-geom.js";
 import { createRng } from "../js/components/loader-ship-rng.js";
 
@@ -120,6 +123,27 @@ describe("loader-fantasy-geom / merlons", () => {
     assert.ok(xs.some((x) => Math.abs(x - (leftEdge + merW)) < 0.01), "falta cima merlón izquierdo");
     assert.ok(xs.some((x) => Math.abs(x - rightEdge) < 0.01), "falta merlón derecho");
     assert.ok(xs.some((x) => Math.abs(x - (rightEdge - merW)) < 0.01), "falta cima merlón derecho");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// chamferRect, crossingArches, spikeRow
+// ---------------------------------------------------------------------------
+describe("loader-fantasy-geom / facciones", () => {
+  it("chamferRect tiene 8 vértices", () => {
+    assert.equal(chamferRect(50, 0, 40, 30, 4).length, 8);
+  });
+
+  it("crossingArches devuelve dos anillos", () => {
+    const rings = crossingArches(50, 10, 30, 20);
+    assert.equal(rings.length, 2);
+    assert.ok(rings[0].length > 4);
+  });
+
+  it("spikeRow devuelve al menos 2 pinchos", () => {
+    const spikes = spikeRow(50, 0, 40, 4, 8);
+    assert.ok(spikes.length >= 2);
+    assert.equal(spikes[0].length, 3);
   });
 });
 

@@ -40,6 +40,30 @@ export function rect(cx, baseY, w, h) {
 }
 
 /**
+ * Rectángulo con esquinas achaflanadas (piedra tallada enana / angular).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} [chamfer]
+ * @returns {FPoint[]}
+ */
+export function chamferRect(cx, baseY, w, h, chamfer = 3) {
+  const hw = w / 2;
+  const c = Math.min(chamfer, hw * 0.45, h * 0.35);
+  return [
+    { x: cx - hw + c, y: baseY },
+    { x: cx + hw - c, y: baseY },
+    { x: cx + hw, y: baseY + c },
+    { x: cx + hw, y: baseY + h - c },
+    { x: cx + hw - c, y: baseY + h },
+    { x: cx - hw + c, y: baseY + h },
+    { x: cx - hw, y: baseY + h - c },
+    { x: cx - hw, y: baseY + c },
+  ];
+}
+
+/**
  * Tejado a dos aguas (triángulo o trapecio con cumbrera).
  * @param {number} cx
  * @param {number} baseY  base del tejado (sobre el muro)
@@ -272,6 +296,168 @@ export function finial(cx, baseY, h, kind = "needle") {
     { x: cx + h * 0.07, y: baseY },
     { x: cx, y: baseY + h },
   ]];
+}
+
+/**
+ * Dos arcos ojivales superpuestos (fachada élfica). Devuelve dos anillos aditivos.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[][]}
+ */
+export function crossingArches(cx, baseY, w, h) {
+  const hw = w / 2;
+  const archH = h * 0.9;
+  const archW = w * 0.52;
+  return [
+    arch(cx - hw * 0.2, baseY, archW, archH, "gothic", 5),
+    arch(cx + hw * 0.2, baseY, archW, archH, "gothic", 5),
+  ];
+}
+
+/**
+ * Fila de pinchos triangulares sobre una línea (fuerzas malignas).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} count
+ * @param {number} spikeH
+ * @returns {FPoint[][]}
+ */
+export function spikeRow(cx, baseY, w, count, spikeH) {
+  const hw = w / 2;
+  const n = Math.max(2, count);
+  const step = w / (n + 1);
+  const halfW = step * 0.22;
+  /** @type {FPoint[][]} */
+  const spikes = [];
+  for (let i = 0; i < n; i++) {
+    const sx = cx - hw + (i + 1) * step;
+    spikes.push([
+      { x: sx - halfW, y: baseY },
+      { x: sx, y: baseY + spikeH },
+      { x: sx + halfW, y: baseY },
+    ]);
+  }
+  return spikes;
+}
+
+/**
+ * Contrafuerte triangular (refuerzo de muro).
+ * @param {number} wallCx
+ * @param {number} wallEdgeX  borde del muro donde se apoya
+ * @param {number} baseY
+ * @param {number} w  anchura hacia fuera
+ * @param {number} h
+ * @returns {FPoint[]}
+ */
+export function buttress(wallCx, wallEdgeX, baseY, w, h) {
+  const outward = wallEdgeX < wallCx ? -1 : 1;
+  const outerX = wallEdgeX + outward * w;
+  const midX = wallEdgeX + outward * w * 0.52;
+  return [
+    { x: wallEdgeX, y: baseY },
+    { x: outerX, y: baseY },
+    { x: midX, y: baseY + h },
+    { x: wallEdgeX, y: baseY + h },
+  ];
+}
+
+/**
+ * Remate de torre élfica: silueta de arco gótico sólido.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[]}
+ */
+export function gothicArchCap(cx, baseY, w, h) {
+  return arch(cx, baseY, w, h, "gothic", 6);
+}
+
+/**
+ * Remate en forma de flecha/chevron apuntando hacia arriba.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[]}
+ */
+export function invertedArrowCap(cx, baseY, w, h) {
+  const hw = w / 2;
+  return [
+    { x: cx - hw, y: baseY },
+    { x: cx, y: baseY + h },
+    { x: cx + hw, y: baseY },
+  ];
+}
+
+/**
+ * Arbotante: puente inclinado entre torre y muro (pieza aditiva fina).
+ * @param {number} x0
+ * @param {number} y0
+ * @param {number} x1
+ * @param {number} y1
+ * @param {number} thick
+ * @returns {FPoint[]}
+ */
+export function flyingButtress(x0, y0, x1, y1, thick) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = (-dy / len) * thick * 0.5;
+  const ny = (dx / len) * thick * 0.5;
+  return [
+    { x: x0 + nx, y: y0 + ny },
+    { x: x1 + nx, y: y1 + ny },
+    { x: x1 - nx, y: y1 - ny },
+    { x: x0 - nx, y: y0 - ny },
+  ];
+}
+
+/**
+ * Fila de arcos finos (arcada / claustro élfico).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} totalW
+ * @param {number} archW
+ * @param {number} archH
+ * @param {number} count
+ * @returns {FPoint[][]}
+ */
+export function arcadeRow(cx, baseY, totalW, archW, archH, count) {
+  /** @type {FPoint[][]} */
+  const rings = [];
+  const n = Math.max(2, count);
+  const step = totalW / n;
+  const startX = cx - totalW / 2 + step / 2;
+  for (let i = 0; i < n; i++) {
+    rings.push(arch(startX + i * step, baseY, archW * 0.92, archH, "gothic", 4));
+  }
+  return rings;
+}
+
+/**
+ * Arcadas cruzadas orgánicas: varias filas de arcos finos superpuestos.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} [rows]
+ * @returns {FPoint[][]}
+ */
+export function elfArcadeCluster(cx, baseY, w, h, rows = 2) {
+  /** @type {FPoint[][]} */
+  const rings = [];
+  const rowH = h / rows;
+  for (let r = 0; r < rows; r++) {
+    const cols = 2 + r;
+    const rowY = baseY + r * rowH * 0.85;
+    rings.push(...arcadeRow(cx, rowY, w * 0.95, w / (cols + 1), rowH * 0.92, cols));
+  }
+  rings.push(...crossingArches(cx, baseY + h * 0.15, w * 0.7, h * 0.75));
+  return rings;
 }
 
 /**

@@ -1,4 +1,5 @@
 import { assetUrl } from "../lib/assets.manifest.js";
+import { parseDevFaction } from "./loader-fantasy-castle-factions.js";
 import { mountFantasyTerrainLayer } from "./loader-fantasy-terrain.js";
 import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
@@ -281,11 +282,13 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
 
   const fantasyDev = new URLSearchParams(window.location.search).get("fantasyDev") || undefined;
+  const fantasyFaction = parseDevFaction(new URLSearchParams(window.location.search).get("fantasyFaction"));
   const fantasyTerrainH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fantasy-terrain-h")) || 48;
   let fantasySceneTeardown = mountFantasyScene(layers, {
     reducedMotion,
     terrainHeightPx: fantasyTerrainH,
     devKind: fantasyDev,
+    devFaction: fantasyFaction,
   });
 
   let destroyed = false;
