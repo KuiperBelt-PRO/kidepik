@@ -26,6 +26,11 @@ const HEIGHT_FRACTION_MAX = 0.34;
 const MIN_ELEMENT_HEIGHT_PX = 60;
 const MAX_ELEMENT_HEIGHT_PX = 150;
 
+// Castillos/palacios: perspectiva un poco más lejana (todas las facciones).
+const CASTLE_HEIGHT_FRAC_MIN = 0.23;
+const CASTLE_HEIGHT_FRAC_MAX = 0.4;
+const CASTLE_MAX_HEIGHT_PX = 168;
+
 // Semilla de sesión para posiciones aleatorias distintas en cada carga.
 let _sessionSeedCounter = Date.now() & 0x7fffffff;
 
@@ -79,11 +84,11 @@ export function mountFantasyScene(container, opts = {}) {
   function computeSizePx(kind) {
     const layerH = layer.clientHeight || 200;
     const isCastle = kind === "castle" || kind === "palace";
-    const fracMin = isCastle ? 0.28 : HEIGHT_FRACTION_MIN;
-    const fracMax = isCastle ? 0.5 : HEIGHT_FRACTION_MAX;
+    const fracMin = isCastle ? CASTLE_HEIGHT_FRAC_MIN : HEIGHT_FRACTION_MIN;
+    const fracMax = isCastle ? CASTLE_HEIGHT_FRAC_MAX : HEIGHT_FRACTION_MAX;
     const frac = randRange(cycleRng, fracMin, fracMax);
     const raw = layerH * frac;
-    const maxPx = isCastle ? 200 : MAX_ELEMENT_HEIGHT_PX;
+    const maxPx = isCastle ? CASTLE_MAX_HEIGHT_PX : MAX_ELEMENT_HEIGHT_PX;
     return Math.max(MIN_ELEMENT_HEIGHT_PX, Math.min(maxPx, raw));
   }
 

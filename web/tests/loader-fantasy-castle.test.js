@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { generateCastle } from "../js/components/loader-fantasy-castle.js";
+import { PLINTH_SCREEN_HEIGHT_FACTOR } from "../js/components/loader-fantasy-geom.js";
 import {
   generateFantasyElement,
   isValidFantasyElement,
@@ -499,7 +500,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
   it("altura del zócalo en SVG ≈ fracción terreno/castillo", () => {
     const terrainPx = 48;
     const castlePx = 120;
-    const expectedFrac = terrainPx / castlePx;
+    const expectedFrac = (terrainPx / castlePx) * PLINTH_SCREEN_HEIGHT_FACTOR;
 
     function pathHeight(d) {
       const nums = d.match(/-?[\d.]+/g).map(Number);

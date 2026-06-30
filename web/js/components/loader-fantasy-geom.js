@@ -864,6 +864,9 @@ export function boundsOfFantasyGroups(groups) {
 export const DEFAULT_TERRAIN_HEIGHT_PX = 48;
 export const DEFAULT_CASTLE_SIZE_PX = 120;
 
+/** Tras el cálculo de altura del zócalo, escala en pantalla (−20 %). */
+export const PLINTH_SCREEN_HEIGHT_FACTOR = 0.8;
+
 /**
  * Altura local del zócalo para que en pantalla ocupe terrainHeightPx (castillo en y≥0).
  * @param {number} heightAbove
@@ -876,7 +879,8 @@ export function computePlinthLocalHeight(heightAbove, terrainHeightPx, castleSiz
   const castle = Math.max(castleSizePx ?? DEFAULT_CASTLE_SIZE_PX, 1);
   const r = Math.min(0.48, Math.max(0.05, terrain / castle));
   const above = Math.max(heightAbove, 1);
-  return Math.max(6, (above * r) / (1 - r));
+  const raw = Math.max(6, (above * r) / (1 - r));
+  return raw * PLINTH_SCREEN_HEIGHT_FACTOR;
 }
 
 /**
