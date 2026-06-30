@@ -66,7 +66,7 @@ export function planElfCastleGraph(options, rng) {
     towerRemate: capKind,
     archDominant: "gothic",
     normalizeScaleBy: "max",
-    normalizeBottomInset: 10,
+    normalizeBottomInset: 0,
   });
 
   addNode(graph, {
@@ -161,7 +161,7 @@ export function planElfCastleGraph(options, rng) {
     deckW: spanW,
     deckH: podiumTop,
     axis,
-    normalizeBottomInset: 10,
+    normalizeBottomInset: 0,
   });
 
   return graph;
@@ -216,7 +216,7 @@ export function generateElfCastleFromGraph(options, rng) {
     windowCount: counters.windowCount,
     slitCount: counters.slitCount,
     normalizeScaleBy: "max",
-    normalizeBottomInset: 10,
+    normalizeBottomInset: 0,
   };
 
   return asm.build(palace ? "palace" : "castle", seed, meta.style, meta);

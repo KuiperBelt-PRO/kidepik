@@ -80,6 +80,103 @@ export function chamferRect(cx, baseY, w, h, chamfer = 3) {
 }
 
 /**
+ * Hueco rectangular achaflanado — vano enano (puerta, ventana, saetera).
+ * Misma forma que chamferRect; se usa como anillo de sustracción (evenodd).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} [chamfer]
+ * @returns {FPoint[]}
+ */
+export function chamferAperture(cx, baseY, w, h, chamfer = 3) {
+  return chamferRect(cx, baseY, w, h, chamfer);
+}
+
+/**
+ * Rectángulo con achaflanado solo en las esquinas superiores (base plana).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} [chamfer]
+ * @returns {FPoint[]}
+ */
+export function chamferTopRect(cx, baseY, w, h, chamfer = 3) {
+  const hw = w / 2;
+  const c = Math.min(chamfer, hw * 0.45, h * 0.35);
+  return [
+    { x: cx - hw, y: baseY },
+    { x: cx + hw, y: baseY },
+    { x: cx + hw, y: baseY + h - c },
+    { x: cx + hw - c, y: baseY + h },
+    { x: cx - hw + c, y: baseY + h },
+    { x: cx - hw, y: baseY + h - c },
+  ];
+}
+
+/**
+ * Hueco con achaflanado solo arriba (vanos enanos).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} [chamfer]
+ * @returns {FPoint[]}
+ */
+export function chamferTopAperture(cx, baseY, w, h, chamfer = 3) {
+  return chamferTopRect(cx, baseY, w, h, chamfer);
+}
+
+/**
+ * Trapecio (base ancha, cima estrecha) con achaflanado solo en las esquinas superiores.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w       anchura en la base
+ * @param {number} h
+ * @param {number} [taper] 0..0.4 — reducción relativa de anchura en la cima
+ * @param {number} [chamfer]
+ * @returns {FPoint[]}
+ */
+export function trapezoidTopChamfer(cx, baseY, w, h, taper = 0.12, chamfer = 3) {
+  const hw = w / 2;
+  const t = Math.min(0.4, Math.max(0, taper));
+  const wTop = w * (1 - t);
+  const hwTop = wTop / 2;
+  const c = Math.min(chamfer, hwTop * 0.45, h * 0.35);
+  return [
+    { x: cx - hw, y: baseY },
+    { x: cx + hw, y: baseY },
+    { x: cx + hwTop, y: baseY + h - c },
+    { x: cx + hwTop - c, y: baseY + h },
+    { x: cx - hwTop + c, y: baseY + h },
+    { x: cx - hwTop, y: baseY + h - c },
+  ];
+}
+
+/**
+ * Trapecio invertido (cima estrecha o igual, base más ancha) para zócalos que
+ * se ensanchan hacia el terreno sin crear un reborde en la unión con el muro.
+ * @param {number} cx
+ * @param {number} topY   borde superior (unión con bastión)
+ * @param {number} wTop   anchura en topY — debe coincidir con el muro superior
+ * @param {number} wBot   anchura en la base (más ancha, hacia el suelo)
+ * @param {number} h      altura hacia abajo (topY → topY − h)
+ * @returns {FPoint[]}
+ */
+export function trapezoidFlareDown(cx, topY, wTop, wBot, h) {
+  const hwTop = wTop / 2;
+  const hwBot = wBot / 2;
+  const botY = topY - h;
+  return [
+    { x: cx - hwTop, y: topY },
+    { x: cx + hwTop, y: topY },
+    { x: cx + hwBot, y: botY },
+    { x: cx - hwBot, y: botY },
+  ];
+}
+
+/**
  * Tejado a dos aguas (triángulo o trapecio con cumbrera).
  * @param {number} cx
  * @param {number} baseY  base del tejado (sobre el muro)
@@ -125,6 +222,47 @@ export function dome(cx, baseY, rx, ry, segments = 10) {
       y: baseY + ry * Math.sin(angle),
     });
   }
+  return pts;
+}
+
+/**
+ * Cúpula con recorte horizontal recto en la parte superior (remate humano).
+ * Genera la silueta: base plana → arcos laterales → tapa plana horizontal.
+ * @param {number} cx
+ * @param {number} baseY  base de la cúpula (y-up)
+ * @param {number} rx     radio horizontal
+ * @param {number} ry     radio vertical (altura total de la semicúpula completa)
+ * @param {number} [cropRatio]  fracción de ry conservada (0,35–0,55)
+ * @param {number} [segments]
+ * @returns {FPoint[]}
+ */
+export function domeCropped(cx, baseY, rx, ry, cropRatio = 0.45, segments = 10) {
+  const cr = Math.min(0.95, Math.max(0.05, cropRatio));
+  const θCut = Math.asin(cr);
+  const cutX = rx * Math.cos(θCut);
+  const cutY = baseY + ry * cr;
+  const steps = Math.max(3, Math.round(segments * θCut / (Math.PI / 2)));
+
+  const pts = [
+    { x: cx - rx, y: baseY },
+    { x: cx + rx, y: baseY },
+  ];
+
+  // Arco derecho: desde la base derecha subiendo hasta el corte
+  for (let i = 1; i <= steps; i++) {
+    const θ = (i / steps) * θCut;
+    pts.push({ x: fmt(cx + rx * Math.cos(θ)), y: fmt(baseY + ry * Math.sin(θ)) });
+  }
+
+  // Tapa plana: del corte derecho al corte izquierdo
+  pts.push({ x: fmt(cx - cutX), y: fmt(cutY) });
+
+  // Arco izquierdo: desde el corte izquierdo bajando hasta la base izquierda
+  for (let i = 1; i <= steps; i++) {
+    const θ = (Math.PI - θCut) + (i / steps) * θCut;
+    pts.push({ x: fmt(cx + rx * Math.cos(θ)), y: fmt(baseY + ry * Math.sin(θ)) });
+  }
+
   return pts;
 }
 

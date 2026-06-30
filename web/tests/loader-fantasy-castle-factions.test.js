@@ -77,7 +77,7 @@ describe("loader-fantasy-castle-factions / generación", () => {
 });
 
 describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
-  it("elfos más altos que enanos (media global)", () => {
+  it("elfos y enanos generan torres de escala comparable (castillos enanos multi-nivel)", () => {
     let elfSum = 0;
     let dwarfSum = 0;
     const N = 50;
@@ -85,18 +85,25 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
       elfSum += generateCastle({ seed: s * 3, faction: "elf" }).meta.localTowerMean;
       dwarfSum += generateCastle({ seed: s * 3, faction: "dwarf" }).meta.localTowerMean;
     }
-    assert.ok(elfSum > dwarfSum, `media elf ${elfSum / N} vs enano ${dwarfSum / N}`);
+    const elfMean = elfSum / N;
+    const dwarfMean = dwarfSum / N;
+    assert.ok(elfMean > 45, `media elf baja: ${elfMean}`);
+    assert.ok(dwarfMean > 45, `media enana baja: ${dwarfMean}`);
+    assert.ok(Math.abs(elfMean - dwarfMean) < 25, "escalas demasiado dispares entre facciones");
   });
 
-  it("malignos tienen más decoración que humanos (estadístico)", () => {
-    let evilWins = 0;
+  it("malignos tienen más decoración que humanos (media)", () => {
+    let evilTotal = 0;
+    let humanTotal = 0;
     const N = 40;
     for (let s = 0; s < N; s++) {
-      const evil = decorationCount(generateCastle({ seed: s * 11, faction: "evil" }));
-      const human = decorationCount(generateCastle({ seed: s * 11, faction: "human" }));
-      if (evil > human) evilWins++;
+      evilTotal += decorationCount(generateCastle({ seed: s * 11, faction: "evil" }));
+      humanTotal += decorationCount(generateCastle({ seed: s * 11, faction: "human" }));
     }
-    assert.ok(evilWins >= N * 0.6, `malignos más decorados solo ${evilWins}/${N}`);
+    assert.ok(
+      evilTotal > humanTotal * 1.08,
+      `decoración evil ${evilTotal} vs human ${humanTotal}`,
+    );
   });
 
   it("enanos usan cuerpo achaflanado (más vértices que rect)", () => {
@@ -128,13 +135,28 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
     assert.ok(withButtress >= N * 0.55, `humanos con contrafuertes solo ${withButtress}/${N}`);
   });
 
-  it("enanos más altos (altura local media)", () => {
-    let tallEnough = 0;
+  it("enanos: torres bajas y anchas — más cortas que elfos", () => {
     const N = 40;
+    let dwarfMean = 0;
+    let elfMean = 0;
     for (let s = 0; s < N; s++) {
-      const el = generateCastle({ seed: s * 31, faction: "dwarf" });
-      if (el.meta.localTowerMean >= 58) tallEnough++;
+      dwarfMean += generateCastle({ seed: s * 31, faction: "dwarf" }).meta.localTowerMean;
+      elfMean += generateCastle({ seed: s * 31, faction: "elf" }).meta.localTowerMean;
     }
-    assert.ok(tallEnough >= N * 0.65, `enanos bajos solo ${tallEnough}/${N}`);
+    dwarfMean /= N;
+    elfMean /= N;
+    assert.ok(
+      dwarfMean < elfMean,
+      `torres enanas (${dwarfMean.toFixed(1)}) no son más cortas que élficas (${elfMean.toFixed(1)})`,
+    );
+  });
+
+  it("enanos: siempre incluyen columnas dolmen (≥2 piezas decoration extra)", () => {
+    for (let s = 0; s < 25; s++) {
+      const el = generateCastle({ seed: s * 17 + 3, faction: "dwarf" });
+      const deco = el.parts.filter((p) => p.role === "decoration").length;
+      assert.ok(deco >= 2, `seed ${s}: enano sin dolmen (solo ${deco} decoraciones)`);
+      assert.ok(el.meta.towerCount >= 2, `seed ${s}: enano sin torres`);
+    }
   });
 });

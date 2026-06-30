@@ -68,8 +68,8 @@ function elfArrowInlay(cx, baseY, w, h) {
  */
 function moduleCorePlinth(ctx, node) {
   const { w, h } = /** @type {{ w: number; h: number }} */ (node.params);
-  let outer = bodyShell(node.cx, node.baseY, w, h, ctx.profile);
-  outer = jitterRing(outer, ctx.rng, ctx.jitterAmt * 0.25, {
+  let outer = rect(node.cx, node.baseY, w, h);
+  outer = jitterRing(outer, ctx.rng, ctx.jitterAmt * 0.15, {
     lockY: [node.baseY],
     freezeSeams: true,
   });

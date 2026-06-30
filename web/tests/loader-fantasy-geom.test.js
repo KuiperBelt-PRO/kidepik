@@ -6,9 +6,13 @@ import {
   aperture,
   boundsOfFantasyGroups,
   buildPartPath,
+  chamferAperture,
   chamferRect,
+  chamferTopAperture,
+  chamferTopRect,
   crossingArches,
   dome,
+  domeCropped,
   gableRoof,
   jitterRing,
   merlons,
@@ -17,6 +21,8 @@ import {
   polygon,
   rect,
   spikeRow,
+  trapezoidTopChamfer,
+  trapezoidFlareDown,
 } from "../js/components/loader-fantasy-geom.js";
 import { createRng } from "../js/components/loader-ship-rng.js";
 
@@ -144,6 +150,111 @@ describe("loader-fantasy-geom / facciones", () => {
     const spikes = spikeRow(50, 0, 40, 4, 8);
     assert.ok(spikes.length >= 2);
     assert.equal(spikes[0].length, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// chamferAperture
+// ---------------------------------------------------------------------------
+describe("loader-fantasy-geom / chamferAperture", () => {
+  it("tiene 8 vértices (igual que chamferRect)", () => {
+    assert.equal(chamferAperture(50, 0, 20, 30, 4).length, 8);
+  });
+
+  it("produce la misma forma que chamferRect con los mismos parámetros", () => {
+    const a = JSON.stringify(chamferAperture(50, 5, 16, 24, 3));
+    const b = JSON.stringify(chamferRect(50, 5, 16, 24, 3));
+    assert.equal(a, b);
+  });
+
+  it("se contiene en la caja w×h", () => {
+    const pts = chamferAperture(50, 10, 18, 26, 4);
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    assert.ok(Math.min(...xs) >= 50 - 9 - 0.1);
+    assert.ok(Math.max(...xs) <= 50 + 9 + 0.1);
+    assert.ok(Math.min(...ys) >= 10 - 0.1);
+    assert.ok(Math.max(...ys) <= 36 + 0.1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// domeCropped
+// ---------------------------------------------------------------------------
+describe("loader-fantasy-geom / domeCropped", () => {
+  it("devuelve al menos 8 puntos", () => {
+    assert.ok(domeCropped(50, 0, 15, 20, 0.45).length >= 8);
+  });
+
+  it("base en baseY (primeros dos puntos)", () => {
+    const pts = domeCropped(50, 10, 15, 20, 0.45);
+    assert.equal(pts[0].y, 10);
+    assert.equal(pts[1].y, 10);
+  });
+
+  it("altura máxima = baseY + ry * cropRatio (tapa plana)", () => {
+    const ry = 20;
+    const cr = 0.45;
+    const pts = domeCropped(50, 0, 15, ry, cr);
+    const maxY = Math.max(...pts.map((p) => p.y));
+    assert.ok(Math.abs(maxY - ry * cr) < 0.5, `altura ${maxY} ≠ ${ry * cr}`);
+  });
+
+  it("forma más baja que dome completa con mismo ry", () => {
+    const domeH = Math.max(...dome(50, 0, 15, 20).map((p) => p.y));
+    const croppedH = Math.max(...domeCropped(50, 0, 15, 20, 0.45).map((p) => p.y));
+    assert.ok(croppedH < domeH);
+  });
+
+  it("cropRatio mayor produce cúpula más alta", () => {
+    const h1 = Math.max(...domeCropped(50, 0, 15, 20, 0.35).map((p) => p.y));
+    const h2 = Math.max(...domeCropped(50, 0, 15, 20, 0.55).map((p) => p.y));
+    assert.ok(h2 > h1);
+  });
+
+  it("simétrica respecto al eje cx", () => {
+    const pts = domeCropped(50, 0, 15, 20, 0.45);
+    const xs = pts.map((p) => p.x);
+    const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
+    assert.ok(Math.abs(mid - 50) < 0.5, `centro ${mid} ≠ 50`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// chamferTopRect, trapezoidTopChamfer
+// ---------------------------------------------------------------------------
+describe("loader-fantasy-geom / enano top-chamfer", () => {
+  it("chamferTopRect: base plana (4 puntos en baseY)", () => {
+    const pts = chamferTopRect(50, 10, 30, 24, 4);
+    const basePts = pts.filter((p) => p.y === 10);
+    assert.equal(basePts.length, 2);
+    assert.equal(pts.length, 6);
+  });
+
+  it("trapezoidTopChamfer: más estrecho arriba que abajo", () => {
+    const pts = trapezoidTopChamfer(50, 0, 40, 30, 0.15, 3);
+    const xs = pts.map((p) => p.x);
+    const baseW = Math.max(...xs) - Math.min(...xs);
+    const topYs = pts.filter((p) => p.y === 30).map((p) => p.x);
+    const topW = topYs.length >= 2 ? Math.max(...topYs) - Math.min(...topYs) : 0;
+    assert.ok(baseW > topW || topW === 0);
+  });
+
+  it("chamferTopAperture coincide con chamferTopRect", () => {
+    const a = JSON.stringify(chamferTopAperture(50, 5, 16, 20, 3));
+    const b = JSON.stringify(chamferTopRect(50, 5, 16, 20, 3));
+    assert.equal(a, b);
+  });
+
+  it("trapezoidFlareDown: ensancha hacia abajo (zócalo enano)", () => {
+    const pts = trapezoidFlareDown(50, 0, 60, 100, 40);
+    const top = pts.filter((p) => p.y === 0);
+    const bot = pts.filter((p) => p.y === -40);
+    assert.equal(top.length, 2);
+    assert.equal(bot.length, 2);
+    const topW = Math.abs(top[1].x - top[0].x);
+    const botW = Math.abs(bot[1].x - bot[0].x);
+    assert.ok(botW > topW);
   });
 });
 

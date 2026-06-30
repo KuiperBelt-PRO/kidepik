@@ -23,6 +23,19 @@ const RING_REVEAL_START_DEG =
   180 + RING_TEXT_SCI_START_FRACTION * 180 - RING_TEXT_REVEAL_LEAD_DEG;
 
 /**
+ * Lee query params del loader desde `?…` o desde `#/loader?…` (ambos formatos).
+ * @returns {URLSearchParams}
+ */
+function getLoaderQueryParams() {
+  const fromSearch = new URLSearchParams(window.location.search);
+  if ([...fromSearch.keys()].length > 0) return fromSearch;
+  const hash = window.location.hash || "";
+  const q = hash.indexOf("?");
+  if (q >= 0) return new URLSearchParams(hash.slice(q + 1));
+  return fromSearch;
+}
+
+/**
  * @param {string} src
  * @returns {Promise<boolean>}
  */
@@ -277,13 +290,14 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   document.body.classList.add("is-loader-active");
 
   let spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
-  const meteorDemo = new URLSearchParams(window.location.search).get("meteorDemo") === "1";
+  const loaderQuery = getLoaderQueryParams();
+  const meteorDemo = loaderQuery.get("meteorDemo") === "1";
   let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
   let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
 
-  const fantasyDev = new URLSearchParams(window.location.search).get("fantasyDev") || undefined;
-  const fantasyFaction = parseDevFaction(new URLSearchParams(window.location.search).get("fantasyFaction"));
-  const fantasySeedRaw = new URLSearchParams(window.location.search).get("fantasySeed");
+  const fantasyDev = loaderQuery.get("fantasyDev") || undefined;
+  const fantasyFaction = parseDevFaction(loaderQuery.get("fantasyFaction"));
+  const fantasySeedRaw = loaderQuery.get("fantasySeed");
   const fantasySeed = fantasySeedRaw != null && fantasySeedRaw !== ""
     ? Number.parseInt(fantasySeedRaw, 10)
     : undefined;

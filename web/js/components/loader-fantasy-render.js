@@ -220,9 +220,8 @@ export function mountFantasyElement(container, element, opts) {
   const el = document.createElement("div");
   el.className = "loader-fantasy-el";
   el.style.left = `${xPercent}%`;
-  // El borde inferior del viewBox queda sobre la cresta del terreno (no enterrado).
-  const terrainH = Math.round(terrainHeightPx ?? 48);
-  el.style.bottom = `${terrainH}px`;
+  // El borde inferior del viewBox queda anclado al fondo de la pantalla (suelo).
+  el.style.bottom = "0";
 
   // El viewBox es cuadrado (0 0 100 100) con el contenido anclado abajo (y=100).
   // Caja cuadrada + preserveAspectRatio xMidYMax: el borde inferior dibujado

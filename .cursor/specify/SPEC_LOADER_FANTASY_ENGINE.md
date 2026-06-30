@@ -65,8 +65,11 @@ Cada builder trabaja en un **espacio local con el suelo en `y = 0` y crecimiento
 | Primitiva | Uso |
 | --- | --- |
 | `rect(x, y, w, h, opts?)` | Bloques, muros, torres rectangulares (con jitter opcional por vértice) |
-| `gableRoof(x, y, w, h, opts?)` | Tejado a dos aguas (triángulo / trapecio con cumbrera) |
-| `dome(cx, baseY, rx, ry, segments)` | Bóveda / cúpula (semielipse poligonalizada) |
+| `chamferRect(cx, baseY, w, h, chamfer)` | Cuerpos enanos (esquinas achaflanadas) |
+| `chamferAperture(cx, baseY, w, h, chamfer)` | Huecos enanos — **planeado**; ver [ELEMENTS_ENGINE_SPECS.md](ELEMENTS_ENGINE_SPECS.md) |
+| `gableRoof(x, y, w, h, opts?)` | Tejado a dos aguas — **no usar en facción humana** (aldeas/poblados sí) |
+| `dome(cx, baseY, rx, ry, segments)` | Bóveda / cúpula semielíptica |
+| `domeCropped(cx, baseY, rx, ry, cropRatio)` | Cúpula humana con recorte horizontal superior — **planeado** |
 | `merlons(x, topY, w, count, opts?)` | Almenas (dientes rectangulares con huecos) — devuelve varios anillos |
 | `arch(cx, baseY, w, h, kind)` | Arco como **hueco** (sustracción): `gothic` (ojival), `romanesque` (medio punto), `flat`, `trefoil` |
 | `aperture(x, y, w, h, kind)` | Ventana/puerta/saetera como **hueco** de sustracción |

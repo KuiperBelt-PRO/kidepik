@@ -8,6 +8,14 @@ export const TERRAIN_ROUGHNESS_MIN = 0.06;
 export const TERRAIN_ROUGHNESS_MAX = 0.22;
 
 /**
+ * Cresta máxima del perfil de terreno medida desde el borde inferior del bbox (0..1).
+ * @returns {number}
+ */
+export function maxTerrainCrestFromBottomFrac() {
+  return 1 - (TERRAIN_CREST_MIN - TERRAIN_ROUGHNESS_MAX);
+}
+
+/**
  * @param {() => number} rng
  * @returns {number}
  */

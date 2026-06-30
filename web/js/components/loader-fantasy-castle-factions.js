@@ -37,6 +37,11 @@ import { randPick } from "./loader-ship-rng.js";
  *   centralCrownChance: number;
  *   blockRoof: boolean;
  *   arcadeRows: number;
+ *   useChamferApertures: boolean;
+ *   useCroppedDome: boolean;
+ *   dolmenChance: number;
+ *   useTrapezoidBodies: boolean;
+ *   towerHByWidth: [number, number] | null;
  * }} FactionProfile */
 
 /** @type {CastleFaction[]} */
@@ -57,7 +62,7 @@ export const FACTION_PROFILES = {
     jitterScale: 0.72,
     archBias: { gothic: 0.48, romanesque: 0.52 },
     winKinds: ["romanesque", "gothic", "romanesque"],
-    remateWeights: { battlement: 0.55, roof: 0.1, dome: 0.35 },
+    remateWeights: { battlement: 0.65, roof: 0, dome: 0.35 },
     blockMax: 3,
     bodyShape: "rect",
     chamfer: 2,
@@ -71,8 +76,13 @@ export const FACTION_PROFILES = {
     buttressChance: 0.88,
     flyingButtressChance: 0,
     centralCrownChance: 0.92,
-    blockRoof: true,
+    blockRoof: false,
     arcadeRows: 0,
+    useChamferApertures: false,
+    useCroppedDome: true,
+    dolmenChance: 0,
+    useTrapezoidBodies: false,
+    towerHByWidth: null,
   },
   elf: {
     id: "elf",
@@ -100,21 +110,26 @@ export const FACTION_PROFILES = {
     centralCrownChance: 0,
     blockRoof: false,
     arcadeRows: 4,
+    useChamferApertures: false,
+    useCroppedDome: false,
+    dolmenChance: 0,
+    useTrapezoidBodies: false,
+    towerHByWidth: null,
   },
   dwarf: {
     id: "dwarf",
     label: "Dwarf",
     baseW: [58, 72],
-    baseH: [32, 48],
-    towerW: [12, 17],
-    hMul: [1.58, 2.12],
+    baseH: [42, 62],
+    towerW: [11, 16],
+    hMul: [1.05, 1.55],
     jitterScale: 0.28,
-    archBias: { gothic: 0.12, romanesque: 0.88 },
-    winKinds: ["flat", "romanesque", "flat"],
+    archBias: { gothic: 0, romanesque: 0 },
+    winKinds: ["flat"],
     remateWeights: { battlement: 0, roof: 0, dome: 0 },
     blockMax: 2,
     bodyShape: "chamfer",
-    chamfer: 6,
+    chamfer: 5,
     crossingArchChance: 0,
     spikeChance: 0,
     spikeDensity: [0, 0],
@@ -122,11 +137,16 @@ export const FACTION_PROFILES = {
     finialChance: 0,
     tiltScale: 0.35,
     remateMode: "none",
-    buttressChance: 0.45,
+    buttressChance: 0,
     flyingButtressChance: 0,
     centralCrownChance: 0,
     blockRoof: false,
     arcadeRows: 0,
+    useChamferApertures: true,
+    useCroppedDome: false,
+    dolmenChance: 1,
+    useTrapezoidBodies: true,
+    towerHByWidth: [1.05, 1.75],
   },
   evil: {
     id: "evil",
@@ -154,6 +174,11 @@ export const FACTION_PROFILES = {
     centralCrownChance: 0,
     blockRoof: true,
     arcadeRows: 0,
+    useChamferApertures: false,
+    useCroppedDome: false,
+    dolmenChance: 0,
+    useTrapezoidBodies: false,
+    towerHByWidth: null,
   },
 };
 

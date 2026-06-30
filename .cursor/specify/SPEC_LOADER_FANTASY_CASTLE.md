@@ -13,6 +13,8 @@ Primer builder concreto del motor de fantasía. Genera **castillos** y **palacio
 - **castle**: más defensivo — almenas, torres macizas, saeteras, arco de entrada bajo.
 - **palace**: más señorial — más bóvedas/cúpulas, ventanales altos, simetría algo mayor, remates ornamentales.
 
+> **Grafos por facción:** las reglas detalladas de silueta (humano, elfo, enano) viven en [ELEMENTS_ENGINE_SPECS.md](ELEMENTS_ENGINE_SPECS.md) y **prevalecen** sobre este documento cuando contradigan remates o vanos por facción. Ejemplos: humanos sin tejado a dos aguas; enanos sin arcos curvos.
+
 ## 2. Modelo de generación
 
 ### 2.1 Anatomía (partes)

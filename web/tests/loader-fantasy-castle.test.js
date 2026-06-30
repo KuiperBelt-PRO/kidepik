@@ -171,9 +171,11 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
-  it("usa ≥1 arco del tipo dominante", () => {
+  it("usa ≥1 arco del tipo dominante (facciones con arcos curvos)", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 11 + 6 });
+      // Enanos usan vanos achaflanados: no tienen arcos curvos
+      if (el.meta.faction === "dwarf") continue;
       const dom = el.meta.archDominant;
       assert.ok(["gothic", "romanesque"].includes(dom), `seed ${s}: dominante ${dom}`);
       assert.ok(el.meta.arches[dom] >= 1, `seed ${s}: 0 arcos ${dom}`);
@@ -273,5 +275,180 @@ describe("loader-fantasy-castle / registro en el motor", () => {
     const p = generateFantasyElement("palace", { seed: 42 });
     assert.ok(isValidFantasyElement(p));
     assert.equal(p.kind, "palace");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reglas de facción — spec ELEMENTS_ENGINE_SPECS
+// ---------------------------------------------------------------------------
+describe("loader-fantasy-castle / facciones spec", () => {
+  it("enanos: cero arcos góticos ni románicos (vanos achaflanados)", () => {
+    for (let s = 0; s < 30; s++) {
+      const el = generateCastle({ seed: s * 7 + 3, faction: "dwarf" });
+      assert.equal(el.meta.arches.gothic, 0, `seed ${s}: arcos góticos en enano`);
+      assert.equal(el.meta.arches.romanesque, 0, `seed ${s}: arcos románicos en enano`);
+    }
+  });
+
+  it("humanos: ninguna torre ni bloque tiene remate 'roof' (sin tejado a dos aguas)", () => {
+    for (let s = 0; s < 40; s++) {
+      const el = generateCastle({ seed: s * 5 + 1, faction: "human" });
+      const roofParts = el.parts.filter((p) => p.role === "roof");
+      assert.equal(roofParts.length, 0, `seed ${s}: tejado a dos aguas en castillo humano`);
+    }
+  });
+
+  it("humanos: puerta y ventanas siguen contando (aunque sin curva en spec no aplica)", () => {
+    for (let s = 0; s < 20; s++) {
+      const el = generateCastle({ seed: s * 13 + 2, faction: "human" });
+      assert.ok(el.meta.doorCount >= 1, `seed ${s}: sin puerta en humano`);
+      assert.ok(el.meta.windowCount >= 1, `seed ${s}: sin ventana en humano`);
+    }
+  });
+
+  it("enanos: puerta y ventanas siguen contando (vanos achaflanados)", () => {
+    for (let s = 0; s < 20; s++) {
+      const el = generateCastle({ seed: s * 11 + 5, faction: "dwarf" });
+      assert.ok(el.meta.doorCount >= 1, `seed ${s}: sin puerta en enano`);
+      assert.ok(el.meta.windowCount >= 1, `seed ${s}: sin ventana en enano`);
+    }
+  });
+
+  it("enanos: 2–4 niveles de altura (bastión + pisos apilados)", () => {
+    const levelCounts = new Set();
+    for (let s = 0; s < 40; s++) {
+      const el = generateCastle({ seed: s * 19 + 2, faction: "dwarf" });
+      assert.ok(el.meta.castleLevelCount >= 2, `seed ${s}: menos de 2 niveles`);
+      assert.ok(el.meta.castleLevelCount <= 4, `seed ${s}: más de 4 niveles`);
+      levelCounts.add(el.meta.castleLevelCount);
+    }
+    assert.ok(levelCounts.size >= 2, "poca variación en nº de niveles enanos");
+  });
+
+  it("torres nunca tapan la puerta central", () => {
+    for (let s = 0; s < 30; s++) {
+      const el = generateCastle({ seed: s * 41 + 3, faction: "dwarf" });
+      const axis = el.meta.axis ?? 50;
+      const doorW = el.meta.doorW ?? (el.meta.baseW ?? 60) * 0.17;
+      for (let ti = 0; ti < (el.meta.towerXs ?? []).length; ti += 1) {
+        const tcx = el.meta.towerXs[ti];
+        const towerW = el.meta.towerWs?.[ti] ?? 12;
+        const dead = doorW / 2 + towerW / 2 + 1;
+        assert.ok(
+          Math.abs(tcx - axis) >= dead * 0.95,
+          `seed ${s}: torre en zona de puerta (x=${tcx})`,
+        );
+      }
+    }
+  });
+
+  it("enanos seed 99: torres superiores dentro del trapecio que las sostiene", () => {
+    const el = generateCastle({ seed: 99, faction: "dwarf" });
+    const axis = el.meta.axis;
+    for (let ti = 0; ti < el.meta.towerXs.length; ti += 1) {
+      const baseY = el.meta.towers[ti]?.baseY ?? 0;
+      if (baseY <= 0) continue;
+      const supportTopW = el.meta.towerSupportTopW?.[ti];
+      assert.ok(supportTopW, `torre ${ti} sin supportTopW`);
+      const half = supportTopW / 2;
+      const tcx = el.meta.towerXs[ti];
+      assert.ok(
+        tcx >= axis - half + 0.5 && tcx <= axis + half - 0.5,
+        `seed 99 torre ${ti}: x=${tcx} fuera de soporte ±${half}`,
+      );
+    }
+  });
+
+  it("enanos: dolmenes no tapan la puerta (seed 99)", () => {
+    const el = generateCastle({ seed: 99, faction: "dwarf" });
+    const axis = el.meta.axis;
+    const doorW = el.meta.doorW;
+    const colW = (el.meta.baseW ?? 60) * 0.07;
+    const slabW = colW * 2;
+    const pieceW = Math.max(colW, slabW);
+    const dead = doorW / 2 + pieceW / 2 + 1;
+    for (const cx of el.meta.dolmenXs ?? []) {
+      assert.ok(
+        Math.abs(cx - axis) >= dead * 0.98,
+        `dolmen en x=${cx} solapa puerta`,
+      );
+    }
+  });
+
+  it("enanos: aparece castillo de 4 niveles en alguna seed", () => {
+    let hasFour = false;
+    for (let s = 0; s < 80; s++) {
+      const el = generateCastle({ seed: s * 19 + 2, faction: "dwarf" });
+      if (el.meta.castleLevelCount === 4) hasFour = true;
+    }
+    assert.ok(hasFour, "ninguna seed produjo 4 niveles en 80 intentos");
+  });
+
+  it("ningún elemento sobresale del zócalo (envelope)", () => {
+    for (const faction of ["human", "dwarf", "evil"]) {
+      for (let s = 0; s < 15; s++) {
+        const el = generateCastle({ seed: s * 31 + 7, faction });
+        const tol = 0.05;
+        assert.ok(
+          el.meta.localMinX >= el.meta.envelopeLeft - tol,
+          `${faction} seed ${s}: sobresale izquierda`,
+        );
+        assert.ok(
+          el.meta.localMaxX <= el.meta.envelopeRight + tol,
+          `${faction} seed ${s}: sobresale derecha`,
+        );
+      }
+    }
+  });
+
+  it("altura del zócalo en SVG ≈ fracción terreno/castillo", () => {
+    const terrainPx = 48;
+    const castlePx = 120;
+    const expectedFrac = terrainPx / castlePx;
+
+    function pathHeight(d) {
+      const nums = d.match(/-?[\d.]+/g).map(Number);
+      const ys = [];
+      for (let i = 1; i < nums.length; i += 2) ys.push(nums[i]);
+      return Math.max(...ys) - Math.min(...ys);
+    }
+
+    for (const faction of ["human", "dwarf", "evil"]) {
+      for (let s = 0; s < 12; s++) {
+        const el = generateCastle({
+          seed: s * 37 + 9,
+          faction,
+          terrainHeightPx: terrainPx,
+          castleSizePx: castlePx,
+        });
+        const plinth = el.parts.find((p) => p.role === "plinth");
+        const frac = pathHeight(plinth.d) / 100;
+        assert.ok(
+          Math.abs(frac - expectedFrac) < 0.06,
+          `${faction} seed ${s}: zócalo ${(frac * 100).toFixed(1)}% vs ${(expectedFrac * 100).toFixed(1)}%`,
+        );
+      }
+    }
+  });
+
+  it("plinth rectangular en castillos monolíticos (4 vértices)", () => {
+    for (const faction of ["human", "dwarf", "evil"]) {
+      for (let s = 0; s < 10; s++) {
+        const el = generateCastle({ seed: s * 23 + 1, faction });
+        const plinth = el.parts.find((p) => p.role === "plinth");
+        assert.ok(plinth, `${faction} seed ${s}: sin plinth`);
+        const verts = (plinth.d.match(/L/g) || []).length + 1;
+        assert.equal(verts, 4, `${faction} seed ${s}: plinth no rectangular (${verts} vértices)`);
+      }
+    }
+  });
+
+  it("humanos: al menos algunas seeds producen partes con rol 'dome' (cúpulas)", () => {
+    let domeCount = 0;
+    for (let s = 0; s < 30; s++) {
+      const el = generateCastle({ seed: s * 17 + 4, faction: "human" });
+      if (el.parts.some((p) => p.role === "dome")) domeCount++;
+    }
+    assert.ok(domeCount >= 8, `solo ${domeCount}/30 humanos tienen cúpulas`);
   });
 });

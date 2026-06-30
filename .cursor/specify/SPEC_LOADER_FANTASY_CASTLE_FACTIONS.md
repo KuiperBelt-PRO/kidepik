@@ -14,10 +14,10 @@ No se usan nombres propietarios (Rohan, Rivendell, etc.): solo arquetipos genér
 
 | ID | Arquetipo | Silueta y carácter |
 | --- | --- | --- |
-| `human` | Reinos humanos | Piedra maciza, solemne, robusta; algo de ornamento; torres altas; arcos románicos/góticos equilibrados; almenas o tejados. |
-| `elf` | Reinos élficos | Orgánico, esbelto, muy alto; torres finas; arcos ojivales y trilobulados; remates en cúpula o aguja; **arcos que se cruzan** en fachada. |
-| `dwarf` | Fortalezas enanas | Piedra tallada, **poligonal** con **esquinas achaflanadas**; baja y ancha; torres macizas; dinteles planos; almenas cuadradas. |
-| `evil` | Fuerzas malignas | Amenazante, irregular; **pinchos y puntas** en remates y cornisas; torres inclinadas; saeteras; agujas frecuentes. |
+| `human` | Reinos humanos | Piedra maciza, solemne, robusta; torres altas; arcos románicos/góticos equilibrados; remates **almenas o cúpula recortada** (sin tejado a dos aguas). |
+| `elf` | Reinos élficos | Orgánico, esbelto, muy alto; torres finas; arcos ojivales y trilobulados; remates en cúpula hueca o aguja; **arcos que se cruzan** en fachada. |
+| `dwarf` | Fortalezas enanas | Piedra tallada **poligonal** con **esquinas achaflanadas**; baja y ancha; torres macizas; **vanos rectangulares achaflanados** (sin arcos curvos); columnas tipo dolmen opcionales. |
+| `evil` | Fuerzas malignas | Amenazante, irregular; **pinchos y puntas** en remates y cornisas; torres inclinadas; saeteras; agujas frecuentes. Grafo detallado: [ELEMENTS_ENGINE_SPECS.md](ELEMENTS_ENGINE_SPECS.md). |
 
 ## 3. Modelo de datos
 
@@ -59,13 +59,13 @@ generateCastle({
 | `fantasyDev` | `castle`, `palace`, `block` | Fuerza el `kind` del elemento |
 | `fantasyFaction` | `human`, `elf`, `dwarf`, `evil` | Fuerza la facción arquitectónica |
 
-Ejemplo: `http://localhost:8082/?scene=fantasy&fantasyDev=castle&fantasyFaction=elf`
+Ejemplo: `http://localhost:8082/?fantasyDev=castle&fantasyFaction=elf#/loader` (también vale `#/loader?fantasyDev=castle&fantasyFaction=elf`)
 
 `meta.faction` y `meta.towerRemate` quedan en el elemento generado.
 
 ## 4. Reglas de coherencia (heredadas + nuevas)
 
-- **Un solo tipo de remate** por edificio (tejado, almenas o cúpula).
+- **Un solo tipo de remate** por edificio (almenas o cúpula recortada en humanos; ninguno en enanos; ver `ELEMENTS_ENGINE_SPECS.md`).
 - **Sin símbolos religiosos** (no cruces).
 - Almenas con merlón en **ambos extremos**.
 - La facción es **determinista** con `seed` (+ `palace` si no se fuerza `faction`).
@@ -75,6 +75,8 @@ Ejemplo: `http://localhost:8082/?scene=fantasy&fantasyDev=castle&fantasyFaction=
 | Función | Uso |
 | --- | --- |
 | `chamferRect(cx, baseY, w, h, chamfer)` | Cuerpos enanos con esquinas achaflanadas |
+| `chamferAperture(cx, baseY, w, h, chamfer)` | Huecos enanos (puertas/ventanas); **planeado** — ver `ELEMENTS_ENGINE_SPECS.md` |
+| `domeCropped(cx, baseY, rx, ry, cropRatio)` | Cúpula humana con **recorte horizontal** superior; **planeado** |
 | `crossingArches(cx, baseY, w, h)` | Marco decorativo de arcos cruzados (elfos) |
 | `spikeRow(cx, baseY, w, count, spikeH)` | Fila de pinchos (malignos) |
 

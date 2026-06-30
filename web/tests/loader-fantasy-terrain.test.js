@@ -10,6 +10,7 @@ import {
   TERRAIN_SEGMENT_MIN,
   buildTerrainPath,
   buildTerrainProfile,
+  maxTerrainCrestFromBottomFrac,
   planTerrainSegmentCount,
 } from "../js/components/loader-fantasy-terrain.js";
 import { createRng } from "../js/components/loader-ship-rng.js";
@@ -65,5 +66,12 @@ describe("loader-fantasy-terrain", () => {
     assert.equal(buildTerrainPath(0, 120, profile), "");
     assert.equal(buildTerrainPath(390, 0, profile), "");
     assert.equal(buildTerrainPath(390, 120, []), "");
+  });
+
+  it("maxTerrainCrestFromBottomFrac está en rango válido", () => {
+    const frac = maxTerrainCrestFromBottomFrac();
+    const minCrest = 1 - (TERRAIN_CREST_MAX + TERRAIN_ROUGHNESS_MAX);
+    const maxCrest = 1 - (TERRAIN_CREST_MIN - TERRAIN_ROUGHNESS_MAX);
+    assert.ok(frac >= minCrest && frac <= maxCrest);
   });
 });

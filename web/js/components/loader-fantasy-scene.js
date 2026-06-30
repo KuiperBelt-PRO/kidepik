@@ -76,11 +76,15 @@ export function mountFantasyScene(container, opts = {}) {
     layer.remove();
   }
 
-  function computeSizePx() {
+  function computeSizePx(kind) {
     const layerH = layer.clientHeight || 200;
-    const frac = randRange(cycleRng, HEIGHT_FRACTION_MIN, HEIGHT_FRACTION_MAX);
+    const isCastle = kind === "castle" || kind === "palace";
+    const fracMin = isCastle ? 0.28 : HEIGHT_FRACTION_MIN;
+    const fracMax = isCastle ? 0.5 : HEIGHT_FRACTION_MAX;
+    const frac = randRange(cycleRng, fracMin, fracMax);
     const raw = layerH * frac;
-    return Math.max(MIN_ELEMENT_HEIGHT_PX, Math.min(MAX_ELEMENT_HEIGHT_PX, raw));
+    const maxPx = isCastle ? 200 : MAX_ELEMENT_HEIGHT_PX;
+    return Math.max(MIN_ELEMENT_HEIGHT_PX, Math.min(maxPx, raw));
   }
 
   function scheduleNext(gapMs = 0) {
@@ -96,7 +100,13 @@ export function mountFantasyScene(container, opts = {}) {
       devKind || (cycleRng() < 0.32 ? "palace" : "castle")
     );
     const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
-    const element = generateFantasyElement(kind, { seed, faction: devFaction });
+    const sizePx = computeSizePx(kind);
+    const element = generateFantasyElement(kind, {
+      seed,
+      faction: devFaction,
+      terrainHeightPx,
+      castleSizePx: sizePx,
+    });
     if (!element) {
       scheduleNext(2000);
       return;
@@ -110,8 +120,6 @@ export function mountFantasyScene(container, opts = {}) {
 
     // Posición horizontal aleatoria (evitando el centro con margen si hay muchos elementos)
     const xPercent = randRange(cycleRng, PLACE_LEFT_MIN, PLACE_LEFT_MAX);
-
-    const sizePx = computeSizePx();
 
     currentTeardown = mountFantasyElement(layer, element, {
       reducedMotion,
