@@ -118,6 +118,38 @@ function pickTierFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW
 }
 
 /**
+ * Torre en el borde del zócalo (enanos): anclada al plinth, no al bastión central.
+ * @param {() => number} rng
+ * @param {-1|1} side
+ * @param {number} axis
+ * @param {number} plinthW
+ * @param {number} towerW
+ * @param {number} envLeft
+ * @param {number} envRight
+ * @param {number} doorCx
+ * @param {number} doorW
+ * @returns {number}
+ */
+function pickPlinthFlankTowerX(rng, side, axis, plinthW, towerW, envLeft, envRight, doorCx, doorW) {
+  const inset = towerW / 2 + 2;
+  const edgeCx = side < 0 ? envLeft + inset : envRight - inset;
+  if (towerClearsDoor(edgeCx, towerW, doorCx, doorW)) {
+    const wiggle = (rng() - 0.5) * towerW * 0.28;
+    return edgeCx + (side < 0 ? Math.abs(wiggle) : -Math.abs(wiggle));
+  }
+  return pickTierFlankTowerX(rng, side, axis, plinthW * 0.55, towerW, doorCx, doorW);
+}
+
+/**
+ * @param {import('./loader-fantasy-castle-factions.js').FactionProfile} profile
+ * @param {number} baseY
+ * @returns {boolean}
+ */
+function dwarfTowerOnPlinth(profile, baseY) {
+  return profile.useTrapezoidBodies && baseY <= 0;
+}
+
+/**
  * Torre humana en el flanco exterior: asoma del muro sin tapar el cuerpo central.
  * @param {() => number} rng
  * @param {-1|1} side
@@ -654,15 +686,9 @@ export function generateCastle(options) {
     const bW = Math.min(baseW * randRange(rng, 0.06, 0.1), plinW * 0.12);
     for (let i = 0; i < bCount; i++) {
       const side = i % 2 === 0 ? -1 : 1;
-      const wallEdge = pickTierFlankTowerX(
-        rng,
-        /** @type {-1|1} */ (side),
-        axis,
-        baseW,
-        bW,
-        doorCx,
-        doorW,
-      );
+      const wallEdge = profile.remateMode === "human_mixed"
+        ? pickTierFlankTowerX(rng, /** @type {-1|1} */ (side), axis, baseW, bW, doorCx, doorW)
+        : clampCenterInEnvelope(axis + side * (plinW / 2 - bW * 0.2), bW, envLeft, envRight);
       let butt = buttress(axis, wallEdge, 0, bW, bH);
       butt = jitterRing(butt, rng, jitterAmt * 0.35, { lockY: [0], freezeSeams: true });
       asm.addPart("decoration", butt);
@@ -713,15 +739,11 @@ export function generateCastle(options) {
       plinW * 0.38,
     );
     const blockH = baseH * randRange(rng, isElf ? 0.55 : 0.5, isElf ? 0.9 : 0.82);
-    const blockCx = pickTierFlankTowerX(
-      rng,
-      /** @type {-1|1} */ (side),
-      axis,
-      baseW,
-      blockW,
-      doorCx,
-      doorW,
-    );
+    // Humanos: alas asomadas hacia dentro (sin columnas flotantes).
+    // Resto de facciones: alas ancladas al borde del zócalo (como históricamente).
+    const blockCx = profile.remateMode === "human_mixed"
+      ? pickTierFlankTowerX(rng, /** @type {-1|1} */ (side), axis, baseW, blockW, doorCx, doorW)
+      : clampCenterInEnvelope(axis + side * (plinW / 2 - blockW / 2 - 1), blockW, envLeft, envRight);
     const blockTop = blockH;
     let blockOuter = bodyShell(blockCx, 0, blockW, blockTop, profile, rng);
     blockOuter = jitterRing(blockOuter, rng, jitterAmt, { lockY: [0, blockTop], freezeSeams: true });
@@ -770,7 +792,9 @@ export function generateCastle(options) {
 
   const baseTowerW = randRange(rng, profile.towerW[0], profile.towerW[1]);
   towerPlans.push({
-    tcx: pickFlankTowerX(rng, -1, axis, baseW, baseTowerW, doorCx, doorW, profile, envelopeHalf),
+    tcx: dwarfTowerOnPlinth(profile, 0)
+      ? pickPlinthFlankTowerX(rng, -1, axis, plinW, baseTowerW, envLeft, envRight, doorCx, doorW)
+      : pickFlankTowerX(rng, -1, axis, baseW, baseTowerW, doorCx, doorW, profile, envelopeHalf),
     baseY: 0,
     levelW: baseW,
     supportTopW: baseW,
@@ -778,7 +802,9 @@ export function generateCastle(options) {
   });
   const baseTowerW2 = randRange(rng, profile.towerW[0], profile.towerW[1]);
   towerPlans.push({
-    tcx: pickFlankTowerX(rng, 1, axis, baseW, baseTowerW2, doorCx, doorW, profile, envelopeHalf),
+    tcx: dwarfTowerOnPlinth(profile, 0)
+      ? pickPlinthFlankTowerX(rng, 1, axis, plinW, baseTowerW2, envLeft, envRight, doorCx, doorW)
+      : pickFlankTowerX(rng, 1, axis, baseW, baseTowerW2, doorCx, doorW, profile, envelopeHalf),
     baseY: 0,
     levelW: baseW,
     supportTopW: baseW,
@@ -843,8 +869,13 @@ export function generateCastle(options) {
       towerW = Math.min(towerW, supportTopW * 0.88);
     }
     const supportHalf = supportTopW / 2;
-    const clampLeft = profile.remateMode === "human_mixed" ? axis - envelopeHalf : axis - supportHalf;
-    const clampRight = profile.remateMode === "human_mixed" ? axis + envelopeHalf : axis + supportHalf;
+    const onPlinth = dwarfTowerOnPlinth(profile, plan.baseY);
+    const clampLeft = profile.remateMode === "human_mixed" || onPlinth
+      ? envLeft
+      : axis - supportHalf;
+    const clampRight = profile.remateMode === "human_mixed" || onPlinth
+      ? envRight
+      : axis + supportHalf;
     let tcx = clampCenterInEnvelope(
       plan.tcx,
       towerW,
@@ -853,7 +884,9 @@ export function generateCastle(options) {
     );
     if (!towerClearsDoor(tcx, towerW, doorCx, doorW)) {
       const side = /** @type {-1|1} */ (tcx < axis ? -1 : 1);
-      tcx = pickFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW, profile, envelopeHalf);
+      tcx = onPlinth
+        ? pickPlinthFlankTowerX(rng, side, axis, plinW, towerW, envLeft, envRight, doorCx, doorW)
+        : pickFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW, profile, envelopeHalf);
       tcx = clampCenterInEnvelope(tcx, towerW, clampLeft, clampRight);
     }
     const towerBaseY = plan.baseY;

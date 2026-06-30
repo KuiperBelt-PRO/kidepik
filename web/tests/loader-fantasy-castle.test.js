@@ -455,6 +455,30 @@ describe("loader-fantasy-castle / facciones spec", () => {
     assert.ok(hasFour, "ninguna seed produjo 4 niveles en 80 intentos");
   });
 
+  it("enanos: torres de planta baja en ambos flancos del zócalo", () => {
+    function plinthSpanX(el) {
+      const plinth = el.parts.find((p) => p.role === "plinth");
+      assert.ok(plinth, "sin plinth");
+      const nums = plinth.d.match(/-?[\d.]+/g).map(Number);
+      const xs = nums.filter((_, i) => i % 2 === 0);
+      return { left: Math.min(...xs), right: Math.max(...xs) };
+    }
+    for (let s = 0; s < 40; s++) {
+      const el = generateCastle({ seed: s * 11 + 3, faction: "dwarf" });
+      const { left, right } = plinthSpanX(el);
+      const baseY = el.parts.find((p) => p.role === "base")?.baseY;
+      const margin = 12;
+      const baseTowers = el.parts.filter(
+        (p) => p.role === "tower" && Math.abs(p.baseY - baseY) < 0.5,
+      );
+      assert.ok(baseTowers.length >= 2, `seed ${s}: menos de 2 torres en planta`);
+      const hasLeft = baseTowers.some((t) => t.centerX < left + margin);
+      const hasRight = baseTowers.some((t) => t.centerX > right - margin);
+      assert.ok(hasLeft, `seed ${s}: sin torre en flanco izq del zócalo`);
+      assert.ok(hasRight, `seed ${s}: sin torre en flanco der del zócalo`);
+    }
+  });
+
   it("ningún elemento sobresale del zócalo (envelope)", () => {
     for (const faction of ["human", "dwarf", "evil", "elf"]) {
       for (let s = 0; s < 15; s++) {
