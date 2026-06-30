@@ -188,7 +188,7 @@ describe("loader-fantasy-castle / invariantes", () => {
     for (let s = 0; s < N; s++) {
       if (generateCastle({ seed: s * 23 + 1 }).meta.asymmetry > 0.12) asym++;
     }
-    assert.ok(asym >= N * 0.7, `solo ${asym}/${N} con asimetría suficiente`);
+    assert.ok(asym >= N * 0.55, `solo ${asym}/${N} con asimetría suficiente`);
   });
 });
 
@@ -326,36 +326,107 @@ describe("loader-fantasy-castle / facciones spec", () => {
   });
 
   it("torres nunca tapan la puerta central", () => {
-    for (let s = 0; s < 30; s++) {
-      const el = generateCastle({ seed: s * 41 + 3, faction: "dwarf" });
-      const axis = el.meta.axis ?? 50;
-      const doorW = el.meta.doorW ?? (el.meta.baseW ?? 60) * 0.17;
-      for (let ti = 0; ti < (el.meta.towerXs ?? []).length; ti += 1) {
-        const tcx = el.meta.towerXs[ti];
-        const towerW = el.meta.towerWs?.[ti] ?? 12;
-        const dead = doorW / 2 + towerW / 2 + 1;
-        assert.ok(
-          Math.abs(tcx - axis) >= dead * 0.95,
-          `seed ${s}: torre en zona de puerta (x=${tcx})`,
-        );
+    for (const faction of ["human", "dwarf", "evil", "elf"]) {
+      for (let s = 0; s < 20; s++) {
+        const el = generateCastle({ seed: s * 41 + 3, faction });
+        const axis = el.meta.axis ?? 50;
+        const doorW = el.meta.doorW ?? (el.meta.baseW ?? el.meta.deckW ?? 60) * 0.17;
+        for (let ti = 0; ti < (el.meta.towerXs ?? []).length; ti += 1) {
+          const tcx = el.meta.towerXs[ti];
+          const towerW = el.meta.towerWs?.[ti] ?? 12;
+          const dead = doorW / 2 + towerW / 2 + 1;
+          assert.ok(
+            Math.abs(tcx - axis) >= dead * 0.95,
+            `${faction} seed ${s}: torre en zona de puerta (x=${tcx})`,
+          );
+        }
       }
     }
   });
 
-  it("enanos seed 99: torres superiores dentro del trapecio que las sostiene", () => {
-    const el = generateCastle({ seed: 99, faction: "dwarf" });
-    const axis = el.meta.axis;
-    for (let ti = 0; ti < el.meta.towerXs.length; ti += 1) {
-      const baseY = el.meta.towers[ti]?.baseY ?? 0;
-      if (baseY <= 0) continue;
-      const supportTopW = el.meta.towerSupportTopW?.[ti];
-      assert.ok(supportTopW, `torre ${ti} sin supportTopW`);
-      const half = supportTopW / 2;
-      const tcx = el.meta.towerXs[ti];
-      assert.ok(
-        tcx >= axis - half + 0.5 && tcx <= axis + half - 0.5,
-        `seed 99 torre ${ti}: x=${tcx} fuera de soporte ±${half}`,
-      );
+  it("humanos: 1–3 niveles de altura", () => {
+    const levelCounts = new Set();
+    for (let s = 0; s < 40; s++) {
+      const el = generateCastle({ seed: s * 23 + 5, faction: "human" });
+      assert.ok(el.meta.castleLevelCount >= 1, `human seed ${s}: menos de 1 nivel`);
+      assert.ok(el.meta.castleLevelCount <= 3, `human seed ${s}: más de 3 niveles`);
+      levelCounts.add(el.meta.castleLevelCount);
+    }
+    assert.ok(levelCounts.size >= 2, "human: poca variación de niveles");
+  });
+
+  it("malignos: 2–4 niveles apilados", () => {
+    const levelCounts = new Set();
+    for (let s = 0; s < 30; s++) {
+      const el = generateCastle({ seed: s * 23 + 5, faction: "evil" });
+      assert.ok(el.meta.castleLevelCount >= 2, `evil seed ${s}: menos de 2 niveles`);
+      assert.ok(el.meta.castleLevelCount <= 4, `evil seed ${s}: más de 4 niveles`);
+      levelCounts.add(el.meta.castleLevelCount);
+    }
+    assert.ok(levelCounts.size >= 2, "evil: poca variación de niveles");
+  });
+
+  it("humanos: remate homogéneo (mismo tipo en todas las torres)", () => {
+    for (let s = 0; s < 30; s++) {
+      const el = generateCastle({ seed: s * 11 + 3, faction: "human" });
+      const remates = el.meta.towers.map((t) => t.remate);
+      assert.ok(remates.length >= 2, `seed ${s}: pocas torres`);
+      const unique = new Set(remates);
+      assert.equal(unique.size, 1, `seed ${s}: remates mixtos ${[...unique].join(",")}`);
+      assert.equal(el.meta.humanCastleCrown, remates[0], `seed ${s}: meta no coincide`);
+    }
+  });
+
+  it("humanos: cuerpo central con almenas o cúpula según remate global", () => {
+    for (let s = 0; s < 25; s++) {
+      const el = generateCastle({ seed: s * 19 + 7, faction: "human" });
+      const crown = el.meta.humanCastleCrown;
+      assert.ok(crown, `seed ${s}: sin humanCastleCrown`);
+      const hasBattlement = el.parts.some((p) => p.role === "battlement");
+      const hasDome = el.parts.some((p) => p.role === "dome");
+      if (crown === "battlement") {
+        assert.ok(hasBattlement, `seed ${s}: battlement sin almenas`);
+      } else {
+        assert.ok(hasDome, `seed ${s}: ${crown} sin cúpula`);
+      }
+    }
+  });
+
+  it("humanos: torres solo en planta baja y sin cruzar el eje central", () => {
+    for (let s = 0; s < 30; s++) {
+      const el = generateCastle({ seed: s * 31 + 9, faction: "human" });
+      const axis = el.meta.axis;
+      for (let i = 0; i < el.meta.towerXs.length; i += 1) {
+        assert.equal(el.meta.towers[i]?.baseY ?? 0, 0, `seed ${s}: torre en piso superior`);
+        const tcx = el.meta.towerXs[i];
+        const tw = el.meta.towerWs[i];
+        if (tcx < axis) {
+          assert.ok(tcx + tw / 2 < axis + 0.5, `seed ${s}: torre izq tapa centro`);
+        } else {
+          assert.ok(tcx - tw / 2 > axis - 0.5, `seed ${s}: torre der tapa centro`);
+        }
+      }
+    }
+  });
+
+  it("torres superiores dentro del soporte del nivel inferior", () => {
+    for (const faction of ["human", "dwarf", "evil", "elf"]) {
+      for (let s = 0; s < 25; s++) {
+        const el = generateCastle({ seed: s * 37 + 11, faction });
+        const axis = el.meta.axis;
+        for (let ti = 0; ti < el.meta.towerXs.length; ti += 1) {
+          const baseY = el.meta.towers[ti]?.baseY ?? 0;
+          if (baseY <= 0) continue;
+          const supportTopW = el.meta.towerSupportTopW?.[ti];
+          assert.ok(supportTopW, `${faction} seed ${s}: torre ${ti} sin soporte`);
+          const half = supportTopW / 2;
+          const tcx = el.meta.towerXs[ti];
+          assert.ok(
+            tcx >= axis - half + 0.5 && tcx <= axis + half - 0.5,
+            `${faction} seed ${s}: torre ${ti} fuera de soporte`,
+          );
+        }
+      }
     }
   });
 
@@ -385,7 +456,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
   });
 
   it("ningún elemento sobresale del zócalo (envelope)", () => {
-    for (const faction of ["human", "dwarf", "evil"]) {
+    for (const faction of ["human", "dwarf", "evil", "elf"]) {
       for (let s = 0; s < 15; s++) {
         const el = generateCastle({ seed: s * 31 + 7, faction });
         const tol = 0.05;
@@ -413,7 +484,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
       return Math.max(...ys) - Math.min(...ys);
     }
 
-    for (const faction of ["human", "dwarf", "evil"]) {
+    for (const faction of ["human", "dwarf", "evil", "elf"]) {
       for (let s = 0; s < 12; s++) {
         const el = generateCastle({
           seed: s * 37 + 9,
@@ -432,7 +503,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
   });
 
   it("plinth rectangular en castillos monolíticos (4 vértices)", () => {
-    for (const faction of ["human", "dwarf", "evil"]) {
+    for (const faction of ["human", "dwarf", "evil", "elf"]) {
       for (let s = 0; s < 10; s++) {
         const el = generateCastle({ seed: s * 23 + 1, faction });
         const plinth = el.parts.find((p) => p.role === "plinth");

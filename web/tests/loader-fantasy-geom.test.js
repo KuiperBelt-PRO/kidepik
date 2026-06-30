@@ -13,6 +13,7 @@ import {
   crossingArches,
   dome,
   domeCropped,
+  domeCroppedCapY,
   gableRoof,
   jitterRing,
   merlons,
@@ -120,15 +121,34 @@ describe("loader-fantasy-geom / merlons", () => {
     const w = 40;
     const hw = w / 2;
     const n = 4;
-    const merW = (w / n) * 0.55;
-    const pts = merlons(cx, 0, w, n, 6);
-    const xs = pts.map((p) => p.x);
+    const fill = 0.5;
+    const pitch = w / n;
+    const merW = pitch * fill;
+    const inset = (pitch - merW) / 2;
     const leftEdge = cx - hw;
-    const rightEdge = cx + hw;
-    assert.ok(xs.some((x) => Math.abs(x - leftEdge) < 0.01), "falta merlón izquierdo");
-    assert.ok(xs.some((x) => Math.abs(x - (leftEdge + merW)) < 0.01), "falta cima merlón izquierdo");
-    assert.ok(xs.some((x) => Math.abs(x - rightEdge) < 0.01), "falta merlón derecho");
-    assert.ok(xs.some((x) => Math.abs(x - (rightEdge - merW)) < 0.01), "falta cima merlón derecho");
+    const merH = merW * 0.82;
+    const pts = merlons(cx, 0, w, n, merH, fill);
+    const xs = pts.map((p) => p.x);
+    const ys = pts.map((p) => p.y);
+    assert.ok(xs.some((x) => Math.abs(x - leftEdge) < 0.01), "falta borde izquierdo");
+    assert.ok(xs.some((x) => Math.abs(x - (leftEdge + inset)) < 0.01), "falta base merlón izquierdo");
+    assert.ok(
+      xs.some((x) => Math.abs(x - (leftEdge + inset + merW)) < 0.01),
+      "falta cima merlón izquierdo",
+    );
+    assert.ok(xs.some((x) => Math.abs(x - (cx + hw)) < 0.01), "falta borde derecho");
+    assert.ok(Math.max(...ys) <= merH + 0.01, "altura acorde al ancho del diente");
+  });
+
+  it("paso uniforme: n merlones reparten todo el ancho", () => {
+    const w = 36;
+    const n = 6;
+    const pts = merlons(50, 0, w, n, 3, 0.5);
+    const xs = pts.map((p) => p.x);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    assert.ok(Math.abs(minX - (50 - w / 2)) < 0.01);
+    assert.ok(Math.abs(maxX - (50 + w / 2)) < 0.01);
   });
 });
 
@@ -217,6 +237,15 @@ describe("loader-fantasy-geom / domeCropped", () => {
     const xs = pts.map((p) => p.x);
     const mid = (Math.min(...xs) + Math.max(...xs)) / 2;
     assert.ok(Math.abs(mid - 50) < 0.5, `centro ${mid} ≠ 50`);
+  });
+
+  it("domeCroppedCapY coincide con la tapa plana", () => {
+    const baseY = 12;
+    const ry = 18;
+    const cr = 0.42;
+    const capY = domeCroppedCapY(baseY, ry, cr);
+    const maxY = Math.max(...domeCropped(50, baseY, 12, ry, cr).map((p) => p.y));
+    assert.ok(Math.abs(capY - maxY) < 0.5);
   });
 });
 

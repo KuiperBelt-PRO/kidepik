@@ -67,13 +67,15 @@ describe("loader-fantasy-compose / grafo", () => {
 });
 
 describe("loader-fantasy-elf-graph / planificación", () => {
-  it("grafo élfico tiene plinth, deck y torres", () => {
+  it("grafo élfico tiene podio, dos torres de flanco y corona central", () => {
     const rng = createRng(99);
     const g = planElfCastleGraph({ seed: 99, ruined: false }, rng);
     assert.equal(g.meta.faction, "elf");
     assert.equal(g.meta.composeMode, "graph");
     assert.ok(g.nodes.some((n) => n.module === "elf.podium"));
-    assert.ok(g.nodes.filter((n) => n.module === "elf.tower_central" || n.module === "elf.tower_flank").length === 3);
+    assert.equal(g.nodes.filter((n) => n.module === "elf.tower_flank").length, 2);
+    assert.ok(g.nodes.some((n) => n.module === "elf.slab_crown"));
+    assert.equal(g.nodes.filter((n) => n.module === "elf.tower_central").length, 0);
   });
 
   it("castillo élfico vía grafo es válido y determinista", () => {
@@ -82,7 +84,8 @@ describe("loader-fantasy-elf-graph / planificación", () => {
     assert.ok(isValidFantasyElement(a));
     assert.equal(a.meta.composeMode, "graph");
     assert.equal(JSON.stringify(a), JSON.stringify(b));
-    assert.ok(a.parts.filter((p) => p.role === "tower").length >= 3);
+    assert.ok(a.parts.filter((p) => p.role === "tower").length >= 2);
+    assert.ok(a.parts.some((p) => p.role === "plinth"), "elfos sin zócalo");
     const hasArrow = a.parts.filter((p) => p.role === "decoration").length >= 5;
     assert.ok(hasArrow, "pocas piezas decorativas en torre élfica");
   });

@@ -19,8 +19,7 @@ import {
   pickArchForFaction,
   pickElfTowerCap,
   pickFaction,
-  pickHumanCentralCrown,
-  pickHumanTowerCap,
+  pickHumanCastleCrown,
   pickRemateForFaction,
 } from "./loader-fantasy-castle-factions.js";
 import {
@@ -36,6 +35,10 @@ import {
   dome,
   domeCropped,
   trapezoidTopChamfer,
+  computePlinthLocalHeight,
+  clampPartsToEnvelope,
+  localBoundsFromParts,
+  DEFAULT_TERRAIN_HEIGHT_PX,
   elfArcadeCluster,
   elfBridgeArcade,
   elfFlyingButtress,
@@ -55,21 +58,6 @@ import { createRng, randPick, randRange } from "./loader-ship-rng.js";
 
 /** Solape vertical entre piezas para evitar huecos tras normalizar. */
 const SEAM = 1.4;
-
-const DEFAULT_TERRAIN_HEIGHT_PX = 48;
-const DEFAULT_CASTLE_SIZE_PX = 120;
-
-/**
- * Altura local del zócalo: en pantalla debe medir terrainHeightPx; el castillo empieza en y=0.
- * Requiere normalizeScaleBy "height" al ensamblar (si no, un zócalo ancho encoge su altura).
- */
-function computePlinthLocalHeight(heightAbove, terrainHeightPx, castleSizePx) {
-  const terrain = terrainHeightPx ?? DEFAULT_TERRAIN_HEIGHT_PX;
-  const castle = Math.max(castleSizePx ?? DEFAULT_CASTLE_SIZE_PX, 1);
-  const r = Math.min(0.48, Math.max(0.05, terrain / castle));
-  const above = Math.max(heightAbove, 1);
-  return Math.max(6, (above * r) / (1 - r));
-}
 
 /**
  * @param {number} tcx
@@ -130,28 +118,43 @@ function pickTierFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW
 }
 
 /**
+ * Torre humana en el flanco exterior: asoma del muro sin tapar el cuerpo central.
  * @param {() => number} rng
  * @param {-1|1} side
  * @param {number} axis
- * @param {number} plinW
- * @param {number} maxTowerW
- * @param {number} envLeft
- * @param {number} envRight
+ * @param {number} supportTopW
+ * @param {number} towerW
  * @param {number} doorCx
  * @param {number} doorW
+ * @param {number} envelopeHalf
  * @returns {number}
  */
-function pickFlankTowerX(rng, side, axis, plinW, maxTowerW, envLeft, envRight, doorCx, doorW) {
-  const inset = maxTowerW / 2 + 2;
-  const dead = doorW / 2 + maxTowerW / 2 + 1;
-  if (side < 0) {
-    const maxCx = Math.min(axis - dead, envRight - inset);
-    const minCx = envLeft + inset;
-    return minCx + rng() * Math.max(0.5, maxCx - minCx);
+function pickHumanOutsetTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW, envelopeHalf) {
+  const wallOverlap = 0.7;
+  let tcx = axis + side * (supportTopW / 2 + towerW / 2 - wallOverlap);
+  if (!towerClearsDoor(tcx, towerW, doorCx, doorW)) {
+    tcx = pickTierFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW);
   }
-  const minCx = Math.max(axis + dead, envLeft + inset);
-  const maxCx = envRight - inset;
-  return minCx + rng() * Math.max(0.5, maxCx - minCx);
+  return clampCenterInEnvelope(tcx, towerW, axis - envelopeHalf, axis + envelopeHalf);
+}
+
+/**
+ * @param {() => number} rng
+ * @param {-1|1} side
+ * @param {number} axis
+ * @param {number} supportTopW
+ * @param {number} towerW
+ * @param {number} doorCx
+ * @param {number} doorW
+ * @param {import('./loader-fantasy-castle-factions.js').FactionProfile} profile
+ * @param {number} envelopeHalf
+ * @returns {number}
+ */
+function pickFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW, profile, envelopeHalf) {
+  if (profile.remateMode === "human_mixed") {
+    return pickHumanOutsetTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW, envelopeHalf);
+  }
+  return pickTierFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW);
 }
 
 /**
@@ -166,30 +169,18 @@ function clampCenterInEnvelope(cx, w, left, right) {
   return Math.max(left + hw, Math.min(right - hw, cx));
 }
 
-function clampAllPartsToEnvelope(parts, left, right) {
-  for (const p of parts) {
-    if (p.role === "plinth") continue;
-    p.outer = p.outer.map((pt) => ({
-      x: Math.max(left, Math.min(right, pt.x)),
-      y: pt.y,
-    }));
+function pickCastleLevelCount(rng, profile) {
+  if (profile.useTrapezoidBodies) {
+    return randPick(rng, [2, 3, 4, 4]);
   }
-}
-
-/**
- * @param {{ outer: import('./loader-fantasy-geom.js').FPoint[] }[]} parts
- * @returns {{ minX: number; maxX: number }}
- */
-function localBoundsFromParts(parts) {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  for (const p of parts) {
-    for (const pt of p.outer) {
-      minX = Math.min(minX, pt.x);
-      maxX = Math.max(maxX, pt.x);
-    }
+  if (profile.useStackedLevels && profile.stackedLevelRange) {
+    const [lo, hi] = profile.stackedLevelRange;
+    /** @type {number[]} */
+    const opts = [];
+    for (let n = lo; n <= hi; n += 1) opts.push(n);
+    return randPick(rng, opts);
   }
-  return { minX, maxX };
+  return 1;
 }
 
 /**
@@ -276,20 +267,79 @@ function addDolmenColumns(asm, rng, axis, flankW, baseH, profile, doorCx, doorW,
 }
 
 /**
- * @param {ElementAssembler} asm
- * @param {number} tcx
- * @param {number} topY
+ * Base Y común del parapeto (almenas y cúpulas al mismo nivel sobre el muro).
+ * @param {number} attachY  cima del muro / torre
+ * @returns {number}
+ */
+function parapetBaseY(attachY) {
+  return attachY - SEAM * 0.35;
+}
+
+/** Fracción del paso que ocupa cada merlón (merlón ≈ hueco). */
+const MERLON_FILL = 0.55;
+
+/**
  * @param {number} w
  * @param {() => number} rng
- * @param {number} jitterAmt
- * @param {number} tilt
+ * @param {number|undefined} fixed
+ * @returns {number}
+ */
+function pickMerlonCount(w, rng, fixed) {
+  if (fixed != null) return Math.max(2, fixed);
+  if (w < 22) return 3;
+  const pitch = randRange(rng, 7, 9.5);
+  const n = Math.round(w / pitch);
+  return Math.max(6, Math.min(11, n));
+}
+
+/**
+ * Almenas: imposta + dientes, centradas en `tcx` y de borde a borde.
+ * @param {ElementAssembler} asm
+ * @param {number} tcx
+ * @param {number} attachY  cima del muro en coords locales (y-up)
+ * @param {number} w
+ * @param {number} wallH  altura del muro que sostiene el parapeto
+ * @param {() => number} rng
  * @param {number} [merCount]
  */
-function addMerlons(asm, tcx, topY, w, rng, jitterAmt, tilt, merCount) {
-  const count = merCount ?? 2 + Math.floor(rng() * 3);
-  let mer = merlons(tcx, topY - SEAM, w * 0.98, count, w * 0.3 + SEAM);
-  mer = jitterRing(mer, rng, jitterAmt * 0.5, { lockY: [topY - SEAM], freezeSeams: true });
-  asm.addPart("battlement", mer, [], { tiltDeg: tilt });
+function addMerlons(asm, tcx, attachY, w, wallH, rng, merCount) {
+  const count = pickMerlonCount(w, rng, merCount);
+  const pitch = w / count;
+  const merW = pitch * MERLON_FILL;
+  const parapetTotalH = Math.max(w * 0.1, wallH * 0.12);
+  const sillH = parapetTotalH * 0.42;
+  const toothH = Math.min(parapetTotalH - sillH, merW * 0.82);
+  const parapetY = parapetBaseY(attachY);
+  asm.addPart("battlement", rect(tcx, parapetY, w, sillH));
+  asm.addPart("battlement", merlons(tcx, parapetY + sillH, w, count, toothH, MERLON_FILL));
+}
+
+/**
+ * Cúpula con base en el parapeto (mismo nivel que almenas, no encima).
+ */
+function addDomeOnParapet(
+  asm, cx, attachY, w, profile, rng, rxFrac = 0.56, ryRange = [0.55, 0.92],
+) {
+  const parapetY = parapetBaseY(attachY);
+  const cropR = randRange(rng, 0.35, 0.55);
+  const domeRy = w * randRange(rng, ryRange[0], ryRange[1]);
+  const rx = w * rxFrac;
+  const domePts = profile.useCroppedDome
+    ? domeCropped(cx, parapetY, rx, domeRy + SEAM, cropR)
+    : dome(cx, parapetY, rx, domeRy + SEAM);
+  asm.addPart("dome", domePts);
+}
+
+/** @typedef {'triple'|'flank_dome'|'split'} ParapetMixStyle */
+
+/**
+ * Mezcla almenas (ancho completo) y cúpula centrada en la misma cornisa.
+ */
+function applyMixedParapetCrown(asm, cx, attachY, w, wallH, profile, rng, mixStyle) {
+  addMerlons(asm, cx, attachY, w, wallH, rng);
+  const domeScale = mixStyle === "triple" ? 0.44 : mixStyle === "split" && rng() < 0.5 ? 0.5 : 0.52;
+  const ryRange = mixStyle === "triple" ? [0.38, 0.58] : [0.48, 0.78];
+  addDomeOnParapet(asm, cx, attachY, w * domeScale, profile, rng, 0.5, ryRange);
 }
 
 /**
@@ -301,16 +351,19 @@ function addMerlons(asm, tcx, topY, w, rng, jitterAmt, tilt, merCount) {
  *   tcx: number;
  *   towerTop: number;
  *   towerW: number;
+ *   towerH: number;
  *   tilt: number;
  *   rng: () => number;
  *   jitterAmt: number;
  *   isCentral?: boolean;
+ *   parapetMix?: ParapetMixStyle|null;
  * }} opts
  */
 function applyTowerCrown(asm, opts) {
   const {
-    profile, elfCapKind, remate, tcx, towerTop, towerW, tilt, rng, jitterAmt,
+    profile, elfCapKind, remate, tcx, towerTop, towerW, towerH, tilt, rng, jitterAmt,
     isCentral = false,
+    parapetMix = null,
   } = opts;
 
   if (profile.remateMode === "none") return;
@@ -344,19 +397,17 @@ function applyTowerCrown(asm, opts) {
   }
 
   if (remate === "battlement") {
-    addMerlons(asm, tcx, towerTop, towerW, rng, jitterAmt, tilt);
+    addMerlons(asm, tcx, towerTop, towerW, towerH, rng);
     return;
   }
 
   if (remate === "dome") {
-    const domeRy = towerW * randRange(rng, 0.65, 1.05);
-    const domePts = profile.useCroppedDome
-      ? domeCropped(tcx, towerTop - SEAM, towerW * 0.56, domeRy + SEAM, randRange(rng, 0.35, 0.55))
-      : dome(tcx, towerTop - SEAM, towerW * 0.56, domeRy + SEAM);
-    asm.addPart("dome", domePts, [], { tiltDeg: tilt });
+    addDomeOnParapet(asm, tcx, towerTop, towerW, profile, rng);
     if (rng() < profile.finialChance) {
       const fk = randPick(rng, profile.finialKinds);
-      for (const ring of finial(tcx, towerTop + domeRy - SEAM, towerW * 0.5, fk)) {
+      const parapetY = parapetBaseY(towerTop);
+      const domeRy = towerW * randRange(rng, 0.55, 0.92);
+      for (const ring of finial(tcx, parapetY + domeRy, towerW * 0.5, fk)) {
         asm.addPart("decoration", ring);
       }
     }
@@ -364,12 +415,8 @@ function applyTowerCrown(asm, opts) {
   }
 
   if (remate === "dome_battlement") {
-    const domeRy = towerW * randRange(rng, 0.55, 0.92);
-    const domePts = profile.useCroppedDome
-      ? domeCropped(tcx, towerTop - SEAM, towerW * 0.56, domeRy + SEAM, randRange(rng, 0.35, 0.55))
-      : dome(tcx, towerTop - SEAM, towerW * 0.56, domeRy + SEAM);
-    asm.addPart("dome", domePts, [], { tiltDeg: tilt });
-    addMerlons(asm, tcx, towerTop + domeRy, towerW * 0.88, rng, jitterAmt, tilt, 2 + Math.floor(rng() * 2));
+    const mix = parapetMix ?? /** @type {ParapetMixStyle} */ (randPick(rng, ["flank_dome", "split", "triple"]));
+    applyMixedParapetCrown(asm, tcx, towerTop, towerW, towerH, profile, rng, mix);
     return;
   }
 
@@ -405,27 +452,20 @@ function applyTowerCrown(asm, opts) {
  */
 /**
  * @param {import('./loader-fantasy-castle-factions.js').FactionProfile} profile
+ * @param {ParapetMixStyle|null} [parapetMix]
  */
-function applyCentralCrown(asm, crown, cx, topY, w, rng, jitterAmt, profile) {
+function applyCentralCrown(asm, crown, cx, topY, w, wallH, rng, _jitterAmt, profile, parapetMix = null) {
   if (crown === "battlement") {
-    addMerlons(asm, cx, topY, w * 0.94, rng, jitterAmt, 0, 3 + Math.floor(rng() * 2));
+    addMerlons(asm, cx, topY, w, wallH, rng);
     return;
   }
   if (crown === "dome") {
-    const domeRy = w * randRange(rng, 0.22, 0.34);
-    const domePts = profile.useCroppedDome
-      ? domeCropped(cx, topY - SEAM, w * 0.38, domeRy + SEAM, randRange(rng, 0.35, 0.55))
-      : dome(cx, topY - SEAM, w * 0.38, domeRy + SEAM);
-    asm.addPart("dome", domePts);
+    addDomeOnParapet(asm, cx, topY, w, profile, rng, 0.38, [0.22, 0.34]);
     return;
   }
   if (crown === "dome_battlement") {
-    const domeRy = w * randRange(rng, 0.18, 0.28);
-    const domePts = profile.useCroppedDome
-      ? domeCropped(cx, topY - SEAM, w * 0.36, domeRy + SEAM, randRange(rng, 0.35, 0.55))
-      : dome(cx, topY - SEAM, w * 0.36, domeRy + SEAM);
-    asm.addPart("dome", domePts);
-    addMerlons(asm, cx, topY + domeRy, w * 0.82, rng, jitterAmt, 0, 3 + Math.floor(rng() * 2));
+    const mix = parapetMix ?? /** @type {ParapetMixStyle} */ (randPick(rng, ["triple", "flank_dome", "split"]));
+    applyMixedParapetCrown(asm, cx, topY, w, wallH, profile, rng, mix);
   }
 }
 
@@ -445,10 +485,25 @@ export function generateCastle(options) {
   const profile = getFactionProfile(faction);
   const style = options.style ?? pickStyle(rng, palace);
   const imperfection = options.imperfection ?? 0.55;
+  /** @type {'battlement'|'dome'|'dome_battlement'|null} */
+  const humanCastleCrown = profile.remateMode === "human_mixed"
+    ? pickHumanCastleCrown(rng, palace)
+    : null;
+  /** @type {ParapetMixStyle|null} */
+  const humanParapetMix = humanCastleCrown === "dome_battlement"
+    ? /** @type {ParapetMixStyle} */ (randPick(rng, ["triple", "flank_dome", "split"]))
+    : null;
 
   if (faction === "elf") {
     return generateElfCastleFromGraph(
-      { seed, palace, style, imperfection },
+      {
+        seed,
+        palace,
+        style,
+        imperfection,
+        terrainHeightPx: options.terrainHeightPx,
+        castleSizePx: options.castleSizePx,
+      },
       rng,
     );
   }
@@ -477,6 +532,7 @@ export function generateCastle(options) {
   const plinW = baseW * randRange(rng, 1.5, 2.0);
   const envLeft = axis - plinW / 2;
   const envRight = axis + plinW / 2;
+  const envelopeHalf = plinW / 2;
 
   const baseTop = baseH;
   let stackTop = baseTop;
@@ -528,23 +584,26 @@ export function generateCastle(options) {
   let castleLevelCount = 1;
   /** @type {{ baseY: number; w: number; topW: number }[]} */
   const levelBands = [{ baseY: 0, w: baseW, topW: trapezoidTopW(baseW, baseTaper) }];
-  if (profile.useTrapezoidBodies) {
-    castleLevelCount = randPick(rng, [2, 3, 4, 4]);
+  const useStackedTiers = profile.useTrapezoidBodies || profile.useStackedLevels;
+  if (useStackedTiers) {
+    castleLevelCount = pickCastleLevelCount(rng, profile);
     const extraTiers = castleLevelCount - 1;
     let tierW = baseW;
     for (let t = 0; t < extraTiers; t += 1) {
       tierW *= randRange(rng, 0.58, 0.78);
       tierW = Math.min(tierW, plinW * 0.9);
       const tierH = baseH * randRange(rng, 0.45, 0.68);
-      const tierTaper = sampleTrapezoidTaper(rng);
-      let tierOuter = trapezoidTopChamfer(
-        axis,
-        stackTop - SEAM,
-        tierW,
-        tierH + SEAM,
-        tierTaper,
-        profile.chamfer,
-      );
+      const tierTaper = profile.useTrapezoidBodies ? sampleTrapezoidTaper(rng) : 0;
+      let tierOuter = profile.useTrapezoidBodies
+        ? trapezoidTopChamfer(
+          axis,
+          stackTop - SEAM,
+          tierW,
+          tierH + SEAM,
+          tierTaper,
+          profile.chamfer,
+        )
+        : bodyShell(axis, stackTop - SEAM, tierW, tierH + SEAM, profile, rng);
       tierOuter = jitterRing(tierOuter, rng, jitterAmt * 0.35, {
         lockY: [stackTop - SEAM, stackTop + tierH],
         freezeSeams: true,
@@ -563,11 +622,20 @@ export function generateCastle(options) {
       levelBands.push({
         baseY: stackTop,
         w: tierW,
-        topW: trapezoidTopW(tierW, tierTaper),
+        topW: profile.useTrapezoidBodies ? trapezoidTopW(tierW, tierTaper) : tierW,
       });
       stackTop += tierH;
       dwarfTierCount += 1;
     }
+  }
+
+  if (humanCastleCrown) {
+    const topBand = levelBands[levelBands.length - 1];
+    const centralWallH = stackTop - topBand.baseY;
+    applyCentralCrown(
+      asm, humanCastleCrown, axis, stackTop, topBand.w, centralWallH,
+      rng, jitterAmt, profile, humanParapetMix,
+    );
   }
 
   /** @type {number[]} */
@@ -579,24 +647,21 @@ export function generateCastle(options) {
     dolmenXs = addDolmenColumns(asm, rng, axis, baseW, baseH, profile, doorCx, doorW);
   }
 
-  // Corona central humana (cúpula grande o almenas en el centro del cuerpo)
-  if (profile.remateMode === "human_mixed" && (palace || rng() < profile.centralCrownChance)) {
-    const crown = palace && rng() < 0.65 ? "dome" : pickHumanCentralCrown(rng);
-    applyCentralCrown(asm, crown, axis, baseTop, baseW, rng, jitterAmt, profile);
-  }
-
-  // Contrafuertes (humanos y enanos)
+  // Contrafuertes (enanos; humanos sin columnas laterales flotantes)
   if (profile.buttressChance > 0 && rng() < profile.buttressChance) {
     const bCount = 2 + Math.floor(rng() * 2);
     const bH = baseH * randRange(rng, 0.42, 0.72);
     const bW = Math.min(baseW * randRange(rng, 0.06, 0.1), plinW * 0.12);
     for (let i = 0; i < bCount; i++) {
       const side = i % 2 === 0 ? -1 : 1;
-      const wallEdge = clampCenterInEnvelope(
-        axis + side * (plinW / 2 - bW * 0.2),
+      const wallEdge = pickTierFlankTowerX(
+        rng,
+        /** @type {-1|1} */ (side),
+        axis,
+        baseW,
         bW,
-        envLeft,
-        envRight,
+        doorCx,
+        doorW,
       );
       let butt = buttress(axis, wallEdge, 0, bW, bH);
       butt = jitterRing(butt, rng, jitterAmt * 0.35, { lockY: [0], freezeSeams: true });
@@ -648,11 +713,14 @@ export function generateCastle(options) {
       plinW * 0.38,
     );
     const blockH = baseH * randRange(rng, isElf ? 0.55 : 0.5, isElf ? 0.9 : 0.82);
-    const blockCx = clampCenterInEnvelope(
-      axis + side * (plinW / 2 - blockW / 2 - 1),
+    const blockCx = pickTierFlankTowerX(
+      rng,
+      /** @type {-1|1} */ (side),
+      axis,
+      baseW,
       blockW,
-      envLeft,
-      envRight,
+      doorCx,
+      doorW,
     );
     const blockTop = blockH;
     let blockOuter = bodyShell(blockCx, 0, blockW, blockTop, profile, rng);
@@ -702,7 +770,7 @@ export function generateCastle(options) {
 
   const baseTowerW = randRange(rng, profile.towerW[0], profile.towerW[1]);
   towerPlans.push({
-    tcx: pickTierFlankTowerX(rng, -1, axis, baseW, baseTowerW, doorCx, doorW),
+    tcx: pickFlankTowerX(rng, -1, axis, baseW, baseTowerW, doorCx, doorW, profile, envelopeHalf),
     baseY: 0,
     levelW: baseW,
     supportTopW: baseW,
@@ -710,15 +778,16 @@ export function generateCastle(options) {
   });
   const baseTowerW2 = randRange(rng, profile.towerW[0], profile.towerW[1]);
   towerPlans.push({
-    tcx: pickTierFlankTowerX(rng, 1, axis, baseW, baseTowerW2, doorCx, doorW),
+    tcx: pickFlankTowerX(rng, 1, axis, baseW, baseTowerW2, doorCx, doorW, profile, envelopeHalf),
     baseY: 0,
     levelW: baseW,
     supportTopW: baseW,
     towerW: baseTowerW2,
   });
 
-  if (profile.useTrapezoidBodies) {
+  if (useStackedTiers) {
     for (let li = 1; li < levelBands.length; li += 1) {
+      if (profile.remateMode === "human_mixed") continue;
       const band = levelBands[li];
       const support = levelBands[li - 1];
       if (rng() > 0.55) continue;
@@ -727,7 +796,7 @@ export function generateCastle(options) {
         randRange(rng, profile.towerW[0], profile.towerW[1]),
         support.topW * 0.88,
       );
-      const tcx = pickTierFlankTowerX(rng, side, axis, support.topW, tw, doorCx, doorW);
+      const tcx = pickFlankTowerX(rng, side, axis, support.topW, tw, doorCx, doorW, profile, envelopeHalf);
       if (!towerClearsDoor(tcx, tw, doorCx, doorW)) continue;
       towerPlans.push({
         tcx,
@@ -742,7 +811,7 @@ export function generateCastle(options) {
     for (let t = 2; t < extraTowers; t++) {
       const side = /** @type {-1|1} */ (rng() < 0.5 ? -1 : 1);
       const tw = maxTowerW;
-      let tcx = pickFlankTowerX(rng, side, axis, plinW, tw, envLeft, envRight, doorCx, doorW);
+      let tcx = pickFlankTowerX(rng, side, axis, baseW, tw, doorCx, doorW, profile, envelopeHalf);
       if (!towerClearsDoor(tcx, tw, doorCx, doorW)) continue;
       towerPlans.push({
         tcx,
@@ -774,16 +843,18 @@ export function generateCastle(options) {
       towerW = Math.min(towerW, supportTopW * 0.88);
     }
     const supportHalf = supportTopW / 2;
+    const clampLeft = profile.remateMode === "human_mixed" ? axis - envelopeHalf : axis - supportHalf;
+    const clampRight = profile.remateMode === "human_mixed" ? axis + envelopeHalf : axis + supportHalf;
     let tcx = clampCenterInEnvelope(
       plan.tcx,
       towerW,
-      axis - supportHalf,
-      axis + supportHalf,
+      clampLeft,
+      clampRight,
     );
     if (!towerClearsDoor(tcx, towerW, doorCx, doorW)) {
       const side = /** @type {-1|1} */ (tcx < axis ? -1 : 1);
-      tcx = pickTierFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW);
-      tcx = clampCenterInEnvelope(tcx, towerW, axis - supportHalf, axis + supportHalf);
+      tcx = pickFlankTowerX(rng, side, axis, supportTopW, towerW, doorCx, doorW, profile, envelopeHalf);
+      tcx = clampCenterInEnvelope(tcx, towerW, clampLeft, clampRight);
     }
     const towerBaseY = plan.baseY;
     let towerH;
@@ -849,11 +920,7 @@ export function generateCastle(options) {
     /** @type {string} */
     let remate;
     if (profile.remateMode === "human_mixed") {
-      if (palace && rng() < 0.72) {
-        remate = rng() < 0.45 ? "dome" : "dome_battlement";
-      } else {
-        remate = pickHumanTowerCap(rng, idx, towerCount);
-      }
+      remate = /** @type {string} */ (humanCastleCrown);
     } else if (profile.remateMode === "elf_cap") {
       remate = /** @type {'gothic_arch'|'inverted_arrow'} */ (elfCapKind);
     } else if (profile.remateMode === "none") {
@@ -870,10 +937,12 @@ export function generateCastle(options) {
       tcx,
       towerTop,
       towerW,
+      towerH,
       tilt,
       rng,
       jitterAmt,
       isCentral: idx === centralTowerIdx,
+      parapetMix: humanParapetMix,
     });
 
     if (profile.remateMode === "elf_cap" && rng() < 0.78) {
@@ -882,21 +951,6 @@ export function generateCastle(options) {
       for (const petal of elfPetalFlare(tcx, midY, towerW, petalH)) {
         asm.addPart("decoration", jitterRing(petal, rng, jitterAmt * 0.25), [], { tiltDeg: tilt });
       }
-    }
-
-    if (profile.remateMode === "human_mixed" && rng() < 0.55) {
-      const side = tcx < axis ? -1 : 1;
-      const bH = towerH * randRange(rng, 0.35, 0.55);
-      const bW = Math.min(towerW * randRange(rng, 0.35, 0.55), plinW * 0.14);
-      const wallEdge = clampCenterInEnvelope(
-        axis + side * (plinW / 2 - 1),
-        bW,
-        envLeft,
-        envRight,
-      );
-      let tb = buttress(tcx, wallEdge, towerBaseY + towerH * 0.2, bW, bH);
-      tb = jitterRing(tb, rng, jitterAmt * 0.3, { freezeSeams: true });
-      asm.addPart("decoration", tb, [], { tiltDeg: tilt });
     }
   });
 
@@ -929,7 +983,7 @@ export function generateCastle(options) {
     axisOffset * 0.5 + heightVar * 0.5 + (ruined ? 0.15 : 0),
   );
 
-  clampAllPartsToEnvelope(asm._parts, envLeft, envRight);
+  clampPartsToEnvelope(asm._parts, envLeft, envRight);
 
   const heightAbove = asm._parts.reduce(
     (maxY, p) => Math.max(maxY, ...p.outer.map((pt) => pt.y)),
@@ -981,6 +1035,8 @@ export function generateCastle(options) {
     localTowerHeights: towerHeights,
     dwarfTierCount,
     castleLevelCount,
+    humanCastleCrown,
+    humanParapetMix,
     plinthLocalH: plinH,
     plinthTerrainPx: options.terrainHeightPx ?? DEFAULT_TERRAIN_HEIGHT_PX,
     heightAboveGround: heightAbove,

@@ -18,24 +18,29 @@ import {
   pickElfTowerCap,
 } from "./loader-fantasy-castle-factions.js";
 import { ensureModulesRegistered } from "./loader-fantasy-modules.js";
+import {
+  clampPartsToEnvelope,
+  computePlinthLocalHeight,
+  DEFAULT_TERRAIN_HEIGHT_PX,
+  localBoundsFromParts,
+  rect,
+} from "./loader-fantasy-geom.js";
 import { randRange } from "./loader-ship-rng.js";
 
+const SEAM = 1.4;
+
 /**
+ * Torres en flancos del podio (nunca sobre el vano central de la puerta).
  * @param {number} cx
  * @param {number} spanW
- * @param {number} count
+ * @param {number} doorW
  * @returns {number[]}
  */
-function planTowerXs(cx, spanW, count) {
-  const span = spanW * 0.88;
-  if (count <= 1) return [cx];
-  const step = span / (count - 1);
-  /** @type {number[]} */
-  const xs = [];
-  for (let i = 0; i < count; i++) {
-    xs.push(cx - span / 2 + i * step);
-  }
-  return xs;
+function planFlankTowerXs(cx, spanW, doorW) {
+  const half = spanW * 0.44;
+  const dead = doorW / 2 + 2;
+  const inset = spanW * 0.06;
+  return [cx - Math.max(inset, half - dead), cx + Math.max(inset, half - dead)];
 }
 
 /**
@@ -48,15 +53,18 @@ export function planElfCastleGraph(options, rng) {
   const axis = 50 + (rng() - 0.5) * 4;
 
   const spanW = randRange(rng, 70, 80);
+  const plinW = spanW * randRange(rng, 1.5, 2.0);
+  const envLeft = axis - plinW / 2;
+  const envRight = axis + plinW / 2;
+  const doorW = spanW * randRange(rng, 0.14, 0.2);
   const stiltH = randRange(rng, 14, 18);
   const slabH = randRange(rng, 5, 7);
   const podiumTop = stiltH + slabH;
 
-  const towerCount = 3;
+  const towerCount = 2;
   const capKind = pickElfTowerCap(rng);
-  const centralIdx = 1;
   const flankH = randRange(rng, 48, 58);
-  const centralH = flankH * randRange(rng, 1.35, 1.55);
+  const centralCrownH = flankH * randRange(rng, 1.35, 1.55);
   const towerW = spanW * randRange(rng, 0.1, 0.13);
 
   const graph = createGraph({
@@ -65,7 +73,7 @@ export function planElfCastleGraph(options, rng) {
     factionLabel: profile.label,
     towerRemate: capKind,
     archDominant: "gothic",
-    normalizeScaleBy: "max",
+    normalizeScaleBy: "height",
     normalizeBottomInset: 0,
   });
 
@@ -83,7 +91,7 @@ export function planElfCastleGraph(options, rng) {
     order: 0,
   });
 
-  const towerXs = planTowerXs(axis, spanW, towerCount);
+  const towerXs = planFlankTowerXs(axis, spanW, doorW);
   /** @type {{ remate: string }[]} */
   const towersMeta = [];
   /** @type {number[]} */
@@ -91,23 +99,36 @@ export function planElfCastleGraph(options, rng) {
   /** @type {number[]} */
   const shaftHeights = [];
 
+  /** @type {number[]} */
+  const towerWidths = [];
+
   towerXs.forEach((tcx, idx) => {
-    const isCentral = idx === centralIdx;
-    let towerH = isCentral ? centralH : flankH * randRange(rng, 0.92, 1.02);
+    let towerH = flankH * randRange(rng, 0.92, 1.02);
     if (options.ruined && idx === towerCount - 1) towerH *= 0.5;
     shaftHeights.push(towerH);
     towerHeights.push(podiumTop + towerH);
-    towersMeta.push({ remate: capKind });
+    towersMeta.push({ remate: capKind, baseY: podiumTop });
+    towerWidths.push(towerW);
 
     addNode(graph, {
       id: `tower_${idx}`,
-      module: isCentral ? "elf.tower_central" : "elf.tower_flank",
+      module: "elf.tower_flank",
       cx: tcx,
       baseY: podiumTop,
       params: { w: towerW, h: towerH, capKind },
       order: 20 + idx,
       after: ["podium"],
     });
+  });
+
+  addNode(graph, {
+    id: "slab_crown",
+    module: "elf.slab_crown",
+    cx: axis,
+    baseY: podiumTop,
+    params: { w: towerW * 2.8, h: centralCrownH * 0.38, capKind },
+    order: 24,
+    after: ["podium"],
   });
 
   for (let i = 0; i < towerXs.length - 1; i++) {
@@ -152,6 +173,9 @@ export function planElfCastleGraph(options, rng) {
     towerCount,
     blockCount: 0,
     towers: towersMeta,
+    towerXs,
+    towerWs: towerWidths,
+    towerSupportTopW: towerWidths.map(() => spanW),
     doorCount: 0,
     windowCount: 0,
     slitCount: 0,
@@ -159,8 +183,13 @@ export function planElfCastleGraph(options, rng) {
     localTowerHeights: towerHeights,
     asymmetry: Math.min(1, std / (podiumTop * 0.9) + (options.ruined ? 0.15 : 0)),
     deckW: spanW,
+    plinW,
+    envelopeW: plinW,
+    envelopeLeft: envLeft,
+    envelopeRight: envRight,
     deckH: podiumTop,
     axis,
+    doorW,
     normalizeBottomInset: 0,
   });
 
@@ -173,6 +202,8 @@ export function planElfCastleGraph(options, rng) {
  *   palace?: boolean;
  *   style?: string;
  *   imperfection?: number;
+ *   terrainHeightPx?: number;
+ *   castleSizePx?: number;
  * }} options
  * @param {() => number} rng
  * @returns {import('./loader-fantasy-element.js').FantasyElement}
@@ -206,6 +237,30 @@ export function generateElfCastleFromGraph(options, rng) {
     counters,
   });
 
+  const axis = graph.meta.axis ?? 50;
+  const plinW = graph.meta.plinW ?? graph.meta.deckW * 1.6;
+  const envLeft = graph.meta.envelopeLeft ?? axis - plinW / 2;
+  const envRight = graph.meta.envelopeRight ?? axis + plinW / 2;
+
+  clampPartsToEnvelope(asm._parts, envLeft, envRight);
+
+  const heightAbove = asm._parts.reduce(
+    (maxY, p) => Math.max(maxY, ...p.outer.map((pt) => pt.y)),
+    0,
+  );
+  const plinH = computePlinthLocalHeight(
+    heightAbove,
+    options.terrainHeightPx,
+    options.castleSizePx,
+  );
+  asm._parts.unshift({
+    role: "plinth",
+    outer: rect(axis, -plinH, plinW, plinH + SEAM),
+    holes: [],
+  });
+
+  const localBounds = localBoundsFromParts(asm._parts);
+
   const meta = {
     ...graph.meta,
     style: options.style ?? "white",
@@ -215,7 +270,12 @@ export function generateElfCastleFromGraph(options, rng) {
     doorCount: counters.doorCount,
     windowCount: counters.windowCount,
     slitCount: counters.slitCount,
-    normalizeScaleBy: "max",
+    plinthLocalH: plinH,
+    plinthTerrainPx: options.terrainHeightPx ?? DEFAULT_TERRAIN_HEIGHT_PX,
+    heightAboveGround: heightAbove,
+    localMinX: localBounds.minX,
+    localMaxX: localBounds.maxX,
+    normalizeScaleBy: "height",
     normalizeBottomInset: 0,
   };
 

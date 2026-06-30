@@ -417,6 +417,27 @@ function moduleElfPavilion(ctx, node) {
   }
 }
 
+function moduleElfSlabCrown(ctx, node) {
+  const w = /** @type {number} */ (node.params.w);
+  const h = /** @type {number} */ (node.params.h);
+  const capKind = /** @type {string} */ (node.params.capKind ?? "rib_crown");
+  const { cx, baseY } = node;
+
+  /** @type {import('./loader-fantasy-geom.js').FPoint[][]} */
+  let rings = [];
+  if (capKind === "rib_crown" || capKind === "spire_cluster") {
+    rings = elfRibCrown(cx, baseY - SEAM, w, h + SEAM);
+  } else {
+    rings = elfSpireCluster(cx, baseY - SEAM, w * 0.55, h + SEAM);
+  }
+  for (const ring of rings) {
+    ctx.asm.addPart("decoration", jitterRing(ring, ctx.rng, ctx.jitterAmt * 0.1));
+  }
+  for (const ring of finial(cx, baseY + h * 0.7, h * 0.85, "needle")) {
+    ctx.asm.addPart("decoration", ring);
+  }
+}
+
 /** Registra todos los módulos en el registry global. */
 export function registerAllModules() {
   registerModule("core.plinth", moduleCorePlinth);
@@ -425,6 +446,7 @@ export function registerAllModules() {
   registerModule("elf.tower", moduleElfTower);
   registerModule("elf.tower_central", moduleElfTowerCentral);
   registerModule("elf.tower_flank", moduleElfTowerFlank);
+  registerModule("elf.slab_crown", moduleElfSlabCrown);
   registerModule("elf.span_arch", moduleElfSpanArch);
   registerModule("elf.rib_dome", moduleElfRibDome);
   registerModule("elf.arcade_band", moduleElfArcadeBand);

@@ -125,14 +125,9 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
     assert.ok(rich >= N * 0.55, `elfos con arcadas solo ${rich}/${N}`);
   });
 
-  it("humanos incluyen contrafuertes con frecuencia", () => {
-    let withButtress = 0;
-    const N = 40;
-    for (let s = 0; s < N; s++) {
-      const el = generateCastle({ seed: s * 13, faction: "human" });
-      if (el.parts.filter((p) => p.role === "decoration").length >= 3) withButtress++;
-    }
-    assert.ok(withButtress >= N * 0.55, `humanos con contrafuertes solo ${withButtress}/${N}`);
+  it("humanos: sin contrafuertes laterales (perfil)", () => {
+    const profile = getFactionProfile("human");
+    assert.equal(profile.buttressChance, 0);
   });
 
   it("enanos: torres bajas y anchas — más cortas que elfos", () => {

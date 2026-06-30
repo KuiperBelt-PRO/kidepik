@@ -267,37 +267,51 @@ export function domeCropped(cx, baseY, rx, ry, cropRatio = 0.45, segments = 10) 
 }
 
 /**
+ * Altura Y de la tapa plana de una cúpula recortada (para anclar almenas).
+ * @param {number} baseY
+ * @param {number} ry
+ * @param {number} [cropRatio]
+ * @returns {number}
+ */
+export function domeCroppedCapY(baseY, ry, cropRatio = 0.45) {
+  const cr = Math.min(0.95, Math.max(0.05, cropRatio));
+  return baseY + ry * cr;
+}
+
+/**
  * Contorno de almenas (merlones + cuerpo base).
+ * Reparte `count` dientes de forma uniforme de borde a borde sobre `w`.
  * @param {number} cx
  * @param {number} baseY  base del parapeto (suelo de la franja de almenas)
- * @param {number} w
+ * @param {number} w  anchura total (extremo izquierdo a derecho)
  * @param {number} count  número de merlones
- * @param {number} merH  altura del merlón
+ * @param {number} merH  altura del merlón (proporcional al ancho de cada diente)
+ * @param {number} [merWidthFrac]  fracción del paso ocupada por cada merlón (≈0,5 → merlón y hueco iguales)
  * @returns {FPoint[]}
  */
-export function merlons(cx, baseY, w, count, merH) {
+export function merlons(cx, baseY, w, count, merH, merWidthFrac = 0.5) {
   const hw = w / 2;
-  const n = Math.max(2, count);
-  const merW = (w / n) * 0.55;
-  const span = w - merW;
+  const n = Math.max(2, Math.round(count));
+  const pitch = w / n;
+  const fill = Math.min(0.88, Math.max(0.38, merWidthFrac));
+  const merW = pitch * fill;
+  const inset = (pitch - merW) / 2;
+  const leftEdge = cx - hw;
 
   /** @type {FPoint[]} */
-  const pts = [];
+  const pts = [{ x: leftEdge, y: baseY }];
 
-  pts.push({ x: cx - hw, y: baseY });
-
-  for (let i = 0; i < n; i++) {
-    const left = (cx - hw) + (n === 1 ? 0 : (i / (n - 1)) * span);
-    const right = left + merW;
+  for (let i = 0; i < n; i += 1) {
+    const merLeft = leftEdge + i * pitch + inset;
+    const merRight = merLeft + merW;
     pts.push(
-      { x: left, y: baseY },
-      { x: left, y: baseY + merH },
-      { x: right, y: baseY + merH },
-      { x: right, y: baseY },
+      { x: merLeft, y: baseY },
+      { x: merLeft, y: baseY + merH },
+      { x: merRight, y: baseY + merH },
+      { x: merRight, y: baseY },
     );
     if (i < n - 1) {
-      const nextLeft = (cx - hw) + ((i + 1) / (n - 1)) * span;
-      pts.push({ x: nextLeft, y: baseY });
+      pts.push({ x: leftEdge + (i + 1) * pitch, y: baseY });
     }
   }
 
@@ -845,6 +859,56 @@ export function boundsOfFantasyGroups(groups) {
     }
   }
   return { minX, minY, maxX, maxY };
+}
+
+export const DEFAULT_TERRAIN_HEIGHT_PX = 48;
+export const DEFAULT_CASTLE_SIZE_PX = 120;
+
+/**
+ * Altura local del zócalo para que en pantalla ocupe terrainHeightPx (castillo en y≥0).
+ * @param {number} heightAbove
+ * @param {number} [terrainHeightPx]
+ * @param {number} [castleSizePx]
+ * @returns {number}
+ */
+export function computePlinthLocalHeight(heightAbove, terrainHeightPx, castleSizePx) {
+  const terrain = terrainHeightPx ?? DEFAULT_TERRAIN_HEIGHT_PX;
+  const castle = Math.max(castleSizePx ?? DEFAULT_CASTLE_SIZE_PX, 1);
+  const r = Math.min(0.48, Math.max(0.05, terrain / castle));
+  const above = Math.max(heightAbove, 1);
+  return Math.max(6, (above * r) / (1 - r));
+}
+
+/**
+ * Recorta piezas al ancho del zócalo (excepto el propio plinth).
+ * @param {{ role: string; outer: FPoint[] }[]} parts
+ * @param {number} left
+ * @param {number} right
+ */
+export function clampPartsToEnvelope(parts, left, right) {
+  for (const p of parts) {
+    if (p.role === "plinth") continue;
+    p.outer = p.outer.map((pt) => ({
+      x: Math.max(left, Math.min(right, pt.x)),
+      y: pt.y,
+    }));
+  }
+}
+
+/**
+ * @param {{ outer: FPoint[] }[]} parts
+ * @returns {{ minX: number; maxX: number }}
+ */
+export function localBoundsFromParts(parts) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  for (const p of parts) {
+    for (const pt of p.outer) {
+      minX = Math.min(minX, pt.x);
+      maxX = Math.max(maxX, pt.x);
+    }
+  }
+  return { minX, maxX };
 }
 
 /**

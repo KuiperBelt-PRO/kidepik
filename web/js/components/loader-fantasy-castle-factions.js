@@ -41,6 +41,8 @@ import { randPick } from "./loader-ship-rng.js";
  *   useCroppedDome: boolean;
  *   dolmenChance: number;
  *   useTrapezoidBodies: boolean;
+ *   useStackedLevels: boolean;
+ *   stackedLevelRange?: [number, number];
  *   towerHByWidth: [number, number] | null;
  * }} FactionProfile */
 
@@ -73,7 +75,7 @@ export const FACTION_PROFILES = {
     finialChance: 0.35,
     tiltScale: 1,
     remateMode: "human_mixed",
-    buttressChance: 0.88,
+    buttressChance: 0,
     flyingButtressChance: 0,
     centralCrownChance: 0.92,
     blockRoof: false,
@@ -82,6 +84,8 @@ export const FACTION_PROFILES = {
     useCroppedDome: true,
     dolmenChance: 0,
     useTrapezoidBodies: false,
+    useStackedLevels: true,
+    stackedLevelRange: [1, 3],
     towerHByWidth: null,
   },
   elf: {
@@ -114,6 +118,7 @@ export const FACTION_PROFILES = {
     useCroppedDome: false,
     dolmenChance: 0,
     useTrapezoidBodies: false,
+    useStackedLevels: false,
     towerHByWidth: null,
   },
   dwarf: {
@@ -146,6 +151,7 @@ export const FACTION_PROFILES = {
     useCroppedDome: false,
     dolmenChance: 1,
     useTrapezoidBodies: true,
+    useStackedLevels: false,
     towerHByWidth: [1.05, 1.75],
   },
   evil: {
@@ -178,6 +184,8 @@ export const FACTION_PROFILES = {
     useCroppedDome: false,
     dolmenChance: 0,
     useTrapezoidBodies: false,
+    useStackedLevels: true,
+    stackedLevelRange: [2, 4],
     towerHByWidth: null,
   },
 };
@@ -264,6 +272,19 @@ export function pickHumanCentralCrown(rng) {
   if (r < 0.4) return "battlement";
   if (r < 0.7) return "dome_battlement";
   return "dome";
+}
+
+/**
+ * Remate único para todo el castillo humano (torres + cuerpo central + alas).
+ * @param {() => number} rng
+ * @param {boolean} palace
+ * @returns {'battlement'|'dome'|'dome_battlement'}
+ */
+export function pickHumanCastleCrown(rng, palace) {
+  if (palace && rng() < 0.72) {
+    return rng() < 0.45 ? "dome" : "dome_battlement";
+  }
+  return pickHumanCentralCrown(rng);
 }
 
 /**
