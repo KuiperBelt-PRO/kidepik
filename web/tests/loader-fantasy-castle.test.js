@@ -107,6 +107,7 @@ describe("loader-fantasy-castle / invariantes", () => {
   it("existe exactamente una base", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 7 + 1 });
+      if (el.meta.faction === "elf") continue;
       const bases = el.parts.filter((p) => p.role === "base");
       assert.equal(bases.length, 1, `seed ${s}: ${bases.length} bases`);
     }
@@ -115,6 +116,7 @@ describe("loader-fantasy-castle / invariantes", () => {
   it("hay 2–5 torres y meta coherente", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 17 + 2 });
+      if (el.meta.faction === "elf") continue;
       const towers = el.parts.filter((p) => p.role === "tower");
       assert.ok(towers.length >= 2 && towers.length <= 6, `seed ${s}: ${towers.length} torres`);
       assert.equal(el.meta.towerCount, towers.length);
@@ -143,12 +145,14 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
-  it("elfos: mismo cap en todas las torres (gótico, agujas o costillas)", () => {
+  it("elfos (rebuild): zócalo y puerta gótica en trazo, sin torres", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 19 + 3, faction: "elf" });
-      const remates = new Set(el.meta.towers.map((t) => t.remate));
-      assert.equal(remates.size, 1, `seed ${s}: caps mezclados ${[...remates].join(",")}`);
-      assert.ok(ELF_CAP_KINDS.includes(el.meta.towerRemate));
+      assert.equal(el.meta.towerCount, 0, `seed ${s}: torres inesperadas`);
+      assert.equal(el.parts.filter((p) => p.role === "plinth").length, 1);
+      const door = el.parts.find((p) => p.stroke);
+      assert.ok(door, `seed ${s}: sin puerta en trazo`);
+      assert.ok(el.meta.arches.gothic >= 1);
     }
   });
 
@@ -168,6 +172,7 @@ describe("loader-fantasy-castle / invariantes", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 3 + 4 });
       assert.ok(el.meta.doorCount >= 1, `seed ${s}: sin puerta`);
+      if (el.meta.faction === "elf") continue;
       assert.ok(el.meta.windowCount >= 1, `seed ${s}: sin ventanas`);
     }
   });
@@ -500,7 +505,11 @@ describe("loader-fantasy-castle / facciones spec", () => {
   it("altura del zócalo en SVG ≈ fracción terreno/castillo", () => {
     const terrainPx = 48;
     const castlePx = 120;
-    const expectedFrac = (terrainPx / castlePx) * PLINTH_SCREEN_HEIGHT_FACTOR;
+    const r = terrainPx / castlePx;
+    // plinH/(plinH+heightAbove) con computePlinthLocalHeight (sin contar SEAM)
+    const expectedFrac =
+      (r * PLINTH_SCREEN_HEIGHT_FACTOR) /
+      (1 - r * (1 - PLINTH_SCREEN_HEIGHT_FACTOR));
 
     function pathHeight(d) {
       const nums = d.match(/-?[\d.]+/g).map(Number);

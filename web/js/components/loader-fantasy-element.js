@@ -42,6 +42,9 @@ import { createRng, randRange } from "./loader-ship-rng.js";
  *   centerX: number;
  *   buildOrder: number;
  *   tiltDeg?: number;
+ *   stroke?: boolean;
+ *   strokeWidth?: number;
+ *   buildSequence?: number;
  * }} FantasyPart
  */
 
@@ -69,7 +72,7 @@ import { createRng, randRange } from "./loader-ship-rng.js";
  */
 export class ElementAssembler {
   constructor() {
-    /** @type {{ role: string; outer: import('./loader-fantasy-geom.js').FPoint[]; holes: import('./loader-fantasy-geom.js').FPoint[][]; tiltDeg?: number }[]} */
+    /** @type {{ role: string; outer: import('./loader-fantasy-geom.js').FPoint[]; holes: import('./loader-fantasy-geom.js').FPoint[][]; tiltDeg?: number; stroke?: boolean; buildSequence?: number }[]} */
     this._parts = [];
   }
 
@@ -78,10 +81,18 @@ export class ElementAssembler {
    * @param {string} role
    * @param {import('./loader-fantasy-geom.js').FPoint[]} outer
    * @param {import('./loader-fantasy-geom.js').FPoint[][]} [holes]
-   * @param {{ tiltDeg?: number }} [opts]
+   * @param {{ tiltDeg?: number; stroke?: boolean; strokeWidth?: number; buildSequence?: number }} [opts]
    */
   addPart(role, outer, holes = [], opts = {}) {
-    this._parts.push({ role, outer, holes, tiltDeg: opts.tiltDeg });
+    this._parts.push({
+      role,
+      outer,
+      holes,
+      tiltDeg: opts.tiltDeg,
+      stroke: opts.stroke,
+      strokeWidth: opts.strokeWidth,
+      buildSequence: opts.buildSequence,
+    });
   }
 
   /**
@@ -103,11 +114,12 @@ export class ElementAssembler {
       ?? (meta.normalizeScaleBy === "height" ? "height" : "max")
     );
     const bottomInset = Number(meta.normalizeBottomInset) || normalizeOpts.bottomInset || 0;
+    const heightFloor = Number(meta.normalizeHeightFloor) || normalizeOpts.heightFloor || 0;
 
     // Recoger todos los anillos para normalización conjunta
     /** @type {import('./loader-fantasy-geom.js').FPoint[][]} */
     const allRings = [];
-    /** @type {{ outerIdx: number; holeIdxs: number[]; role: string; tiltDeg?: number }[]} */
+    /** @type {{ outerIdx: number; holeIdxs: number[]; role: string; tiltDeg?: number; stroke?: boolean; strokeWidth?: number; buildSequence?: number }[]} */
     const partMeta = [];
 
     for (const p of this._parts) {
@@ -118,16 +130,31 @@ export class ElementAssembler {
         allRings.push(h);
         return i;
       });
-      partMeta.push({ outerIdx, holeIdxs, role: p.role, tiltDeg: p.tiltDeg });
+      partMeta.push({
+        outerIdx,
+        holeIdxs,
+        role: p.role,
+        tiltDeg: p.tiltDeg,
+        stroke: p.stroke,
+        strokeWidth: p.strokeWidth,
+        buildSequence: p.buildSequence,
+      });
     }
 
-    const normalized = normalizeFantasyGroups(allRings, { anchorY: "bottom", scaleBy, bottomInset });
+    const normalized = normalizeFantasyGroups(allRings, {
+      anchorY: "bottom",
+      scaleBy,
+      bottomInset,
+      heightFloor,
+    });
 
     /** @type {FantasyPart[]} */
     const parts = partMeta.map((pm, partIdx) => {
       const normOuter = normalized[pm.outerIdx];
       const normHoles = pm.holeIdxs.map((i) => normalized[i]);
-      const d = buildPartPath(normOuter, normHoles);
+      const d = pm.stroke
+        ? buildPartPath(normOuter, normHoles, { open: true })
+        : buildPartPath(normOuter, normHoles);
 
       // baseY SVG = max y del anillo exterior (= parte inferior de la forma en SVG y-down)
       const ys = normOuter.map((p) => p.y);
@@ -141,8 +168,11 @@ export class ElementAssembler {
         d,
         baseY,
         centerX,
-        buildOrder: 0, // se asigna en planBuildOrder
+        buildOrder: 0,
         tiltDeg: pm.tiltDeg,
+        stroke: pm.stroke,
+        strokeWidth: pm.strokeWidth,
+        buildSequence: pm.buildSequence,
       };
     });
 
@@ -180,7 +210,10 @@ export class ElementAssembler {
  * @returns {FantasyPart[]}
  */
 export function planBuildOrder(parts) {
-  const sorted = [...parts].sort((a, b) => b.baseY - a.baseY);
+  const sorted = [...parts].sort((a, b) => {
+    if (b.baseY !== a.baseY) return b.baseY - a.baseY;
+    return (a.buildSequence ?? 0) - (b.buildSequence ?? 0);
+  });
   sorted.forEach((p, i) => {
     p.buildOrder = i;
   });

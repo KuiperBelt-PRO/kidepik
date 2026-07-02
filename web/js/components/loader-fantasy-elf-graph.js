@@ -1,8 +1,7 @@
 /**
  * Planificador de grafos de construcción para castillos élficos.
  *
- * Silueta tipo referencias: podio elevado con arcadas, tres torres
- * (cúpula de costillas central + agujas laterales), arcadas de unión.
+ * Reconstrucción incremental (fase 2): zócalo + arco gótico central en trazo.
  *
  * @module loader-fantasy-elf-graph
  */
@@ -13,10 +12,7 @@ import {
   executeGraph,
 } from "./loader-fantasy-compose.js";
 import { ElementAssembler } from "./loader-fantasy-element.js";
-import {
-  getFactionProfile,
-  pickElfTowerCap,
-} from "./loader-fantasy-castle-factions.js";
+import { getFactionProfile } from "./loader-fantasy-castle-factions.js";
 import { ensureModulesRegistered } from "./loader-fantasy-modules.js";
 import {
   clampPartsToEnvelope,
@@ -28,20 +24,8 @@ import {
 import { randRange } from "./loader-ship-rng.js";
 
 const SEAM = 1.4;
-
-/**
- * Torres en flancos del podio (nunca sobre el vano central de la puerta).
- * @param {number} cx
- * @param {number} spanW
- * @param {number} doorW
- * @returns {number[]}
- */
-function planFlankTowerXs(cx, spanW, doorW) {
-  const half = spanW * 0.44;
-  const dead = doorW / 2 + 2;
-  const inset = spanW * 0.06;
-  return [cx - Math.max(inset, half - dead), cx + Math.max(inset, half - dead)];
-}
+/** Arco central élfico: escala respecto a los rangos base (−25 %). */
+const ELF_DOOR_SIZE_FACTOR = 0.75;
 
 /**
  * @param {{ seed: number; palace?: boolean; imperfection?: number; style?: string; ruined?: boolean }} options
@@ -50,146 +34,57 @@ function planFlankTowerXs(cx, spanW, doorW) {
  */
 export function planElfCastleGraph(options, rng) {
   const profile = getFactionProfile("elf");
-  const axis = 50 + (rng() - 0.5) * 4;
+  const axis = 50 + (rng() - 0.5) * 3;
 
-  const spanW = randRange(rng, 70, 80);
-  const plinW = spanW * randRange(rng, 1.5, 2.0);
+  const spanW = randRange(rng, 36, 44);
+  const plinW = spanW * randRange(rng, 1.08, 1.22);
   const envLeft = axis - plinW / 2;
   const envRight = axis + plinW / 2;
-  const doorW = spanW * randRange(rng, 0.14, 0.2);
-  const stiltH = randRange(rng, 14, 18);
-  const slabH = randRange(rng, 5, 7);
-  const podiumTop = stiltH + slabH;
-
-  const towerCount = 2;
-  const capKind = pickElfTowerCap(rng);
-  const flankH = randRange(rng, 48, 58);
-  const centralCrownH = flankH * randRange(rng, 1.35, 1.55);
-  const towerW = spanW * randRange(rng, 0.1, 0.13);
+  const doorW = spanW * randRange(rng, 0.36, 0.46) * ELF_DOOR_SIZE_FACTOR;
+  const doorH = randRange(rng, 24, 32) * ELF_DOOR_SIZE_FACTOR;
 
   const graph = createGraph({
     composeMode: "graph",
     faction: "elf",
     factionLabel: profile.label,
-    towerRemate: capKind,
+    towerRemate: null,
     archDominant: "gothic",
     normalizeScaleBy: "height",
     normalizeBottomInset: 0,
+    elfRebuildPhase: 2,
   });
 
   addNode(graph, {
-    id: "podium",
-    module: "elf.podium",
+    id: "door",
+    module: "elf.door_outline",
     cx: axis,
     baseY: 0,
-    params: {
-      w: spanW,
-      stiltH,
-      slabH,
-      archCount: 4 + Math.floor(rng() * 2),
-    },
-    order: 0,
+    params: { w: doorW, h: doorH },
+    order: 10,
   });
-
-  const towerXs = planFlankTowerXs(axis, spanW, doorW);
-  /** @type {{ remate: string }[]} */
-  const towersMeta = [];
-  /** @type {number[]} */
-  const towerHeights = [];
-  /** @type {number[]} */
-  const shaftHeights = [];
-
-  /** @type {number[]} */
-  const towerWidths = [];
-
-  towerXs.forEach((tcx, idx) => {
-    let towerH = flankH * randRange(rng, 0.92, 1.02);
-    if (options.ruined && idx === towerCount - 1) towerH *= 0.5;
-    shaftHeights.push(towerH);
-    towerHeights.push(podiumTop + towerH);
-    towersMeta.push({ remate: capKind, baseY: podiumTop });
-    towerWidths.push(towerW);
-
-    addNode(graph, {
-      id: `tower_${idx}`,
-      module: "elf.tower_flank",
-      cx: tcx,
-      baseY: podiumTop,
-      params: { w: towerW, h: towerH, capKind },
-      order: 20 + idx,
-      after: ["podium"],
-    });
-  });
-
-  addNode(graph, {
-    id: "slab_crown",
-    module: "elf.slab_crown",
-    cx: axis,
-    baseY: podiumTop,
-    params: { w: towerW * 2.8, h: centralCrownH * 0.38, capKind },
-    order: 24,
-    after: ["podium"],
-  });
-
-  for (let i = 0; i < towerXs.length - 1; i++) {
-    const maxShaft = Math.max(shaftHeights[i], shaftHeights[i + 1]);
-    addNode(graph, {
-      id: `span_${i}`,
-      module: "elf.span_arch",
-      cx: (towerXs[i] + towerXs[i + 1]) / 2,
-      baseY: podiumTop + maxShaft * randRange(rng, 0.38, 0.46),
-      params: {
-        x1: towerXs[i],
-        x2: towerXs[i + 1],
-        h: maxShaft * randRange(rng, 0.22, 0.3),
-      },
-      order: 30 + i,
-      after: [`tower_${i}`, `tower_${i + 1}`],
-    });
-  }
-
-  if (rng() < 0.45) {
-    addNode(graph, {
-      id: "entry_bridge",
-      module: "elf.bridge",
-      cx: axis,
-      baseY: 0,
-      params: {
-        w: spanW * randRange(rng, 0.38, 0.52),
-        h: stiltH * randRange(rng, 0.88, 1.02),
-        count: 2 + Math.floor(rng() * 2),
-      },
-      order: 8,
-      after: ["podium"],
-    });
-  }
-
-  const meanH = towerHeights.reduce((s, h) => s + h, 0) / (towerHeights.length || 1);
-  const std = Math.sqrt(
-    towerHeights.reduce((s, h) => s + (h - meanH) ** 2, 0) / (towerHeights.length || 1),
-  );
 
   Object.assign(graph.meta, {
-    towerCount,
+    towerCount: 0,
     blockCount: 0,
-    towers: towersMeta,
-    towerXs,
-    towerWs: towerWidths,
-    towerSupportTopW: towerWidths.map(() => spanW),
-    doorCount: 0,
+    towers: [],
+    towerXs: [],
+    towerWs: [],
+    towerSupportTopW: [],
+    doorCount: 1,
     windowCount: 0,
     slitCount: 0,
-    localTowerMean: meanH,
-    localTowerHeights: towerHeights,
-    asymmetry: Math.min(1, std / (podiumTop * 0.9) + (options.ruined ? 0.15 : 0)),
+    localTowerMean: doorH,
+    localTowerHeights: [],
+    asymmetry: Math.min(1, Math.abs(axis - 50) / 8 + (options.ruined ? 0.1 : 0)),
     deckW: spanW,
     plinW,
     envelopeW: plinW,
     envelopeLeft: envLeft,
     envelopeRight: envRight,
-    deckH: podiumTop,
+    deckH: 0,
     axis,
     doorW,
+    doorH,
     normalizeBottomInset: 0,
   });
 
@@ -257,6 +152,7 @@ export function generateElfCastleFromGraph(options, rng) {
     role: "plinth",
     outer: rect(axis, -plinH, plinW, plinH + SEAM),
     holes: [],
+    buildSequence: 0,
   });
 
   const localBounds = localBoundsFromParts(asm._parts);

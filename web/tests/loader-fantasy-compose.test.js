@@ -67,15 +67,15 @@ describe("loader-fantasy-compose / grafo", () => {
 });
 
 describe("loader-fantasy-elf-graph / planificación", () => {
-  it("grafo élfico tiene podio, dos torres de flanco y corona central", () => {
+  it("grafo élfico (fase 2): solo puerta en trazo sobre zócalo", () => {
     const rng = createRng(99);
     const g = planElfCastleGraph({ seed: 99, ruined: false }, rng);
     assert.equal(g.meta.faction, "elf");
     assert.equal(g.meta.composeMode, "graph");
-    assert.ok(g.nodes.some((n) => n.module === "elf.podium"));
-    assert.equal(g.nodes.filter((n) => n.module === "elf.tower_flank").length, 2);
-    assert.ok(g.nodes.some((n) => n.module === "elf.slab_crown"));
-    assert.equal(g.nodes.filter((n) => n.module === "elf.tower_central").length, 0);
+    assert.equal(g.meta.elfRebuildPhase, 2);
+    assert.equal(g.nodes.length, 1);
+    assert.equal(g.nodes[0].module, "elf.door_outline");
+    assert.equal(g.meta.towerCount, 0);
   });
 
   it("castillo élfico vía grafo es válido y determinista", () => {
@@ -84,21 +84,19 @@ describe("loader-fantasy-elf-graph / planificación", () => {
     assert.ok(isValidFantasyElement(a));
     assert.equal(a.meta.composeMode, "graph");
     assert.equal(JSON.stringify(a), JSON.stringify(b));
-    assert.ok(a.parts.filter((p) => p.role === "tower").length >= 2);
-    assert.ok(a.parts.some((p) => p.role === "plinth"), "elfos sin zócalo");
-    const hasArrow = a.parts.filter((p) => p.role === "decoration").length >= 5;
-    assert.ok(hasArrow, "pocas piezas decorativas en torre élfica");
+    assert.equal(a.parts.filter((p) => p.role === "plinth").length, 1);
+    assert.equal(a.parts.filter((p) => p.stroke).length, 1);
+    assert.equal(a.meta.towerCount, 0);
+    assert.ok(a.meta.doorCount >= 1);
   });
 
-  it("torres élficas son esbeltas (ancho local bajo)", () => {
+  it("elfos: puerta en trazo aparece tras el zócalo", () => {
     const el = generateCastle({ seed: 77, faction: "elf" });
-    const towers = el.parts.filter((p) => p.role === "tower");
-    for (const t of towers) {
-      const w = t.d.match(/[\d.]+/g)?.map(Number) ?? [];
-      const xs = [];
-      for (let i = 0; i < w.length; i += 2) xs.push(w[i]);
-      const width = xs.length ? Math.max(...xs) - Math.min(...xs) : 100;
-      assert.ok(width < 10, `torre demasiado ancha: ${width}`);
-    }
+    const plinth = el.parts.find((p) => p.role === "plinth");
+    const door = el.parts.find((p) => p.stroke);
+    assert.ok(plinth);
+    assert.ok(door);
+    assert.ok(!door.d.endsWith("Z"), "arco de puerta no debe cerrarse");
+    assert.ok(door.buildOrder > plinth.buildOrder, "puerta después del zócalo");
   });
 });

@@ -22,6 +22,7 @@ import {
   finial,
   gableRoof,
   gothicArchCap,
+  gothicArchOutline,
   hollowRect,
   jitterRing,
   rect,
@@ -74,6 +75,21 @@ function moduleCorePlinth(ctx, node) {
     freezeSeams: true,
   });
   ctx.asm.addPart("plinth", outer);
+}
+
+/**
+ * Puerta élfica: arco gótico central en trazo (sin relleno).
+ * @param {import('./loader-fantasy-compose.js').ComposeContext} ctx
+ * @param {import('./loader-fantasy-compose.js').ComposeNode} node
+ */
+function moduleElfDoorOutline(ctx, node) {
+  const w = /** @type {number} */ (node.params.w);
+  const h = /** @type {number} */ (node.params.h);
+  const { cx, baseY } = node;
+  const outline = gothicArchOutline(cx, baseY, w, h);
+  ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2.2, buildSequence: 1 });
+  ctx.arches.gothic += 1;
+  ctx.counters.doorCount += 1;
 }
 
 /**
@@ -441,6 +457,7 @@ function moduleElfSlabCrown(ctx, node) {
 /** Registra todos los módulos en el registry global. */
 export function registerAllModules() {
   registerModule("core.plinth", moduleCorePlinth);
+  registerModule("elf.door_outline", moduleElfDoorOutline);
   registerModule("elf.podium", moduleElfPodium);
   registerModule("elf.deck", moduleElfDeck);
   registerModule("elf.tower", moduleElfTower);

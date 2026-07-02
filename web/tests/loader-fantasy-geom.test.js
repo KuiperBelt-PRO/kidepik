@@ -15,6 +15,7 @@ import {
   domeCropped,
   domeCroppedCapY,
   gableRoof,
+  gothicArchOutline,
   jitterRing,
   merlons,
   normalizeFantasyGroups,
@@ -324,6 +325,34 @@ describe("loader-fantasy-geom / arch", () => {
       assert.ok(Math.min(...ys) >= -0.1, `${kind}: baseY overflow`);
       assert.ok(Math.max(...ys) <= 20 + 0.1, `${kind}: height overflow`);
     }
+  });
+});
+
+describe("loader-fantasy-geom / gothicArchOutline", () => {
+  it("genera contorno abierto sin cierre Z", () => {
+    const pts = gothicArchOutline(50, 0, 16, 24);
+    const d = pointsToPath(pts, false);
+    assert.ok(pts.length > 12);
+    assert.ok(!d.endsWith("Z"));
+    assert.equal(pts[0].x, 50 - 8);
+    assert.equal(pts[pts.length - 1].x, 50 + 8);
+  });
+
+  it("la cúspide está centrada y las hojas son simétricas", () => {
+    const pts = gothicArchOutline(50, 0, 20, 30);
+    const apex = pts.reduce((best, p) => (p.y > best.y ? p : best), pts[0]);
+    assert.ok(Math.abs(apex.x - 50) < 0.6, `ápice descentrado: ${apex.x}`);
+    const leftSide = pts.filter((p) => p.x < 50 && p.y > 8);
+    const rightSide = pts.filter((p) => p.x > 50 && p.y > 8);
+    const leftSpan = Math.max(...leftSide.map((p) => p.x)) - Math.min(...leftSide.map((p) => p.x));
+    const rightSpan = Math.max(...rightSide.map((p) => p.x)) - Math.min(...rightSide.map((p) => p.x));
+    assert.ok(Math.abs(leftSpan - rightSpan) < 2, `asimetría hojas: ${leftSpan} vs ${rightSpan}`);
+  });
+
+  it("buildPartPath open no cierra el subpath exterior", () => {
+    const pts = gothicArchOutline(50, 0, 16, 24);
+    const d = buildPartPath(pts, [], { open: true });
+    assert.ok(!d.endsWith("Z"));
   });
 });
 

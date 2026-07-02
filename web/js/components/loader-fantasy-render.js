@@ -73,8 +73,18 @@ function createElementSvg(element) {
 
     const path = document.createElementNS(SVG_NS, "path");
     path.setAttribute("d", part.d);
-    path.setAttribute("fill", "#fff");
-    path.setAttribute("fill-rule", "evenodd");
+    if (part.stroke) {
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "#fff");
+      path.setAttribute("stroke-width", String(part.strokeWidth ?? 2));
+      path.setAttribute("vector-effect", "non-scaling-stroke");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+      g.classList.add("loader-fantasy-part--stroke");
+    } else {
+      path.setAttribute("fill", "#fff");
+      path.setAttribute("fill-rule", "evenodd");
+    }
     g.appendChild(path);
 
     partsGroup.appendChild(g);

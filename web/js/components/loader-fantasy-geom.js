@@ -320,6 +320,50 @@ export function merlons(cx, baseY, w, count, merH, merWidthFrac = 0.5) {
 }
 
 /**
+ * Hojas ojivales góticas (imposta → ápice) compartidas por `arch` y `gothicArchOutline`.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} segments
+ * @param {number} [straightFrac]
+ * @param {number} [bulgeK]
+ */
+function gothicArchLeaves(cx, baseY, w, h, segments, straightFrac = 0.25, bulgeK = 0.2) {
+  const hw = w / 2;
+  const straightH = h * straightFrac;
+  const apexY = baseY + h;
+  const segs = Math.max(6, Math.floor(segments / 2));
+
+  /** @type {FPoint[]} */
+  const rightLeaf = [];
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    rightLeaf.push({
+      x: (cx + hw) + (cx - (cx + hw)) * t + Math.sin(t * Math.PI) * hw * bulgeK,
+      y: (baseY + straightH) + (apexY - (baseY + straightH)) * t,
+    });
+  }
+
+  /** @type {FPoint[]} */
+  const leftLeaf = [];
+  for (let i = 1; i <= segs; i++) {
+    const t = i / segs;
+    leftLeaf.push({
+      x: cx + (cx - hw - cx) * t - Math.sin((1 - t) * Math.PI) * hw * bulgeK,
+      y: apexY + ((baseY + straightH) - apexY) * t,
+    });
+  }
+
+  return {
+    leftSpring: { x: cx - hw, y: baseY + straightH },
+    rightSpring: { x: cx + hw, y: baseY + straightH },
+    leftLeaf,
+    rightLeaf,
+  };
+}
+
+/**
  * Arco como anillo de sustracción (hueco).
  * @param {number} cx
  * @param {number} baseY  base del arco
@@ -358,35 +402,17 @@ export function arch(cx, baseY, w, h, kind = "gothic", segments = 8) {
   }
 
   if (kind === "gothic") {
-    // Arco ojival: parte recta + dos segmentos curvos que se cruzan en la cima
-    const straightH = h * 0.25;
-    const apexY = baseY + h;
-    /** @type {FPoint[]} */
-    const pts = [
+    const { leftSpring, rightSpring, leftLeaf, rightLeaf } = gothicArchLeaves(
+      cx, baseY, w, h, segments, 0.25, 0.2,
+    );
+    return [
       { x: cx - hw, y: baseY },
       { x: cx + hw, y: baseY },
-      { x: cx + hw, y: baseY + straightH },
+      rightSpring,
+      ...rightLeaf,
+      ...leftLeaf,
+      leftSpring,
     ];
-    // Lado derecho: de (cx+hw, baseY+straightH) hacia el ápice
-    const segs = Math.max(4, Math.floor(segments / 2));
-    for (let i = 1; i <= segs; i++) {
-      const t = i / segs;
-      const x = (cx + hw) + (cx - (cx + hw)) * t;
-      const y = (baseY + straightH) + (apexY - (baseY + straightH)) * t;
-      // Curvatura hacia afuera (característica del gótico)
-      const bulge = Math.sin(t * Math.PI) * hw * 0.2;
-      pts.push({ x: x + bulge, y });
-    }
-    // Lado izquierdo: de la cima hacia (cx-hw, baseY+straightH)
-    for (let i = 1; i <= segs; i++) {
-      const t = i / segs;
-      const x = cx + (cx - hw - cx) * t;
-      const y = apexY + ((baseY + straightH) - apexY) * t;
-      const bulge = Math.sin((1 - t) * Math.PI) * hw * 0.2;
-      pts.push({ x: x - bulge, y });
-    }
-    pts.push({ x: cx - hw, y: baseY + straightH });
-    return pts;
   }
 
   if (kind === "trefoil") {
@@ -429,6 +455,34 @@ export function arch(cx, baseY, w, h, kind = "gothic", segments = 8) {
 
   // Fallback: flat
   return rect(cx, baseY, w, h);
+}
+
+/**
+ * Contorno abierto de arco gótico (trazo, sin relleno).
+ * Ojiva puntiaguda: jambas cortas + dos arcos ojivales con curvatura hacia fuera.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {number} [segments]
+ * @returns {FPoint[]}
+ */
+export function gothicArchOutline(cx, baseY, w, h, segments = 16) {
+  const hw = w / 2;
+  const { leftSpring, rightSpring, leftLeaf, rightLeaf } = gothicArchLeaves(
+    cx, baseY, w, h, segments, 0.18, 0.34,
+  );
+  const apex = rightLeaf[rightLeaf.length - 1];
+
+  return [
+    { x: cx - hw, y: baseY },
+    leftSpring,
+    ...leftLeaf.slice().reverse().slice(1),
+    apex,
+    ...rightLeaf.slice(0, -1).reverse(),
+    rightSpring,
+    { x: cx + hw, y: baseY },
+  ];
 }
 
 /**
@@ -919,17 +973,19 @@ export function localBoundsFromParts(parts) {
  * Normaliza grupos de puntos en espacio local y-up al espacio SVG (y-down) 0..100.
  * Por defecto ancla el suelo local (minY) al borde inferior del viewBox (y=100).
  * @param {FPoint[][]} groups
- * @param {{ anchorY?: 'bottom' | 'center'; scaleBy?: 'max' | 'height'; bottomInset?: number }} [opts]
+ * @param {{ anchorY?: 'bottom' | 'center'; scaleBy?: 'max' | 'height'; bottomInset?: number; heightFloor?: number }} [opts]
  * @returns {FPoint[][]}
  */
 export function normalizeFantasyGroups(groups, opts = {}) {
-  const { anchorY = "bottom", scaleBy = "max", bottomInset = 0 } = opts;
+  const { anchorY = "bottom", scaleBy = "max", bottomInset = 0, heightFloor = 0 } = opts;
   if (groups.length === 0 || groups.every((g) => g.length === 0)) return [];
 
   const { minX, minY, maxX, maxY } = boundsOfFantasyGroups(groups);
   const contentW = maxX - minX || 1;
   const contentH = maxY - minY || 1;
-  const size = scaleBy === "height" ? contentH : Math.max(contentW, contentH);
+  const size = scaleBy === "height"
+    ? Math.max(contentH, heightFloor)
+    : Math.max(contentW, contentH, heightFloor);
   const usable = Math.max(1, 100 - bottomInset);
   const scale = usable / size;
   const padX = (100 - contentW * scale) / 2;
@@ -978,8 +1034,9 @@ export function pointsToPath(points, closed = true) {
  * @param {FPoint[][]} holeRings
  * @returns {string}
  */
-export function buildPartPath(outerRing, holeRings) {
-  const parts = [pointsToPath(outerRing)];
+export function buildPartPath(outerRing, holeRings, opts = {}) {
+  const closed = !opts.open;
+  const parts = [pointsToPath(outerRing, closed)];
   for (const hole of holeRings) {
     if (hole.length > 0) parts.push(pointsToPath(hole));
   }
