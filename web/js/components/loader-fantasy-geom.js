@@ -516,7 +516,7 @@ export function gothicFlankInterlaceRow(
     const cx = count > 1
       ? spanStart + i * pitch
       : spanStart + span / 2;
-    outlines.push(gothicArchOutline(cx, baseY, archW, h));
+    outlines.push(gothicArchOutline(cx, baseY, archW, h, 8));
   }
 
   void side;
@@ -1027,6 +1027,23 @@ export function localBoundsFromParts(parts) {
     }
   }
   return { minX, maxX };
+}
+
+/**
+ * Escala piezas en espacio local (Y desde el suelo y=0; X relativo a un eje).
+ * @param {{ outer: FPoint[]; holes: FPoint[][] }[]} parts
+ * @param {number} axis
+ * @param {number} scale
+ */
+export function scaleFantasyPartsLocal(parts, axis, scale) {
+  for (const p of parts) {
+    const mapPt = (pt) => ({
+      x: axis + (pt.x - axis) * scale,
+      y: pt.y * scale,
+    });
+    p.outer = p.outer.map(mapPt);
+    p.holes = p.holes.map((ring) => ring.map(mapPt));
+  }
 }
 
 /**

@@ -529,9 +529,9 @@ describe("loader-fantasy-castle / facciones spec", () => {
         const frac = pathHeight(plinth.d) / 100;
         let factionExpected = expectedFrac;
         if (faction === "elf") {
-          const above = Number(el.meta.heightAboveGround) || 1;
           const plin = Number(el.meta.plinthLocalH) || 1;
-          factionExpected = (plin + 1.4) / (plin + above + 1.4);
+          const floor = Number(el.meta.normalizeHeightFloor) || 1;
+          factionExpected = (plin + 1.4) / floor;
         }
         assert.ok(
           Math.abs(frac - factionExpected) < 0.06,

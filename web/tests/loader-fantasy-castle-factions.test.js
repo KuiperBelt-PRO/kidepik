@@ -145,4 +145,18 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
       assert.ok(el.meta.towerCount >= 2, `seed ${s}: enano sin torres`);
     }
   });
+
+  it("elfos: huella en viewBox similar a enanos", () => {
+    function meanFootprint(faction, n = 16) {
+      let sum = 0;
+      for (let s = 0; s < n; s++) {
+        sum += generateCastle({ seed: s * 41 + 3, faction }).footprint;
+      }
+      return sum / n;
+    }
+    const dwarfFp = meanFootprint("dwarf");
+    const elfFp = meanFootprint("elf");
+    assert.ok(elfFp >= dwarfFp * 0.85, `elfo estrecho: ${elfFp.toFixed(1)} vs enano ${dwarfFp.toFixed(1)}`);
+    assert.ok(elfFp <= dwarfFp * 1.15, `elfo ancho: ${elfFp.toFixed(1)} vs enano ${dwarfFp.toFixed(1)}`);
+  });
 });

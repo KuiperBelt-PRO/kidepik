@@ -289,36 +289,40 @@ export function mountFantasyElement(container, element, opts) {
   }
 
   // ─── Fase BUILDING ────────────────────────────────────────────────────────
+  const STROKE_PART_DURATION_FACTOR = 0.15;
+  const STROKE_PART_OVERLAP = 0.92;
+  const STROKE_PART_MIN_MS = 70;
   /** @type {{ g: SVGGElement; part: import('./loader-fantasy-element.js').FantasyPart; startMs: number; durationMs: number; done: boolean }[]} */
   const buildInfos = [];
   const overlapFactor = 0.28;
-  let cumulativeDelayMs = 0;
 
   for (const part of element.parts) {
     const i = part.buildOrder;
+    const stroke = !!part.stroke;
     buildInfos.push({
       g: partGs[i],
       part,
-      startMs: 0, // se rellena en el primer tick
-      durationMs: timing.partDurationMs,
+      startMs: 0,
+      durationMs: stroke
+        ? Math.max(STROKE_PART_MIN_MS, Math.round(timing.partDurationMs * STROKE_PART_DURATION_FACTOR))
+        : timing.partDurationMs,
       done: false,
     });
-    if (i === 0) {
-      cumulativeDelayMs = 0;
-    } else {
-      cumulativeDelayMs += timing.partDurationMs * (1 - overlapFactor);
-    }
   }
 
-  // Calcular delays acumulados
+  // Calcular delays acumulados (trazos: solape alto para apilar rápido)
   let accDelay = 0;
   buildInfos.forEach((info, i) => {
     if (i === 0) {
       info._delay = 0;
-    } else {
-      accDelay += timing.partDurationMs * (1 - overlapFactor);
-      info._delay = accDelay;
+      return;
     }
+    const prev = buildInfos[i - 1];
+    const overlap = prev.part.stroke && info.part.stroke
+      ? STROKE_PART_OVERLAP
+      : overlapFactor;
+    accDelay += prev.durationMs * (1 - overlap);
+    info._delay = accDelay;
   });
 
   let buildStartMs = 0;

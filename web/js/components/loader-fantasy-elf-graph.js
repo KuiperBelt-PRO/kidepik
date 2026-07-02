@@ -20,6 +20,7 @@ import {
   DEFAULT_TERRAIN_HEIGHT_PX,
   localBoundsFromParts,
   rect,
+  scaleFantasyPartsLocal,
 } from "./loader-fantasy-geom.js";
 import { randRange } from "./loader-ship-rng.js";
 
@@ -32,6 +33,10 @@ export const ELF_PLINTH_HEIGHT_FACTOR = 0.75;
 export const ELF_FLANK_ARCH_HEIGHT = { min: 0.48, max: 0.62 };
 /** Arcos entrecruzados por flanco (zócalo ↔ arco central). */
 export const ELF_FLANK_INTERLACE_COUNT = 5;
+/** Escala del castillo élfico (ancho y arcos); la altura del zócalo se conserva aparte. */
+export const ELF_CASTLE_DISPLAY_SCALE = 0.5;
+/** Anchura objetivo en viewBox (0–100), alineada con castillos enanos (~70–75 u.). */
+export const ELF_TARGET_FOOTPRINT = 72;
 
 /**
  * @param {{ seed: number; palace?: boolean; imperfection?: number; style?: string; ruined?: boolean }} options
@@ -42,7 +47,7 @@ export function planElfCastleGraph(options, rng) {
   const profile = getFactionProfile("elf");
   const axis = 50 + (rng() - 0.5) * 3;
 
-  const spanW = randRange(rng, 36, 44);
+  const spanW = randRange(rng, 28, 36);
   const plinW = spanW * randRange(rng, 1.08, 1.22);
   const envLeft = axis - plinW / 2;
   const envRight = axis + plinW / 2;
@@ -174,14 +179,24 @@ export function generateElfCastleFromGraph(options, rng) {
       options.terrainHeightPx,
       options.castleSizePx,
     ) * ELF_PLINTH_HEIGHT_FACTOR;
+
+  scaleFantasyPartsLocal(asm._parts, axis, ELF_CASTLE_DISPLAY_SCALE);
+  const scaledHeightAbove = heightAbove * ELF_CASTLE_DISPLAY_SCALE;
+  const scaledPlinW = plinW * ELF_CASTLE_DISPLAY_SCALE;
+
   asm._parts.unshift({
     role: "plinth",
-    outer: rect(axis, -plinH, plinW, plinH + SEAM),
+    outer: rect(axis, -plinH, scaledPlinW, plinH + SEAM),
     holes: [],
     buildSequence: 0,
   });
 
   const localBounds = localBoundsFromParts(asm._parts);
+  const contentH = plinH + scaledHeightAbove + SEAM;
+  const normalizeHeightFloor = Math.max(
+    contentH,
+    (scaledPlinW * 100) / ELF_TARGET_FOOTPRINT,
+  );
 
   const meta = {
     ...graph.meta,
@@ -194,11 +209,13 @@ export function generateElfCastleFromGraph(options, rng) {
     slitCount: counters.slitCount,
     plinthLocalH: plinH,
     plinthTerrainPx: options.terrainHeightPx ?? DEFAULT_TERRAIN_HEIGHT_PX,
-    heightAboveGround: heightAbove,
+    heightAboveGround: scaledHeightAbove,
+    plinW: scaledPlinW,
     localMinX: localBounds.minX,
     localMaxX: localBounds.maxX,
     normalizeScaleBy: "height",
     normalizeBottomInset: 0,
+    normalizeHeightFloor,
   };
 
   return asm.build(palace ? "palace" : "castle", seed, meta.style, meta);

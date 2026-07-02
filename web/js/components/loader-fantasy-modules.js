@@ -87,7 +87,7 @@ function moduleElfDoorOutline(ctx, node) {
   const w = /** @type {number} */ (node.params.w);
   const h = /** @type {number} */ (node.params.h);
   const { cx, baseY } = node;
-  const outline = gothicArchOutline(cx, baseY, w, h);
+  const outline = gothicArchOutline(cx, baseY, w, h, 8);
   ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2.2, buildSequence: 1 });
   ctx.arches.gothic += 1;
   ctx.counters.doorCount += 1;
@@ -111,7 +111,7 @@ function moduleElfFlankArcades(ctx, node) {
     cx, baseY, doorW, archH, envLeft, envRight, archCount,
   );
   for (const outline of outlines) {
-    ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2.2, buildSequence: 2 });
+    ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2.2, buildSequence: 1 });
     ctx.arches.gothic += 1;
   }
   ctx.counters.windowCount += outlines.length;
