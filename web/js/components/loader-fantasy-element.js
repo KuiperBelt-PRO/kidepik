@@ -352,7 +352,7 @@ export const FANTASY_BUILDERS = {
 /**
  * Genera un FantasyElement del tipo indicado.
  * @param {FantasyKind} kind
- * @param {{ seed: number }} options
+ * @param {{ seed: number; variant?: number }} options
  * @returns {FantasyElement | null}  null si el builder no está registrado
  */
 export function generateFantasyElement(kind, options = {}) {

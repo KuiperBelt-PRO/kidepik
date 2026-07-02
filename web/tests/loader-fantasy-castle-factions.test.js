@@ -110,7 +110,7 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
     }
   });
 
-  it("elfos (rebuild): zócalo, arcadas y tejados laterales en trazo", () => {
+  it("elfos (rebuild): zócalo, arcadas, tejados y 1–3 torres en trazo", () => {
     let ok = 0;
     const N = 30;
     for (let s = 0; s < N; s++) {
@@ -118,9 +118,10 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
       const plinth = el.parts.some((p) => p.role === "plinth");
       const strokeCount = el.parts.filter((p) => p.stroke).length;
       const strokeArches = strokeCount > 11;
-      if (plinth && strokeArches && el.meta.towerCount === 0) ok++;
+      const towersOk = el.meta.towerCount >= 1 && el.meta.towerCount <= 3;
+      if (plinth && strokeArches && towersOk) ok++;
     }
-    assert.equal(ok, N, `solo ${ok}/${N} elfos con zócalo + trazos (arcos y tejados)`);
+    assert.equal(ok, N, `solo ${ok}/${N} elfos con zócalo + trazos + torres`);
   });
 
   it("humanos: sin contrafuertes laterales (perfil)", () => {

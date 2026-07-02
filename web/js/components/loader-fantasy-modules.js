@@ -19,6 +19,7 @@ import {
   elfFlankRoofOutlines,
   elfPodium,
   elfRibCrown,
+  elfRoofTowerOutlines,
   elfSpireCluster,
   finial,
   gableRoof,
@@ -139,6 +140,31 @@ function moduleElfFlankRoofs(ctx, node) {
   );
   for (const outline of outlines) {
     ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2, buildSequence: 2 });
+  }
+}
+
+/**
+ * Torres sobre los tejados laterales: rectángulo en trazo, arcos góticos cruzados y arcada de 3 arcos.
+ * @param {import('./loader-fantasy-compose.js').ComposeContext} ctx
+ * @param {import('./loader-fantasy-compose.js').ComposeNode} node
+ */
+function moduleElfRoofTowers(ctx, node) {
+  const towers = /** @type {{ cx: number; baseY: number; w: number; h: number }[]} */ (
+    node.params.towers ?? []
+  );
+  const crownArchCount = /** @type {number} */ (node.params.crownArchCount ?? 3);
+
+  for (const tower of towers) {
+    const outlines = elfRoofTowerOutlines(
+      tower.cx, tower.baseY, tower.w, tower.h, ctx.rng, crownArchCount,
+    );
+    for (const outline of outlines) {
+      ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2, buildSequence: 3 });
+      if (outline.length > 6) {
+        ctx.arches.gothic += 1;
+        ctx.counters.windowCount += 1;
+      }
+    }
   }
 }
 
@@ -510,6 +536,7 @@ export function registerAllModules() {
   registerModule("elf.door_outline", moduleElfDoorOutline);
   registerModule("elf.flank_arcades", moduleElfFlankArcades);
   registerModule("elf.flank_roofs", moduleElfFlankRoofs);
+  registerModule("elf.roof_towers", moduleElfRoofTowers);
   registerModule("elf.podium", moduleElfPodium);
   registerModule("elf.deck", moduleElfDeck);
   registerModule("elf.tower", moduleElfTower);

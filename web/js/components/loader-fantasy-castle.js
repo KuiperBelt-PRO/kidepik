@@ -54,7 +54,7 @@ import {
   rect,
   spikeRow,
 } from "./loader-fantasy-geom.js";
-import { createRng, randPick, randRange } from "./loader-ship-rng.js";
+import { createRng, mixFantasySeed, randPick, randRange } from "./loader-ship-rng.js";
 
 /** Solape vertical entre piezas para evitar huecos tras normalizar. */
 const SEAM = 1.4;
@@ -504,19 +504,39 @@ function applyCentralCrown(asm, crown, cx, topY, w, wallH, rng, _jitterAmt, prof
 /**
  * Genera un castillo o palacio.
  *
- * @param {{ seed:number; style?:string; palace?:boolean; faction?:string; imperfection?:number; terrainHeightPx?:number; castleSizePx?: number }} options
+ * @param {{ seed:number; variant?:number; style?:string; palace?:boolean; faction?:string; imperfection?:number; terrainHeightPx?:number; castleSizePx?: number }} options
  * @returns {import('./loader-fantasy-element.js').FantasyElement}
  */
 export function generateCastle(options) {
   const seed = options.seed >>> 0;
+  const variant = options.variant ?? 0;
+  const effectiveSeed = mixFantasySeed(seed, variant);
   const palace = !!options.palace;
-  const rng = createRng(seed);
+  const imperfection = options.imperfection ?? 0.55;
+  const rng = createRng(effectiveSeed);
   const faction = /** @type {import('./loader-fantasy-castle-factions.js').CastleFaction} */ (
     options.faction ?? pickFaction(rng, palace)
   );
   const profile = getFactionProfile(faction);
+
+  if (faction === "elf") {
+    const elfRng = createRng(effectiveSeed);
+    const style = options.style ?? pickStyle(elfRng, palace);
+    return generateElfCastleFromGraph(
+      {
+        seed,
+        variant,
+        palace,
+        style,
+        imperfection,
+        terrainHeightPx: options.terrainHeightPx,
+        castleSizePx: options.castleSizePx,
+      },
+      elfRng,
+    );
+  }
+
   const style = options.style ?? pickStyle(rng, palace);
-  const imperfection = options.imperfection ?? 0.55;
   /** @type {'battlement'|'dome'|'dome_battlement'|null} */
   const humanCastleCrown = profile.remateMode === "human_mixed"
     ? pickHumanCastleCrown(rng, palace)
@@ -525,20 +545,6 @@ export function generateCastle(options) {
   const humanParapetMix = humanCastleCrown === "dome_battlement"
     ? /** @type {ParapetMixStyle} */ (randPick(rng, ["triple", "flank_dome", "split"]))
     : null;
-
-  if (faction === "elf") {
-    return generateElfCastleFromGraph(
-      {
-        seed,
-        palace,
-        style,
-        imperfection,
-        terrainHeightPx: options.terrainHeightPx,
-        castleSizePx: options.castleSizePx,
-      },
-      rng,
-    );
-  }
 
   const ruined = style === "ruinedKeep";
 
@@ -1039,6 +1045,7 @@ export function generateCastle(options) {
     style,
     palace,
     faction,
+    variant,
     factionLabel: profile.label,
     towerCount,
     blockCount,

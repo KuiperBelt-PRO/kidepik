@@ -70,6 +70,7 @@ export function mountFantasyScene(container, opts = {}) {
   let currentTeardown = /** @type {{ destroy: () => void } | null} */ (null);
   let nextTimer = 0;
   let cycleRng = createRng(sessionSeed());
+  let spawnVariant = 0;
 
   function destroy() {
     destroyed = true;
@@ -105,9 +106,12 @@ export function mountFantasyScene(container, opts = {}) {
       devKind || (cycleRng() < 0.32 ? "palace" : "castle")
     );
     const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+    const variant = spawnVariant;
+    spawnVariant += 1;
     const sizePx = computeSizePx(kind);
     const element = generateFantasyElement(kind, {
       seed,
+      variant,
       faction: devFaction,
       terrainHeightPx,
       castleSizePx: sizePx,

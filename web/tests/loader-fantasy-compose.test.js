@@ -12,7 +12,7 @@ import { planElfCastleGraph } from "../js/components/loader-fantasy-elf-graph.js
 import { ensureModulesRegistered } from "../js/components/loader-fantasy-modules.js";
 import { ElementAssembler } from "../js/components/loader-fantasy-element.js";
 import { getFactionProfile } from "../js/components/loader-fantasy-castle-factions.js";
-import { createRng } from "../js/components/loader-ship-rng.js";
+import { createRng, mixFantasySeed } from "../js/components/loader-ship-rng.js";
 import { isValidFantasyElement } from "../js/components/loader-fantasy-element.js";
 
 describe("loader-fantasy-compose / grafo", () => {
@@ -67,17 +67,15 @@ describe("loader-fantasy-compose / grafo", () => {
 });
 
 describe("loader-fantasy-elf-graph / planificación", () => {
-  it("grafo élfico (fase 4): puerta, arcadas y tejados laterales", () => {
+  it("grafo élfico (fase 5): puerta, arcadas, tejados y torres sobre tejados", () => {
     const rng = createRng(99);
     const g = planElfCastleGraph({ seed: 99, ruined: false }, rng);
     assert.equal(g.meta.faction, "elf");
     assert.equal(g.meta.composeMode, "graph");
-    assert.equal(g.meta.elfRebuildPhase, 4);
-    assert.equal(g.nodes.length, 3);
-    assert.equal(g.nodes[0].module, "elf.door_outline");
-    assert.equal(g.nodes[1].module, "elf.flank_arcades");
-    assert.equal(g.nodes[2].module, "elf.flank_roofs");
-    assert.equal(g.meta.towerCount, 0);
+    assert.equal(g.meta.elfRebuildPhase, 5);
+    assert.equal(g.nodes.length, 4);
+    assert.equal(g.nodes[3].module, "elf.roof_towers");
+    assert.ok(g.meta.towerCount >= 1 && g.meta.towerCount <= 3);
   });
 
   it("castillo élfico vía grafo es válido y determinista", () => {
@@ -88,22 +86,63 @@ describe("loader-fantasy-elf-graph / planificación", () => {
     assert.equal(JSON.stringify(a), JSON.stringify(b));
     assert.equal(a.parts.filter((p) => p.role === "plinth").length, 1);
     assert.ok(a.parts.filter((p) => p.stroke).length > 11);
-    assert.equal(a.meta.towerCount, 0);
+    assert.ok(a.meta.towerCount >= 1 && a.meta.towerCount <= 3);
     assert.ok(a.meta.doorCount >= 1);
     assert.ok(a.meta.arches.gothic >= 11);
   });
 
-  it("elfos: puerta, arcadas y tejados aparecen tras el zócalo", () => {
+  it("elfos: torres sobre tejados con buildSequence >= 3", () => {
     const el = generateCastle({ seed: 77, faction: "elf" });
     const plinth = el.parts.find((p) => p.role === "plinth");
     const strokes = el.parts.filter((p) => p.stroke);
     assert.ok(plinth);
     assert.ok(strokes.length > 11);
-    for (const part of strokes) {
-      assert.ok(!part.d.endsWith("Z"), "trazos no deben cerrarse");
+    assert.ok(el.meta.towerCount >= 1 && el.meta.towerCount <= 3);
+    const towerStrokes = strokes.filter((p) => p.buildOrder >= 3);
+    assert.ok(towerStrokes.length > 4, "torres con trazos propios");
+    assert.ok(strokes.every((p) => p.buildOrder > plinth.buildOrder));
+  });
+
+  it("elfos: towerCount del castillo coincide con el grafo (sin style, como dev URL)", () => {
+    const elfRng = createRng(mixFantasySeed(77, 0));
+    elfRng(); // pickStyle implícito cuando no hay style en la URL
+    const graph = planElfCastleGraph({ seed: 77, variant: 0, ruined: false }, elfRng);
+    const el = generateCastle({ seed: 77, faction: "elf", variant: 0 });
+    assert.equal(el.meta.towerCount, graph.meta.towerCount);
+    assert.deepEqual(
+      (el.meta.towerXs ?? []).map((x) => x.toFixed(2)),
+      (graph.meta.towerXs ?? []).map((x) => x.toFixed(2)),
+    );
+  });
+
+  it("elfos: variant distinto altera torres y arcos con la misma seed base", () => {
+    /** @param {import('../js/components/loader-fantasy-element.js').FantasyElement} el */
+    const signature = (el) => JSON.stringify({
+      tc: el.meta.towerCount,
+      doorH: el.meta.doorH?.toFixed(2),
+      flank: el.meta.flankArchH?.toFixed(2),
+      roof: el.meta.roofHRatio?.toFixed(3),
+      xs: (el.meta.towerXs ?? []).map((x) => x.toFixed(1)),
+      ws: (el.meta.towerWs ?? []).map((w) => w.toFixed(1)),
+    });
+    const variants = [0, 1, 2, 3, 4, 5].map((v) =>
+      signature(generateCastle({ seed: 77, faction: "elf", variant: v })));
+    const unique = new Set(variants);
+    assert.ok(unique.size >= 4, `pocas variantes distintas con seed 77: ${unique.size}`);
+    assert.equal(
+      signature(generateCastle({ seed: 77, faction: "elf", variant: 2 })),
+      variants[2],
+      "misma variant debe ser reproducible",
+    );
+  });
+
+  it("elfos: posiciones de torre varían entre seeds", () => {
+    /** @type {Set<string>} */
+    const signatures = new Set();
+    for (let s = 0; s < 40; s++) {
+      const el = generateCastle({ seed: s, faction: "elf" });
+      signatures.add((el.meta.towerXs ?? []).map((x) => x.toFixed(1)).join("|"));
     }
-    assert.ok(strokes.every((p) => p.buildOrder > plinth.buildOrder), "detalle después del zócalo");
-    const roofStrokes = strokes.filter((p) => p.buildOrder >= 2);
-    assert.ok(roofStrokes.length > 2, "tejados y tejas con buildSequence >= 2");
+    assert.ok(signatures.size >= 28, `pocas disposiciones distintas: ${signatures.size}`);
   });
 });

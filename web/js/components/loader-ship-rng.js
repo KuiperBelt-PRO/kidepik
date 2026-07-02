@@ -42,3 +42,17 @@ export function hashSeed(text) {
   }
   return h >>> 0;
 }
+
+/**
+ * Mezcla semilla base + índice de aparición (cada ciclo del loader).
+ * `variant === 0` conserva la semilla original (tests y primera aparición).
+ * @param {number} seed
+ * @param {number} [variant]
+ * @returns {number}
+ */
+export function mixFantasySeed(seed, variant = 0) {
+  const s = seed >>> 0;
+  const v = variant >>> 0;
+  if (v === 0) return s;
+  return hashSeed(`fantasy:${s}:${v}`);
+}

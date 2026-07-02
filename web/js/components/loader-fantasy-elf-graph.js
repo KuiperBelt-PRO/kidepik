@@ -1,7 +1,7 @@
 /**
  * Planificador de grafos de construcción para castillos élficos.
  *
- * Reconstrucción incremental (fase 4): zócalo + arco central + arcadas + tejados laterales.
+ * Reconstrucción incremental (fase 5): zócalo + arco + arcadas + tejados + torres sobre tejados.
  *
  * @module loader-fantasy-elf-graph
  */
@@ -19,16 +19,17 @@ import {
   computePlinthLocalHeight,
   DEFAULT_TERRAIN_HEIGHT_PX,
   localBoundsFromParts,
+  planElfRoofTowerPlacements,
   rect,
   scaleFantasyPartsLocal,
 } from "./loader-fantasy-geom.js";
-import { randRange } from "./loader-ship-rng.js";
+import { createRng, hashSeed, mixFantasySeed, randRange } from "./loader-ship-rng.js";
 
 const SEAM = 1.4;
 /** Arco central élfico: escala respecto a los rangos base (−30 %). */
 export const ELF_DOOR_SIZE_FACTOR = 0.7;
-/** Zócalo élfico: altura respecto al cálculo estándar (−25 %). */
-export const ELF_PLINTH_HEIGHT_FACTOR = 0.75;
+/** Zócalo élfico: altura respecto al cálculo estándar (factor ajustado; +10 % sobre 0.3375). */
+export const ELF_PLINTH_HEIGHT_FACTOR = 0.37125;
 /** Arcos laterales: altura respecto al arco central. */
 export const ELF_FLANK_ARCH_HEIGHT = { min: 0.48, max: 0.62 };
 /** Arcos entrecruzados por flanco (zócalo ↔ arco central). */
@@ -39,13 +40,44 @@ export const ELF_FLANK_ROOF_HEIGHT = { min: 0.28, max: 0.38 };
 export const ELF_FLANK_ROOF_TOP_TAPER = 0.12;
 /** Filas de tejas en escama de pez por tejado. */
 export const ELF_FLANK_ROOF_ROWS = 3;
+/** Torres sobre tejados: anchura como fracción de la cumbrera del trapecio. */
+export const ELF_ROOF_TOWER_WIDTH = { min: 0.24, max: 0.42 };
+/** Par de torres en el mismo tejado: anchura individual más estrecha. */
+export const ELF_ROOF_TOWER_PAIR_WIDTH = { min: 0.2, max: 0.34 };
+/** Tres torres en el mismo tejado: anchura aún más estrecha. */
+export const ELF_ROOF_TOWER_TRIPLE_WIDTH = { min: 0.14, max: 0.22 };
+/** Torres sobre tejados: altura como múltiplo de la altura del tejado. */
+export const ELF_ROOF_TOWER_HEIGHT = { min: 2.8, max: 5.2 };
+/** Arcos entrecruzados en la coronación de cada torre. */
+export const ELF_ROOF_TOWER_CROWN_ARCHES = 3;
 /** Escala del castillo élfico (ancho y arcos); la altura del zócalo se conserva aparte. */
 export const ELF_CASTLE_DISPLAY_SCALE = 0.5;
 /** Anchura objetivo en viewBox (0–100), alineada con castillos enanos (~70–75 u.). */
 export const ELF_TARGET_FOOTPRINT = 72;
 
+/** Sub-stream RNG para torres: semilla mezclada + geometría del tejado. */
+export function createElfRoofTowerRng(seed, geometry = {}, variant = 0) {
+  const {
+    axis = 0,
+    doorW = 0,
+    envLeft = 0,
+    envRight = 0,
+    roofHRatio = 0,
+  } = geometry;
+  const key = [
+    "elf-towers",
+    mixFantasySeed(seed, variant),
+    axis.toFixed(2),
+    doorW.toFixed(2),
+    envLeft.toFixed(2),
+    envRight.toFixed(2),
+    roofHRatio.toFixed(3),
+  ].join(":");
+  return createRng(hashSeed(key));
+}
+
 /**
- * @param {{ seed: number; palace?: boolean; imperfection?: number; style?: string; ruined?: boolean }} options
+ * @param {{ seed: number; variant?: number; palace?: boolean; imperfection?: number; style?: string; ruined?: boolean }} options
  * @param {() => number} rng
  * @returns {import('./loader-fantasy-compose.js').ConstructionGraph}
  */
@@ -69,7 +101,7 @@ export function planElfCastleGraph(options, rng) {
     archDominant: "gothic",
     normalizeScaleBy: "height",
     normalizeBottomInset: 0,
-    elfRebuildPhase: 4,
+    elfRebuildPhase: 5,
   });
 
   addNode(graph, {
@@ -118,18 +150,51 @@ export function planElfCastleGraph(options, rng) {
     after: ["flank_arcades"],
   });
 
+  const towerRng = createElfRoofTowerRng(options.seed, {
+    axis,
+    doorW,
+    envLeft,
+    envRight,
+    roofHRatio,
+  }, options.variant ?? 0);
+  const roofTowers = planElfRoofTowerPlacements(
+    axis, 0, doorW, flankArchH, envLeft, envRight, roofHRatio, ELF_FLANK_ROOF_TOP_TAPER, towerRng,
+    { widthFrac: ELF_ROOF_TOWER_WIDTH, heightFrac: ELF_ROOF_TOWER_HEIGHT, pairWidthFrac: ELF_ROOF_TOWER_PAIR_WIDTH, tripleWidthFrac: ELF_ROOF_TOWER_TRIPLE_WIDTH },
+  );
+
+  addNode(graph, {
+    id: "roof_towers",
+    module: "elf.roof_towers",
+    cx: axis,
+    baseY: 0,
+    params: {
+      towers: roofTowers,
+      crownArchCount: ELF_ROOF_TOWER_CROWN_ARCHES,
+    },
+    order: 25,
+    after: ["flank_roofs"],
+  });
+
   Object.assign(graph.meta, {
-    towerCount: 0,
+    towerCount: roofTowers.length,
     blockCount: 0,
-    towers: [],
-    towerXs: [],
-    towerWs: [],
-    towerSupportTopW: [],
+    towers: roofTowers.map((t, i) => ({
+      id: `roof_tower_${i}`,
+      cx: t.cx,
+      w: t.w,
+      h: t.h,
+      remate: "gothic_arch",
+    })),
+    towerXs: roofTowers.map((t) => t.cx),
+    towerWs: roofTowers.map((t) => t.w),
+    towerSupportTopW: roofTowers.map((t) => t.w),
     doorCount: 1,
     windowCount: 0,
     slitCount: 0,
-    localTowerMean: doorH,
-    localTowerHeights: [],
+    localTowerMean: roofTowers.length
+      ? roofTowers.reduce((s, t) => s + t.h, 0) / roofTowers.length
+      : doorH,
+    localTowerHeights: roofTowers.map((t) => t.h),
     asymmetry: Math.min(1, Math.abs(axis - 50) / 8 + (options.ruined ? 0.1 : 0)),
     deckW: spanW,
     plinW,
@@ -142,6 +207,7 @@ export function planElfCastleGraph(options, rng) {
     doorH,
     flankArchH,
     roofHRatio,
+    roofTowers,
     normalizeBottomInset: 0,
   });
 
@@ -151,6 +217,7 @@ export function planElfCastleGraph(options, rng) {
 /**
  * @param {{
  *   seed: number;
+ *   variant?: number;
  *   palace?: boolean;
  *   style?: string;
  *   imperfection?: number;
@@ -227,6 +294,7 @@ export function generateElfCastleFromGraph(options, rng) {
 
   const meta = {
     ...graph.meta,
+    variant: options.variant ?? 0,
     style: options.style ?? "white",
     palace,
     arches,

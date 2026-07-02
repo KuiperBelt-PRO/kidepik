@@ -16,12 +16,17 @@ import {
   domeCroppedCapY,
   gableRoof,
   gothicArchOutline,
+  gothicBoundedInterlaceRow,
   gothicFlankInterlaceOutlines,
   gothicFlankInterlaceRow,
   elfFlankRoofOutlines,
+  elfRoofTowerOutlines,
   elfTrapezoidRoofOutline,
   fishScaleFillTrapezoid,
   fishScaleOutline,
+  planElfRoofTowerPlacements,
+  planElfRoofTowerTargetCount,
+  rectOutline,
   jitterRing,
   merlons,
   normalizeFantasyGroups,
@@ -497,6 +502,91 @@ describe("loader-fantasy-geom / elfFlankRoofOutlines", () => {
       }
     }
     assert.ok(outline.length === 5);
+  });
+});
+
+describe("loader-fantasy-geom / elfRoofTowerOutlines", () => {
+  it("planElfRoofTowerPlacements genera entre 1 y 3 torres sobre la cumbrera", () => {
+    const counts = { 1: 0, 2: 0, 3: 0 };
+    for (let s = 0; s < 120; s++) {
+      const rng = createRng(s * 17 + 3);
+      const target = planElfRoofTowerTargetCount(rng);
+      const towers = planElfRoofTowerPlacements(
+        50, 0, 14, 10, 28, 72, 0.34, 0.12, rng,
+        { targetCount: target },
+      );
+      assert.ok(towers.length >= 1 && towers.length <= 3, `seed ${s}: count ${towers.length}`);
+      assert.ok(towers.length <= target, `seed ${s}: más torres que objetivo`);
+      counts[Math.min(3, towers.length)] += 1;
+      const roofTop = 10 + 10 * 0.34;
+      for (const t of towers) {
+        assert.equal(t.baseY, roofTop);
+        assert.ok(t.w > 0 && t.h > 0);
+      }
+      if (towers.length >= 2) {
+        const ws = new Set(towers.map((t) => Math.round(t.w * 10)));
+        const hs = new Set(towers.map((t) => Math.round(t.h * 10)));
+        assert.ok(ws.size === towers.length || hs.size === towers.length, "dimensiones distintas");
+      }
+    }
+    assert.ok(counts[1] > 0 && counts[2] > 0 && counts[3] > 0, "debe haber 1, 2 y 3 torres");
+  });
+
+  it("elfRoofTowerOutlines: rectángulo, líneas verticales y 3 arcos de coronación", () => {
+    const rng = createRng(4242);
+    const w = 8;
+    const cx = 40;
+    const outlines = elfRoofTowerOutlines(cx, 12, w, 18, rng, 3);
+    assert.ok(outlines.length >= 5);
+    assert.equal(outlines[0].length, 5, "contorno rectangular");
+    const body = outlines.slice(1, -3);
+    for (const line of body) {
+      assert.equal(line.length, 2);
+      assert.equal(line[0].x, line[1].x, "línea vertical");
+    }
+    const crown = outlines.slice(-3);
+    assert.equal(crown.length, 3);
+    const leftX = cx - w / 2;
+    const rightX = cx + w / 2;
+    assert.ok(crown[0].some((p) => p.x === leftX), "arco izquierdo recortado al borde");
+    assert.ok(crown[2].some((p) => p.x === rightX), "arco derecho recortado al borde");
+  });
+
+  it("gothicBoundedInterlaceRow recorta arcos exteriores al tramo", () => {
+    const spanStart = 30;
+    const spanEnd = 44;
+    const rows = gothicBoundedInterlaceRow(10, 6, spanStart, spanEnd, 3);
+    assert.equal(rows.length, 3);
+    for (const pts of rows) {
+      for (const p of pts) {
+        assert.ok(p.x >= spanStart && p.x <= spanEnd);
+      }
+    }
+  });
+
+  it("torres distintas producen alturas y anchuras diferentes con otra seed", () => {
+    const a = planElfRoofTowerPlacements(50, 0, 14, 10, 28, 72, 0.34, 0.12, createRng(1));
+    const b = planElfRoofTowerPlacements(50, 0, 14, 10, 28, 72, 0.34, 0.12, createRng(999));
+    if (a.length === 2 && b.length === 2) {
+      const same = a[0].w === b[0].w && a[0].h === b[0].h && a[1].w === b[1].w && a[1].h === b[1].h;
+      assert.ok(!same, "seeds distintas deben variar dimensiones");
+    }
+  });
+
+  it("planElfRoofTowerPlacements varía la posición horizontal entre seeds", () => {
+    /** @type {string[]} */
+    const signatures = [];
+    for (let s = 0; s < 40; s++) {
+      const rng = createRng(s * 13 + 7);
+      const target = planElfRoofTowerTargetCount(rng);
+      const towers = planElfRoofTowerPlacements(
+        50, 0, 14, 10, 28, 72, 0.34, 0.12, createRng(s * 29 + 11),
+        { targetCount: target },
+      );
+      signatures.push(towers.map((t) => `${t.cx.toFixed(1)}:${t.w.toFixed(1)}`).join("|"));
+    }
+    const unique = new Set(signatures);
+    assert.ok(unique.size >= 28, `posiciones repetidas: solo ${unique.size} firmas distintas`);
   });
 });
 

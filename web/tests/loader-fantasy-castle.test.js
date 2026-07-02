@@ -145,12 +145,12 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
-  it("elfos (rebuild): zócalo, arco, arcadas y tejados laterales en trazo", () => {
+  it("elfos (rebuild): zócalo, arcadas, tejados y 1–3 torres en trazo", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 19 + 3, faction: "elf" });
-      assert.equal(el.meta.towerCount, 0, `seed ${s}: torres inesperadas`);
+      assert.ok(el.meta.towerCount >= 1 && el.meta.towerCount <= 3, `seed ${s}: torres`);
       assert.equal(el.parts.filter((p) => p.role === "plinth").length, 1);
-      assert.ok(el.parts.filter((p) => p.stroke).length > 11, `seed ${s}: trazos con tejados`);
+      assert.ok(el.parts.filter((p) => p.stroke).length > 11, `seed ${s}: trazos con tejados y torres`);
       assert.ok(el.meta.arches.gothic >= 11);
     }
   });

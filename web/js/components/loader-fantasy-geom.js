@@ -7,6 +7,8 @@
  * @module loader-fantasy-geom
  */
 
+import { createRng, hashSeed, randRange } from "./loader-ship-rng.js";
+
 /** @typedef {{ x: number; y: number }} FPoint */
 
 /**
@@ -488,6 +490,36 @@ export function gothicArchOutline(cx, baseY, w, h, segments = 16) {
 }
 
 /**
+ * Recorta un contorno de arco a [minX, maxX] (arcos exteriores → medio arco con lado vertical).
+ * @param {FPoint[]} pts
+ * @param {number} minX
+ * @param {number} maxX
+ * @returns {FPoint[]}
+ */
+export function clampOutlineX(pts, minX, maxX) {
+  return pts.map((pt) => ({
+    x: Math.max(minX, Math.min(maxX, pt.x)),
+    y: pt.y,
+  }));
+}
+
+/**
+ * Fila de arcos entrecruzados recortada al tramo (como arcadas del zócalo en el envelope).
+ * @param {number} baseY
+ * @param {number} archH
+ * @param {number} spanStart
+ * @param {number} spanEnd
+ * @param {number} [count]
+ * @returns {FPoint[][]}
+ */
+export function gothicBoundedInterlaceRow(
+  baseY, archH, spanStart, spanEnd, count = 3,
+) {
+  const rows = gothicFlankInterlaceRow(baseY, archH, spanStart, spanEnd, "left", count);
+  return rows.map((pts) => clampOutlineX(pts, spanStart, spanEnd));
+}
+
+/**
  * Fila de arcos góticos en trazo a lo largo de [spanStart, spanEnd].
  * Centros equidistantes de A a B; ancho > paso para que las curvas se crucen.
  * @param {number} baseY
@@ -684,6 +716,254 @@ export function elfFlankRoofOutlines(
   );
 
   return [leftOutline, rightOutline, ...leftScales, ...rightScales];
+}
+
+/**
+ * Rectángulo en trazo abierto (cierra el lado izquierdo).
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[]}
+ */
+export function rectOutline(cx, baseY, w, h) {
+  const hw = w / 2;
+  return [
+    { x: cx - hw, y: baseY },
+    { x: cx + hw, y: baseY },
+    { x: cx + hw, y: baseY + h },
+    { x: cx - hw, y: baseY + h },
+    { x: cx - hw, y: baseY },
+  ];
+}
+
+/**
+ * Líneas verticales en trazo dentro del rectángulo de torre élfica.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {() => number} rng
+ * @returns {FPoint[][]}
+ */
+export function elfTowerBodyVerticalLines(cx, baseY, w, h, rng) {
+  const count = 3 + Math.floor(rng() * 3);
+  const margin = w * 0.1;
+  const left = cx - w / 2 + margin;
+  const right = cx + w / 2 - margin;
+  /** @type {FPoint[][]} */
+  const lines = [];
+
+  for (let i = 0; i < count; i++) {
+    const x = count <= 1
+      ? cx
+      : left + (i / (count - 1)) * (right - left);
+    const jitter = (rng() - 0.5) * w * 0.035;
+    lines.push([
+      { x: x + jitter, y: baseY },
+      { x: x + jitter, y: baseY + h },
+    ]);
+  }
+
+  return lines;
+}
+
+/**
+ * Torre élfica sobre tejado: contorno rectangular + líneas verticales + arcada de 3 arcos recortada.
+ * @param {number} cx
+ * @param {number} baseY
+ * @param {number} w
+ * @param {number} h
+ * @param {() => number} rng
+ * @param {number} [crownArchCount]
+ * @returns {FPoint[][]}
+ */
+export function elfRoofTowerOutlines(cx, baseY, w, h, rng, crownArchCount = 3) {
+  const shell = rectOutline(cx, baseY, w, h);
+  const body = elfTowerBodyVerticalLines(cx, baseY, w, h, rng);
+  const crownArchH = Math.max(2, w * (0.34 + rng() * 0.16));
+  const crownBase = baseY + h;
+  const leftX = cx - w / 2;
+  const rightX = cx + w / 2;
+  const crown = gothicBoundedInterlaceRow(
+    crownBase, crownArchH, leftX, rightX, crownArchCount,
+  );
+  return [shell, ...body, ...crown];
+}
+
+/**
+ * Número aleatorio de torres élficas por castillo (1, 2 o 3).
+ * @param {() => number} rng
+ * @returns {1 | 2 | 3}
+ */
+export function planElfRoofTowerTargetCount(rng) {
+  return /** @type {1 | 2 | 3} */ (1 + Math.floor(rng() * 3));
+}
+
+/**
+ * Posición horizontal sobre la cumbrera: reparte en huecos para evitar siempre el centro.
+ * @param {() => number} rng
+ * @param {number} minCx
+ * @param {number} maxCx
+ * @param {Set<number>} [usedSlots] slots ya ocupados en esta cumbrera (0..slots-1)
+ * @returns {number|null}
+ */
+function pickTowerCxAlongRidge(rng, minCx, maxCx, usedSlots = new Set()) {
+  const span = maxCx - minCx;
+  if (span <= 0.4) return (minCx + maxCx) / 2;
+
+  const slots = Math.max(3, Math.min(8, Math.floor(span / 1.8)));
+  /** @type {number[]} */
+  const free = [];
+  for (let i = 0; i < slots; i += 1) {
+    if (!usedSlots.has(i)) free.push(i);
+  }
+  if (free.length === 0) return null;
+
+  const slot = free[Math.floor(rng() * free.length)];
+  usedSlots.add(slot);
+  const t0 = slot / slots;
+  const t1 = (slot + 1) / slots;
+  const innerPad = 0.1 + rng() * 0.12;
+  const t = t0 + innerPad + rng() * Math.max(0.08, (t1 - t0) - 2 * innerPad);
+  return minCx + Math.min(1, Math.max(0, t)) * span;
+}
+
+/**
+ * Planifica 1–3 torres sobre la cumbrera de los tejados laterales.
+ * @param {number} axis
+ * @param {number} baseY
+ * @param {number} doorW
+ * @param {number} archH
+ * @param {number} envLeft
+ * @param {number} envRight
+ * @param {number} roofHRatio
+ * @param {number} topInsetRatio
+ * @param {() => number} rng
+ * @param {{ widthFrac?: { min: number; max: number }; pairWidthFrac?: { min: number; max: number }; tripleWidthFrac?: { min: number; max: number }; heightFrac?: { min: number; max: number }; targetCount?: number }} [opts]
+ * @returns {{ cx: number; baseY: number; w: number; h: number }[]}
+ */
+export function planElfRoofTowerPlacements(
+  axis, baseY, doorW, archH, envLeft, envRight, roofHRatio, topInsetRatio, rng,
+  opts = {},
+) {
+  const widthFrac = opts.widthFrac ?? { min: 0.24, max: 0.42 };
+  const pairWidthFrac = opts.pairWidthFrac ?? { min: 0.2, max: 0.34 };
+  const tripleWidthFrac = opts.tripleWidthFrac ?? { min: 0.14, max: 0.22 };
+  const heightFrac = opts.heightFrac ?? { min: 2.8, max: 5.2 };
+  const targetCount = opts.targetCount ?? planElfRoofTowerTargetCount(rng);
+  const roofBase = baseY + archH;
+  const roofH = Math.max(2, archH * roofHRatio);
+  const towerBaseY = roofBase + roofH;
+  const centralLeft = axis - doorW / 2;
+  const centralRight = axis + doorW / 2;
+
+  const roofSpans = [
+    { spanStart: envLeft, spanEnd: centralLeft },
+    { spanStart: centralRight, spanEnd: envRight },
+  ];
+
+  /** @type {{ cx: number; baseY: number; w: number; h: number }[]} */
+  const towers = [];
+
+  const roofTopBand = (roof) => {
+    const span = roof.spanEnd - roof.spanStart;
+    const topInset = Math.max(1, span * topInsetRatio);
+    return {
+      topStart: roof.spanStart + topInset,
+      topEnd: roof.spanEnd - topInset,
+      topW: roof.spanEnd - roof.spanStart - 2 * topInset,
+    };
+  };
+
+  const dimsDistinct = (w, h) => {
+    if (towers.length === 0) return true;
+    return towers.every(
+      (t) => Math.abs(t.w - w) > w * 0.05 || Math.abs(t.h - h) > h * 0.07,
+    );
+  };
+
+  const widthRangeForRemaining = (remaining) => {
+    if (remaining >= 3) return tripleWidthFrac;
+    if (remaining === 2) return pairWidthFrac;
+    return widthFrac;
+  };
+
+  /** @type [Set<number>, Set<number>] */
+  const ridgeSlots = [new Set(), new Set()];
+
+  const tryPlaceSingle = (roofIdx, roof, widthRange) => {
+    const { topStart, topEnd, topW } = roofTopBand(roof);
+    if (topW < 3.5) return false;
+
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const w = topW * randRange(rng, widthRange.min, widthRange.max);
+      const h = roofH * randRange(rng, heightFrac.min, heightFrac.max);
+      if (!dimsDistinct(w, h)) continue;
+
+      const minCx = topStart + w / 2;
+      const maxCx = topEnd - w / 2;
+      if (maxCx <= minCx) continue;
+
+      const cx = pickTowerCxAlongRidge(rng, minCx, maxCx, ridgeSlots[roofIdx]);
+      if (cx == null) continue;
+
+      const overlaps = towers.some(
+        (t) => Math.abs(t.cx - cx) < (t.w + w) / 2 + 0.5,
+      );
+      if (!overlaps) {
+        towers.push({ cx, baseY: towerBaseY, w, h });
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const pickRoofOrder = (remaining) => {
+    const counts = roofSpans.map((roof, idx) => ({
+      idx,
+      count: towers.filter((t) => t.cx >= roof.spanStart && t.cx <= roof.spanEnd).length,
+    }));
+    counts.sort((a, b) => a.count - b.count);
+
+    // Con 2+ torres pendientes, a veces apilar en el mismo tejado.
+    if (remaining >= 2 && rng() < 0.42) {
+      const host = counts[Math.floor(rng() * Math.min(2, counts.length))].idx;
+      return [host, host, 1 - host, 1 - host];
+    }
+
+    const shuffled = rng() < 0.5 ? [0, 1] : [1, 0];
+    if (counts[0].count > counts[1].count) return [counts[0].idx, counts[1].idx];
+    return shuffled;
+  };
+
+  let guard = 0;
+  while (towers.length < targetCount && guard < 50) {
+    guard += 1;
+    const remaining = targetCount - towers.length;
+    const widthRange = widthRangeForRemaining(remaining);
+    let placed = false;
+
+    for (const idx of pickRoofOrder(remaining)) {
+      if (tryPlaceSingle(idx, roofSpans[idx], widthRange)) {
+        placed = true;
+        break;
+      }
+    }
+
+    if (!placed) {
+      for (const idx of [0, 1]) {
+        if (tryPlaceSingle(idx, roofSpans[idx], tripleWidthFrac)) {
+          placed = true;
+          break;
+        }
+      }
+    }
+
+    if (!placed) break;
+  }
+
+  return towers;
 }
 
 /**
