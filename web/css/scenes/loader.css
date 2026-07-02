@@ -231,7 +231,7 @@
   overflow: visible;
 }
 
-/* Grupo de partes: recibe la máscara de erosión cuando corresponde */
+/* Grupo de partes: recibe el clip de erosión cuando corresponde */
 .loader-fantasy-el__parts {
   /* sin transform aquí; los subgrupos llevan el transform de construcción */
 }

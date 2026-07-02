@@ -528,9 +528,15 @@ describe("loader-fantasy-castle / facciones spec", () => {
         });
         const plinth = el.parts.find((p) => p.role === "plinth");
         const frac = pathHeight(plinth.d) / 100;
+        let factionExpected = expectedFrac;
+        if (faction === "elf") {
+          const above = Number(el.meta.heightAboveGround) || 1;
+          const plin = Number(el.meta.plinthLocalH) || 1;
+          factionExpected = (plin + 1.4) / (plin + above + 1.4);
+        }
         assert.ok(
-          Math.abs(frac - expectedFrac) < 0.06,
-          `${faction} seed ${s}: zócalo ${(frac * 100).toFixed(1)}% vs ${(expectedFrac * 100).toFixed(1)}%`,
+          Math.abs(frac - factionExpected) < 0.06,
+          `${faction} seed ${s}: zócalo ${(frac * 100).toFixed(1)}% vs ${(factionExpected * 100).toFixed(1)}%`,
         );
       }
     }

@@ -24,8 +24,10 @@ import {
 import { randRange } from "./loader-ship-rng.js";
 
 const SEAM = 1.4;
-/** Arco central élfico: escala respecto a los rangos base (−25 %). */
-const ELF_DOOR_SIZE_FACTOR = 0.75;
+/** Arco central élfico: escala respecto a los rangos base (−30 %). */
+export const ELF_DOOR_SIZE_FACTOR = 0.7;
+/** Zócalo élfico: altura respecto al cálculo estándar (−25 %). */
+export const ELF_PLINTH_HEIGHT_FACTOR = 0.75;
 
 /**
  * @param {{ seed: number; palace?: boolean; imperfection?: number; style?: string; ruined?: boolean }} options
@@ -143,11 +145,12 @@ export function generateElfCastleFromGraph(options, rng) {
     (maxY, p) => Math.max(maxY, ...p.outer.map((pt) => pt.y)),
     0,
   );
-  const plinH = computePlinthLocalHeight(
-    heightAbove,
-    options.terrainHeightPx,
-    options.castleSizePx,
-  );
+  const plinH =
+    computePlinthLocalHeight(
+      heightAbove,
+      options.terrainHeightPx,
+      options.castleSizePx,
+    ) * ELF_PLINTH_HEIGHT_FACTOR;
   asm._parts.unshift({
     role: "plinth",
     outer: rect(axis, -plinH, plinW, plinH + SEAM),

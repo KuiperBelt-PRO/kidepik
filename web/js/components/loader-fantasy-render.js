@@ -5,7 +5,8 @@
  *   seeded → building → holding → eroding → gone
  *
  * Usa rAF + transform SVG para la animación de construcción (de abajo a arriba)
- * y una máscara SVG con feTurbulence + gradiente lineal para la erosión.
+ * y un clipPath rectangular animado para la erosión (solo vertical, sin
+ * estrechar el zócalo por los lados).
  *
  * @module loader-fantasy-render
  */
@@ -52,7 +53,7 @@ function applyPartScale(g, pivotX, pivotY, sy, tiltDeg = 0) {
 }
 
 /**
- * Crea el marcado SVG del elemento (defs + partes), sin la máscara de erosión.
+ * Crea el marcado SVG del elemento (defs + partes), sin el clip de erosión.
  * @param {import('./loader-fantasy-element.js').FantasyElement} element
  * @returns {{ svg: SVGSVGElement; partsGroup: SVGGElement; partGs: SVGGElement[] }}
  */
@@ -94,106 +95,109 @@ function createElementSvg(element) {
   return { svg, partsGroup, partGs };
 }
 
+/** Padding alrededor del contenido para el clip de erosión (trazo, antialias). */
+const EROSION_CLIP_PAD_X = 14;
+const EROSION_CLIP_PAD_Y = 10;
+
 /**
- * Crea e inserta en el SVG la infraestructura de máscara de erosión.
- * El progreso se controla actualizando los stops del gradiente vía rAF.
+ * @param {import('./loader-fantasy-element.js').FantasyPart[]} parts
+ * @returns {{ minX: number; minY: number; maxX: number; maxY: number }}
+ */
+export function svgBoundsFromParts(parts) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const part of parts) {
+    const nums = part.d.match(/-?[\d.]+/g)?.map(Number) ?? [];
+    for (let i = 0; i < nums.length; i += 2) {
+      const x = nums[i];
+      const y = nums[i + 1];
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    }
+  }
+  if (!Number.isFinite(minX)) {
+    return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+/**
+ * @param {import('./loader-fantasy-element.js').FantasyPart[]} parts
+ * @returns {{ x: number; width: number; yMin: number; yMax: number }}
+ */
+export function erosionClipBoundsFromParts(parts) {
+  const { minX, minY, maxX, maxY } = svgBoundsFromParts(parts);
+  return {
+    x: minX - EROSION_CLIP_PAD_X,
+    width: (maxX - minX) + EROSION_CLIP_PAD_X * 2,
+    yMin: minY - EROSION_CLIP_PAD_Y,
+    yMax: maxY + EROSION_CLIP_PAD_Y,
+  };
+}
+
+/**
+ * Rectángulo de clip para un umbral de erosión 0..1 (0 = intacto, 1 = borrado).
+ * Solo recorta en Y; el ancho se toma del bounding box real del elemento.
+ * @param {number} threshold
+ * @param {{ x: number; width: number; yMin: number; yMax: number }} bounds
+ * @returns {{ x: number; y: number; width: number; height: number }}
+ */
+export function erosionClipRectForThreshold(threshold, bounds) {
+  const t = Math.min(1, Math.max(0, threshold));
+  const frontY = bounds.yMin + t * (bounds.yMax - bounds.yMin);
+  return {
+    x: bounds.x,
+    width: bounds.width,
+    y: frontY,
+    height: Math.max(0, bounds.yMax - frontY),
+  };
+}
+
+/**
+ * @param {SVGRectElement} clipRect
+ * @param {number} threshold
+ * @param {{ x: number; width: number; yMin: number; yMax: number }} bounds
+ */
+function applyErosionClipRect(clipRect, threshold, bounds) {
+  const { x, y, width, height } = erosionClipRectForThreshold(threshold, bounds);
+  clipRect.setAttribute("x", String(x));
+  clipRect.setAttribute("width", String(width));
+  clipRect.setAttribute("y", String(y));
+  clipRect.setAttribute("height", String(height));
+}
+
+/**
+ * Crea e inserta en el SVG la infraestructura de clip de erosión.
+ * El progreso se controla actualizando el rect del clipPath vía rAF.
  * @param {SVGSVGElement} svg
  * @param {SVGGElement} partsGroup
  * @param {number} seed
- * @returns {{ stopB: SVGStopElement; stopC: SVGStopElement }}
+ * @param {{ x: number; width: number; yMin: number; yMax: number }} bounds
+ * @returns {{ clipRect: SVGRectElement; bounds: { x: number; width: number; yMin: number; yMax: number } }}
  */
-function createErosionMask(svg, partsGroup, seed) {
+function createErosionClip(svg, partsGroup, seed, bounds) {
   const uid = `fe-${(seed >>> 0).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
   const defs = document.createElementNS(SVG_NS, "defs");
 
-  // Gradiente lineal vertical: define un frente CONTINUO negro(arriba)→blanco(abajo).
-  // El borde de transición es estrecho (sharp) y al desplazarlo con ruido de baja
-  // frecuencia se convierte en una línea ondulada conexa, sin islas blancas.
-  const grad = document.createElementNS(SVG_NS, "linearGradient");
-  grad.id = `eg-${uid}`;
-  grad.setAttribute("gradientUnits", "userSpaceOnUse");
-  grad.setAttribute("x1", "0");
-  grad.setAttribute("y1", "-10");
-  grad.setAttribute("x2", "0");
-  grad.setAttribute("y2", "110");
+  const clipPath = document.createElementNS(SVG_NS, "clipPath");
+  clipPath.id = `ec-${uid}`;
+  clipPath.setAttribute("clipPathUnits", "userSpaceOnUse");
 
-  // stop inicial: negro fijo en top
-  const stopA = document.createElementNS(SVG_NS, "stop");
-  stopA.setAttribute("offset", "0");
-  stopA.setAttribute("stop-color", "black");
+  const clipRect = /** @type {SVGRectElement} */ (document.createElementNS(SVG_NS, "rect"));
+  applyErosionClipRect(clipRect, 0, bounds);
 
-  // stop dinámico: final del frente negro (erosionado)
-  const stopB = /** @type {SVGStopElement} */ (document.createElementNS(SVG_NS, "stop"));
-  stopB.setAttribute("offset", "0");
-  stopB.setAttribute("stop-color", "black");
-
-  // stop dinámico: inicio del área blanca (intacta) — mismo offset que stopB
-  // para un frente duro sin difuminado.
-  const stopC = /** @type {SVGStopElement} */ (document.createElementNS(SVG_NS, "stop"));
-  stopC.setAttribute("offset", "0");
-  stopC.setAttribute("stop-color", "white");
-
-  // stop final: blanco fijo en bottom
-  const stopD = document.createElementNS(SVG_NS, "stop");
-  stopD.setAttribute("offset", "1");
-  stopD.setAttribute("stop-color", "white");
-
-  grad.append(stopA, stopB, stopC, stopD);
-
-  // Filtro: ruido de BAJA frecuencia → ondula el frente de forma continua.
-  // numOctaves=2 y freq baja evitan el detalle fino que generaba islas tipo "fuego".
-  const filter = document.createElementNS(SVG_NS, "filter");
-  filter.id = `ef-${uid}`;
-  filter.setAttribute("x", "-40%");
-  filter.setAttribute("y", "-40%");
-  filter.setAttribute("width", "180%");
-  filter.setAttribute("height", "180%");
-  filter.setAttribute("color-interpolation-filters", "sRGB");
-
-  const turbulence = document.createElementNS(SVG_NS, "feTurbulence");
-  turbulence.setAttribute("type", "fractalNoise");
-  // Frecuencia muy baja: grandes ondulaciones del frente, no granulado
-  turbulence.setAttribute("baseFrequency", "0.018 0.012");
-  turbulence.setAttribute("numOctaves", "2");
-  turbulence.setAttribute("seed", String((seed ^ 0x7f3c) & 0xffff));
-  turbulence.setAttribute("result", "noise");
-
-  const disp = document.createElementNS(SVG_NS, "feDisplacementMap");
-  disp.setAttribute("in", "SourceGraphic");
-  disp.setAttribute("in2", "noise");
-  // Desplazamiento vertical generoso para un barrido irregular pero conexo
-  disp.setAttribute("scale", "26");
-  disp.setAttribute("xChannelSelector", "R");
-  disp.setAttribute("yChannelSelector", "G");
-
-  filter.append(turbulence, disp);
-
-  // Máscara: rect relleno con el gradiente + turbulencia
-  const mask = document.createElementNS(SVG_NS, "mask");
-  mask.id = `em-${uid}`;
-  mask.setAttribute("maskUnits", "userSpaceOnUse");
-  mask.setAttribute("x", "-20");
-  mask.setAttribute("y", "-20");
-  mask.setAttribute("width", "140");
-  mask.setAttribute("height", "140");
-
-  const maskRect = document.createElementNS(SVG_NS, "rect");
-  maskRect.setAttribute("x", "-20");
-  maskRect.setAttribute("y", "-20");
-  maskRect.setAttribute("width", "140");
-  maskRect.setAttribute("height", "140");
-  maskRect.setAttribute("fill", `url(#eg-${uid})`);
-  maskRect.setAttribute("filter", `url(#ef-${uid})`);
-
-  mask.appendChild(maskRect);
-  defs.append(grad, filter, mask);
+  clipPath.appendChild(clipRect);
+  defs.appendChild(clipPath);
   svg.insertBefore(defs, svg.firstChild);
 
-  // Aplicar la máscara al grupo de partes
-  partsGroup.setAttribute("mask", `url(#em-${uid})`);
+  partsGroup.setAttribute("clip-path", `url(#ec-${uid})`);
 
-  return { stopB, stopC, turbulence, disp };
+  return { clipRect, bounds };
 }
 
 /**
@@ -359,12 +363,10 @@ export function mountFantasyElement(container, element, opts) {
   function startEroding() {
     if (destroyed) return;
 
-    const { stopB, stopC } = createErosionMask(svg, partsGroup, element.seed);
+    const erosionBounds = erosionClipBoundsFromParts(element.parts);
+    const { clipRect } = createErosionClip(svg, partsGroup, element.seed, erosionBounds);
 
     let erodeStartMs = 0;
-    // delta=0 → frente duro (sin banda de difuminado); la irregularidad
-    // la aporta solo el feDisplacementMap de baja frecuencia.
-    const delta = 0;
 
     function tickErode(now) {
       if (destroyed) return;
@@ -374,8 +376,7 @@ export function mountFantasyElement(container, element, opts) {
       const tRaw = Math.min(1, elapsed / timing.erodeMs);
       const threshold = erosionThresholdAt(tRaw);
 
-      stopB.setAttribute("offset", String(threshold));
-      stopC.setAttribute("offset", String(threshold));
+      applyErosionClipRect(clipRect, threshold, erosionBounds);
 
       if (tRaw >= 1) {
         destroy();
