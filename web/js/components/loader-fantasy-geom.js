@@ -546,6 +546,147 @@ export function gothicFlankInterlaceOutlines(
 }
 
 /**
+ * Contorno abierto de tejado trapezoidal regular (base y cumbrera paralelas).
+ * @param {number} spanStart
+ * @param {number} spanEnd
+ * @param {number} baseY  borde inferior del tejado (cima de las arcadas)
+ * @param {number} roofH  altura uniforme del trapecio
+ * @param {number} [topInsetRatio]
+ * @returns {FPoint[]}
+ */
+export function elfTrapezoidRoofOutline(
+  spanStart, spanEnd, baseY, roofH, topInsetRatio = 0.12,
+) {
+  const span = spanEnd - spanStart;
+  if (span <= 0 || roofH <= 0) return [];
+  const topInset = Math.max(1, span * topInsetRatio);
+  const topY = baseY + roofH;
+  return [
+    { x: spanStart, y: baseY },
+    { x: spanEnd, y: baseY },
+    { x: spanEnd - topInset, y: topY },
+    { x: spanStart + topInset, y: topY },
+    { x: spanStart, y: baseY },
+  ];
+}
+
+/**
+ * Una teja en escama de pez (pico hacia abajo), trazo abierto.
+ * @param {number} cx
+ * @param {number} topY  borde superior de la escama
+ * @param {number} w
+ * @param {number} h
+ * @returns {FPoint[]}
+ */
+export function fishScaleOutline(cx, topY, w, h) {
+  const hw = w / 2;
+  const midY = topY + h * 0.36;
+  return [
+    { x: cx - hw, y: topY },
+    { x: cx - hw * 0.14, y: midY },
+    { x: cx, y: topY + h },
+    { x: cx + hw * 0.14, y: midY },
+    { x: cx + hw, y: topY },
+  ];
+}
+
+/**
+ * Rellena un trapecio regular de tejado con filas de tejas en escama de pez.
+ * @param {number} spanStart
+ * @param {number} spanEnd
+ * @param {number} baseY
+ * @param {number} roofH
+ * @param {number} topInsetRatio
+ * @param {{ rows?: number; cols?: number; padRatio?: number }} [opts]
+ * @returns {FPoint[][]}
+ */
+export function fishScaleFillTrapezoid(
+  spanStart, spanEnd, baseY, roofH, topInsetRatio,
+  opts = {},
+) {
+  const { rows = 3, cols = 0, padRatio = 0.06 } = opts;
+  const span = spanEnd - spanStart;
+  if (span <= 0 || rows <= 0 || roofH <= 0) return [];
+
+  const topInset = Math.max(1, span * topInsetRatio);
+  const padY = roofH * padRatio;
+  const innerBaseY = baseY + padY * 0.35;
+  const innerRoofH = roofH - padY;
+  const rowH = innerRoofH / rows;
+  /** @type {FPoint[][]} */
+  const scales = [];
+
+  for (let r = 0; r < rows; r++) {
+    const y = innerBaseY + innerRoofH - (r + 0.5) * rowH;
+    const t = Math.min(1, Math.max(0, (y - baseY) / roofH));
+    const leftX = spanStart + topInset * t;
+    const rightX = spanEnd - topInset * t;
+    const rowW = rightX - leftX;
+    if (rowW < 1.5) continue;
+
+    const nCols = cols > 0
+      ? cols
+      : Math.max(2, Math.round(rowW / (rowH * 1.25)));
+    const scaleW = rowW / nCols;
+    const scaleH = rowH * 0.88;
+    const yTop = y - scaleH * 0.4;
+    const offset = (r % 2) * scaleW * 0.5;
+
+    for (let c = 0; c < nCols; c++) {
+      const cx = leftX + offset + (c + 0.5) * scaleW;
+      const half = scaleW * 0.44;
+      if (cx - half < leftX || cx + half > rightX) continue;
+      scales.push(fishScaleOutline(cx, yTop, scaleW * 0.9, scaleH));
+    }
+  }
+
+  return scales;
+}
+
+/**
+ * Tejados trapezoidales + tejas en escama para ambos flancos laterales.
+ * @param {number} axis
+ * @param {number} baseY
+ * @param {number} doorW
+ * @param {number} archH
+ * @param {number} envLeft
+ * @param {number} envRight
+ * @param {{ roofHRatio?: number; topInsetRatio?: number; rows?: number }} [opts]
+ * @returns {FPoint[][]}
+ */
+export function elfFlankRoofOutlines(
+  axis, baseY, doorW, archH, envLeft, envRight,
+  opts = {},
+) {
+  const {
+    roofHRatio = 0.34,
+    topInsetRatio = 0.12,
+    rows = 3,
+  } = opts;
+
+  const roofBase = baseY + archH;
+  const centralLeft = axis - doorW / 2;
+  const centralRight = axis + doorW / 2;
+  const roofH = Math.max(2, archH * roofHRatio);
+  const fillOpts = { rows };
+
+  const leftOutline = elfTrapezoidRoofOutline(
+    envLeft, centralLeft, roofBase, roofH, topInsetRatio,
+  );
+  const rightOutline = elfTrapezoidRoofOutline(
+    centralRight, envRight, roofBase, roofH, topInsetRatio,
+  );
+  const leftScales = fishScaleFillTrapezoid(
+    envLeft, centralLeft, roofBase, roofH, topInsetRatio, fillOpts,
+  );
+  const rightScales = fishScaleFillTrapezoid(
+    centralRight, envRight, roofBase, roofH, topInsetRatio, fillOpts,
+  );
+
+  return [leftOutline, rightOutline, ...leftScales, ...rightScales];
+}
+
+/**
  * Ventana o puerta como anillo de sustracción.
  * @param {number} cx
  * @param {number} baseY

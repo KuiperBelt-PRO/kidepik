@@ -18,6 +18,10 @@ import {
   gothicArchOutline,
   gothicFlankInterlaceOutlines,
   gothicFlankInterlaceRow,
+  elfFlankRoofOutlines,
+  elfTrapezoidRoofOutline,
+  fishScaleFillTrapezoid,
+  fishScaleOutline,
   jitterRing,
   merlons,
   normalizeFantasyGroups,
@@ -422,6 +426,77 @@ describe("loader-fantasy-geom / gothicFlankInterlaceOutlines", () => {
     for (const pts of outlines) {
       assert.ok(apexY(pts) < doorH);
     }
+  });
+});
+
+describe("loader-fantasy-geom / elfFlankRoofOutlines", () => {
+  it("genera trapecio regular y 3 filas de tejas por flanco", () => {
+    const outlines = elfFlankRoofOutlines(50, 0, 14, 10, 28, 72, {
+      roofHRatio: 0.5,
+      rows: 3,
+    });
+    assert.ok(outlines.length > 4, "al menos 2 contornos + varias tejas");
+    const roofBase = 10;
+    const leftTopRight = outlines[0][2];
+    const leftTopLeft = outlines[0][3];
+    assert.equal(outlines[0][0].y, roofBase);
+    assert.equal(outlines[0][1].y, roofBase);
+    assert.equal(leftTopRight.y, leftTopLeft.y, "cumbrera horizontal (trapecio regular)");
+    assert.ok(leftTopRight.x < outlines[0][1].x, "cumbrera más estrecha hacia el centro");
+    assert.ok(leftTopLeft.x > outlines[0][0].x, "cumbrera más estrecha hacia fuera");
+  });
+
+  it("cada teja apunta hacia abajo (pico inferior)", () => {
+    const scale = fishScaleOutline(20, 5, 6, 4);
+    const peak = scale.reduce((best, p) => (p.y > best.y ? p : best), scale[0]);
+    assert.equal(peak.x, 20);
+    assert.ok(peak.y > scale[0].y);
+    assert.ok(peak.y > scale[scale.length - 1].y);
+  });
+
+  it("fishScaleFillTrapezoid rellena exactamente 3 filas", () => {
+    const scales = fishScaleFillTrapezoid(30, 44, 10, 5, 0.12, { rows: 3 });
+    assert.ok(scales.length >= 4);
+    for (const pts of scales) {
+      assert.equal(pts.length, 5);
+      assert.ok(!buildPartPath(pts, [], { open: true }).endsWith("Z"));
+    }
+  });
+
+  it("contorno trapezoidal regular es abierto (sin Z) y cierra el lado izquierdo", () => {
+    const pts = elfTrapezoidRoofOutline(30, 44, 10, 5, 0.12);
+    const d = buildPartPath(pts, [], { open: true });
+    assert.ok(!d.endsWith("Z"));
+    assert.equal(pts.length, 5);
+    assert.equal(pts[2].y, pts[3].y, "cumbrera plana");
+    assert.equal(pts[0].x, pts[4].x);
+    assert.equal(pts[0].y, pts[4].y, "vuelve al vértice inferior izquierdo");
+  });
+
+  it("todas las tejas quedan dentro del trapecio del contorno", () => {
+    const spanStart = 30;
+    const spanEnd = 44;
+    const baseY = 10;
+    const roofH = 5;
+    const topInsetRatio = 0.12;
+    const outline = elfTrapezoidRoofOutline(spanStart, spanEnd, baseY, roofH, topInsetRatio);
+    const scales = fishScaleFillTrapezoid(spanStart, spanEnd, baseY, roofH, topInsetRatio, { rows: 3 });
+    const topInset = Math.max(1, (spanEnd - spanStart) * topInsetRatio);
+    const topY = baseY + roofH;
+
+    const inside = (x, y) => {
+      const t = Math.min(1, Math.max(0, (y - baseY) / roofH));
+      const leftX = spanStart + topInset * t;
+      const rightX = spanEnd - topInset * t;
+      return x >= leftX - 0.05 && x <= rightX + 0.05 && y >= baseY - 0.05 && y <= topY + 0.05;
+    };
+
+    for (const pts of scales) {
+      for (const p of pts) {
+        assert.ok(inside(p.x, p.y), `teja fuera del trapecio en (${p.x}, ${p.y})`);
+      }
+    }
+    assert.ok(outline.length === 5);
   });
 });
 

@@ -1,7 +1,7 @@
 /**
  * Planificador de grafos de construcción para castillos élficos.
  *
- * Reconstrucción incremental (fase 3): zócalo + arco central + arcadas laterales entrecruzadas.
+ * Reconstrucción incremental (fase 4): zócalo + arco central + arcadas + tejados laterales.
  *
  * @module loader-fantasy-elf-graph
  */
@@ -33,6 +33,12 @@ export const ELF_PLINTH_HEIGHT_FACTOR = 0.75;
 export const ELF_FLANK_ARCH_HEIGHT = { min: 0.48, max: 0.62 };
 /** Arcos entrecruzados por flanco (zócalo ↔ arco central). */
 export const ELF_FLANK_INTERLACE_COUNT = 5;
+/** Tejado lateral: altura del trapecio regular (fracción de `flankArchH`). */
+export const ELF_FLANK_ROOF_HEIGHT = { min: 0.28, max: 0.38 };
+/** Estrechamiento de la cumbrera respecto al ancho de arcadas. */
+export const ELF_FLANK_ROOF_TOP_TAPER = 0.12;
+/** Filas de tejas en escama de pez por tejado. */
+export const ELF_FLANK_ROOF_ROWS = 3;
 /** Escala del castillo élfico (ancho y arcos); la altura del zócalo se conserva aparte. */
 export const ELF_CASTLE_DISPLAY_SCALE = 0.5;
 /** Anchura objetivo en viewBox (0–100), alineada con castillos enanos (~70–75 u.). */
@@ -63,7 +69,7 @@ export function planElfCastleGraph(options, rng) {
     archDominant: "gothic",
     normalizeScaleBy: "height",
     normalizeBottomInset: 0,
-    elfRebuildPhase: 3,
+    elfRebuildPhase: 4,
   });
 
   addNode(graph, {
@@ -92,6 +98,26 @@ export function planElfCastleGraph(options, rng) {
     after: ["door"],
   });
 
+  const roofHRatio = randRange(rng, ELF_FLANK_ROOF_HEIGHT.min, ELF_FLANK_ROOF_HEIGHT.max);
+
+  addNode(graph, {
+    id: "flank_roofs",
+    module: "elf.flank_roofs",
+    cx: axis,
+    baseY: 0,
+    params: {
+      doorW,
+      archH: flankArchH,
+      envLeft,
+      envRight,
+      roofHRatio,
+      topInsetRatio: ELF_FLANK_ROOF_TOP_TAPER,
+      rows: ELF_FLANK_ROOF_ROWS,
+    },
+    order: 20,
+    after: ["flank_arcades"],
+  });
+
   Object.assign(graph.meta, {
     towerCount: 0,
     blockCount: 0,
@@ -115,6 +141,7 @@ export function planElfCastleGraph(options, rng) {
     doorW,
     doorH,
     flankArchH,
+    roofHRatio,
     normalizeBottomInset: 0,
   });
 

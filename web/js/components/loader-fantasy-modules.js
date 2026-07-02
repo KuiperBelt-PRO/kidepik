@@ -16,6 +16,7 @@ import {
   elfArcadeCluster,
   elfBridgeArcade,
   elfFlyingButtress,
+  elfFlankRoofOutlines,
   elfPodium,
   elfRibCrown,
   elfSpireCluster,
@@ -115,6 +116,30 @@ function moduleElfFlankArcades(ctx, node) {
     ctx.arches.gothic += 1;
   }
   ctx.counters.windowCount += outlines.length;
+}
+
+/**
+ * Tejados trapezoidales en trazo sobre las arcadas laterales, con tejas en escama de pez.
+ * @param {import('./loader-fantasy-compose.js').ComposeContext} ctx
+ * @param {import('./loader-fantasy-compose.js').ComposeNode} node
+ */
+function moduleElfFlankRoofs(ctx, node) {
+  const doorW = /** @type {number} */ (node.params.doorW);
+  const archH = /** @type {number} */ (node.params.archH);
+  const envLeft = /** @type {number} */ (node.params.envLeft);
+  const envRight = /** @type {number} */ (node.params.envRight);
+  const hInnerRatio = /** @type {number} */ (node.params.roofHRatio ?? 0.5);
+  const topInsetRatio = /** @type {number} */ (node.params.topInsetRatio ?? 0.12);
+  const rows = /** @type {number} */ (node.params.rows ?? 3);
+  const { cx, baseY } = node;
+
+  const outlines = elfFlankRoofOutlines(
+    cx, baseY, doorW, archH, envLeft, envRight,
+    { roofHRatio: hInnerRatio, topInsetRatio, rows },
+  );
+  for (const outline of outlines) {
+    ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2, buildSequence: 2 });
+  }
 }
 
 /**
@@ -484,6 +509,7 @@ export function registerAllModules() {
   registerModule("core.plinth", moduleCorePlinth);
   registerModule("elf.door_outline", moduleElfDoorOutline);
   registerModule("elf.flank_arcades", moduleElfFlankArcades);
+  registerModule("elf.flank_roofs", moduleElfFlankRoofs);
   registerModule("elf.podium", moduleElfPodium);
   registerModule("elf.deck", moduleElfDeck);
   registerModule("elf.tower", moduleElfTower);
