@@ -16,6 +16,8 @@ import {
   domeCroppedCapY,
   gableRoof,
   gothicArchOutline,
+  gothicFlankInterlaceOutlines,
+  gothicFlankInterlaceRow,
   jitterRing,
   merlons,
   normalizeFantasyGroups,
@@ -353,6 +355,73 @@ describe("loader-fantasy-geom / gothicArchOutline", () => {
     const pts = gothicArchOutline(50, 0, 16, 24);
     const d = buildPartPath(pts, [], { open: true });
     assert.ok(!d.endsWith("Z"));
+  });
+});
+
+describe("loader-fantasy-geom / gothicFlankInterlaceOutlines", () => {
+  it("genera 5 arcos por flanco (10 en total)", () => {
+    const outlines = gothicFlankInterlaceOutlines(50, 0, 14, 10, 28, 72, 5);
+    assert.equal(outlines.length, 10);
+    for (const pts of outlines) {
+      assert.ok(pts.length > 10);
+    }
+  });
+
+  it("cada flanco cubre el tramo completo con distribución uniforme", () => {
+    const envLeft = 30;
+    const centralLeft = 44;
+    const count = 5;
+    const span = centralLeft - envLeft;
+    const pitch = span / (count - 1);
+    const left = gothicFlankInterlaceRow(0, 9, envLeft, centralLeft, "left", count);
+
+    const centers = left.map((pts) => (pts[0].x + pts[pts.length - 1].x) / 2);
+    assert.equal(centers[0], envLeft);
+    assert.equal(centers[count - 1], centralLeft);
+    for (let i = 1; i < count; i++) {
+      assert.ok(Math.abs((centers[i] - centers[i - 1]) - pitch) < 0.01);
+    }
+  });
+
+  it("arcos vecinos se solapan (entrecruzados)", () => {
+    const envLeft = 30;
+    const centralLeft = 44;
+    const count = 5;
+    const span = centralLeft - envLeft;
+    const pitch = span / (count - 1);
+    const archW = pitch * 1.62;
+    const left = gothicFlankInterlaceRow(0, 9, envLeft, centralLeft, "left", count);
+
+    assert.ok(archW > pitch, "ancho mayor que separación");
+
+    const spanX = (pts) => {
+      const xs = pts.map((p) => p.x);
+      return [Math.min(...xs), Math.max(...xs)];
+    };
+    const baseCx = (pts) => (pts[0].x + pts[pts.length - 1].x) / 2;
+    const apexPt = (pts) => pts.reduce((best, p) => (p.y > best.y ? p : best), pts[0]);
+
+    for (const pts of left) {
+      const cx = baseCx(pts);
+      const apex = apexPt(pts);
+      assert.ok(Math.abs(apex.x - cx) < 0.35, "arco simétrico, no inclinado");
+    }
+
+    for (let i = 0; i < left.length - 1; i++) {
+      const [a0, a1] = spanX(left[i]);
+      const [b0, b1] = spanX(left[i + 1]);
+      assert.ok(a1 > b0 && b1 > a0, `arcos ${i} y ${i + 1} no se solapan`);
+    }
+  });
+
+  it("los arcos laterales son más bajos que el central", () => {
+    const doorH = 20;
+    const archH = doorH * 0.55;
+    const outlines = gothicFlankInterlaceOutlines(50, 0, 14, archH, 28, 72, 5);
+    const apexY = (pts) => pts.reduce((best, p) => (p.y > best.y ? p : best), pts[0]).y;
+    for (const pts of outlines) {
+      assert.ok(apexY(pts) < doorH);
+    }
   });
 });
 

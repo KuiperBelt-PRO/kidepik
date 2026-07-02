@@ -145,14 +145,13 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
-  it("elfos (rebuild): zócalo y puerta gótica en trazo, sin torres", () => {
+  it("elfos (rebuild): zócalo, arco central y diez arcadas laterales en trazo", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 19 + 3, faction: "elf" });
       assert.equal(el.meta.towerCount, 0, `seed ${s}: torres inesperadas`);
       assert.equal(el.parts.filter((p) => p.role === "plinth").length, 1);
-      const door = el.parts.find((p) => p.stroke);
-      assert.ok(door, `seed ${s}: sin puerta en trazo`);
-      assert.ok(el.meta.arches.gothic >= 1);
+      assert.equal(el.parts.filter((p) => p.stroke).length, 11, `seed ${s}: arcos en trazo`);
+      assert.ok(el.meta.arches.gothic >= 11);
     }
   });
 

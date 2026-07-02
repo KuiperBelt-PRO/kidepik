@@ -110,16 +110,16 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
     }
   });
 
-  it("elfos (rebuild): zócalo y arco gótico central en trazo", () => {
+  it("elfos (rebuild): zócalo y once arcos góticos en trazo", () => {
     let ok = 0;
     const N = 30;
     for (let s = 0; s < N; s++) {
       const el = generateCastle({ seed: s * 7, faction: "elf" });
       const plinth = el.parts.some((p) => p.role === "plinth");
-      const strokeDoor = el.parts.some((p) => p.stroke);
-      if (plinth && strokeDoor && el.meta.towerCount === 0) ok++;
+      const strokeArches = el.parts.filter((p) => p.stroke).length === 11;
+      if (plinth && strokeArches && el.meta.towerCount === 0) ok++;
     }
-    assert.equal(ok, N, `solo ${ok}/${N} elfos con zócalo + puerta en trazo`);
+    assert.equal(ok, N, `solo ${ok}/${N} elfos con zócalo + 11 arcos en trazo`);
   });
 
   it("humanos: sin contrafuertes laterales (perfil)", () => {

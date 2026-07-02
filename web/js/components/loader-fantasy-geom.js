@@ -334,13 +334,15 @@ function gothicArchLeaves(cx, baseY, w, h, segments, straightFrac = 0.25, bulgeK
   const straightH = h * straightFrac;
   const apexY = baseY + h;
   const segs = Math.max(6, Math.floor(segments / 2));
+  const springRX = cx + hw;
+  const springLX = cx - hw;
 
   /** @type {FPoint[]} */
   const rightLeaf = [];
   for (let i = 1; i <= segs; i++) {
     const t = i / segs;
     rightLeaf.push({
-      x: (cx + hw) + (cx - (cx + hw)) * t + Math.sin(t * Math.PI) * hw * bulgeK,
+      x: springRX + (cx - springRX) * t + Math.sin(t * Math.PI) * hw * bulgeK,
       y: (baseY + straightH) + (apexY - (baseY + straightH)) * t,
     });
   }
@@ -350,7 +352,7 @@ function gothicArchLeaves(cx, baseY, w, h, segments, straightFrac = 0.25, bulgeK
   for (let i = 1; i <= segs; i++) {
     const t = i / segs;
     leftLeaf.push({
-      x: cx + (cx - hw - cx) * t - Math.sin((1 - t) * Math.PI) * hw * bulgeK,
+      x: cx + (springLX - cx) * t - Math.sin((1 - t) * Math.PI) * hw * bulgeK,
       y: apexY + ((baseY + straightH) - apexY) * t,
     });
   }
@@ -483,6 +485,64 @@ export function gothicArchOutline(cx, baseY, w, h, segments = 16) {
     rightSpring,
     { x: cx + hw, y: baseY },
   ];
+}
+
+/**
+ * Fila de arcos góticos en trazo a lo largo de [spanStart, spanEnd].
+ * Centros equidistantes de A a B; ancho > paso para que las curvas se crucen.
+ * @param {number} baseY
+ * @param {number} archH
+ * @param {number} spanStart  punto A
+ * @param {number} spanEnd    punto B
+ * @param {'left' | 'right'} side
+ * @param {number} [count]
+ * @returns {FPoint[][]}
+ */
+export function gothicFlankInterlaceRow(
+  baseY, archH, spanStart, spanEnd, side, count = 5,
+) {
+  const span = spanEnd - spanStart;
+  const minH = 4;
+  const h = Math.max(minH, archH);
+  /** @type {FPoint[][]} */
+  const outlines = [];
+
+  if (count <= 0 || span <= 0) return outlines;
+
+  const pitch = count > 1 ? span / (count - 1) : span;
+  const archW = Math.max(3, pitch * 1.62);
+
+  for (let i = 0; i < count; i++) {
+    const cx = count > 1
+      ? spanStart + i * pitch
+      : spanStart + span / 2;
+    outlines.push(gothicArchOutline(cx, baseY, archW, h));
+  }
+
+  void side;
+  return outlines;
+}
+
+/**
+ * Arcadas laterales: 5 arcos entrecruzados por flanco, desde el borde del arco
+ * central hasta el extremo del zócalo.
+ * @param {number} axis
+ * @param {number} baseY
+ * @param {number} doorW
+ * @param {number} archH
+ * @param {number} envLeft
+ * @param {number} envRight
+ * @param {number} [count]
+ * @returns {FPoint[][]}
+ */
+export function gothicFlankInterlaceOutlines(
+  axis, baseY, doorW, archH, envLeft, envRight, count = 5,
+) {
+  const centralLeft = axis - doorW / 2;
+  const centralRight = axis + doorW / 2;
+  const left = gothicFlankInterlaceRow(baseY, archH, envLeft, centralLeft, "left", count);
+  const right = gothicFlankInterlaceRow(baseY, archH, centralRight, envRight, "right", count);
+  return [...left, ...right];
 }
 
 /**

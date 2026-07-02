@@ -1,7 +1,7 @@
 /**
  * Planificador de grafos de construcción para castillos élficos.
  *
- * Reconstrucción incremental (fase 2): zócalo + arco gótico central en trazo.
+ * Reconstrucción incremental (fase 3): zócalo + arco central + arcadas laterales entrecruzadas.
  *
  * @module loader-fantasy-elf-graph
  */
@@ -28,6 +28,10 @@ const SEAM = 1.4;
 export const ELF_DOOR_SIZE_FACTOR = 0.7;
 /** Zócalo élfico: altura respecto al cálculo estándar (−25 %). */
 export const ELF_PLINTH_HEIGHT_FACTOR = 0.75;
+/** Arcos laterales: altura respecto al arco central. */
+export const ELF_FLANK_ARCH_HEIGHT = { min: 0.48, max: 0.62 };
+/** Arcos entrecruzados por flanco (zócalo ↔ arco central). */
+export const ELF_FLANK_INTERLACE_COUNT = 5;
 
 /**
  * @param {{ seed: number; palace?: boolean; imperfection?: number; style?: string; ruined?: boolean }} options
@@ -44,6 +48,7 @@ export function planElfCastleGraph(options, rng) {
   const envRight = axis + plinW / 2;
   const doorW = spanW * randRange(rng, 0.36, 0.46) * ELF_DOOR_SIZE_FACTOR;
   const doorH = randRange(rng, 24, 32) * ELF_DOOR_SIZE_FACTOR;
+  const flankArchH = doorH * randRange(rng, ELF_FLANK_ARCH_HEIGHT.min, ELF_FLANK_ARCH_HEIGHT.max);
 
   const graph = createGraph({
     composeMode: "graph",
@@ -53,7 +58,7 @@ export function planElfCastleGraph(options, rng) {
     archDominant: "gothic",
     normalizeScaleBy: "height",
     normalizeBottomInset: 0,
-    elfRebuildPhase: 2,
+    elfRebuildPhase: 3,
   });
 
   addNode(graph, {
@@ -63,6 +68,23 @@ export function planElfCastleGraph(options, rng) {
     baseY: 0,
     params: { w: doorW, h: doorH },
     order: 10,
+  });
+
+  addNode(graph, {
+    id: "flank_arcades",
+    module: "elf.flank_arcades",
+    cx: axis,
+    baseY: 0,
+    params: {
+      doorW,
+      doorH,
+      archH: flankArchH,
+      archCount: ELF_FLANK_INTERLACE_COUNT,
+      envLeft,
+      envRight,
+    },
+    order: 15,
+    after: ["door"],
   });
 
   Object.assign(graph.meta, {
@@ -87,6 +109,7 @@ export function planElfCastleGraph(options, rng) {
     axis,
     doorW,
     doorH,
+    flankArchH,
     normalizeBottomInset: 0,
   });
 

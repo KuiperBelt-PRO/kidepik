@@ -23,6 +23,7 @@ import {
   gableRoof,
   gothicArchCap,
   gothicArchOutline,
+  gothicFlankInterlaceOutlines,
   hollowRect,
   jitterRing,
   rect,
@@ -90,6 +91,30 @@ function moduleElfDoorOutline(ctx, node) {
   ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2.2, buildSequence: 1 });
   ctx.arches.gothic += 1;
   ctx.counters.doorCount += 1;
+}
+
+/**
+ * Arcadas laterales élficas: 5 arcos góticos en trazo por flanco, entrecruzados,
+ * desde el borde del arco central hasta el extremo del zócalo.
+ * @param {import('./loader-fantasy-compose.js').ComposeContext} ctx
+ * @param {import('./loader-fantasy-compose.js').ComposeNode} node
+ */
+function moduleElfFlankArcades(ctx, node) {
+  const doorW = /** @type {number} */ (node.params.doorW);
+  const archH = /** @type {number} */ (node.params.archH);
+  const envLeft = /** @type {number} */ (node.params.envLeft);
+  const envRight = /** @type {number} */ (node.params.envRight);
+  const archCount = /** @type {number} */ (node.params.archCount ?? 5);
+  const { cx, baseY } = node;
+
+  const outlines = gothicFlankInterlaceOutlines(
+    cx, baseY, doorW, archH, envLeft, envRight, archCount,
+  );
+  for (const outline of outlines) {
+    ctx.asm.addPart("decoration", outline, [], { stroke: true, strokeWidth: 2.2, buildSequence: 2 });
+    ctx.arches.gothic += 1;
+  }
+  ctx.counters.windowCount += outlines.length;
 }
 
 /**
@@ -458,6 +483,7 @@ function moduleElfSlabCrown(ctx, node) {
 export function registerAllModules() {
   registerModule("core.plinth", moduleCorePlinth);
   registerModule("elf.door_outline", moduleElfDoorOutline);
+  registerModule("elf.flank_arcades", moduleElfFlankArcades);
   registerModule("elf.podium", moduleElfPodium);
   registerModule("elf.deck", moduleElfDeck);
   registerModule("elf.tower", moduleElfTower);
