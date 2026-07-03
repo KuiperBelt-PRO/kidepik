@@ -2,6 +2,7 @@ import { assetUrl } from "../lib/assets.manifest.js";
 import { parseDevFaction } from "./loader-fantasy-castle-factions.js";
 import { mountFantasyTerrainLayer } from "./loader-fantasy-terrain.js";
 import { mountFantasyScene } from "./loader-fantasy-scene.js";
+import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 
@@ -292,8 +293,10 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   let spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
   const loaderQuery = getLoaderQueryParams();
   const meteorDemo = loaderQuery.get("meteorDemo") === "1";
+  const cloudDemo = loaderQuery.get("cloudDemo") === "1";
   let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
   let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
+  let fantasyCloudsTeardown = mountFantasyCloudsLayer(layers, { reducedMotion, demoFast: cloudDemo });
 
   const fantasyDev = loaderQuery.get("fantasyDev") || undefined;
   const fantasyFaction = parseDevFaction(loaderQuery.get("fantasyFaction"));
@@ -421,6 +424,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       spaceOrbitTeardown.destroy();
       meteorTeardown.destroy();
       fantasyTerrainTeardown.destroy();
+      fantasyCloudsTeardown.destroy();
       fantasySceneTeardown.destroy();
       if (rafId) cancelAnimationFrame(rafId);
     },

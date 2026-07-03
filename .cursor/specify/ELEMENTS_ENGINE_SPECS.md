@@ -167,6 +167,18 @@
 
 ---
 
+## Nubes de cielo
+
+> Arquetipo: ambiente atmosférico en la mitad fantasía. **No** usa el ciclo build/erode del motor de suelo; capa independiente con desplazamiento horizontal.
+
+- Entrada por la **derecha**, salida por la **izquierda**; velocidad lenta e **individual** por nube (22–52 s de cruce).
+- Variación de **altura** (banda 18–50 % del layer, sin alcanzar el logo ni el terreno) y **tamaño** (3 clases, 52–148 px de ancho).
+- Silueta procedural: 3–6 bultos con **base plana** y picos superiores **redondeados** (cúbicas Bézier); distinta por semilla.
+- Máximo **6** nubes concurrentes; spawn continuo cada 2,5–7 s.
+- Detalle: [SPEC_LOADER_FANTASY_CLOUDS.md](SPEC_LOADER_FANTASY_CLOUDS.md). Código: `loader-fantasy-clouds.js`.
+
+---
+
 ## Relacion con otras specs
 
 | Documento | Contenido |

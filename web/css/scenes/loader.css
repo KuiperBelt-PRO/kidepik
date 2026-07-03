@@ -203,6 +203,57 @@
   fill: #fff;
 }
 
+/* Nubes procedurales — cielo mitad fantasía (detrás de castillos) */
+.loader-layer.loader-layer--fantasy-clouds {
+  inset: 50% 0 0 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
+  mask-image: radial-gradient(
+    circle at 50% -40px,
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 50% -40px,
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+}
+
+.loader-cloud {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.loader-cloud__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.loader-cloud__shape {
+  fill: #fff;
+}
+
+.loader-cloud--small {
+  filter: blur(0.4px);
+  opacity: 0.9;
+}
+
+.loader-cloud--medium {
+  filter: blur(0.25px);
+}
+
+.loader-cloud--large {
+  filter: blur(0.15px);
+}
+
 /* ── Fantasy scene (elementos procedurales: castillos, bloques, etc.) ───── */
 
 .loader-layer.loader-layer--fantasy-scene {
