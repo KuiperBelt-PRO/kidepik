@@ -416,6 +416,25 @@ export function buildConstellationEdges(stars, rng, layerW = 390, layerH = 400) 
 }
 
 /**
+ * Campo estelar + constelaciones deterministas por seed.
+ * @param {number} seed
+ * @param {number} [layerW]
+ * @param {number} [layerH]
+ * @returns {{ stars: StarPoint[]; edges: [number, number][] }}
+ */
+export function buildStarFieldFromSeed(seed, layerW = 390, layerH = 400) {
+  const starRng = createRng(seed >>> 0);
+  const stars = generateStarField(starRng);
+  const edges = buildConstellationEdges(
+    stars,
+    createRng((seed ^ 0x9e3779b9) >>> 0),
+    layerW,
+    layerH,
+  );
+  return { stars, edges };
+}
+
+/**
  * @param {() => number} rng
  * @param {CelestialKind} kind
  * @param {number} [moonPhase]
@@ -588,11 +607,6 @@ export function mountFantasyCelestialLayer(container, { reducedMotion = false, r
   layer.appendChild(starsWrap);
 
   const random = rng ?? createRng(Date.now() >>> 0);
-  const starSeed = Math.floor(random() * 0xffffffff) >>> 0;
-  const starRng = createRng(starSeed);
-  const stars = generateStarField(starRng);
-  const edges = buildConstellationEdges(stars, createRng(starSeed ^ 0x9e3779b9));
-  starsWrap.appendChild(createStarFieldSvg(stars, edges));
 
   let destroyed = false;
   let rafId = 0;
@@ -607,6 +621,14 @@ export function mountFantasyCelestialLayer(container, { reducedMotion = false, r
   function scheduleNext(kind, delayMs) {
     nextKind = kind;
     nextSpawnAt = performance.now() + delayMs;
+  }
+
+  function refreshStarField() {
+    const layerW = layer.clientWidth || 390;
+    const layerH = layer.clientHeight || 400;
+    const starSeed = Math.floor(random() * 0xffffffff) >>> 0;
+    const { stars, edges } = buildStarFieldFromSeed(starSeed, layerW, layerH);
+    starsWrap.replaceChildren(createStarFieldSvg(stars, edges));
   }
 
   function beginTransit(now) {
@@ -625,9 +647,7 @@ export function mountFantasyCelestialLayer(container, { reducedMotion = false, r
     layer.appendChild(el);
 
     if (kind === "moon") {
-      starsWrap.style.opacity = "0";
-    } else {
-      starsWrap.style.opacity = "0";
+      refreshStarField();
     }
 
     active = { el, params, startMs: now };

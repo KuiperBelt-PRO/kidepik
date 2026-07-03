@@ -6,6 +6,7 @@ import {
   MOON_PHASE_NAMES,
   planSunRayCounts,
   buildConstellationEdges,
+  buildStarFieldFromSeed,
   celestialArcPoseAt,
   celestialOpacityAt,
   celestialTransitPoseAt,
@@ -84,6 +85,16 @@ describe("loader-fantasy-celestial", () => {
     assert.ok(d.startsWith("M"));
     assert.ok(d.endsWith("Z"));
     assert.ok(d.includes("L"));
+  });
+
+  it("buildStarFieldFromSeed: seeds distintos generan campos distintos", () => {
+    const a = buildStarFieldFromSeed(42);
+    const b = buildStarFieldFromSeed(99);
+    const sumA = a.stars.reduce((s, p) => s + p.xFrac + p.yFrac, 0);
+    const sumB = b.stars.reduce((s, p) => s + p.xFrac + p.yFrac, 0);
+    assert.notEqual(sumA, sumB);
+    assert.ok(a.edges.length >= 2);
+    assert.ok(b.edges.length >= 2);
   });
 
   it("generateStarField: estrellas más bajas y constelaciones sin cruces", () => {
