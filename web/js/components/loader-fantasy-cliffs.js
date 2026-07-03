@@ -24,6 +24,16 @@ export function planCliffSides(seed) {
 }
 
 /**
+ * Tipo de formación compartido por ambos extremos en un mismo ciclo de muro.
+ * @param {number} seed  semilla de sesión/ciclo (no la semilla por lado)
+ * @returns {CliffFormationType}
+ */
+export function planCliffFormation(seed) {
+  const rng = createRng(seed >>> 0);
+  return rng() < 0.5 ? "cliff" : "rocks";
+}
+
+/**
  * @param {string} d
  * @returns {number}
  */
@@ -104,14 +114,16 @@ function buildWallMass(rng, bleed, faceDepth, height) {
  * @returns {import('./loader-fantasy-geom.js').FPoint[]}
  */
 function buildRockSlab(bleed, y0, y1, frontLo, frontHi) {
-  const back = -bleed;
+  const h = y1 - y0;
+  const backBot = -bleed;
+  const backTop = backBot + Math.min(h * 0.4, bleed * 0.1);
   const f0 = Math.min(frontLo, frontHi);
   const f1 = Math.max(frontLo, frontHi);
   return polygon([
-    { x: back, y: y0 },
+    { x: backBot, y: y0 },
     { x: f0, y: y0 },
     { x: f1, y: y1 },
-    { x: back, y: y1 },
+    { x: backTop, y: y1 },
   ]);
 }
 
@@ -142,7 +154,12 @@ function addRockSlabs(rng, asm, bleed, faceDepth, height) {
   let front = toeX;
   heights.forEach((h, i) => {
     const y1 = y + h;
-    const frontTop = toeX * randRange(rng, 0.52, 1.0);
+    let frontTop = toeX * randRange(rng, 0.52, 1.0);
+    const minSpread = h * 0.42;
+    if (Math.abs(frontTop - front) < minSpread) {
+      frontTop = front + (frontTop >= front ? minSpread : -minSpread);
+      frontTop = Math.min(toeX, Math.max(toeX * 0.38, frontTop));
+    }
     const slab = buildRockSlab(bleed, y, y1, front, frontTop);
     asm.addPart("rock", slab, [], { buildSequence: i });
     y = y1 - SEAM * 0.5;
@@ -173,10 +190,10 @@ function addCliffMass(rng, asm, bleed, faceDepth, height) {
 export function generateCliffs(options) {
   const { seed, side } = options;
   const rng = createRng(seed >>> 0);
-  const formationType = options.formationType ?? (rng() < 0.5 ? "cliff" : "rocks");
+  const formationType = options.formationType ?? planCliffFormation(seed);
 
   const faceDepth = randRange(rng, FACE_DEPTH_MIN, FACE_DEPTH_MAX);
-  const heightAbove = randRange(rng, 62, 88);
+  const heightAbove = randRange(rng, 74, 98);
   const bleed = WALL_BLEED * randRange(rng, 0.94, 1.06);
 
   const asm = new ElementAssembler();

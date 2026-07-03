@@ -9,7 +9,7 @@
  */
 
 import { generateFantasyElement, planLifecycleTiming } from "./loader-fantasy-element.js";
-import { planCliffSides } from "./loader-fantasy-cliffs.js";
+import { planCliffFormation, planCliffSides } from "./loader-fantasy-cliffs.js";
 import { mountFantasyElement } from "./loader-fantasy-render.js";
 import { pickFaction } from "./loader-fantasy-castle-factions.js";
 import { createRng, mixFantasySeed, randRange } from "./loader-ship-rng.js";
@@ -28,11 +28,11 @@ const CASTLE_HEIGHT_FRAC_MIN = 0.23;
 const CASTLE_HEIGHT_FRAC_MAX = 0.4;
 const CASTLE_MAX_HEIGHT_PX = 168;
 
-// Muros laterales (~50 % del tamaño anterior; costura en x 0 % / 100 %).
-const CLIFF_HEIGHT_FRAC_MIN = 0.17;
-const CLIFF_HEIGHT_FRAC_MAX = 0.28;
-const CLIFF_MIN_HEIGHT_PX = 30;
-const CLIFF_MAX_HEIGHT_PX = 94;
+// Muros laterales (costura en x 0 % / 100 %).
+const CLIFF_HEIGHT_FRAC_MIN = 0.26;
+const CLIFF_HEIGHT_FRAC_MAX = 0.42;
+const CLIFF_MIN_HEIGHT_PX = 46;
+const CLIFF_MAX_HEIGHT_PX = 142;
 
 let _sessionSeedCounter = Date.now() & 0x7fffffff;
 
@@ -49,6 +49,7 @@ function sessionSeed() {
  *   devKind?: string;
  *   devFaction?: import('./loader-fantasy-castle-factions.js').CastleFaction;
  *   devSeed?: number;
+ *   devFormation?: import('./loader-fantasy-cliffs.js').CliffFormationType;
  * }} [opts]
  * @returns {{ destroy: () => void }}
  */
@@ -59,6 +60,7 @@ export function mountFantasyScene(container, opts = {}) {
     devKind,
     devFaction,
     devSeed,
+    devFormation,
   } = opts;
 
   const layer = document.createElement("div");
@@ -76,6 +78,16 @@ export function mountFantasyScene(container, opts = {}) {
   let cycleRng = createRng(sessionSeed());
   let spawnVariant = 0;
   let wallSessionSeed = sessionSeed();
+  /** @type {import('./loader-fantasy-cliffs.js').CliffFormationType | undefined} */
+  let wallFormationType;
+
+  /** @param {number} cycleSeed */
+  function resolveWallFormation(cycleSeed) {
+    if (devKind === "cliffs") {
+      return devFormation ?? "cliff";
+    }
+    return planCliffFormation(cycleSeed);
+  }
 
   function destroy() {
     destroyed = true;
@@ -120,15 +132,20 @@ export function mountFantasyScene(container, opts = {}) {
    * Una sola formación por extremo; no respawn si ya hay muro activo en ese lado.
    * @param {'left' | 'right'} side
    * @param {number} [cycleSeed]
+   * @param {import('./loader-fantasy-cliffs.js').CliffFormationType} [formationType]
    */
-  function spawnCliffWall(side, cycleSeed = wallSessionSeed) {
+  function spawnCliffWall(side, cycleSeed = wallSessionSeed, formationType) {
     if (destroyed || cliffActive[side]) return;
+
+    const type = formationType ?? wallFormationType ?? resolveWallFormation(cycleSeed);
+    wallFormationType = type;
 
     const cliffSeed = mixFantasySeed(cycleSeed, side === "left" ? 0x10 : 0x20);
     const sizePx = computeSizePx("cliffs");
     const element = generateFantasyElement("cliffs", {
       seed: cliffSeed,
       side,
+      formationType: type,
       terrainHeightPx,
       cliffSizePx: sizePx,
     });
@@ -155,7 +172,7 @@ export function mountFantasyScene(container, opts = {}) {
           if (!cliffActive.left && !cliffActive.right) scheduleNext(devTiming.gapMs);
           return;
         }
-        spawnCliffWall(side, sessionSeed());
+        spawnCliffWall(side, sessionSeed(), wallFormationType);
       },
     });
     cliffTeardowns.push(teardown);
@@ -164,8 +181,10 @@ export function mountFantasyScene(container, opts = {}) {
   /** Mantiene exactamente un muro por borde cuando procede. */
   function ensureEdgeWalls(cycleSeed = wallSessionSeed) {
     if (devKind === "cliffs") return;
+    const formation = resolveWallFormation(cycleSeed);
+    wallFormationType = formation;
     for (const side of planCliffSides(cycleSeed).sides) {
-      spawnCliffWall(side, cycleSeed);
+      spawnCliffWall(side, cycleSeed, formation);
     }
   }
 
@@ -189,8 +208,10 @@ export function mountFantasyScene(container, opts = {}) {
 
     if (kind === "cliffs") {
       wallSessionSeed = seed;
+      const formation = resolveWallFormation(seed);
+      wallFormationType = formation;
       for (const side of planCliffSides(seed).sides) {
-        spawnCliffWall(side, seed);
+        spawnCliffWall(side, seed, formation);
       }
       if (!cliffActive.left && !cliffActive.right) scheduleNext(2000);
       return;

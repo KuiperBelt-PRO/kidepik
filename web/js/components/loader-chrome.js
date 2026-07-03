@@ -301,6 +301,10 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const fantasySeed = fantasySeedRaw != null && fantasySeedRaw !== ""
     ? Number.parseInt(fantasySeedRaw, 10)
     : undefined;
+  const fantasyFormationRaw = loaderQuery.get("fantasyFormation");
+  const fantasyFormation = fantasyFormationRaw === "cliff" || fantasyFormationRaw === "rocks"
+    ? fantasyFormationRaw
+    : undefined;
   const fantasyTerrainH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fantasy-terrain-h")) || 48;
   let fantasySceneTeardown = mountFantasyScene(layers, {
     reducedMotion,
@@ -308,6 +312,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     devKind: fantasyDev,
     devFaction: fantasyFaction,
     devSeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,
+    devFormation: fantasyFormation,
   });
 
   let destroyed = false;

@@ -5,8 +5,10 @@ import {
   buildInnerFaceProfile,
   generateCliffs,
   maxVerticalSpanInPath,
+  planCliffFormation,
   planCliffSides,
 } from "../js/components/loader-fantasy-cliffs.js";
+import { mixFantasySeed } from "../js/components/loader-ship-rng.js";
 import {
   generateFantasyElement,
   isValidFantasyElement,
@@ -31,6 +33,31 @@ describe("loader-fantasy-cliffs / planCliffSides", () => {
   it("siempre devuelve ambos extremos", () => {
     for (let s = 0; s < 20; s++) {
       assert.deepEqual(planCliffSides(s), { sides: ["left", "right"] });
+    }
+  });
+
+  it("mismo ciclo: izquierda y derecha comparten formationType", () => {
+    for (let base = 0; base < 50; base++) {
+      const formation = planCliffFormation(base);
+      const left = generateCliffs({
+        seed: mixFantasySeed(base, 0x10),
+        side: "left",
+        formationType: formation,
+      });
+      const right = generateCliffs({
+        seed: mixFantasySeed(base, 0x20),
+        side: "right",
+        formationType: formation,
+      });
+      assert.equal(left.meta.formationType, formation, `base ${base} left`);
+      assert.equal(right.meta.formationType, formation, `base ${base} right`);
+      if (formation === "rocks") {
+        assert.ok(left.parts.filter((p) => p.role === "rock").length >= 6);
+        assert.ok(right.parts.filter((p) => p.role === "rock").length >= 6);
+      } else {
+        assert.equal(left.parts.filter((p) => p.role === "cliff").length, 1);
+        assert.equal(right.parts.filter((p) => p.role === "cliff").length, 1);
+      }
     }
   });
 });
