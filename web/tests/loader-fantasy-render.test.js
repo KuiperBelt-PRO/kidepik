@@ -3,43 +3,37 @@ import { describe, it } from "node:test";
 
 import { generateCastle } from "../js/components/loader-fantasy-castle.js";
 import {
+  buildErosionSpeedSegments,
+  erosionThresholdAt,
+} from "../js/components/loader-fantasy-element.js";
+import {
   castleBuildTimingProfile,
   erosionClipBoundsFromParts,
-  erosionClipRectForThreshold,
+  erosionMaskNoiseParams,
+  erosionMaskOffsetForThreshold,
   svgBoundsFromParts,
 } from "../js/components/loader-fantasy-render.js";
 
-describe("loader-fantasy-render / erosion clip", () => {
-  const sampleBounds = { x: -60, width: 220, yMin: -10, yMax: 110 };
-
-  it("threshold 0 deja todo el castillo visible", () => {
-    const r = erosionClipRectForThreshold(0, sampleBounds);
-    assert.equal(r.y, -10);
-    assert.equal(r.height, 120);
-    assert.equal(r.width, 220);
+describe("loader-fantasy-render / erosion mask", () => {
+  it("offset 0 deja el castillo intacto y 1 lo borra", () => {
+    assert.equal(erosionMaskOffsetForThreshold(0), "0");
+    assert.equal(erosionMaskOffsetForThreshold(1), "1");
   });
 
-  it("threshold 1 recorta por completo", () => {
-    const r = erosionClipRectForThreshold(1, sampleBounds);
-    assert.equal(r.height, 0);
+  it("el offset crece con el umbral", () => {
+    const a = Number(erosionMaskOffsetForThreshold(0.2));
+    const b = Number(erosionMaskOffsetForThreshold(0.6));
+    assert.ok(b > a);
   });
 
-  it("el ancho del clip no cambia con el progreso", () => {
-    for (let t = 0; t <= 1; t += 0.1) {
-      const r = erosionClipRectForThreshold(t, sampleBounds);
-      assert.equal(r.x, -60);
-      assert.equal(r.width, 220);
-    }
+  it("ruido de máscara más irregular que la versión plana (mayor displacement)", () => {
+    const p = erosionMaskNoiseParams(42);
+    assert.ok(p.dispScale >= 38);
+    assert.equal(p.numOctaves, 3);
+    assert.ok(parseFloat(p.baseFrequency.split(" ")[0]) >= 0.028);
   });
 
-  it("el frente baja solo en Y", () => {
-    const a = erosionClipRectForThreshold(0.2, sampleBounds);
-    const b = erosionClipRectForThreshold(0.6, sampleBounds);
-    assert.ok(b.y > a.y, "el frente debe descender");
-    assert.ok(b.height < a.height, "menos área visible");
-  });
-
-  it("elfos: el clip cubre todo el zócalo en todas las seeds", () => {
+  it("elfos: la máscara cubre todo el zócalo en todas las seeds", () => {
     for (let s = 0; s < 50; s++) {
       const el = generateCastle({ seed: s * 41 + 2, faction: "elf" });
       const bounds = erosionClipBoundsFromParts(el.parts);
@@ -48,9 +42,29 @@ describe("loader-fantasy-render / erosion clip", () => {
       const plinthBounds = svgBoundsFromParts([plinth]);
       assert.ok(
         plinthBounds.minX >= bounds.x && plinthBounds.maxX <= bounds.x + bounds.width,
-        `seed ${s}: zócalo [${plinthBounds.minX}, ${plinthBounds.maxX}] fuera de clip [${bounds.x}, ${bounds.x + bounds.width}]`,
+        `seed ${s}: zócalo [${plinthBounds.minX}, ${plinthBounds.maxX}] fuera de máscara [${bounds.x}, ${bounds.x + bounds.width}]`,
       );
     }
+  });
+});
+
+describe("loader-fantasy-element / erosionThresholdAt variable", () => {
+  it("misma seed → misma curva", () => {
+    const samples = [0.1, 0.35, 0.7, 0.95].map((t) => erosionThresholdAt(t, 99));
+    const again = [0.1, 0.35, 0.7, 0.95].map((t) => erosionThresholdAt(t, 99));
+    assert.deepEqual(samples, again);
+  });
+
+  it("velocidad no uniforme: no coincide con progreso lineal puro", () => {
+    const mid = erosionThresholdAt(0.5, 12345);
+    assert.ok(Math.abs(mid - 0.5) > 0.04, `demasiado lineal: ${mid}`);
+  });
+
+  it("buildErosionSpeedSegments normaliza duraciones", () => {
+    const segs = buildErosionSpeedSegments(7);
+    const sum = segs.reduce((s, seg) => s + seg.dur, 0);
+    assert.ok(Math.abs(sum - 1) < 1e-9);
+    assert.equal(segs.length, 6);
   });
 });
 
@@ -65,10 +79,13 @@ describe("loader-fantasy-render / castleBuildTimingProfile", () => {
   it("humanos y enanos: bloques 65 % más rápidos", () => {
     const human = generateCastle({ seed: 2, faction: "human" });
     const dwarf = generateCastle({ seed: 2, faction: "dwarf" });
-    const evil = generateCastle({ seed: 2, faction: "evil" });
     const fastScale = 1 / 1.65;
     assert.ok(Math.abs(castleBuildTimingProfile(human).fillScale - fastScale) < 1e-9);
     assert.ok(Math.abs(castleBuildTimingProfile(dwarf).fillScale - fastScale) < 1e-9);
-    assert.equal(castleBuildTimingProfile(evil).fillScale, 1);
+  });
+
+  it("elfos: timing de construcción sin aceleración de bloques", () => {
+    const elf = generateCastle({ seed: 2, faction: "elf" });
+    assert.equal(castleBuildTimingProfile(elf).fillScale, 1);
   });
 });

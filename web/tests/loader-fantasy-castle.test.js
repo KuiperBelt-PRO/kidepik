@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { generateCastle } from "../js/components/loader-fantasy-castle.js";
+import { HUMAN_PLINTH_HEIGHT_FACTOR } from "../js/components/loader-fantasy-castle-factions.js";
 import { PLINTH_SCREEN_HEIGHT_FACTOR } from "../js/components/loader-fantasy-geom.js";
 import {
   generateFantasyElement,
@@ -125,7 +126,7 @@ describe("loader-fantasy-castle / invariantes", () => {
   });
 
   it("cada torre tiene un remate arquitectónico válido", () => {
-    const factions = ["human", "elf", "dwarf", "evil"];
+    const factions = ["human", "elf", "dwarf"];
     for (const faction of factions) {
       for (let s = 0; s < 15; s++) {
         const el = generateCastle({ seed: s * 5 + 9, faction });
@@ -136,12 +137,12 @@ describe("loader-fantasy-castle / invariantes", () => {
     }
   });
 
-  it("malignos: todas las torres comparten el mismo remate clásico", () => {
+  it("humanos: todas las torres comparten el mismo remate clásico", () => {
     for (let s = 0; s < 40; s++) {
-      const el = generateCastle({ seed: s * 13 + 7, faction: "evil" });
+      const el = generateCastle({ seed: s * 13 + 7, faction: "human" });
       const remates = new Set(el.meta.towers.map((t) => t.remate));
       assert.equal(remates.size, 1, `seed ${s}: mezcla de remates ${[...remates].join(",")}`);
-      assert.equal(el.meta.towerRemate, el.meta.towers[0].remate);
+      assert.equal(el.meta.humanCastleCrown, el.meta.towers[0].remate);
     }
   });
 
@@ -218,9 +219,9 @@ describe("loader-fantasy-castle / build order", () => {
     }
   });
 
-  it("las coronaciones se construyen después de las torres (maligno)", () => {
+  it("las coronaciones se construyen después de las torres (humano)", () => {
     for (let s = 0; s < 20; s++) {
-      const el = generateCastle({ seed: s * 29 + 5, faction: "evil" });
+      const el = generateCastle({ seed: s * 29 + 5, faction: "human" });
       const maxTower = Math.max(...el.parts.filter((p) => p.role === "tower").map((p) => p.buildOrder));
       const caps = el.parts.filter((p) => CAP_ROLES.has(p.role));
       assert.ok(caps.some((c) => c.buildOrder > maxTower), `seed ${s}: ninguna coronación tras torres`);
@@ -331,7 +332,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
   });
 
   it("torres nunca tapan la puerta central", () => {
-    for (const faction of ["human", "dwarf", "evil", "elf"]) {
+    for (const faction of ["human", "dwarf", "elf"]) {
       for (let s = 0; s < 20; s++) {
         const el = generateCastle({ seed: s * 41 + 3, faction });
         const axis = el.meta.axis ?? 50;
@@ -359,18 +360,6 @@ describe("loader-fantasy-castle / facciones spec", () => {
     }
     assert.ok(levelCounts.size >= 2, "human: poca variación de niveles");
   });
-
-  it("malignos: 2–4 niveles apilados", () => {
-    const levelCounts = new Set();
-    for (let s = 0; s < 30; s++) {
-      const el = generateCastle({ seed: s * 23 + 5, faction: "evil" });
-      assert.ok(el.meta.castleLevelCount >= 2, `evil seed ${s}: menos de 2 niveles`);
-      assert.ok(el.meta.castleLevelCount <= 4, `evil seed ${s}: más de 4 niveles`);
-      levelCounts.add(el.meta.castleLevelCount);
-    }
-    assert.ok(levelCounts.size >= 2, "evil: poca variación de niveles");
-  });
-
   it("humanos: remate homogéneo (mismo tipo en todas las torres)", () => {
     for (let s = 0; s < 30; s++) {
       const el = generateCastle({ seed: s * 11 + 3, faction: "human" });
@@ -415,7 +404,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
   });
 
   it("torres superiores dentro del soporte del nivel inferior", () => {
-    for (const faction of ["human", "dwarf", "evil", "elf"]) {
+    for (const faction of ["human", "dwarf", "elf"]) {
       for (let s = 0; s < 25; s++) {
         const el = generateCastle({ seed: s * 37 + 11, faction });
         const axis = el.meta.axis;
@@ -485,7 +474,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
   });
 
   it("ningún elemento sobresale del zócalo (envelope)", () => {
-    for (const faction of ["human", "dwarf", "evil", "elf"]) {
+    for (const faction of ["human", "dwarf", "elf"]) {
       for (let s = 0; s < 15; s++) {
         const el = generateCastle({ seed: s * 31 + 7, faction });
         const tol = 0.05;
@@ -517,7 +506,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
       return Math.max(...ys) - Math.min(...ys);
     }
 
-    for (const faction of ["human", "dwarf", "evil", "elf"]) {
+    for (const faction of ["human", "dwarf", "elf"]) {
       for (let s = 0; s < 12; s++) {
         const el = generateCastle({
           seed: s * 37 + 9,
@@ -532,6 +521,9 @@ describe("loader-fantasy-castle / facciones spec", () => {
           const plin = Number(el.meta.plinthLocalH) || 1;
           const floor = Number(el.meta.normalizeHeightFloor) || 1;
           factionExpected = (plin + 1.4) / floor;
+        } else if (faction === "human") {
+          const f = HUMAN_PLINTH_HEIGHT_FACTOR;
+          factionExpected = (f * expectedFrac) / (f * expectedFrac + (1 - expectedFrac));
         }
         assert.ok(
           Math.abs(frac - factionExpected) < 0.06,
@@ -542,7 +534,7 @@ describe("loader-fantasy-castle / facciones spec", () => {
   });
 
   it("plinth rectangular en castillos monolíticos (4 vértices)", () => {
-    for (const faction of ["human", "dwarf", "evil", "elf"]) {
+    for (const faction of ["human", "dwarf", "elf"]) {
       for (let s = 0; s < 10; s++) {
         const el = generateCastle({ seed: s * 23 + 1, faction });
         const plinth = el.parts.find((p) => p.role === "plinth");

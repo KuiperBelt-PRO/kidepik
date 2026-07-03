@@ -1020,7 +1020,7 @@ export function crossingArches(cx, baseY, w, h) {
 }
 
 /**
- * Fila de pinchos triangulares sobre una línea (fuerzas malignas).
+ * Fila de pinchos triangulares sobre una línea.
  * @param {number} cx
  * @param {number} baseY
  * @param {number} w

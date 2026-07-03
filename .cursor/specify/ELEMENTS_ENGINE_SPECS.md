@@ -52,7 +52,7 @@
 
 **Construccion por niveles**
 
-- Desde la base (`plinth`): zocalo macizo rectangular, **mas ancho que el cuerpo** (factor 1,4–1,8×), altura baja (15–22 % del cuerpo). Borde superior horizontal bien marcado; es la transicion visible con el terreno.
+- Desde la base (`plinth`): zocalo macizo rectangular, **mas ancho que el cuerpo** (factor 1,4–1,8×), altura baja (**9–13 %** del cuerpo; factor `HUMAN_PLINTH_HEIGHT_FACTOR` 0,6 sobre el zocalo base). Borde superior horizontal bien marcado; es la transicion visible con el terreno.
 - Desde el zocalo: **muralla principal** (`curtain`) — rectangulo macizo del ancho del envelope, altura media-alta. Un solo vano grande: **puerta** centrada o ligeramente desplazada (arco romanico de medio punto o gotico, 50–65 % de la altura del muro). Ventanas secundarias: 2–5 vanos mas pequenos (romanicos o goticos) en rejilla irregular, nunca simetrica perfecta.
 - Desde la muralla, en los extremos (opcional): **alas** (`wing`) — bloques adosados mas bajos (60–85 % de la altura del cuerpo), mismo ancho que una torre intermedia. Remate del ala: **almenas** o **cupula recortada** (ver abajo); nunca tejado a dos aguas.
 - Desde la muralla o el zocalo: **2–4 torres** de seccion **gruesa** (ancho 12–18 % del `spanW`), alturas variables (la central o una lateral puede ser 1,2–1,5× mas alta). Separacion irregular, no equiespaciada. Cada torre:
@@ -150,90 +150,15 @@
 - Columnas cilindricas o capiteles redondeados.
 - Curvas organicas o domos bulbosos.
 
-### Castillos malignos
-
-> Arquetipo: amenazante, irregular, dentado. Piedra maciza con **esquinas achaflanadas** y **alta imperfeccion** (`jitter`). **Pinchos y agujas** en cornisas y remates; torres con **inclinacion** visible. Referencia visual: fortaleza corrompida / torre de hechicero — no elegancia elfica ni solidez humana ordenada.
-
-**Lenguaje formal maligno**
-
-- Cuerpos macizos: `chamferRect` (misma logica achaflanada que enanos, pero con vanos curvos permitidos).
-- Vanos: mezcla de **saeteras rectangulares** (`flat`), ventanas goticas puntuales y puerta con arco (gotico o romanico segun `archBias`).
-- Decoracion agresiva: `spikeRow` en cornisas; `finial(..., 'needle')` sobre tejados y cupulas.
-- **Remate uniforme:** todas las torres del mismo castillo comparten **un solo tipo** de remate (`roof` | `battlement` | `dome`); no mezclar tipos entre torres.
-- **Tejado a dos aguas permitido** en torres y bloques laterales (`gableRoof` + pinchos opcionales en la cumbrera).
-
-**Modulos del grafo (orden sugerido)**
-
-| ID nodo | Modulo | Rol |
-| --- | --- | --- |
-| `foundation` | `evil.foundation` | `plinth` |
-| `keep` | `evil.keep_wall` | `base` |
-| `block_*` | `evil.block` (opcional, 0–2) | `block` |
-| `tower_*` | `evil.tower` | `tower` |
-| `cornice_spikes` | `evil.cornice_spikes` | `decoration` |
-| `tower_crown_*` | `evil.tower_crown` | `roof` o `decoration` |
-
-**Construccion por niveles**
-
-- Desde la base (`foundation`): zocalo achaflanado **ancho e irregular** (1,5–2,0× el cuerpo), altura baja (20–30 % del cuerpo), bordes con `jitter` alto. Transicion visible con el terreno.
-- Desde el zocalo: **muralla del keep** (`keep`) — `chamferRect`, ancho casi total del envelope, altura media. Vanos:
-  - **Puerta:** arco grande (gotico predominante ~68 %), desplazada del centro.
-  - **Ventanas:** 2–4 vanos en rejilla **irregular** (gotico o plano); nunca simetria perfecta.
-  - Sin arcadas huecas de claustro (eso es elfico).
-- Desde el keep (opcional): **0–2 bloques** laterales (`block`) — mas bajos que el cuerpo (55–75 % altura), achaflanados, con **tejado a dos aguas** (`blockRoof`) y pinchos en la cumbrera (~65 % de probabilidad si hay tejado).
-- Desde el keep o zocalo: **2–4 torres** achaflanadas, separacion irregular. Cada torre:
-  - Fuste macizo con **inclinacion** (`tiltDeg` hasta ±3° × `tiltScale`).
-  - **1–2 saeteras** verticales estrechas (`flat`) en la mitad inferior.
-  - Ventana superior ocasional (gotica o plana).
-  - **Remate unico** (elegido una vez para todo el castillo):
-    - **`roof`:** `gableRoof` puntiagudo + aguja (`finial` needle) frecuente; pinchos extra en cumbrera (~50 % × `spikeChance`).
-    - **`battlement`:** almenas con merlones en ambos extremos + fila de `spikeRow` sobre el parapeto.
-    - **`dome`:** cupula semieliptica (no recortada) + aguja needle encima.
-- Desde la cornisa del keep (`cornice_spikes`): **fila de pinchos** (`spikeRow`) — 3–6 pinchos, altura 12–22 % del cuerpo; probabilidad alta (~78 %). Es la firma visual principal del castillo.
-- Sin contrafuertes humanos, sin columnas dolmen, sin corona central humana (`central_crown`).
-
-**Primitivas malignas (existentes / planeadas)**
-
-| Funcion | Uso |
-| --- | --- |
-| `spikeRow(cx, baseY, w, count, spikeH)` | Pinchos triangulares en cornisa o parapeto |
-| `finial(cx, y, r, 'needle')` | Aguja sobre tejado o cupula |
-| `gableRoof(x, y, w, h)` | Tejado puntiagudo en torres y bloques |
-| `chamferRect(cx, baseY, w, h, chamfer)` | Cuerpos achaflanados |
-| `evil.tower_crown` (modulo) | Encapsula remate uniforme + decoracion asociada |
-
-**Proporciones orientativas**
-
-| Parametro | Rango local | Notas |
-| --- | --- | --- |
-| Relacion altura torre / ancho torre | 2,5:1 – 4:1 | Alta pero no aguja elfica |
-| Relacion altura total / ancho envelope | 1,0:1 – 1,5:1 | Vertical amenazante |
-| Arcos | ~68 % goticos, ~32 % romanicos | Puerta marca el tono |
-| Remates (peso) | Tejado > almenas > cupula | Un solo tipo por castillo |
-| Pinchos en cornisa | ~78 % castillos | 3–6 pinchos |
-| Inclinacion torre | `tiltScale` 1,35 | Visible a simple vista |
-| Imperfeccion (`jitter`) | Alta (~0,95× perfil) | Bordes dentados |
-
-**Anti-patrones malignos**
-
-- Simetria bilateral perfecta.
-- Silueta esbelta tipo elfo (torres 6:1+, arcadas huecas, domos goticos vacios).
-- Estetica enana (solo vanos rectangulares achaflanados, sin arcos ni pinchos).
-- Estetica humana solemne (contrafuertes, cupula recortada, almenas limpias sin pinchos).
-- Superficies lisas sin `jitter` ni dentellado.
-- Mezclar tipos de remate distintos entre torres del mismo castillo.
-- Cupulas bulbosas o «cebollas» sin aguja ni pinchos.
-- Simbolos religiosos (cruces).
-
 ---
 
 ## Relacion con otras specs
 
 | Documento | Contenido |
 | --- | --- |
-| [ELEMENTS_ENGINE_SPECS.md](ELEMENTS_ENGINE_SPECS.md) | **Fuente de verdad** — grafos de construccion por faccion (elfo, humano, enano, maligno) |
+| [ELEMENTS_ENGINE_SPECS.md](ELEMENTS_ENGINE_SPECS.md) | **Fuente de verdad** — grafos de construccion por faccion (elfo, humano, enano) |
 | [SPEC_LOADER_FANTASY_CASTLE.md](SPEC_LOADER_FANTASY_CASTLE.md) | Roles de partes, arcos, API `generateCastle` |
 | [SPEC_LOADER_FANTASY_CASTLE_FACTIONS.md](SPEC_LOADER_FANTASY_CASTLE_FACTIONS.md) | Perfiles `FactionProfile`; detalle de grafo en este documento |
 | [SPEC_LOADER_FANTASY_ENGINE.md](SPEC_LOADER_FANTASY_ENGINE.md) | Ciclo de vida, normalizacion, render |
 
-**Estado:** implementado (jun 2026). Cuatro facciones operativas en `loader-fantasy-castle.js`. Primitivas `chamferAperture` y `domeCropped` añadidas a `loader-fantasy-geom.js`. Pendiente: migración a grafo para humano/enano/maligno (elfo ya usa grafo). Tests: 153/153 en verde.
+**Estado:** implementado (jul 2026). Tres facciones operativas en `loader-fantasy-castle.js`. Primitivas `chamferAperture` y `domeCropped` en `loader-fantasy-geom.js`. Pendiente: migración a grafo para humano/enano (elfo ya usa grafo).

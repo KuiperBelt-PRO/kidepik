@@ -17,12 +17,13 @@ No se usan nombres propietarios (Rohan, Rivendell, etc.): solo arquetipos genér
 | `human` | Reinos humanos | Piedra maciza, solemne, robusta; torres altas; arcos románicos/góticos equilibrados; remates **almenas o cúpula recortada** (sin tejado a dos aguas). |
 | `elf` | Reinos élficos | Orgánico, esbelto, muy alto; torres finas; arcos ojivales y trilobulados; remates en cúpula hueca o aguja; **arcos que se cruzan** en fachada. |
 | `dwarf` | Fortalezas enanas | Piedra tallada **poligonal** con **esquinas achaflanadas**; baja y ancha; torres macizas; **vanos rectangulares achaflanados** (sin arcos curvos); columnas tipo dolmen opcionales. |
-| `evil` | Fuerzas malignas | Amenazante, irregular; **pinchos y puntas** en remates y cornisas; torres inclinadas; saeteras; agujas frecuentes. Grafo detallado: [ELEMENTS_ENGINE_SPECS.md](ELEMENTS_ENGINE_SPECS.md). |
+
+En el loader, cada ciclo elige **una facción al azar** (`human` / `elf` / `dwarf`); solo un castillo o palacio visible a la vez.
 
 ## 3. Modelo de datos
 
 ```js
-/** @typedef {'human'|'elf'|'dwarf'|'evil'} CastleFaction */
+/** @typedef {'human'|'elf'|'dwarf'} CastleFaction */
 
 // Perfil (resumen; ver loader-fantasy-castle-factions.js)
 {
@@ -35,7 +36,6 @@ No se usan nombres propietarios (Rohan, Rivendell, etc.): solo arquetipos genér
   blockMax,
   bodyShape: 'rect' | 'chamfer',
   crossingArchChance,                  // elf
-  spikeChance, spikeDensity,           // evil
   finialKinds: ('ball'|'needle')[],
   palaceBias,                          // peso si palace:true
 }
@@ -57,7 +57,7 @@ generateCastle({
 | Parámetro | Valores | Efecto |
 | --- | --- | --- |
 | `fantasyDev` | `castle`, `palace`, `block` | Fuerza el `kind` del elemento |
-| `fantasyFaction` | `human`, `elf`, `dwarf`, `evil` | Fuerza la facción arquitectónica |
+| `fantasyFaction` | `human`, `elf`, `dwarf` | Fuerza la facción arquitectónica |
 
 Ejemplo: `http://localhost:8082/?fantasyDev=castle&fantasyFaction=elf#/loader` (también vale `#/loader?fantasyDev=castle&fantasyFaction=elf`)
 
@@ -78,18 +78,17 @@ Ejemplo: `http://localhost:8082/?fantasyDev=castle&fantasyFaction=elf#/loader` (
 | `chamferAperture(cx, baseY, w, h, chamfer)` | Huecos enanos (puertas/ventanas); **planeado** — ver `ELEMENTS_ENGINE_SPECS.md` |
 | `domeCropped(cx, baseY, rx, ry, cropRatio)` | Cúpula humana con **recorte horizontal** superior; **planeado** |
 | `crossingArches(cx, baseY, w, h)` | Marco decorativo de arcos cruzados (elfos) |
-| `spikeRow(cx, baseY, w, count, spikeH)` | Fila de pinchos (malignos) |
 
 ## 6. Tests
 
-1. Cada facción produce `isValidFantasyElement` OK (30 seeds × 4).
+1. Cada facción produce `isValidFantasyElement` OK (30 seeds × 3).
 2. `meta.faction` coherente con opción forzada.
 3. Determinismo: misma `seed` + `faction` → mismo SVG.
-4. Estadístico: elfos más altos que enanos; malignos más piezas `decoration` con pinchos.
+4. Estadístico: elfos más altos que enanos.
 5. Invariantes de castillo existentes siguen en verde.
 
 ## 7. Criterios de aceptación visual
 
-1. A simple vista se distingue humano (robusto) de elfo (esbelto/alto) de enano (achatado/angular) de maligno (pinchos).
-2. Palacios tienden a facciones `human`/`elf`; castillos mezclan las cuatro.
+1. A simple vista se distingue humano (robusto) de elfo (esbelto/alto) de enano (achatado/angular).
+2. Palacios tienden a facciones `human`/`elf`; castillos rotan las tres facciones al azar (un edificio visible).
 3. Ciclo build → hold → erode sin regresiones.

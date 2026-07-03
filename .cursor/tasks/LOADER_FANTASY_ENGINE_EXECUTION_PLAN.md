@@ -15,7 +15,7 @@
 | Fase | Nombre | Depende de | `kind`(s) | Estado |
 | --- | --- | --- | --- | --- |
 | 0 | Núcleo del motor | — | (`block` de prueba) | ✅ aprobada |
-| 1 | Castillos y palacios | 0 | `castle`, `palace` + facciones (`human`, `elf`, `dwarf`, `evil`) | 🔧 implementada (pendiente visto bueno) |
+| 1 | Castillos y palacios | 0 | `castle`, `palace` + facciones (`human`, `elf`, `dwarf`) | 🔧 implementada (pendiente visto bueno) |
 | 2 | Torres aisladas | 1 | `tower` | ⏳ no iniciada |
 | 3 | Aldeas, pueblos, posadas | 1 | `village`, `town`, `inn` | ⏳ no iniciada |
 | 4 | Megalitos | 0 | `menhir`, `dolmen`, `stoneCircle` | ⏳ no iniciada |

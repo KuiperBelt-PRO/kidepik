@@ -6,7 +6,7 @@
  *  - `isValidFantasyElement(el)` → boolean
  *  - `planBuildOrder(parts)` → FantasyPart[] ordenado
  *  - `planLifecycleTiming(seed, kind, partCount)` → tiempos
- *  - `erosionThresholdAt(t)` → 0..1
+ *  - `erosionThresholdAt(t, seed?)` → 0..1 (velocidad variable)
  *  - `ElementAssembler` → helper para builders
  *  - `FANTASY_BUILDERS` → registro de builders
  *
@@ -24,10 +24,6 @@ import {
   rect,
 } from "./loader-fantasy-geom.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
-
-// ---------------------------------------------------------------------------
-// Tipos (JSDoc)
-// ---------------------------------------------------------------------------
 
 /**
  * @typedef {'block'|'castle'|'palace'|'tower'|'village'|'town'|'inn'|'forest'|'crystals'|'portal'|'menhir'|'dolmen'|'stoneCircle'} FantasyKind
@@ -246,16 +242,55 @@ export function planLifecycleTiming(seed, kind, _partCount) {
 // erosionThresholdAt
 // ---------------------------------------------------------------------------
 
+const EROSION_SPEED_SEGMENTS = 6;
+
 /**
- * Curva de progreso de erosión (ease-in suave).
- * @param {number} t  progreso temporal 0..1
- * @returns {number}  posición del frente de erosión 0..1 (0 = intacto, 1 = borrado)
+ * Segmentos de velocidad para la erosión (determinista por seed).
+ * @param {number} seed
+ * @returns {{ dur: number; speed: number }[]}
  */
-export function erosionThresholdAt(t) {
+export function buildErosionSpeedSegments(seed) {
+  const rng = createRng((seed ^ 0xe7a91c3b) >>> 0);
+  /** @type {{ dur: number; speed: number }[]} */
+  const segments = [];
+  for (let i = 0; i < EROSION_SPEED_SEGMENTS; i++) {
+    segments.push({
+      dur: 0.35 + rng() * 1.25,
+      speed: 0.3 + rng() * 1.7,
+    });
+  }
+  const durSum = segments.reduce((s, seg) => s + seg.dur, 0);
+  for (const seg of segments) seg.dur /= durSum;
+  return segments;
+}
+
+/**
+ * Progreso del frente de erosión 0..1 (0 = intacto, 1 = borrado).
+ * El tiempo `t` avanza linealmente; la velocidad del frente varía por segmentos.
+ * @param {number} t  progreso temporal 0..1
+ * @param {number} [seed]  semilla del elemento (velocidad irregular)
+ * @returns {number}
+ */
+export function erosionThresholdAt(t, seed = 0) {
   if (t <= 0) return 0;
   if (t >= 1) return 1;
-  // Potencia 1.15: descenso casi constante del frente (no acelera tipo llama)
-  return Math.pow(t, 1.15);
+
+  const segments = buildErosionSpeedSegments(seed);
+  let timeLeft = t;
+  let weightedProgress = 0;
+  let totalWeight = 0;
+  for (const seg of segments) totalWeight += seg.dur * seg.speed;
+
+  for (const seg of segments) {
+    if (timeLeft <= seg.dur) {
+      weightedProgress += timeLeft * seg.speed;
+      const raw = weightedProgress / totalWeight;
+      return Math.pow(raw, 1.1);
+    }
+    timeLeft -= seg.dur;
+    weightedProgress += seg.dur * seg.speed;
+  }
+  return 1;
 }
 
 // ---------------------------------------------------------------------------

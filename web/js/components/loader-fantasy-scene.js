@@ -10,6 +10,7 @@
 
 import { generateFantasyElement, planLifecycleTiming } from "./loader-fantasy-element.js";
 import { mountFantasyElement } from "./loader-fantasy-render.js";
+import { pickFaction } from "./loader-fantasy-castle-factions.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
 
 // Zona horizontal prohibida (% del ancho) para evitar el logo central.
@@ -101,18 +102,25 @@ export function mountFantasyScene(container, opts = {}) {
   function runCycle() {
     if (destroyed) return;
 
+    // Un solo castillo/palacio visible: el ciclo anterior debe haber terminado (onGone).
+    if (currentTeardown) {
+      currentTeardown.destroy();
+      currentTeardown = null;
+    }
+
     // Phase 1: castillos y palacios. devKind (?fantasyDev=) fuerza un tipo.
     const kind = /** @type {import('./loader-fantasy-element.js').FantasyKind} */ (
       devKind || (cycleRng() < 0.32 ? "palace" : "castle")
     );
     const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+    const faction = devFaction ?? pickFaction(cycleRng, kind === "palace");
     const variant = spawnVariant;
     spawnVariant += 1;
     const sizePx = computeSizePx(kind);
     const element = generateFantasyElement(kind, {
       seed,
       variant,
-      faction: devFaction,
+      faction,
       terrainHeightPx,
       castleSizePx: sizePx,
     });

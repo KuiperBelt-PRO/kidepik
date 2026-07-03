@@ -7,7 +7,7 @@
  * ventanas mediante arcos góticos/románicos/flat/trilobulados.
  *
  * `castle` y `palace` comparten builder; cada aparición elige una facción
- * (humano, elfo, enano, maligno) que sesga arquitectura y decoración.
+ * (humano, elfo, enano) que sesga arquitectura y decoración.
  *
  * @module loader-fantasy-castle
  */
@@ -725,7 +725,7 @@ export function generateCastle(options) {
     }
   }
 
-  // Pinchos malignos en la cornisa del cuerpo central
+  // Pinchos opcionales en cornisa (perfil con spikeChance > 0)
   if (profile.spikeChance > 0 && rng() < profile.spikeChance) {
     const spikeN = profile.spikeDensity[0]
       + Math.floor(rng() * (profile.spikeDensity[1] - profile.spikeDensity[0] + 1));
@@ -1028,11 +1028,12 @@ export function generateCastle(options) {
     (maxY, p) => Math.max(maxY, ...p.outer.map((pt) => pt.y)),
     0,
   );
-  const plinH = computePlinthLocalHeight(
-    heightAbove,
-    options.terrainHeightPx,
-    options.castleSizePx,
-  );
+  const plinH =
+    computePlinthLocalHeight(
+      heightAbove,
+      options.terrainHeightPx,
+      options.castleSizePx,
+    ) * (profile.plinthHeightFactor ?? 1);
   asm._parts.unshift({
     role: "plinth",
     outer: rect(axis, -plinH, plinW, plinH + SEAM),

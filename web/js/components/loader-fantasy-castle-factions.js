@@ -1,7 +1,7 @@
 /**
  * Perfiles de facción para castillos y palacios de fantasía.
  *
- * Arquetipos genéricos (humanos, elfos, enanos, fuerzas malignas) que sesgan
+ * Arquetipos genéricos (humanos, elfos, enanos) que sesgan
  * proporciones, formas, arcos y decoración sin usar IP de terceros.
  *
  * @module loader-fantasy-castle-factions
@@ -9,7 +9,10 @@
 
 import { randPick } from "./loader-ship-rng.js";
 
-/** @typedef {'human'|'elf'|'dwarf'|'evil'} CastleFaction */
+/** @typedef {'human'|'elf'|'dwarf'} CastleFaction */
+
+/** Zócalo humano: 40 % más bajo que el cálculo base terreno/pantalla. */
+export const HUMAN_PLINTH_HEIGHT_FACTOR = 0.6;
 
 /** @typedef {{
  *   id: CastleFaction;
@@ -44,13 +47,14 @@ import { randPick } from "./loader-ship-rng.js";
  *   useStackedLevels: boolean;
  *   stackedLevelRange?: [number, number];
  *   towerHByWidth: [number, number] | null;
+ *   plinthHeightFactor?: number;
  * }} FactionProfile */
 
 /** @type {CastleFaction[]} */
 const PALACE_FACTION_POOL = ["human", "human", "human", "elf", "human"];
 
 /** @type {CastleFaction[]} */
-const CASTLE_FACTION_POOL = ["human", "human", "human", "elf", "elf", "dwarf", "dwarf", "evil", "evil", "evil"];
+const CASTLE_FACTION_POOL = ["human", "elf", "dwarf"];
 
 /** @type {Record<CastleFaction, FactionProfile>} */
 export const FACTION_PROFILES = {
@@ -87,6 +91,7 @@ export const FACTION_PROFILES = {
     useStackedLevels: true,
     stackedLevelRange: [1, 3],
     towerHByWidth: null,
+    plinthHeightFactor: HUMAN_PLINTH_HEIGHT_FACTOR,
   },
   elf: {
     id: "elf",
@@ -154,43 +159,9 @@ export const FACTION_PROFILES = {
     useStackedLevels: false,
     towerHByWidth: [1.05, 1.75],
   },
-  evil: {
-    id: "evil",
-    label: "Evil",
-    baseW: [48, 62],
-    baseH: [28, 42],
-    towerW: [9, 14],
-    hMul: [1.25, 2.0],
-    jitterScale: 0.95,
-    archBias: { gothic: 0.68, romanesque: 0.32 },
-    winKinds: ["flat", "gothic", "flat"],
-    remateWeights: { battlement: 0.22, roof: 0.58, dome: 0.2 },
-    blockMax: 2,
-    bodyShape: "chamfer",
-    chamfer: 3.2,
-    crossingArchChance: 0,
-    spikeChance: 0.78,
-    spikeDensity: [3, 6],
-    finialKinds: ["needle"],
-    finialChance: 0.85,
-    tiltScale: 1.35,
-    remateMode: "uniform",
-    buttressChance: 0,
-    flyingButtressChance: 0,
-    centralCrownChance: 0,
-    blockRoof: true,
-    arcadeRows: 0,
-    useChamferApertures: false,
-    useCroppedDome: false,
-    dolmenChance: 0,
-    useTrapezoidBodies: false,
-    useStackedLevels: true,
-    stackedLevelRange: [2, 4],
-    towerHByWidth: null,
-  },
 };
 
-export const CASTLE_FACTIONS = /** @type {const} */ (["human", "elf", "dwarf", "evil"]);
+export const CASTLE_FACTIONS = /** @type {const} */ (["human", "elf", "dwarf"]);
 
 /**
  * @param {CastleFaction | string} faction

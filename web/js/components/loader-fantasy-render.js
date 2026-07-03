@@ -5,8 +5,7 @@
  *   seeded → building → holding → eroding → gone
  *
  * Usa rAF + transform SVG para la animación de construcción (de abajo a arriba)
- * y un clipPath rectangular animado para la erosión (solo vertical, sin
- * estrechar el zócalo por los lados).
+ * y una máscara SVG con feTurbulence + gradiente lineal para la erosión.
  *
  * @module loader-fantasy-render
  */
@@ -131,9 +130,9 @@ export function castleBuildTimingProfile(element) {
   return DEFAULT_BUILD_TIMING;
 }
 
-/** Padding alrededor del contenido para el clip de erosión (trazo, antialias). */
-const EROSION_CLIP_PAD_X = 14;
-const EROSION_CLIP_PAD_Y = 10;
+/** Padding alrededor del contenido para la máscara de erosión (trazo, antialias). */
+const EROSION_MASK_PAD_X = 14;
+const EROSION_MASK_PAD_Y = 10;
 
 /**
  * @param {import('./loader-fantasy-element.js').FantasyPart[]} parts
@@ -168,72 +167,140 @@ export function svgBoundsFromParts(parts) {
 export function erosionClipBoundsFromParts(parts) {
   const { minX, minY, maxX, maxY } = svgBoundsFromParts(parts);
   return {
-    x: minX - EROSION_CLIP_PAD_X,
-    width: (maxX - minX) + EROSION_CLIP_PAD_X * 2,
-    yMin: minY - EROSION_CLIP_PAD_Y,
-    yMax: maxY + EROSION_CLIP_PAD_Y,
+    x: minX - EROSION_MASK_PAD_X,
+    width: (maxX - minX) + EROSION_MASK_PAD_X * 2,
+    yMin: minY - EROSION_MASK_PAD_Y,
+    yMax: maxY + EROSION_MASK_PAD_Y,
   };
 }
 
 /**
- * Rectángulo de clip para un umbral de erosión 0..1 (0 = intacto, 1 = borrado).
- * Solo recorta en Y; el ancho se toma del bounding box real del elemento.
+ * Offset del gradiente de máscara para un umbral de erosión 0..1.
  * @param {number} threshold
- * @param {{ x: number; width: number; yMin: number; yMax: number }} bounds
- * @returns {{ x: number; y: number; width: number; height: number }}
+ * @returns {string}
  */
-export function erosionClipRectForThreshold(threshold, bounds) {
-  const t = Math.min(1, Math.max(0, threshold));
-  const frontY = bounds.yMin + t * (bounds.yMax - bounds.yMin);
+export function erosionMaskOffsetForThreshold(threshold) {
+  return String(Math.min(1, Math.max(0, threshold)));
+}
+
+/**
+ * Parámetros de turbulencia/displacement para la máscara (más irregular que v1).
+ * @param {number} seed
+ * @returns {{ baseFrequency: string; numOctaves: number; dispScale: number; noiseSeed: number }}
+ */
+export function erosionMaskNoiseParams(seed) {
+  const s = seed >>> 0;
+  const freqX = 0.028 + (s % 11) * 0.0025;
+  const freqY = 0.018 + ((s >>> 4) % 9) * 0.002;
+  const dispScale = 38 + (s % 19);
   return {
-    x: bounds.x,
-    width: bounds.width,
-    y: frontY,
-    height: Math.max(0, bounds.yMax - frontY),
+    baseFrequency: `${freqX.toFixed(4)} ${freqY.toFixed(4)}`,
+    numOctaves: 3,
+    dispScale,
+    noiseSeed: (s ^ 0x7f3c) & 0xffff,
   };
 }
 
 /**
- * @param {SVGRectElement} clipRect
+ * @param {SVGStopElement} stopB
+ * @param {SVGStopElement} stopC
  * @param {number} threshold
- * @param {{ x: number; width: number; yMin: number; yMax: number }} bounds
  */
-function applyErosionClipRect(clipRect, threshold, bounds) {
-  const { x, y, width, height } = erosionClipRectForThreshold(threshold, bounds);
-  clipRect.setAttribute("x", String(x));
-  clipRect.setAttribute("width", String(width));
-  clipRect.setAttribute("y", String(y));
-  clipRect.setAttribute("height", String(height));
+function applyErosionMaskStops(stopB, stopC, threshold) {
+  const offset = erosionMaskOffsetForThreshold(threshold);
+  stopB.setAttribute("offset", offset);
+  stopC.setAttribute("offset", offset);
 }
 
 /**
- * Crea e inserta en el SVG la infraestructura de clip de erosión.
- * El progreso se controla actualizando el rect del clipPath vía rAF.
+ * Crea e inserta en el SVG la infraestructura de máscara de erosión.
+ * El progreso se controla actualizando los stops del gradiente vía rAF.
  * @param {SVGSVGElement} svg
  * @param {SVGGElement} partsGroup
  * @param {number} seed
  * @param {{ x: number; width: number; yMin: number; yMax: number }} bounds
- * @returns {{ clipRect: SVGRectElement; bounds: { x: number; width: number; yMin: number; yMax: number } }}
+ * @returns {{ stopB: SVGStopElement; stopC: SVGStopElement }}
  */
-function createErosionClip(svg, partsGroup, seed, bounds) {
+function createErosionMask(svg, partsGroup, seed, bounds) {
   const uid = `fe-${(seed >>> 0).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const noise = erosionMaskNoiseParams(seed);
+  const padY = EROSION_MASK_PAD_Y * 1.5;
 
   const defs = document.createElementNS(SVG_NS, "defs");
 
-  const clipPath = document.createElementNS(SVG_NS, "clipPath");
-  clipPath.id = `ec-${uid}`;
-  clipPath.setAttribute("clipPathUnits", "userSpaceOnUse");
+  const grad = document.createElementNS(SVG_NS, "linearGradient");
+  grad.id = `eg-${uid}`;
+  grad.setAttribute("gradientUnits", "userSpaceOnUse");
+  grad.setAttribute("x1", "0");
+  grad.setAttribute("y1", String(bounds.yMin - padY));
+  grad.setAttribute("x2", "0");
+  grad.setAttribute("y2", String(bounds.yMax + padY));
 
-  const clipRect = /** @type {SVGRectElement} */ (document.createElementNS(SVG_NS, "rect"));
-  applyErosionClipRect(clipRect, 0, bounds);
+  const stopA = document.createElementNS(SVG_NS, "stop");
+  stopA.setAttribute("offset", "0");
+  stopA.setAttribute("stop-color", "black");
 
-  clipPath.appendChild(clipRect);
-  defs.appendChild(clipPath);
+  const stopB = /** @type {SVGStopElement} */ (document.createElementNS(SVG_NS, "stop"));
+  stopB.setAttribute("offset", "0");
+  stopB.setAttribute("stop-color", "black");
+
+  const stopC = /** @type {SVGStopElement} */ (document.createElementNS(SVG_NS, "stop"));
+  stopC.setAttribute("offset", "0");
+  stopC.setAttribute("stop-color", "white");
+
+  const stopD = document.createElementNS(SVG_NS, "stop");
+  stopD.setAttribute("offset", "1");
+  stopD.setAttribute("stop-color", "white");
+
+  grad.append(stopA, stopB, stopC, stopD);
+
+  const filter = document.createElementNS(SVG_NS, "filter");
+  filter.id = `ef-${uid}`;
+  filter.setAttribute("x", "-50%");
+  filter.setAttribute("y", "-50%");
+  filter.setAttribute("width", "200%");
+  filter.setAttribute("height", "200%");
+  filter.setAttribute("color-interpolation-filters", "sRGB");
+
+  const turbulence = document.createElementNS(SVG_NS, "feTurbulence");
+  turbulence.setAttribute("type", "fractalNoise");
+  turbulence.setAttribute("baseFrequency", noise.baseFrequency);
+  turbulence.setAttribute("numOctaves", String(noise.numOctaves));
+  turbulence.setAttribute("seed", String(noise.noiseSeed));
+  turbulence.setAttribute("result", "noise");
+
+  const disp = document.createElementNS(SVG_NS, "feDisplacementMap");
+  disp.setAttribute("in", "SourceGraphic");
+  disp.setAttribute("in2", "noise");
+  disp.setAttribute("scale", String(noise.dispScale));
+  disp.setAttribute("xChannelSelector", "R");
+  disp.setAttribute("yChannelSelector", "G");
+
+  filter.append(turbulence, disp);
+
+  const mask = document.createElementNS(SVG_NS, "mask");
+  mask.id = `em-${uid}`;
+  mask.setAttribute("maskUnits", "userSpaceOnUse");
+  mask.setAttribute("x", String(bounds.x));
+  mask.setAttribute("y", String(bounds.yMin - padY));
+  mask.setAttribute("width", String(bounds.width));
+  mask.setAttribute("height", String(bounds.yMax - bounds.yMin + padY * 2));
+
+  const maskRect = document.createElementNS(SVG_NS, "rect");
+  maskRect.setAttribute("x", String(bounds.x));
+  maskRect.setAttribute("y", String(bounds.yMin - padY));
+  maskRect.setAttribute("width", String(bounds.width));
+  maskRect.setAttribute("height", String(bounds.yMax - bounds.yMin + padY * 2));
+  maskRect.setAttribute("fill", `url(#eg-${uid})`);
+  maskRect.setAttribute("filter", `url(#ef-${uid})`);
+
+  mask.appendChild(maskRect);
+  defs.append(grad, filter, mask);
   svg.insertBefore(defs, svg.firstChild);
 
-  partsGroup.setAttribute("clip-path", `url(#ec-${uid})`);
+  partsGroup.setAttribute("mask", `url(#em-${uid})`);
 
-  return { clipRect, bounds };
+  return { stopB, stopC };
 }
 
 /**
@@ -404,7 +471,7 @@ export function mountFantasyElement(container, element, opts) {
     if (destroyed) return;
 
     const erosionBounds = erosionClipBoundsFromParts(element.parts);
-    const { clipRect } = createErosionClip(svg, partsGroup, element.seed, erosionBounds);
+    const { stopB, stopC } = createErosionMask(svg, partsGroup, element.seed, erosionBounds);
 
     let erodeStartMs = 0;
 
@@ -414,9 +481,9 @@ export function mountFantasyElement(container, element, opts) {
 
       const elapsed = now - erodeStartMs;
       const tRaw = Math.min(1, elapsed / timing.erodeMs);
-      const threshold = erosionThresholdAt(tRaw);
+      const threshold = erosionThresholdAt(tRaw, element.seed);
 
-      applyErosionClipRect(clipRect, threshold, erosionBounds);
+      applyErosionMaskStops(stopB, stopC, threshold);
 
       if (tRaw >= 1) {
         destroy();

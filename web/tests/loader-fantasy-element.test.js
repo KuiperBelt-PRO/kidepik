@@ -213,7 +213,12 @@ describe("loader-fantasy-element / erosionThresholdAt", () => {
   });
 
   it("satura correctamente para t < 0 y t > 1", () => {
-    assert.equal(erosionThresholdAt(-1), 0);
-    assert.equal(erosionThresholdAt(2), 1);
+    assert.equal(erosionThresholdAt(-1, 1), 0);
+    assert.equal(erosionThresholdAt(2, 1), 1);
+  });
+
+  it("con seed fija no es progreso lineal puro en t=0.5", () => {
+    const mid = erosionThresholdAt(0.5, 404);
+    assert.ok(Math.abs(mid - 0.5) > 0.03);
   });
 });

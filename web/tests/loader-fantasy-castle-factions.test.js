@@ -6,7 +6,9 @@ import {
   CASTLE_FACTIONS,
   getFactionProfile,
   parseDevFaction,
+  pickFaction,
 } from "../js/components/loader-fantasy-castle-factions.js";
+import { createRng } from "../js/components/loader-ship-rng.js";
 import { isValidFantasyElement } from "../js/components/loader-fantasy-element.js";
 
 function meanTowerHeight(el) {
@@ -15,13 +17,8 @@ function meanTowerHeight(el) {
   if (!towers.length) return 0;
   return towers.reduce((s, t) => s + (100 - t.baseY), 0) / towers.length;
 }
-
-function decorationCount(el) {
-  return el.parts.filter((p) => p.role === "decoration").length;
-}
-
 describe("loader-fantasy-castle-factions / perfiles", () => {
-  it("las cuatro facciones tienen perfil", () => {
+  it("las tres facciones tienen perfil", () => {
     for (const f of CASTLE_FACTIONS) {
       assert.equal(getFactionProfile(f).id, f);
     }
@@ -59,7 +56,7 @@ describe("loader-fantasy-castle-factions / generación", () => {
     assert.notEqual(JSON.stringify(h.parts), JSON.stringify(e.parts));
   });
 
-  it("sin faction explícita, meta.faction es una de las cuatro", () => {
+  it("sin faction explícita, meta.faction es una de las tres", () => {
     for (let s = 0; s < 40; s++) {
       const el = generateCastle({ seed: s * 17 + 5 });
       assert.ok(CASTLE_FACTIONS.includes(el.meta.faction), `seed ${s}: ${el.meta.faction}`);
@@ -74,6 +71,13 @@ describe("loader-fantasy-castle-factions / generación", () => {
     const el2 = generateCastle({ seed: 123 });
     assert.equal(el.meta.faction, el2.meta.faction);
   });
+  it("pickFaction (castillo) solo elige human, elf o dwarf", () => {
+    const rng = createRng(4242);
+    for (let i = 0; i < 60; i++) {
+      const f = pickFaction(rng, false);
+      assert.ok(CASTLE_FACTIONS.includes(f), `iter ${i}: ${f}`);
+    }
+  });
 });
 
 describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
@@ -86,21 +90,6 @@ describe("loader-fantasy-castle-factions / rasgos arquitectónicos", () => {
     const dwarfMean = dwarfSum / N;
     assert.ok(dwarfMean > 45, `media enana baja: ${dwarfMean}`);
   });
-
-  it("malignos tienen más decoración que humanos (media)", () => {
-    let evilTotal = 0;
-    let humanTotal = 0;
-    const N = 40;
-    for (let s = 0; s < N; s++) {
-      evilTotal += decorationCount(generateCastle({ seed: s * 11, faction: "evil" }));
-      humanTotal += decorationCount(generateCastle({ seed: s * 11, faction: "human" }));
-    }
-    assert.ok(
-      evilTotal > humanTotal * 1.08,
-      `decoración evil ${evilTotal} vs human ${humanTotal}`,
-    );
-  });
-
   it("enanos usan cuerpo achaflanado (más vértices que rect)", () => {
     for (let s = 0; s < 20; s++) {
       const el = generateCastle({ seed: s * 29, faction: "dwarf" });
