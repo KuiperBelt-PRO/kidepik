@@ -95,6 +95,42 @@ function createElementSvg(element) {
   return { svg, partsGroup, partGs };
 }
 
+/** Perfil de velocidad de construcción por facción (solo fase BUILD). */
+const DEFAULT_BUILD_TIMING = {
+  fillScale: 1,
+  strokeFactor: 0.15,
+  strokeOverlap: 0.92,
+  strokeMinMs: 70,
+  fillOverlap: 0.28,
+};
+
+/** Élficos: duración de trazos × (1 + 0.30). */
+const ELF_BUILD_STROKE_SLOW = 1.3;
+/** Humanos/enanos: duración de bloques ÷ (1 + 0.65). */
+const HUMAN_DWARF_BUILD_FILL_FAST = 1.65;
+
+/**
+ * @param {import('./loader-fantasy-element.js').FantasyElement} element
+ */
+export function castleBuildTimingProfile(element) {
+  const faction = element.meta?.faction;
+  if (faction === "elf") {
+    return {
+      ...DEFAULT_BUILD_TIMING,
+      strokeFactor: DEFAULT_BUILD_TIMING.strokeFactor * ELF_BUILD_STROKE_SLOW,
+      strokeMinMs: Math.round(DEFAULT_BUILD_TIMING.strokeMinMs * ELF_BUILD_STROKE_SLOW),
+      strokeOverlap: 0.9,
+    };
+  }
+  if (faction === "human" || faction === "dwarf") {
+    return {
+      ...DEFAULT_BUILD_TIMING,
+      fillScale: 1 / HUMAN_DWARF_BUILD_FILL_FAST,
+    };
+  }
+  return DEFAULT_BUILD_TIMING;
+}
+
 /** Padding alrededor del contenido para el clip de erosión (trazo, antialias). */
 const EROSION_CLIP_PAD_X = 14;
 const EROSION_CLIP_PAD_Y = 10;
@@ -289,12 +325,9 @@ export function mountFantasyElement(container, element, opts) {
   }
 
   // ─── Fase BUILDING ────────────────────────────────────────────────────────
-  const STROKE_PART_DURATION_FACTOR = 0.15;
-  const STROKE_PART_OVERLAP = 0.92;
-  const STROKE_PART_MIN_MS = 70;
+  const buildProfile = castleBuildTimingProfile(element);
   /** @type {{ g: SVGGElement; part: import('./loader-fantasy-element.js').FantasyPart; startMs: number; durationMs: number; done: boolean }[]} */
   const buildInfos = [];
-  const overlapFactor = 0.28;
 
   for (const part of element.parts) {
     const i = part.buildOrder;
@@ -304,8 +337,11 @@ export function mountFantasyElement(container, element, opts) {
       part,
       startMs: 0,
       durationMs: stroke
-        ? Math.max(STROKE_PART_MIN_MS, Math.round(timing.partDurationMs * STROKE_PART_DURATION_FACTOR))
-        : timing.partDurationMs,
+        ? Math.max(
+          buildProfile.strokeMinMs,
+          Math.round(timing.partDurationMs * buildProfile.strokeFactor),
+        )
+        : Math.round(timing.partDurationMs * buildProfile.fillScale),
       done: false,
     });
   }
@@ -319,8 +355,8 @@ export function mountFantasyElement(container, element, opts) {
     }
     const prev = buildInfos[i - 1];
     const overlap = prev.part.stroke && info.part.stroke
-      ? STROKE_PART_OVERLAP
-      : overlapFactor;
+      ? buildProfile.strokeOverlap
+      : buildProfile.fillOverlap;
     accDelay += prev.durationMs * (1 - overlap);
     info._delay = accDelay;
   });

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 
 import { generateCastle } from "../js/components/loader-fantasy-castle.js";
 import {
+  castleBuildTimingProfile,
   erosionClipBoundsFromParts,
   erosionClipRectForThreshold,
   svgBoundsFromParts,
@@ -50,5 +51,24 @@ describe("loader-fantasy-render / erosion clip", () => {
         `seed ${s}: zócalo [${plinthBounds.minX}, ${plinthBounds.maxX}] fuera de clip [${bounds.x}, ${bounds.x + bounds.width}]`,
       );
     }
+  });
+});
+
+describe("loader-fantasy-render / castleBuildTimingProfile", () => {
+  it("elfos: trazos 30 % más lentos que el perfil base", () => {
+    const elf = generateCastle({ seed: 1, faction: "elf" });
+    const elfP = castleBuildTimingProfile(elf);
+    assert.equal(elfP.strokeFactor, 0.15 * 1.3);
+    assert.equal(elfP.strokeMinMs, Math.round(70 * 1.3));
+  });
+
+  it("humanos y enanos: bloques 65 % más rápidos", () => {
+    const human = generateCastle({ seed: 2, faction: "human" });
+    const dwarf = generateCastle({ seed: 2, faction: "dwarf" });
+    const evil = generateCastle({ seed: 2, faction: "evil" });
+    const fastScale = 1 / 1.65;
+    assert.ok(Math.abs(castleBuildTimingProfile(human).fillScale - fastScale) < 1e-9);
+    assert.ok(Math.abs(castleBuildTimingProfile(dwarf).fillScale - fastScale) < 1e-9);
+    assert.equal(castleBuildTimingProfile(evil).fillScale, 1);
   });
 });
