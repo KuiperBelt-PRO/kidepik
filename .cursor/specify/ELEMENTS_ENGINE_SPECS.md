@@ -179,6 +179,18 @@
 
 ---
 
+## Sol y luna
+
+> Arquetipo: cuerpos celestes en **arco** (amanecer → mediodía → atardecer), derecha → izquierda. **Alternados** (sol, luna, sol…); nunca a la vez.
+
+- Trayectoria parabólica; el centro **no cruza** el logo (restricción radial + máscara).
+- Con la **luna**: campo de estrellas + **constelaciones** (segmentos sin cruces).
+- **2 fases lunares** alternadas: creciente muy fina ↔ menguante muy fina (sin luna llena).
+- Sol: rayos cortos con **rotación lenta** y **pulso de opacidad** (efecto de brillo).
+- Detalle: [SPEC_LOADER_FANTASY_CELESTIAL.md](SPEC_LOADER_FANTASY_CELESTIAL.md). Código: `loader-fantasy-celestial.js`.
+
+---
+
 ## Relacion con otras specs
 
 | Documento | Contenido |

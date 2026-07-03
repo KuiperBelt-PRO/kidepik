@@ -254,6 +254,111 @@
   filter: blur(0.15px);
 }
 
+/* Sol, luna, estrellas y constelaciones — cielo fantasía */
+.loader-layer.loader-layer--fantasy-celestial {
+  inset: 50% 0 0 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
+  mask-image: radial-gradient(
+    circle at 50% -40px,
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at 50% -40px,
+    transparent var(--orbit-logo-mask-r),
+    #000 calc(var(--orbit-logo-mask-r) + 3px)
+  );
+}
+
+.loader-celestial {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.loader-celestial__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.loader-celestial__sun-disc {
+  fill: #fff;
+}
+
+.loader-celestial__sun-rays {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: loader-celestial-sun-rays-spin 96s linear infinite;
+}
+
+@keyframes loader-celestial-sun-rays-spin {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+.loader-celestial__sun-ray--pulse {
+  animation: loader-celestial-sun-ray-glow var(--ray-pulse-dur, 2s) ease-in-out infinite;
+  animation-delay: var(--ray-pulse-delay, 0s);
+}
+
+@keyframes loader-celestial-sun-ray-glow {
+  0%,
+  100% {
+    opacity: 0.28;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.loader-celestial__sun-ray-main {
+  fill: #fff;
+}
+
+.loader-celestial__sun-ray-wisp {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 1.15;
+  stroke-linecap: round;
+}
+
+.loader-celestial__moon-body {
+  fill: #fff;
+}
+
+.loader-celestial__stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
+}
+
+.loader-celestial__stars-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.loader-celestial__star-shape {
+  fill: #fff;
+}
+
+.loader-celestial__constellation-line {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 0.35;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
 /* ── Fantasy scene (elementos procedurales: castillos, bloques, etc.) ───── */
 
 .loader-layer.loader-layer--fantasy-scene {
@@ -635,6 +740,11 @@
   .loader-ring__progress,
   .loader-ring__reveal {
     transition: none;
+  }
+
+  .loader-celestial__sun-rays,
+  .loader-celestial__sun-ray--pulse {
+    animation: none;
   }
 }
 
