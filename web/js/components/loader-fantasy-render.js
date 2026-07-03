@@ -311,6 +311,7 @@ function createErosionMask(svg, partsGroup, seed, bounds) {
  * @param {{
  *   reducedMotion?: boolean;
  *   xPercent: number;        0..100
+ *   anchor?: 'center' | 'left' | 'right';
  *   sizePx: number;          tamaño CSS del lado del SVG en px (equivale a altura deseada)
  *   terrainHeightPx: number; altura en px de la franja de terreno
  *   timing?: ReturnType<import('./loader-fantasy-element.js').planLifecycleTiming>;
@@ -324,6 +325,7 @@ export function mountFantasyElement(container, element, opts) {
     xPercent,
     sizePx,
     terrainHeightPx,
+    anchor = "center",
     onGone,
   } = opts;
 
@@ -337,6 +339,13 @@ export function mountFantasyElement(container, element, opts) {
   const el = document.createElement("div");
   el.className = "loader-fantasy-el";
   el.style.left = `${xPercent}%`;
+  if (anchor === "left") {
+    el.style.transform = "translateX(0)";
+  } else if (anchor === "right") {
+    el.style.transform = "translateX(-100%)";
+  } else {
+    el.style.transform = "translateX(-50%)";
+  }
   // El borde inferior del viewBox queda anclado al fondo de la pantalla (suelo).
   el.style.bottom = "0";
 
@@ -349,7 +358,12 @@ export function mountFantasyElement(container, element, opts) {
   el.style.height = `${svgH}px`;
 
   const { svg, partsGroup, partGs } = createElementSvg(element);
-  svg.setAttribute("preserveAspectRatio", "xMidYMax meet");
+  const preserve = anchor === "left"
+    ? "xMinYMax meet"
+    : anchor === "right"
+      ? "xMaxYMax meet"
+      : "xMidYMax meet";
+  svg.setAttribute("preserveAspectRatio", preserve);
   svg.style.width = `${svgW}px`;
   svg.style.height = `${svgH}px`;
   el.appendChild(svg);

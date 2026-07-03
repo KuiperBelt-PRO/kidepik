@@ -9,30 +9,31 @@
  */
 
 import { generateFantasyElement, planLifecycleTiming } from "./loader-fantasy-element.js";
+import { planCliffSides } from "./loader-fantasy-cliffs.js";
 import { mountFantasyElement } from "./loader-fantasy-render.js";
 import { pickFaction } from "./loader-fantasy-castle-factions.js";
-import { createRng, randRange } from "./loader-ship-rng.js";
+import { createRng, mixFantasySeed, randRange } from "./loader-ship-rng.js";
 
 // Zona horizontal prohibida (% del ancho) para evitar el logo central.
-// En Phase 0 no aplicamos exclusión central porque los elementos no llegan tan alto.
 const PLACE_LEFT_MIN = 8;
 const PLACE_LEFT_MAX = 92;
 
-// Fracción de la altura del contenedor de la escena que puede ocupar un elemento.
-// Mantiene los elementos pequeños y lejos del anillo del logo.
 const HEIGHT_FRACTION_MIN = 0.18;
 const HEIGHT_FRACTION_MAX = 0.34;
 
-// Límites de altura del elemento en px.
 const MIN_ELEMENT_HEIGHT_PX = 60;
 const MAX_ELEMENT_HEIGHT_PX = 150;
 
-// Castillos/palacios: perspectiva un poco más lejana (todas las facciones).
 const CASTLE_HEIGHT_FRAC_MIN = 0.23;
 const CASTLE_HEIGHT_FRAC_MAX = 0.4;
 const CASTLE_MAX_HEIGHT_PX = 168;
 
-// Semilla de sesión para posiciones aleatorias distintas en cada carga.
+// Muros laterales (~50 % del tamaño anterior; costura en x 0 % / 100 %).
+const CLIFF_HEIGHT_FRAC_MIN = 0.17;
+const CLIFF_HEIGHT_FRAC_MAX = 0.28;
+const CLIFF_MIN_HEIGHT_PX = 30;
+const CLIFF_MAX_HEIGHT_PX = 94;
+
 let _sessionSeedCounter = Date.now() & 0x7fffffff;
 
 function sessionSeed() {
@@ -41,9 +42,7 @@ function sessionSeed() {
 }
 
 /**
- * Monta el director de escena de fantasía dentro del `container`.
- *
- * @param {HTMLElement} container  elemento padre (loader-layers o similar)
+ * @param {HTMLElement} container
  * @param {{
  *   reducedMotion?: boolean;
  *   terrainHeightPx?: number;
@@ -69,9 +68,14 @@ export function mountFantasyScene(container, opts = {}) {
 
   let destroyed = false;
   let currentTeardown = /** @type {{ destroy: () => void } | null} */ (null);
+  /** @type {{ destroy: () => void }[]} */
+  let cliffTeardowns = [];
+  /** @type {{ left: boolean; right: boolean }} */
+  const cliffActive = { left: false, right: false };
   let nextTimer = 0;
   let cycleRng = createRng(sessionSeed());
   let spawnVariant = 0;
+  let wallSessionSeed = sessionSeed();
 
   function destroy() {
     destroyed = true;
@@ -80,18 +84,89 @@ export function mountFantasyScene(container, opts = {}) {
       currentTeardown.destroy();
       currentTeardown = null;
     }
+    for (const td of cliffTeardowns) td.destroy();
+    cliffTeardowns = [];
+    cliffActive.left = false;
+    cliffActive.right = false;
     layer.remove();
   }
 
   function computeSizePx(kind) {
     const layerH = layer.clientHeight || 200;
     const isCastle = kind === "castle" || kind === "palace";
-    const fracMin = isCastle ? CASTLE_HEIGHT_FRAC_MIN : HEIGHT_FRACTION_MIN;
-    const fracMax = isCastle ? CASTLE_HEIGHT_FRAC_MAX : HEIGHT_FRACTION_MAX;
+    const isCliff = kind === "cliffs";
+    const fracMin = isCastle
+      ? CASTLE_HEIGHT_FRAC_MIN
+      : isCliff
+        ? CLIFF_HEIGHT_FRAC_MIN
+        : HEIGHT_FRACTION_MIN;
+    const fracMax = isCastle
+      ? CASTLE_HEIGHT_FRAC_MAX
+      : isCliff
+        ? CLIFF_HEIGHT_FRAC_MAX
+        : HEIGHT_FRACTION_MAX;
     const frac = randRange(cycleRng, fracMin, fracMax);
     const raw = layerH * frac;
-    const maxPx = isCastle ? CASTLE_MAX_HEIGHT_PX : MAX_ELEMENT_HEIGHT_PX;
-    return Math.max(MIN_ELEMENT_HEIGHT_PX, Math.min(maxPx, raw));
+    const minPx = isCliff ? CLIFF_MIN_HEIGHT_PX : MIN_ELEMENT_HEIGHT_PX;
+    const maxPx = isCastle
+      ? CASTLE_MAX_HEIGHT_PX
+      : isCliff
+        ? CLIFF_MAX_HEIGHT_PX
+        : MAX_ELEMENT_HEIGHT_PX;
+    return Math.max(minPx, Math.min(maxPx, raw));
+  }
+
+  /**
+   * Una sola formación por extremo; no respawn si ya hay muro activo en ese lado.
+   * @param {'left' | 'right'} side
+   * @param {number} [cycleSeed]
+   */
+  function spawnCliffWall(side, cycleSeed = wallSessionSeed) {
+    if (destroyed || cliffActive[side]) return;
+
+    const cliffSeed = mixFantasySeed(cycleSeed, side === "left" ? 0x10 : 0x20);
+    const sizePx = computeSizePx("cliffs");
+    const element = generateFantasyElement("cliffs", {
+      seed: cliffSeed,
+      side,
+      terrainHeightPx,
+      cliffSizePx: sizePx,
+    });
+    if (!element) return;
+
+    const timing = planLifecycleTiming(cliffSeed, "cliffs", element.parts.length);
+    const devTiming = devKind === "cliffs"
+      ? { ...timing, holdMs: 4000, erodeMs: 6000, gapMs: 800 }
+      : timing;
+    const xPercent = side === "left" ? 0 : 100;
+
+    cliffActive[side] = true;
+    const teardown = mountFantasyElement(layer, element, {
+      reducedMotion,
+      xPercent,
+      anchor: side,
+      sizePx,
+      terrainHeightPx,
+      timing: devTiming,
+      onGone: () => {
+        cliffActive[side] = false;
+        cliffTeardowns = cliffTeardowns.filter((t) => t !== teardown);
+        if (devKind === "cliffs") {
+          if (!cliffActive.left && !cliffActive.right) scheduleNext(devTiming.gapMs);
+          return;
+        }
+        spawnCliffWall(side, sessionSeed());
+      },
+    });
+    cliffTeardowns.push(teardown);
+  }
+
+  /** Mantiene exactamente un muro por borde cuando procede. */
+  function ensureEdgeWalls(cycleSeed = wallSessionSeed) {
+    if (devKind === "cliffs") return;
+    for (const side of planCliffSides(cycleSeed).sides) {
+      spawnCliffWall(side, cycleSeed);
+    }
   }
 
   function scheduleNext(gapMs = 0) {
@@ -102,17 +177,25 @@ export function mountFantasyScene(container, opts = {}) {
   function runCycle() {
     if (destroyed) return;
 
-    // Un solo castillo/palacio visible: el ciclo anterior debe haber terminado (onGone).
     if (currentTeardown) {
       currentTeardown.destroy();
       currentTeardown = null;
     }
 
-    // Phase 1: castillos y palacios. devKind (?fantasyDev=) fuerza un tipo.
     const kind = /** @type {import('./loader-fantasy-element.js').FantasyKind} */ (
       devKind || (cycleRng() < 0.32 ? "palace" : "castle")
     );
     const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+
+    if (kind === "cliffs") {
+      wallSessionSeed = seed;
+      for (const side of planCliffSides(seed).sides) {
+        spawnCliffWall(side, seed);
+      }
+      if (!cliffActive.left && !cliffActive.right) scheduleNext(2000);
+      return;
+    }
+
     const faction = devFaction ?? pickFaction(cycleRng, kind === "palace");
     const variant = spawnVariant;
     spawnVariant += 1;
@@ -129,13 +212,11 @@ export function mountFantasyScene(container, opts = {}) {
       return;
     }
 
-    // Tiempos: en devMode acelera el hold para ciclar rápido
     const baseTiming = planLifecycleTiming(seed, kind, element.parts.length);
     const timing = devKind || devFaction
       ? { ...baseTiming, holdMs: 2200, gapMs: 500 }
       : baseTiming;
 
-    // Posición horizontal aleatoria (evitando el centro con margen si hay muchos elementos)
     const xPercent = randRange(cycleRng, PLACE_LEFT_MIN, PLACE_LEFT_MAX);
 
     currentTeardown = mountFantasyElement(layer, element, {
@@ -151,7 +232,8 @@ export function mountFantasyScene(container, opts = {}) {
     });
   }
 
-  // Arranca tras una breve pausa inicial para que el loader esté visible
+  wallSessionSeed = sessionSeed();
+  ensureEdgeWalls(wallSessionSeed);
   scheduleNext(devKind || devFaction ? 200 : 900);
 
   return { destroy };

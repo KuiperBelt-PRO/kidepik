@@ -152,6 +152,21 @@
 
 ---
 
+## Acantilados y formaciones rocosas
+
+> Arquetipo: columnas estrechas y altas en los **bordes** de la pantalla (izquierdo, derecho o ambos). Dos subtipos exclusivos: acantilado macizo que crece, o rocas apiladas.
+
+| Subtipo | Comportamiento build | Piezas |
+| --- | --- | --- |
+| `cliff` | Escala vertical de una sola masa | 1 silueta + repisas opcionales (misma secuencia) |
+| `rocks` | Apilado bottom-up | 3–6 bloques con `buildSequence` creciente |
+
+- Anchura 10–18 u local; altura 52–78 u; relación altura/anchura ≥ 3:1 tras normalizar.
+- Cara exterior dentada hacia el borde de pantalla; zócalo hacia el terreno (como castillos).
+- Detalle: [SPEC_LOADER_FANTASY_CLIFFS.md](SPEC_LOADER_FANTASY_CLIFFS.md).
+
+---
+
 ## Relacion con otras specs
 
 | Documento | Contenido |

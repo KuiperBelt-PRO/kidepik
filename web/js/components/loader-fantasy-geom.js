@@ -1471,11 +1471,17 @@ export function scaleFantasyPartsLocal(parts, axis, scale) {
  * Normaliza grupos de puntos en espacio local y-up al espacio SVG (y-down) 0..100.
  * Por defecto ancla el suelo local (minY) al borde inferior del viewBox (y=100).
  * @param {FPoint[][]} groups
- * @param {{ anchorY?: 'bottom' | 'center'; scaleBy?: 'max' | 'height'; bottomInset?: number; heightFloor?: number }} [opts]
+ * @param {{ anchorY?: 'bottom' | 'center'; scaleBy?: 'max' | 'height'; bottomInset?: number; heightFloor?: number; anchorX?: 'center' | 'left' | 'right' }} [opts]
  * @returns {FPoint[][]}
  */
 export function normalizeFantasyGroups(groups, opts = {}) {
-  const { anchorY = "bottom", scaleBy = "max", bottomInset = 0, heightFloor = 0 } = opts;
+  const {
+    anchorY = "bottom",
+    scaleBy = "max",
+    bottomInset = 0,
+    heightFloor = 0,
+    anchorX = "center",
+  } = opts;
   if (groups.length === 0 || groups.every((g) => g.length === 0)) return [];
 
   const { minX, minY, maxX, maxY } = boundsOfFantasyGroups(groups);
@@ -1486,7 +1492,15 @@ export function normalizeFantasyGroups(groups, opts = {}) {
     : Math.max(contentW, contentH, heightFloor);
   const usable = Math.max(1, 100 - bottomInset);
   const scale = usable / size;
-  const padX = (100 - contentW * scale) / 2;
+  const scaledW = contentW * scale;
+  let padX;
+  if (anchorX === "left") {
+    padX = 0;
+  } else if (anchorX === "right") {
+    padX = 100 - scaledW;
+  } else {
+    padX = (100 - scaledW) / 2;
+  }
   const floorY = 100 - bottomInset;
 
   if (anchorY === "bottom") {
@@ -1505,6 +1519,31 @@ export function normalizeFantasyGroups(groups, opts = {}) {
     pts.map((p) => ({
       x: ((p.x - minX + padXLegacy) / size) * 100,
       y: ((maxY - p.y + padY) / size) * 100,
+    })),
+  );
+}
+
+/**
+ * Normaliza formaciones tipo muro lateral: costura en x=0 local, masa negativa (izq) o
+ * espejada hacia la derecha del viewBox. Permite coordenadas fuera de 0..100.
+ * @param {FPoint[][]} groups
+ * @param {{ side: 'left' | 'right'; bottomInset?: number; heightFloor?: number }} opts
+ * @returns {FPoint[][]}
+ */
+export function normalizeFantasyWallGroups(groups, opts) {
+  const { side, bottomInset = 0, heightFloor = 0 } = opts;
+  if (groups.length === 0 || groups.every((g) => g.length === 0)) return [];
+
+  const { minY, maxY } = boundsOfFantasyGroups(groups);
+  const contentH = maxY - minY || 1;
+  const usable = Math.max(1, 100 - bottomInset);
+  const scale = usable / Math.max(contentH, heightFloor);
+  const floorY = 100 - bottomInset;
+
+  return groups.map((pts) =>
+    pts.map((p) => ({
+      x: side === "left" ? p.x * scale : 100 - p.x * scale,
+      y: floorY - (p.y - minY) * scale,
     })),
   );
 }

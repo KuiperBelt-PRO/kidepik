@@ -14,6 +14,7 @@
  */
 
 import { generateCastle } from "./loader-fantasy-castle.js";
+import { generateCliffs } from "./loader-fantasy-cliffs.js";
 import {
   aperture,
   buildPartPath,
@@ -21,12 +22,13 @@ import {
   jitterRing,
   merlons,
   normalizeFantasyGroups,
+  normalizeFantasyWallGroups,
   rect,
 } from "./loader-fantasy-geom.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
 
 /**
- * @typedef {'block'|'castle'|'palace'|'tower'|'village'|'town'|'inn'|'forest'|'crystals'|'portal'|'menhir'|'dolmen'|'stoneCircle'} FantasyKind
+ * @typedef {'block'|'castle'|'palace'|'cliffs'|'tower'|'village'|'town'|'inn'|'forest'|'crystals'|'portal'|'menhir'|'dolmen'|'stoneCircle'} FantasyKind
  */
 
 /**
@@ -137,12 +139,27 @@ export class ElementAssembler {
       });
     }
 
-    const normalized = normalizeFantasyGroups(allRings, {
-      anchorY: "bottom",
-      scaleBy,
-      bottomInset,
-      heightFloor,
-    });
+    const anchorX = meta.normalizeAnchorX === "left" || meta.normalizeAnchorX === "right"
+      ? meta.normalizeAnchorX
+      : "center";
+
+    const wallSide = meta.normalizeMode === "wallSeam" && (meta.side === "left" || meta.side === "right")
+      ? /** @type {'left'|'right'} */ (meta.side)
+      : null;
+
+    const normalized = wallSide
+      ? normalizeFantasyWallGroups(allRings, {
+        side: wallSide,
+        bottomInset,
+        heightFloor,
+      })
+      : normalizeFantasyGroups(allRings, {
+        anchorY: "bottom",
+        scaleBy,
+        bottomInset,
+        heightFloor,
+        anchorX,
+      });
 
     /** @type {FantasyPart[]} */
     const parts = partMeta.map((pm, partIdx) => {
@@ -229,8 +246,15 @@ export function planBuildOrder(parts) {
  * @returns {{ partDurationMs: number; holdMs: number; erodeMs: number; gapMs: number }}
  */
 export function planLifecycleTiming(seed, kind, _partCount) {
-  // Mezclar seed con una constante para independizarlo del RNG de geometría
   const rng = createRng((seed ^ 0x4f3a9c2b) >>> 0);
+  if (kind === "cliffs") {
+    return {
+      partDurationMs: Math.round(randRange(rng, 520, 780)),
+      holdMs: Math.round(randRange(rng, 9000, 15000)),
+      erodeMs: Math.round(randRange(rng, 13000, 20000)),
+      gapMs: Math.round(randRange(rng, 2500, 5000)),
+    };
+  }
   const partDurationMs = Math.round(randRange(rng, 580, 920));
   const holdMs = Math.round(randRange(rng, 2000, 5500));
   const erodeMs = Math.round(randRange(rng, 7000, 11000));
@@ -367,6 +391,7 @@ export const FANTASY_BUILDERS = {
   // Phase 1 — castillos y palacios (mismo builder, palace sesga estilo)
   castle: (seed, opts = {}) => generateCastle({ ...opts, seed, palace: false }),
   palace: (seed, opts = {}) => generateCastle({ ...opts, seed, palace: true }),
+  cliffs: (seed, opts = {}) => generateCliffs({ ...opts, seed, side: opts.side ?? "left" }),
   // Phase 2+:
   tower: null,
   village: null,
