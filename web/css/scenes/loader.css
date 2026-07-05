@@ -17,6 +17,7 @@
   overflow: hidden;
   cursor: pointer;
   background: #000;
+  --fantasy-terrain-h: clamp(36px, 7vh, 66px);
   --loader-fantasy: #3ddb7e;
   --loader-fantasy-gold: #f0c14a;
   --loader-space: #4da3ff;

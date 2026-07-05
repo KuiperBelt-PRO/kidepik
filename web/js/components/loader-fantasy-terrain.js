@@ -35,6 +35,102 @@ function fmt(value) {
 /** @typedef {{ x: number; y: number }[]} TerrainProfile */
 
 /**
+ * Interpola la altura de la cresta del terreno (fracción 0..1 desde el borde superior de la franja).
+ * @param {TerrainProfile} profile
+ * @param {number} xNorm 0..1
+ * @returns {number}
+ */
+export function sampleTerrainCrestYNorm(profile, xNorm) {
+  if (!profile?.length) return 0.5;
+  const x = Math.max(0, Math.min(1, xNorm));
+  if (x <= profile[0].x) return profile[0].y;
+  const last = profile[profile.length - 1];
+  if (x >= last.x) return last.y;
+
+  for (let i = 1; i < profile.length; i += 1) {
+    const a = profile[i - 1];
+    const b = profile[i];
+    if (x <= b.x) {
+      const t = (x - a.x) / Math.max(1e-6, b.x - a.x);
+      return a.y + (b.y - a.y) * t;
+    }
+  }
+  return last.y;
+}
+
+/**
+ * Offset en px desde el fondo del escenario hasta la cresta del terreno en xPercent.
+ * @param {TerrainProfile} profile
+ * @param {number} xPercent 0..100
+ * @param {number} terrainHeightPx
+ * @returns {number}
+ */
+export function terrainCrestOffsetPx(profile, xPercent, terrainHeightPx) {
+  if (!profile?.length || terrainHeightPx <= 0) return 0;
+  const yNorm = sampleTerrainCrestYNorm(profile, xPercent / 100);
+  return terrainHeightPx * (1 - yNorm);
+}
+
+/**
+ * X de pantalla (0–100) de un árbol dentro de un bosque centrado en forestXPercent.
+ * @param {number} forestXPercent
+ * @param {number} pivotXViewBox  0..100 en viewBox del bosque
+ * @param {number} forestSizePx
+ * @param {number} sceneWidthPx
+ * @returns {number}
+ */
+export function computeTreeScreenXPercent(forestXPercent, pivotXViewBox, forestSizePx, sceneWidthPx) {
+  if (!sceneWidthPx) return forestXPercent;
+  const offsetPercent = ((pivotXViewBox - 50) / 100) * (forestSizePx / sceneWidthPx) * 100;
+  return Math.max(0, Math.min(100, forestXPercent + offsetPercent));
+}
+
+/**
+ * Desplazamiento SVG (unidades viewBox 0–100) para apoyar el árbol en la cresta del terreno.
+ * @param {TerrainProfile} profile
+ * @param {number} forestXPercent
+ * @param {number} pivotXViewBox
+ * @param {number} pivotYViewBox  base del árbol en viewBox (mayor y = más abajo)
+ * @param {number} forestSizePx
+ * @param {number} sceneWidthPx
+ * @param {number} terrainHeightPx
+ * @returns {number}
+ */
+export function computeTreeTerrainLiftSvg(
+  profile,
+  forestXPercent,
+  pivotXViewBox,
+  pivotYViewBox,
+  forestSizePx,
+  sceneWidthPx,
+  terrainHeightPx,
+) {
+  if (!profile?.length || forestSizePx <= 0 || terrainHeightPx <= 0) return 0;
+  const treeX = computeTreeScreenXPercent(forestXPercent, pivotXViewBox, forestSizePx, sceneWidthPx);
+  const targetFromBottomPx = terrainCrestOffsetPx(profile, treeX, terrainHeightPx);
+  const currentFromBottomPx = ((100 - pivotYViewBox) / 100) * forestSizePx;
+  const liftPx = targetFromBottomPx - currentFromBottomPx;
+  return (liftPx / forestSizePx) * 100;
+}
+
+/**
+ * Altura real en px de la capa de terreno (o fallback CSS).
+ * @param {ParentNode} [layersRoot]
+ * @returns {number}
+ */
+export function measureFantasyTerrainHeightPx(layersRoot) {
+  const root = layersRoot ?? document;
+  const terrainLayer = root.querySelector?.(".loader-layer--fantasy-terrain");
+  if (terrainLayer?.clientHeight) return terrainLayer.clientHeight;
+  const sceneLayer = root.querySelector?.(".loader-layer--fantasy-scene");
+  const fromScene = sceneLayer
+    && parseFloat(getComputedStyle(sceneLayer).getPropertyValue("--fantasy-terrain-h"));
+  if (fromScene) return fromScene;
+  const fromDoc = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fantasy-terrain-h"));
+  return fromDoc || 48;
+}
+
+/**
  * Perfil normalizado (0–1) del borde superior del suelo.
  * @param {() => number} rng
  * @returns {TerrainProfile}
@@ -133,6 +229,7 @@ export function mountFantasyTerrainLayer(container, { rng } = {}) {
   }
 
   return {
+    profile,
     destroy() {
       destroyed = true;
       ro?.disconnect();

@@ -11,8 +11,13 @@ import {
   erosionClipBoundsFromParts,
   erosionMaskNoiseParams,
   erosionMaskOffsetForThreshold,
+  forestTreePivot,
+  FOREST_TREE_STAGGER_MS,
+  groupForestPartsByTree,
+  planForestTreeBuildDelays,
   svgBoundsFromParts,
 } from "../js/components/loader-fantasy-render.js";
+import { generateForest } from "../js/components/loader-fantasy-forest.js";
 
 describe("loader-fantasy-render / erosion mask", () => {
   it("offset 0 deja el castillo intacto y 1 lo borra", () => {
@@ -87,5 +92,34 @@ describe("loader-fantasy-render / castleBuildTimingProfile", () => {
   it("elfos: timing de construcción sin aceleración de bloques", () => {
     const elf = generateCastle({ seed: 2, faction: "elf" });
     assert.equal(castleBuildTimingProfile(elf).fillScale, 1);
+  });
+});
+
+describe("loader-fantasy-render / bosques", () => {
+  it("groupForestPartsByTree agrupa tronco y copas del mismo árbol", () => {
+    const el = generateForest({ seed: 12, extent: "compact" });
+    const groups = groupForestPartsByTree(el.parts);
+    assert.equal(groups.length, el.meta.treeCount);
+    for (const group of groups) {
+      assert.ok(group.parts.some((p) => p.role === "trunk"));
+      assert.ok(group.parts.some((p) => p.role === "canopy"));
+      const roles = new Set(group.parts.map((p) => p.treeIndex));
+      assert.equal(roles.size, 1);
+    }
+  });
+
+  it("forestTreePivot usa el tronco como ancla horizontal", () => {
+    const el = generateForest({ seed: 3 });
+    const group = groupForestPartsByTree(el.parts)[0];
+    const trunk = group.parts.find((p) => p.role === "trunk");
+    const pivot = forestTreePivot(group.parts);
+    assert.equal(pivot.pivotX, trunk?.centerX);
+    assert.ok(pivot.pivotY >= trunk?.baseY ?? 0);
+  });
+
+  it("planForestTreeBuildDelays escalona el crecimiento", () => {
+    const delays = planForestTreeBuildDelays(5);
+    assert.deepEqual(delays, [0, FOREST_TREE_STAGGER_MS, FOREST_TREE_STAGGER_MS * 2, FOREST_TREE_STAGGER_MS * 3, FOREST_TREE_STAGGER_MS * 4]);
+    assert.ok(FOREST_TREE_STAGGER_MS >= 40 && FOREST_TREE_STAGGER_MS <= 60);
   });
 });

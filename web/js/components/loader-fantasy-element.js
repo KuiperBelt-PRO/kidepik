@@ -15,6 +15,7 @@
 
 import { generateCastle } from "./loader-fantasy-castle.js";
 import { generateCliffs } from "./loader-fantasy-cliffs.js";
+import { generateForest } from "./loader-fantasy-forest.js";
 import {
   aperture,
   buildPartPath,
@@ -43,6 +44,7 @@ import { createRng, randRange } from "./loader-ship-rng.js";
  *   stroke?: boolean;
  *   strokeWidth?: number;
  *   buildSequence?: number;
+ *   treeIndex?: number;
  * }} FantasyPart
  */
 
@@ -70,7 +72,7 @@ import { createRng, randRange } from "./loader-ship-rng.js";
  */
 export class ElementAssembler {
   constructor() {
-    /** @type {{ role: string; outer: import('./loader-fantasy-geom.js').FPoint[]; holes: import('./loader-fantasy-geom.js').FPoint[][]; tiltDeg?: number; stroke?: boolean; buildSequence?: number }[]} */
+    /** @type {{ role: string; outer: import('./loader-fantasy-geom.js').FPoint[]; holes: import('./loader-fantasy-geom.js').FPoint[][]; tiltDeg?: number; stroke?: boolean; buildSequence?: number; treeIndex?: number; smoothOutline?: boolean }[]} */
     this._parts = [];
   }
 
@@ -79,7 +81,7 @@ export class ElementAssembler {
    * @param {string} role
    * @param {import('./loader-fantasy-geom.js').FPoint[]} outer
    * @param {import('./loader-fantasy-geom.js').FPoint[][]} [holes]
-   * @param {{ tiltDeg?: number; stroke?: boolean; strokeWidth?: number; buildSequence?: number }} [opts]
+   * @param {{ tiltDeg?: number; stroke?: boolean; strokeWidth?: number; buildSequence?: number; treeIndex?: number; smoothOutline?: boolean }} [opts]
    */
   addPart(role, outer, holes = [], opts = {}) {
     this._parts.push({
@@ -90,6 +92,8 @@ export class ElementAssembler {
       stroke: opts.stroke,
       strokeWidth: opts.strokeWidth,
       buildSequence: opts.buildSequence,
+      treeIndex: opts.treeIndex,
+      smoothOutline: opts.smoothOutline,
     });
   }
 
@@ -117,7 +121,7 @@ export class ElementAssembler {
     // Recoger todos los anillos para normalización conjunta
     /** @type {import('./loader-fantasy-geom.js').FPoint[][]} */
     const allRings = [];
-    /** @type {{ outerIdx: number; holeIdxs: number[]; role: string; tiltDeg?: number; stroke?: boolean; strokeWidth?: number; buildSequence?: number }[]} */
+    /** @type {{ outerIdx: number; holeIdxs: number[]; role: string; tiltDeg?: number; stroke?: boolean; strokeWidth?: number; buildSequence?: number; treeIndex?: number; smoothOutline?: boolean }[]} */
     const partMeta = [];
 
     for (const p of this._parts) {
@@ -136,6 +140,8 @@ export class ElementAssembler {
         stroke: p.stroke,
         strokeWidth: p.strokeWidth,
         buildSequence: p.buildSequence,
+        treeIndex: p.treeIndex,
+        smoothOutline: p.smoothOutline,
       });
     }
 
@@ -165,9 +171,11 @@ export class ElementAssembler {
     const parts = partMeta.map((pm, partIdx) => {
       const normOuter = normalized[pm.outerIdx];
       const normHoles = pm.holeIdxs.map((i) => normalized[i]);
-      const d = pm.stroke
-        ? buildPartPath(normOuter, normHoles, { open: true })
-        : buildPartPath(normOuter, normHoles);
+      const pathOpts = {
+        open: Boolean(pm.stroke),
+        smooth: Boolean(pm.smoothOutline),
+      };
+      const d = buildPartPath(normOuter, normHoles, pathOpts);
 
       // baseY SVG = max y del anillo exterior (= parte inferior de la forma en SVG y-down)
       const ys = normOuter.map((p) => p.y);
@@ -186,6 +194,7 @@ export class ElementAssembler {
         stroke: pm.stroke,
         strokeWidth: pm.strokeWidth,
         buildSequence: pm.buildSequence,
+        treeIndex: pm.treeIndex,
       };
     });
 
@@ -253,6 +262,14 @@ export function planLifecycleTiming(seed, kind, _partCount) {
       holdMs: Math.round(randRange(rng, 9000, 15000)),
       erodeMs: Math.round(randRange(rng, 13000, 20000)),
       gapMs: Math.round(randRange(rng, 2500, 5000)),
+    };
+  }
+  if (kind === "forest") {
+    return {
+      partDurationMs: Math.round(randRange(rng, 240, 420)),
+      holdMs: Math.round(randRange(rng, 16000, 26000)),
+      erodeMs: Math.round(randRange(rng, 5500, 9000)),
+      gapMs: Math.round(randRange(rng, 900, 2200)),
     };
   }
   const partDurationMs = Math.round(randRange(rng, 580, 920));
@@ -392,12 +409,12 @@ export const FANTASY_BUILDERS = {
   castle: (seed, opts = {}) => generateCastle({ ...opts, seed, palace: false }),
   palace: (seed, opts = {}) => generateCastle({ ...opts, seed, palace: true }),
   cliffs: (seed, opts = {}) => generateCliffs({ ...opts, seed, side: opts.side ?? "left" }),
+  forest: (seed, opts = {}) => generateForest({ ...opts, seed }),
   // Phase 2+:
   tower: null,
   village: null,
   town: null,
   inn: null,
-  forest: null,
   crystals: null,
   portal: null,
   menhir: null,

@@ -12,6 +12,10 @@ import {
   buildTerrainProfile,
   maxTerrainCrestFromBottomFrac,
   planTerrainSegmentCount,
+  sampleTerrainCrestYNorm,
+  terrainCrestOffsetPx,
+  computeTreeScreenXPercent,
+  computeTreeTerrainLiftSvg,
 } from "../js/components/loader-fantasy-terrain.js";
 import { createRng } from "../js/components/loader-ship-rng.js";
 
@@ -73,5 +77,39 @@ describe("loader-fantasy-terrain", () => {
     const minCrest = 1 - (TERRAIN_CREST_MAX + TERRAIN_ROUGHNESS_MAX);
     const maxCrest = 1 - (TERRAIN_CREST_MIN - TERRAIN_ROUGHNESS_MAX);
     assert.ok(frac >= minCrest && frac <= maxCrest);
+  });
+
+  it("sampleTerrainCrestYNorm interpola entre puntos", () => {
+    const profile = [
+      { x: 0, y: 0.4 },
+      { x: 0.5, y: 0.5 },
+      { x: 1, y: 0.6 },
+    ];
+    assert.equal(sampleTerrainCrestYNorm(profile, 0), 0.4);
+    assert.equal(sampleTerrainCrestYNorm(profile, 1), 0.6);
+    assert.ok(Math.abs(sampleTerrainCrestYNorm(profile, 0.5) - 0.5) < 0.01);
+  });
+
+  it("terrainCrestOffsetPx aumenta cuando la cresta sube", () => {
+    const low = [{ x: 0, y: 0.6 }, { x: 1, y: 0.6 }];
+    const high = [{ x: 0, y: 0.35 }, { x: 1, y: 0.35 }];
+    const offLow = terrainCrestOffsetPx(low, 50, 48);
+    const offHigh = terrainCrestOffsetPx(high, 50, 48);
+    assert.ok(offHigh > offLow);
+  });
+
+  it("computeTreeTerrainLiftSvg alinea la base del árbol con la cresta", () => {
+    const profile = [{ x: 0, y: 0.5 }, { x: 1, y: 0.5 }];
+    const crestPx = terrainCrestOffsetPx(profile, 50, 48);
+    const pivotYAligned = 100 - (crestPx / 96) * 100;
+    const lift = computeTreeTerrainLiftSvg(profile, 50, 50, pivotYAligned, 96, 390, 48);
+    assert.ok(Math.abs(lift) < 0.5, "base alineada con cresta → lift ~0");
+    const liftHigh = computeTreeTerrainLiftSvg(profile, 50, 50, 92, 96, 390, 48);
+    assert.ok(liftHigh > 0, "árbol con base por encima del suelo necesita lift positivo");
+  });
+
+  it("computeTreeScreenXPercent desplaza según pivot en viewBox", () => {
+    assert.ok(computeTreeScreenXPercent(50, 70, 100, 400) > 50);
+    assert.ok(computeTreeScreenXPercent(50, 30, 100, 400) < 50);
   });
 });

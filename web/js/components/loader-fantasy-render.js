@@ -11,6 +11,10 @@
  */
 
 import { erosionThresholdAt, planLifecycleTiming } from "./loader-fantasy-element.js";
+import {
+  computeTreeTerrainLiftSvg,
+  measureFantasyTerrainHeightPx,
+} from "./loader-fantasy-terrain.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 
@@ -40,10 +44,6 @@ function easeOutBack(t) {
  */
 function applyPartScale(g, pivotX, pivotY, sy, tiltDeg = 0) {
   const s = Math.max(0, sy);
-  // La rotación de imperfección usa y=100 como pivote (suelo del viewBox),
-  // igual para todas las piezas — torre y remate giran alrededor del mismo
-  // punto y permanecen alineados aunque el eje de escala de cada pieza sea
-  // su propio baseY.
   const rot = tiltDeg ? ` rotate(${fmt(tiltDeg)} ${fmt(pivotX)} 100)` : "";
   g.setAttribute(
     "transform",
@@ -52,9 +52,101 @@ function applyPartScale(g, pivotX, pivotY, sy, tiltDeg = 0) {
 }
 
 /**
+ * Transform de un árbol de bosque: apoyo en terreno + escala desde el suelo.
+ * @param {SVGGElement} g
+ * @param {number} pivotX
+ * @param {number} pivotY
+ * @param {number} sy
+ * @param {number} tiltDeg
+ * @param {number} liftSvg  desplazamiento hacia arriba en unidades viewBox
+ */
+export function applyForestTreeTransform(g, pivotX, pivotY, sy, tiltDeg = 0, liftSvg = 0) {
+  const s = Math.max(0, sy);
+  const rot = tiltDeg ? ` rotate(${fmt(tiltDeg)} ${fmt(pivotX)} ${fmt(pivotY)})` : "";
+  g.setAttribute(
+    "transform",
+    `translate(0 ${fmt(-liftSvg)}) translate(${fmt(pivotX)} ${fmt(pivotY)}) scale(1 ${fmt(s)}) translate(${fmt(-pivotX)} ${fmt(-pivotY)})${rot}`,
+  );
+}
+
+/**
+ * Índice de árbol al que pertenece una parte de bosque.
+ * @param {import('./loader-fantasy-element.js').FantasyPart} part
+ * @returns {number}
+ */
+export function forestTreeIndexFromPart(part) {
+  if (Number.isFinite(part.treeIndex)) return /** @type {number} */ (part.treeIndex);
+  return Math.floor((part.buildSequence ?? 0) / 10);
+}
+
+/**
+ * Agrupa partes de bosque por árbol (orden estable por treeIndex).
+ * @param {import('./loader-fantasy-element.js').FantasyPart[]} parts
+ * @returns {{ treeIndex: number; parts: import('./loader-fantasy-element.js').FantasyPart[] }[]}
+ */
+export function groupForestPartsByTree(parts) {
+  /** @type {Map<number, import('./loader-fantasy-element.js').FantasyPart[]>} */
+  const map = new Map();
+  for (const part of parts) {
+    const idx = forestTreeIndexFromPart(part);
+    const bucket = map.get(idx) ?? [];
+    bucket.push(part);
+    map.set(idx, bucket);
+  }
+  return [...map.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([treeIndex, treeParts]) => ({ treeIndex, parts: treeParts }));
+}
+
+/**
+ * Pivote de escala para un árbol completo (suelo + centro horizontal).
+ * @param {import('./loader-fantasy-element.js').FantasyPart[]} treeParts
+ * @returns {{ pivotX: number; pivotY: number; tiltDeg: number }}
+ */
+export function forestTreePivot(treeParts) {
+  const trunk = treeParts.find((p) => p.role === "trunk");
+  const pivotY = Math.max(...treeParts.map((p) => p.baseY));
+  const pivotX = trunk?.centerX ?? treeParts.reduce((s, p) => s + p.centerX, 0) / treeParts.length;
+  const tiltDeg = trunk?.tiltDeg ?? treeParts[0]?.tiltDeg ?? 0;
+  return { pivotX, pivotY, tiltDeg };
+}
+
+/**
+ * @param {import('./loader-fantasy-element.js').FantasyPart} part
+ * @returns {SVGGElement}
+ */
+function createPartGroup(part) {
+  const g = /** @type {SVGGElement} */ (document.createElementNS(SVG_NS, "g"));
+  g.classList.add("loader-fantasy-part");
+  g.dataset.role = part.role;
+
+  const path = document.createElementNS(SVG_NS, "path");
+  path.setAttribute("d", part.d);
+  if (part.stroke) {
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "#fff");
+    path.setAttribute("stroke-width", String(part.strokeWidth ?? 2));
+    path.setAttribute("vector-effect", "non-scaling-stroke");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    g.classList.add("loader-fantasy-part--stroke");
+  } else {
+    path.setAttribute("fill", "#fff");
+    path.setAttribute("fill-rule", "evenodd");
+  }
+  g.appendChild(path);
+  return g;
+}
+
+/**
  * Crea el marcado SVG del elemento (defs + partes), sin el clip de erosión.
  * @param {import('./loader-fantasy-element.js').FantasyElement} element
- * @returns {{ svg: SVGSVGElement; partsGroup: SVGGElement; partGs: SVGGElement[] }}
+ * @returns {{
+ *   svg: SVGSVGElement;
+ *   partsGroup: SVGGElement;
+ *   partGs: SVGGElement[];
+ *   forestTrees?: { g: SVGGElement; treeIndex: number; parts: import('./loader-fantasy-element.js').FantasyPart[]; pivotX: number; pivotY: number; tiltDeg: number }[];
+ * }}
  */
 function createElementSvg(element) {
   const svg = /** @type {SVGSVGElement} */ (document.createElementNS(SVG_NS, "svg"));
@@ -66,32 +158,54 @@ function createElementSvg(element) {
   partsGroup.classList.add("loader-fantasy-el__parts");
   svg.appendChild(partsGroup);
 
-  const partGs = element.parts.map((part) => {
-    const g = /** @type {SVGGElement} */ (document.createElementNS(SVG_NS, "g"));
-    g.classList.add("loader-fantasy-part");
-    g.dataset.role = part.role;
+  if (element.kind === "forest") {
+    const trees = groupForestPartsByTree(element.parts);
+    /** @type {SVGGElement[]} */
+    const partGs = [];
+    /** @type {NonNullable<ReturnType<typeof createElementSvg>["forestTrees"]>} */
+    const forestTrees = [];
 
-    const path = document.createElementNS(SVG_NS, "path");
-    path.setAttribute("d", part.d);
-    if (part.stroke) {
-      path.setAttribute("fill", "none");
-      path.setAttribute("stroke", "#fff");
-      path.setAttribute("stroke-width", String(part.strokeWidth ?? 2));
-      path.setAttribute("vector-effect", "non-scaling-stroke");
-      path.setAttribute("stroke-linecap", "round");
-      path.setAttribute("stroke-linejoin", "round");
-      g.classList.add("loader-fantasy-part--stroke");
-    } else {
-      path.setAttribute("fill", "#fff");
-      path.setAttribute("fill-rule", "evenodd");
+    for (const { treeIndex, parts } of trees) {
+      const treeG = /** @type {SVGGElement} */ (document.createElementNS(SVG_NS, "g"));
+      treeG.classList.add("loader-fantasy-tree");
+      treeG.dataset.treeIndex = String(treeIndex);
+      const { pivotX, pivotY, tiltDeg } = forestTreePivot(parts);
+      for (const part of parts) {
+        const partG = createPartGroup(part);
+        treeG.appendChild(partG);
+        partGs.push(partG);
+      }
+      partsGroup.appendChild(treeG);
+      forestTrees.push({ g: treeG, treeIndex, parts, pivotX, pivotY, tiltDeg });
     }
-    g.appendChild(path);
 
+    return { svg, partsGroup, partGs, forestTrees };
+  }
+
+  const partGs = element.parts.map((part) => {
+    const g = createPartGroup(part);
     partsGroup.appendChild(g);
     return g;
   });
 
   return { svg, partsGroup, partGs };
+}
+
+/** Desfase entre árboles al crecer (ms). */
+export const FOREST_TREE_STAGGER_MS = 48;
+
+/**
+ * Delays acumulados para el crecimiento escalonado de un bosque.
+ * @param {number} treeCount
+ * @param {number} [staggerMs]
+ * @returns {number[]}
+ */
+export function planForestTreeBuildDelays(treeCount, staggerMs = FOREST_TREE_STAGGER_MS) {
+  const delays = [];
+  for (let i = 0; i < treeCount; i += 1) {
+    delays.push(i * staggerMs);
+  }
+  return delays;
 }
 
 /** Perfil de velocidad de construcción por facción (solo fase BUILD). */
@@ -125,6 +239,13 @@ export function castleBuildTimingProfile(element) {
     return {
       ...DEFAULT_BUILD_TIMING,
       fillScale: 1 / HUMAN_DWARF_BUILD_FILL_FAST,
+    };
+  }
+  if (element.kind === "forest") {
+    return {
+      ...DEFAULT_BUILD_TIMING,
+      fillScale: 0.78,
+      fillOverlap: 0.12,
     };
   }
   return DEFAULT_BUILD_TIMING;
@@ -314,6 +435,7 @@ function createErosionMask(svg, partsGroup, seed, bounds) {
  *   anchor?: 'center' | 'left' | 'right';
  *   sizePx: number;          tamaño CSS del lado del SVG en px (equivale a altura deseada)
  *   terrainHeightPx: number; altura en px de la franja de terreno
+ *   terrainProfile?: import('./loader-fantasy-terrain.js').TerrainProfile;
  *   timing?: ReturnType<import('./loader-fantasy-element.js').planLifecycleTiming>;
  *   onGone?: () => void;
  * }} opts
@@ -326,6 +448,7 @@ export function mountFantasyElement(container, element, opts) {
     sizePx,
     terrainHeightPx,
     anchor = "center",
+    terrainProfile,
     onGone,
   } = opts;
 
@@ -346,7 +469,7 @@ export function mountFantasyElement(container, element, opts) {
   } else {
     el.style.transform = "translateX(-50%)";
   }
-  // El borde inferior del viewBox queda anclado al fondo de la pantalla (suelo).
+  // Bosques: base en el suelo de la escena; cada árbol se apoya en la cresta del terreno.
   el.style.bottom = "0";
 
   // El viewBox es cuadrado (0 0 100 100) con el contenido anclado abajo (y=100).
@@ -357,7 +480,8 @@ export function mountFantasyElement(container, element, opts) {
   el.style.width = `${svgW}px`;
   el.style.height = `${svgH}px`;
 
-  const { svg, partsGroup, partGs } = createElementSvg(element);
+  const { svg, partsGroup, partGs, forestTrees } = createElementSvg(element);
+  const isForest = element.kind === "forest" && forestTrees?.length;
   const preserve = anchor === "left"
     ? "xMinYMax meet"
     : anchor === "right"
@@ -369,10 +493,33 @@ export function mountFantasyElement(container, element, opts) {
   el.appendChild(svg);
   container.appendChild(el);
 
+  const sceneWidthPx = container.clientWidth || 390;
+  const resolvedTerrainH = measureFantasyTerrainHeightPx(container.parentElement ?? container);
+
+  if (isForest && forestTrees && terrainProfile?.length) {
+    for (const tree of forestTrees) {
+      tree.liftSvg = computeTreeTerrainLiftSvg(
+        terrainProfile,
+        xPercent,
+        tree.pivotX,
+        tree.pivotY,
+        sizePx,
+        sceneWidthPx,
+        resolvedTerrainH || terrainHeightPx,
+      );
+    }
+  }
+
   // ─── Inicializar partes con escala 0 ──────────────────────────────────────
-  element.parts.forEach((part, i) => {
-    applyPartScale(partGs[i], part.centerX, part.baseY, 0, part.tiltDeg ?? 0);
-  });
+  if (isForest && forestTrees) {
+    for (const tree of forestTrees) {
+      applyForestTreeTransform(tree.g, tree.pivotX, tree.pivotY, 0, 0, tree.liftSvg ?? 0);
+    }
+  } else {
+    element.parts.forEach((part, i) => {
+      applyPartScale(partGs[i], part.centerX, part.baseY, 0, part.tiltDeg ?? 0);
+    });
+  }
 
   // ─── Función de limpieza ──────────────────────────────────────────────────
   function destroy() {
@@ -386,9 +533,15 @@ export function mountFantasyElement(container, element, opts) {
   if (reducedMotion) {
     el.style.transition = "opacity 400ms ease";
     el.style.opacity = "0";
-    element.parts.forEach((part, i) => {
-      applyPartScale(partGs[i], part.centerX, part.baseY, 1, part.tiltDeg ?? 0);
-    });
+    if (isForest && forestTrees) {
+      for (const tree of forestTrees) {
+        applyForestTreeTransform(tree.g, tree.pivotX, tree.pivotY, 1, tree.tiltDeg, tree.liftSvg ?? 0);
+      }
+    } else {
+      element.parts.forEach((part, i) => {
+        applyPartScale(partGs[i], part.centerX, part.baseY, 1, part.tiltDeg ?? 0);
+      });
+    }
     // Force reflow
     void el.offsetHeight;
     el.style.opacity = "1";
@@ -407,6 +560,63 @@ export function mountFantasyElement(container, element, opts) {
 
   // ─── Fase BUILDING ────────────────────────────────────────────────────────
   const buildProfile = castleBuildTimingProfile(element);
+
+  if (isForest && forestTrees) {
+    const treeDurationMs = Math.round(timing.partDurationMs * buildProfile.fillScale);
+    const buildDelays = planForestTreeBuildDelays(forestTrees.length);
+    /** @type {{ g: SVGGElement; pivotX: number; pivotY: number; tiltDeg: number; liftSvg: number; durationMs: number; done: boolean; _delay: number }[]} */
+    const treeBuildInfos = forestTrees.map((tree, i) => ({
+      g: tree.g,
+      pivotX: tree.pivotX,
+      pivotY: tree.pivotY,
+      tiltDeg: tree.tiltDeg,
+      liftSvg: tree.liftSvg ?? 0,
+      durationMs: treeDurationMs,
+      done: false,
+      _delay: buildDelays[i] ?? 0,
+    }));
+
+    let buildStartMs = 0;
+
+    function tickForestBuild(now) {
+      if (destroyed) return;
+      if (buildStartMs === 0) buildStartMs = now;
+
+      let allDone = true;
+      for (const info of treeBuildInfos) {
+        if (info.done) continue;
+        const elapsed = now - buildStartMs - info._delay;
+        if (elapsed < 0) {
+          allDone = false;
+          continue;
+        }
+        const t = Math.min(1, elapsed / info.durationMs);
+        const sy = easeOutBack(t);
+        const tilt = info.tiltDeg * t;
+        applyForestTreeTransform(info.g, info.pivotX, info.pivotY, sy, tilt, info.liftSvg);
+        if (t >= 1) {
+          info.done = true;
+          applyForestTreeTransform(info.g, info.pivotX, info.pivotY, 1, info.tiltDeg, info.liftSvg);
+        } else {
+          allDone = false;
+        }
+      }
+
+      if (!allDone) {
+        rafId = requestAnimationFrame(tickForestBuild);
+        return;
+      }
+
+      phaseTimer = setTimeout(() => {
+        if (destroyed) return;
+        startEroding();
+      }, timing.holdMs);
+    }
+
+    rafId = requestAnimationFrame(tickForestBuild);
+    return { destroy };
+  }
+
   /** @type {{ g: SVGGElement; part: import('./loader-fantasy-element.js').FantasyPart; startMs: number; durationMs: number; done: boolean }[]} */
   const buildInfos = [];
 

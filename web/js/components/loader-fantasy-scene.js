@@ -28,6 +28,11 @@ const CASTLE_HEIGHT_FRAC_MIN = 0.23;
 const CASTLE_HEIGHT_FRAC_MAX = 0.4;
 const CASTLE_MAX_HEIGHT_PX = 168;
 
+const FOREST_HEIGHT_FRAC_MIN = 0.12;
+const FOREST_HEIGHT_FRAC_MAX = 0.22;
+const FOREST_MIN_HEIGHT_PX = 40;
+const FOREST_MAX_HEIGHT_PX = 96;
+
 // Muros laterales (costura en x 0 % / 100 %).
 const CLIFF_HEIGHT_FRAC_MIN = 0.26;
 const CLIFF_HEIGHT_FRAC_MAX = 0.42;
@@ -41,6 +46,30 @@ function sessionSeed() {
   return _sessionSeedCounter;
 }
 
+/** @typedef {'forest' | 'building'} CenterSceneSlot */
+
+/**
+ * Ranura del centro que corresponde a un kind de fantasía.
+ * @param {import('./loader-fantasy-element.js').FantasyKind} kind
+ * @returns {CenterSceneSlot | null}
+ */
+export function centerSlotForKind(kind) {
+  if (kind === "forest") return "forest";
+  if (kind === "castle" || kind === "palace") return "building";
+  return null;
+}
+
+/**
+ * Elige castillo o palacio para la ranura de edificio.
+ * @param {() => number} rng
+ * @param {string | undefined} devKind
+ * @returns {'castle' | 'palace'}
+ */
+export function planBuildingKind(rng, devKind) {
+  if (devKind === "castle" || devKind === "palace") return devKind;
+  return rng() < 0.42 ? "palace" : "castle";
+}
+
 /**
  * @param {HTMLElement} container
  * @param {{
@@ -50,6 +79,7 @@ function sessionSeed() {
  *   devFaction?: import('./loader-fantasy-castle-factions.js').CastleFaction;
  *   devSeed?: number;
  *   devFormation?: import('./loader-fantasy-cliffs.js').CliffFormationType;
+ *   terrainProfile?: import('./loader-fantasy-terrain.js').TerrainProfile;
  * }} [opts]
  * @returns {{ destroy: () => void }}
  */
@@ -61,6 +91,7 @@ export function mountFantasyScene(container, opts = {}) {
     devFaction,
     devSeed,
     devFormation,
+    terrainProfile,
   } = opts;
 
   const layer = document.createElement("div");
@@ -69,17 +100,27 @@ export function mountFantasyScene(container, opts = {}) {
   container.appendChild(layer);
 
   let destroyed = false;
-  let currentTeardown = /** @type {{ destroy: () => void } | null} */ (null);
+  /** @type {{ destroy: () => void } | null} */
+  let forestTeardown = null;
+  /** @type {{ destroy: () => void } | null} */
+  let buildingTeardown = null;
   /** @type {{ destroy: () => void }[]} */
   let cliffTeardowns = [];
   /** @type {{ left: boolean; right: boolean }} */
   const cliffActive = { left: false, right: false };
-  let nextTimer = 0;
+  let forestTimer = 0;
+  let buildingTimer = 0;
   let cycleRng = createRng(sessionSeed());
-  let spawnVariant = 0;
+  let forestSpawnVariant = 0;
+  let buildingSpawnVariant = 0;
   let wallSessionSeed = sessionSeed();
   /** @type {import('./loader-fantasy-cliffs.js').CliffFormationType | undefined} */
   let wallFormationType;
+
+  const centerDevEnabled = {
+    forest: !devKind || devKind === "forest",
+    building: !devKind || devKind === "castle" || devKind === "palace",
+  };
 
   /** @param {number} cycleSeed */
   function resolveWallFormation(cycleSeed) {
@@ -91,10 +132,15 @@ export function mountFantasyScene(container, opts = {}) {
 
   function destroy() {
     destroyed = true;
-    clearTimeout(nextTimer);
-    if (currentTeardown) {
-      currentTeardown.destroy();
-      currentTeardown = null;
+    clearTimeout(forestTimer);
+    clearTimeout(buildingTimer);
+    if (forestTeardown) {
+      forestTeardown.destroy();
+      forestTeardown = null;
+    }
+    if (buildingTeardown) {
+      buildingTeardown.destroy();
+      buildingTeardown = null;
     }
     for (const td of cliffTeardowns) td.destroy();
     cliffTeardowns = [];
@@ -107,24 +153,31 @@ export function mountFantasyScene(container, opts = {}) {
     const layerH = layer.clientHeight || 200;
     const isCastle = kind === "castle" || kind === "palace";
     const isCliff = kind === "cliffs";
+    const isForest = kind === "forest";
     const fracMin = isCastle
       ? CASTLE_HEIGHT_FRAC_MIN
       : isCliff
         ? CLIFF_HEIGHT_FRAC_MIN
-        : HEIGHT_FRACTION_MIN;
+        : isForest
+          ? FOREST_HEIGHT_FRAC_MIN
+          : HEIGHT_FRACTION_MIN;
     const fracMax = isCastle
       ? CASTLE_HEIGHT_FRAC_MAX
       : isCliff
         ? CLIFF_HEIGHT_FRAC_MAX
-        : HEIGHT_FRACTION_MAX;
+        : isForest
+          ? FOREST_HEIGHT_FRAC_MAX
+          : HEIGHT_FRACTION_MAX;
     const frac = randRange(cycleRng, fracMin, fracMax);
     const raw = layerH * frac;
-    const minPx = isCliff ? CLIFF_MIN_HEIGHT_PX : MIN_ELEMENT_HEIGHT_PX;
+    const minPx = isCliff ? CLIFF_MIN_HEIGHT_PX : isForest ? FOREST_MIN_HEIGHT_PX : MIN_ELEMENT_HEIGHT_PX;
     const maxPx = isCastle
       ? CASTLE_MAX_HEIGHT_PX
       : isCliff
         ? CLIFF_MAX_HEIGHT_PX
-        : MAX_ELEMENT_HEIGHT_PX;
+        : isForest
+          ? FOREST_MAX_HEIGHT_PX
+          : MAX_ELEMENT_HEIGHT_PX;
     return Math.max(minPx, Math.min(maxPx, raw));
   }
 
@@ -164,12 +217,15 @@ export function mountFantasyScene(container, opts = {}) {
       anchor: side,
       sizePx,
       terrainHeightPx,
+      terrainProfile,
       timing: devTiming,
       onGone: () => {
         cliffActive[side] = false;
         cliffTeardowns = cliffTeardowns.filter((t) => t !== teardown);
         if (devKind === "cliffs") {
-          if (!cliffActive.left && !cliffActive.right) scheduleNext(devTiming.gapMs);
+          if (!cliffActive.left && !cliffActive.right) {
+            setTimeout(() => startCliffDevMode(sessionSeed()), devTiming.gapMs);
+          }
           return;
         }
         spawnCliffWall(side, sessionSeed(), wallFormationType);
@@ -188,39 +244,69 @@ export function mountFantasyScene(container, opts = {}) {
     }
   }
 
-  function scheduleNext(gapMs = 0) {
-    if (destroyed) return;
-    nextTimer = setTimeout(runCycle, gapMs);
+  function scheduleForestSpawn(gapMs = 0) {
+    if (destroyed || !centerDevEnabled.forest) return;
+    clearTimeout(forestTimer);
+    forestTimer = setTimeout(spawnForest, gapMs);
   }
 
-  function runCycle() {
-    if (destroyed) return;
+  function scheduleBuildingSpawn(gapMs = 0) {
+    if (destroyed || !centerDevEnabled.building) return;
+    clearTimeout(buildingTimer);
+    buildingTimer = setTimeout(spawnBuilding, gapMs);
+  }
 
-    if (currentTeardown) {
-      currentTeardown.destroy();
-      currentTeardown = null;
-    }
+  function spawnForest() {
+    if (destroyed || !centerDevEnabled.forest || forestTeardown) return;
 
-    const kind = /** @type {import('./loader-fantasy-element.js').FantasyKind} */ (
-      devKind || (cycleRng() < 0.32 ? "palace" : "castle")
-    );
-    const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+    const variant = forestSpawnVariant;
+    forestSpawnVariant += 1;
+    const sizePx = computeSizePx("forest");
+    const xPercent = randRange(cycleRng, PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+    const baseSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+    const seed = mixFantasySeed(baseSeed, variant);
 
-    if (kind === "cliffs") {
-      wallSessionSeed = seed;
-      const formation = resolveWallFormation(seed);
-      wallFormationType = formation;
-      for (const side of planCliffSides(seed).sides) {
-        spawnCliffWall(side, seed, formation);
-      }
-      if (!cliffActive.left && !cliffActive.right) scheduleNext(2000);
+    const element = generateFantasyElement("forest", {
+      seed,
+      terrainProfile,
+      forestCenterXNorm: xPercent / 100,
+      terrainHeightPx,
+    });
+    if (!element) {
+      scheduleForestSpawn(2000);
       return;
     }
 
-    const faction = devFaction ?? pickFaction(cycleRng, kind === "palace");
-    const variant = spawnVariant;
-    spawnVariant += 1;
+    const baseTiming = planLifecycleTiming(seed, "forest", element.parts.length);
+    const timing = devKind || devFaction
+      ? { ...baseTiming, holdMs: 3200, gapMs: 500 }
+      : baseTiming;
+
+    forestTeardown = mountFantasyElement(layer, element, {
+      reducedMotion,
+      xPercent,
+      sizePx,
+      terrainHeightPx,
+      terrainProfile,
+      timing,
+      onGone: () => {
+        forestTeardown = null;
+        scheduleForestSpawn(timing.gapMs);
+      },
+    });
+  }
+
+  function spawnBuilding() {
+    if (destroyed || !centerDevEnabled.building || buildingTeardown) return;
+
+    const kind = planBuildingKind(cycleRng, devKind);
+    const variant = buildingSpawnVariant;
+    buildingSpawnVariant += 1;
     const sizePx = computeSizePx(kind);
+    const xPercent = randRange(cycleRng, PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+    const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+    const faction = devFaction ?? pickFaction(cycleRng, kind === "palace");
+
     const element = generateFantasyElement(kind, {
       seed,
       variant,
@@ -229,7 +315,7 @@ export function mountFantasyScene(container, opts = {}) {
       castleSizePx: sizePx,
     });
     if (!element) {
-      scheduleNext(2000);
+      scheduleBuildingSpawn(2000);
       return;
     }
 
@@ -238,24 +324,51 @@ export function mountFantasyScene(container, opts = {}) {
       ? { ...baseTiming, holdMs: 2200, gapMs: 500 }
       : baseTiming;
 
-    const xPercent = randRange(cycleRng, PLACE_LEFT_MIN, PLACE_LEFT_MAX);
-
-    currentTeardown = mountFantasyElement(layer, element, {
+    buildingTeardown = mountFantasyElement(layer, element, {
       reducedMotion,
       xPercent,
       sizePx,
       terrainHeightPx,
+      terrainProfile,
       timing,
       onGone: () => {
-        currentTeardown = null;
-        scheduleNext(timing.gapMs);
+        buildingTeardown = null;
+        scheduleBuildingSpawn(timing.gapMs);
       },
     });
   }
 
+  function startCliffDevMode(seed) {
+    wallSessionSeed = seed;
+    const formation = resolveWallFormation(seed);
+    wallFormationType = formation;
+    for (const side of planCliffSides(seed).sides) {
+      spawnCliffWall(side, seed, formation);
+    }
+    if (!cliffActive.left && !cliffActive.right) scheduleForestSpawn(2000);
+  }
+
+  function bootstrapCenterSpawns() {
+    const quick = Boolean(devKind || devFaction);
+    const baseGap = quick ? 200 : 900;
+    if (centerDevEnabled.forest) {
+      const forestDelay = quick ? 0 : randRange(cycleRng, 0, 500);
+      scheduleForestSpawn(baseGap + forestDelay);
+    }
+    if (centerDevEnabled.building) {
+      const buildingDelay = quick ? 0 : randRange(cycleRng, 200, 1100);
+      scheduleBuildingSpawn(baseGap + buildingDelay);
+    }
+  }
+
   wallSessionSeed = sessionSeed();
   ensureEdgeWalls(wallSessionSeed);
-  scheduleNext(devKind || devFaction ? 200 : 900);
+  if (devKind === "cliffs") {
+    const cliffSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+    startCliffDevMode(cliffSeed);
+  } else {
+    bootstrapCenterSpawns();
+  }
 
   return { destroy };
 }

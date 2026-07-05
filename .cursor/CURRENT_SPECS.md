@@ -20,6 +20,7 @@
   - Acantilados y rocas en bordes: [specify/SPEC_LOADER_FANTASY_CLIFFS.md](specify/SPEC_LOADER_FANTASY_CLIFFS.md)
   - **Nubes de cielo (mitad fantasía):** [specify/SPEC_LOADER_FANTASY_CLOUDS.md](specify/SPEC_LOADER_FANTASY_CLOUDS.md) — implementada jul 2026
   - **Sol, luna y constelaciones:** [specify/SPEC_LOADER_FANTASY_CELESTIAL.md](specify/SPEC_LOADER_FANTASY_CELESTIAL.md) — implementada jul 2026
+  - **Bosques y árboles:** [specify/SPEC_LOADER_FANTASY_FOREST.md](specify/SPEC_LOADER_FANTASY_FOREST.md) — implementada jul 2026
   - **Diseño por grafos (castillos por facción):** [specify/ELEMENTS_ENGINE_SPECS.md](specify/ELEMENTS_ENGINE_SPECS.md) — fuente de verdad para implementación futura humano/enano/elfo
   - Facciones temáticas: [specify/SPEC_LOADER_FANTASY_CASTLE_FACTIONS.md](specify/SPEC_LOADER_FANTASY_CASTLE_FACTIONS.md)
   - Catálogo del resto de tipos: [specify/SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md](specify/SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md)

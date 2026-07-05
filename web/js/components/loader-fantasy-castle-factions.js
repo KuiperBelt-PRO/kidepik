@@ -225,12 +225,11 @@ export function pickRemateForFaction(rng, profile) {
  */
 export function pickHumanTowerCap(rng, towerIndex, towerCount) {
   if (towerIndex === Math.floor(towerCount / 2) && rng() < 0.55) {
-    return rng() < 0.5 ? "dome_battlement" : "dome";
+    return "dome_battlement";
   }
   const r = rng();
-  if (r < 0.62) return "battlement";
-  if (r < 0.82) return "dome_battlement";
-  return "dome";
+  if (r < 0.58) return "battlement";
+  return "dome_battlement";
 }
 
 /**
@@ -240,9 +239,8 @@ export function pickHumanTowerCap(rng, towerIndex, towerCount) {
  */
 export function pickHumanCentralCrown(rng) {
   const r = rng();
-  if (r < 0.4) return "battlement";
-  if (r < 0.7) return "dome_battlement";
-  return "dome";
+  if (r < 0.42) return "battlement";
+  return "dome_battlement";
 }
 
 /**
@@ -253,7 +251,7 @@ export function pickHumanCentralCrown(rng) {
  */
 export function pickHumanCastleCrown(rng, palace) {
   if (palace && rng() < 0.72) {
-    return rng() < 0.45 ? "dome" : "dome_battlement";
+    return rng() < 0.38 ? "battlement" : "dome_battlement";
   }
   return pickHumanCentralCrown(rng);
 }

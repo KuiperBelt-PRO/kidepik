@@ -1,6 +1,6 @@
 import { assetUrl } from "../lib/assets.manifest.js";
 import { parseDevFaction } from "./loader-fantasy-castle-factions.js";
-import { mountFantasyTerrainLayer } from "./loader-fantasy-terrain.js";
+import { mountFantasyTerrainLayer, measureFantasyTerrainHeightPx } from "./loader-fantasy-terrain.js";
 import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountFantasyCelestialLayer } from "./loader-fantasy-celestial.js";
 import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
@@ -298,6 +298,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const celestialDemo = loaderQuery.get("celestialDemo") === "1";
   let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
   let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
+  const terrainProfile = fantasyTerrainTeardown.profile;
   let fantasyCloudsTeardown = mountFantasyCloudsLayer(layers, { reducedMotion, demoFast: cloudDemo });
   let fantasyCelestialTeardown = mountFantasyCelestialLayer(layers, { reducedMotion, demoFast: celestialDemo });
 
@@ -311,10 +312,11 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const fantasyFormation = fantasyFormationRaw === "cliff" || fantasyFormationRaw === "rocks"
     ? fantasyFormationRaw
     : undefined;
-  const fantasyTerrainH = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--fantasy-terrain-h")) || 48;
+  const fantasyTerrainH = measureFantasyTerrainHeightPx(layers);
   let fantasySceneTeardown = mountFantasyScene(layers, {
     reducedMotion,
     terrainHeightPx: fantasyTerrainH,
+    terrainProfile,
     devKind: fantasyDev,
     devFaction: fantasyFaction,
     devSeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,

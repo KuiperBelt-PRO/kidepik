@@ -380,9 +380,22 @@ describe("loader-fantasy-castle / facciones spec", () => {
       const hasDome = el.parts.some((p) => p.role === "dome");
       if (crown === "battlement") {
         assert.ok(hasBattlement, `seed ${s}: battlement sin almenas`);
+      } else if (crown === "dome_battlement") {
+        assert.ok(hasBattlement, `seed ${s}: mixto sin almenas`);
+        assert.ok(hasDome, `seed ${s}: mixto sin cúpula`);
       } else {
         assert.ok(hasDome, `seed ${s}: ${crown} sin cúpula`);
       }
+    }
+  });
+
+  it("humanos: siempre hay almenas en el castillo", () => {
+    for (let s = 0; s < 40; s++) {
+      const el = generateCastle({ seed: s * 7 + 3, faction: "human" });
+      assert.ok(
+        el.parts.some((p) => p.role === "battlement"),
+        `seed ${s}: castillo humano sin almenas`,
+      );
     }
   });
 

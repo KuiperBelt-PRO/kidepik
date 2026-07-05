@@ -1356,19 +1356,22 @@ export function polygon(points) {
  * @param {FPoint[]} points
  * @param {() => number} rng  función que devuelve valores en [0, 1)
  * @param {number} amount  desplazamiento máximo por eje (unidades locales)
- * @param {{ lockY?: number[]; freezeSeams?: boolean; tolerance?: number }} [opts]
+ * @param {{ lockY?: number[]; freezeSeams?: boolean; freezeHighY?: number; tolerance?: number }} [opts]
  *   lockY: valores Y de aristas compartidas entre piezas.
  *   freezeSeams: si true, los puntos en lockY no se desplazan (evita huecos).
+ *   freezeHighY: puntos con y >= umbral solo se desplazan en X (preserva cúspide).
  * @returns {FPoint[]}
  */
 export function jitterRing(points, rng, amount, opts = {}) {
-  const { lockY = [], freezeSeams = false, tolerance = 0.05 } = opts;
+  const { lockY = [], freezeSeams = false, freezeHighY, tolerance = 0.05 } = opts;
   return points.map((p) => {
     const onSeam = lockY.some((ly) => Math.abs(p.y - ly) <= tolerance);
     if (onSeam && freezeSeams) return { x: p.x, y: p.y };
-    const jitterY = onSeam ? 0 : (rng() - 0.5) * 2 * amount;
+    const preserveApex = Number.isFinite(freezeHighY) && p.y >= freezeHighY - tolerance;
+    const jitterY = onSeam || preserveApex ? 0 : (rng() - 0.5) * 2 * amount;
+    const jitterX = (rng() - 0.5) * 2 * amount * (preserveApex ? 0.35 : 1);
     return {
-      x: p.x + (rng() - 0.5) * 2 * amount,
+      x: p.x + jitterX,
       y: p.y + jitterY,
     };
   });
@@ -1565,6 +1568,39 @@ export function pointsToPath(points, closed = true) {
 }
 
 /**
+ * Path cerrado con curvas cúbicas suaves (Catmull-Rom → Bézier).
+ * @param {FPoint[]} points
+ * @param {boolean} [closed]
+ * @returns {string}
+ */
+export function pointsToSmoothPath(points, closed = true) {
+  const n = points.length;
+  if (n === 0) return "";
+  if (n < 3) return pointsToPath(points, closed);
+
+  const get = (i) => points[((i % n) + n) % n];
+  let d = `M ${fmt(points[0].x)} ${fmt(points[0].y)}`;
+  const segments = closed ? n : n - 1;
+
+  for (let i = 0; i < segments; i += 1) {
+    const p0 = closed ? get(i - 1) : points[Math.max(0, i - 1)];
+    const p1 = get(i);
+    const p2 = closed ? get(i + 1) : points[Math.min(n - 1, i + 1)];
+    const p3 = closed ? get(i + 2) : points[Math.min(n - 1, i + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    d += ` C ${fmt(cp1x)} ${fmt(cp1y)} ${fmt(cp2x)} ${fmt(cp2y)} ${fmt(p2.x)} ${fmt(p2.y)}`;
+  }
+
+  if (closed) d += " Z";
+  return d;
+}
+
+/**
  * Construye el `d` de un `<path>` con sustracción evenodd:
  * primer subpath = forma exterior; subpaths siguientes = huecos.
  * @param {FPoint[]} outerRing  puntos en SVG space (normalizados)
@@ -1573,9 +1609,10 @@ export function pointsToPath(points, closed = true) {
  */
 export function buildPartPath(outerRing, holeRings, opts = {}) {
   const closed = !opts.open;
-  const parts = [pointsToPath(outerRing, closed)];
+  const toPath = opts.smooth ? pointsToSmoothPath : pointsToPath;
+  const parts = [toPath(outerRing, closed)];
   for (const hole of holeRings) {
-    if (hole.length > 0) parts.push(pointsToPath(hole));
+    if (hole.length > 0) parts.push(toPath(hole, true));
   }
   return parts.join(" ");
 }

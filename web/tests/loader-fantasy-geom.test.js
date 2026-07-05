@@ -31,6 +31,7 @@ import {
   merlons,
   normalizeFantasyGroups,
   pointsToPath,
+  pointsToSmoothPath,
   polygon,
   rect,
   spikeRow,
@@ -765,6 +766,26 @@ describe("loader-fantasy-geom / pointsToPath", () => {
 
   it("lista vacía devuelve string vacío", () => {
     assert.equal(pointsToPath([]), "");
+  });
+});
+
+describe("loader-fantasy-geom / pointsToSmoothPath", () => {
+  it("usa curvas cúbicas en lugar de segmentos rectos", () => {
+    const pts = [
+      { x: 10, y: 80 },
+      { x: 30, y: 40 },
+      { x: 70, y: 35 },
+      { x: 90, y: 80 },
+    ];
+    const d = pointsToSmoothPath(pts);
+    assert.ok(d.includes(" C "), d);
+    assert.ok(!d.includes(" L "), d);
+    assert.ok(d.endsWith("Z"));
+  });
+
+  it("con menos de 3 puntos delega en pointsToPath", () => {
+    const d = pointsToSmoothPath([{ x: 0, y: 0 }, { x: 10, y: 5 }]);
+    assert.ok(d.includes(" L "));
   });
 });
 
