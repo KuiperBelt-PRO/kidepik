@@ -18,6 +18,69 @@ import { createRng, mixFantasySeed, randRange } from "./loader-ship-rng.js";
 const PLACE_LEFT_MIN = 8;
 const PLACE_LEFT_MAX = 92;
 
+/** Separación mínima alrededor del 50 % (logo). */
+export const CENTER_LOGO_GAP = 16;
+/** Límite superior de la franja izquierda (%). */
+export const CENTER_LEFT_ZONE_MAX = 50 - CENTER_LOGO_GAP / 2;
+/** Límite inferior de la franja derecha (%). */
+export const CENTER_RIGHT_ZONE_MIN = 50 + CENTER_LOGO_GAP / 2;
+
+const CENTER_ZONE_MIN_WIDTH_PX = 36;
+
+/**
+ * Rango seguro (centro del elemento) evitando riscos laterales y el propio ancho.
+ * Con `preferSide`, solo reserva el margen del borde opuesto al que se va a usar.
+ * @param {number} layerWidthPx
+ * @param {number} selfSizePx
+ * @param {number} [cliffLeftPx]
+ * @param {number} [cliffRightPx]
+ * @param {'left' | 'right' | null} [preferSide]
+ * @returns {{ min: number; max: number }}
+ */
+export function computeSafeCenterRange(
+  layerWidthPx,
+  selfSizePx,
+  cliffLeftPx = 0,
+  cliffRightPx = 0,
+  preferSide = null,
+) {
+  if (layerWidthPx <= 0) {
+    return { min: PLACE_LEFT_MIN, max: PLACE_LEFT_MAX };
+  }
+  const halfPct = (selfSizePx / 2 / layerWidthPx) * 100;
+  const leftPct = (cliffLeftPx / layerWidthPx) * 100;
+  const rightPct = (cliffRightPx / layerWidthPx) * 100;
+
+  if (preferSide === "left") {
+    return {
+      min: Math.max(PLACE_LEFT_MIN, leftPct + halfPct),
+      max: PLACE_LEFT_MAX,
+    };
+  }
+  if (preferSide === "right") {
+    return {
+      min: PLACE_LEFT_MIN,
+      max: Math.min(PLACE_LEFT_MAX, 100 - rightPct - halfPct),
+    };
+  }
+
+  const min = Math.max(PLACE_LEFT_MIN, leftPct + halfPct);
+  const max = Math.min(PLACE_LEFT_MAX, 100 - rightPct - halfPct);
+  return { min, max };
+}
+
+/**
+ * @param {{ min: number; max: number }} a
+ * @param {{ min: number; max: number }} b
+ * @returns {{ min: number; max: number } | null}
+ */
+function intersectPlacementRange(a, b) {
+  const min = Math.max(a.min, b.min);
+  const max = Math.min(a.max, b.max);
+  if (min >= max) return null;
+  return { min, max };
+}
+
 const HEIGHT_FRACTION_MIN = 0.18;
 const HEIGHT_FRACTION_MAX = 0.34;
 
@@ -71,6 +134,87 @@ export function planBuildingKind(rng, devKind) {
 }
 
 /**
+ * Elige la posición horizontal de bosque o edificio intentando no mezclarlos.
+ * Si no hay espacio suficiente en pantalla, cae al rango completo.
+ *
+ * @param {{
+ *   rng: () => number;
+ *   slot: CenterSceneSlot;
+ *   otherXPercent?: number | null;
+ *   layerWidthPx?: number;
+ *   selfSizePx?: number;
+ *   bothSlotsEnabled?: boolean;
+ *   cliffLeftPx?: number;
+ *   cliffRightPx?: number;
+ *   avoidEdgeCliffs?: boolean;
+ * }} options
+ * @returns {number}
+ */
+export function pickCenterPlacementX(options) {
+  const {
+    rng,
+    slot,
+    otherXPercent = null,
+    layerWidthPx = 390,
+    selfSizePx = 96,
+    bothSlotsEnabled = true,
+    cliffLeftPx = 0,
+    cliffRightPx = 0,
+    avoidEdgeCliffs = false,
+  } = options;
+
+  const cliffLeft = avoidEdgeCliffs ? cliffLeftPx : 0;
+  const cliffRight = avoidEdgeCliffs ? cliffRightPx : 0;
+
+  const pickIn = (min, max) => randRange(rng, min, max);
+
+  const pickFromSafe = (preferSide) => {
+    const safe = computeSafeCenterRange(
+      layerWidthPx, selfSizePx, cliffLeft, cliffRight, preferSide,
+    );
+    const r = intersectPlacementRange(safe, { min: PLACE_LEFT_MIN, max: PLACE_LEFT_MAX });
+    if (!r) return pickIn(PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+    return pickIn(r.min, r.max);
+  };
+
+  if (!bothSlotsEnabled) {
+    return avoidEdgeCliffs ? pickFromSafe(null) : pickIn(PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+  }
+
+  const minZonePx = Math.max(selfSizePx * 0.5, CENTER_ZONE_MIN_WIDTH_PX);
+  const leftZonePx = layerWidthPx * (CENTER_LEFT_ZONE_MAX - PLACE_LEFT_MIN) / 100;
+  const rightZonePx = layerWidthPx * (PLACE_LEFT_MAX - CENTER_RIGHT_ZONE_MIN) / 100;
+  if (leftZonePx < minZonePx || rightZonePx < minZonePx) {
+    return avoidEdgeCliffs ? pickFromSafe(null) : pickIn(PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+  }
+
+  /** @type {'left' | 'right'} */
+  let targetSide;
+  if (otherXPercent != null) {
+    targetSide = otherXPercent < 50 ? "right" : "left";
+  } else {
+    const forestOnLeft = rng() < 0.5;
+    const selfOnLeft = slot === "forest" ? forestOnLeft : !forestOnLeft;
+    targetSide = selfOnLeft ? "left" : "right";
+  }
+
+  const targetRange = targetSide === "left"
+    ? { min: PLACE_LEFT_MIN, max: CENTER_LEFT_ZONE_MAX }
+    : { min: CENTER_RIGHT_ZONE_MIN, max: PLACE_LEFT_MAX };
+
+  const safe = computeSafeCenterRange(
+    layerWidthPx, selfSizePx, cliffLeft, cliffRight,
+    avoidEdgeCliffs ? targetSide : null,
+  );
+
+  const finalRange = intersectPlacementRange(targetRange, safe);
+  if (!finalRange) {
+    return avoidEdgeCliffs ? pickFromSafe(targetSide) : pickIn(PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+  }
+  return pickIn(finalRange.min, finalRange.max);
+}
+
+/**
  * @param {HTMLElement} container
  * @param {{
  *   reducedMotion?: boolean;
@@ -108,11 +252,17 @@ export function mountFantasyScene(container, opts = {}) {
   let cliffTeardowns = [];
   /** @type {{ left: boolean; right: boolean }} */
   const cliffActive = { left: false, right: false };
+  /** @type {{ left: number; right: number }} */
+  const cliffSizePx = { left: 0, right: 0 };
   let forestTimer = 0;
   let buildingTimer = 0;
   let cycleRng = createRng(sessionSeed());
   let forestSpawnVariant = 0;
   let buildingSpawnVariant = 0;
+  /** @type {number | null} */
+  let activeForestX = null;
+  /** @type {number | null} */
+  let activeBuildingX = null;
   let wallSessionSeed = sessionSeed();
   /** @type {import('./loader-fantasy-cliffs.js').CliffFormationType | undefined} */
   let wallFormationType;
@@ -142,10 +292,14 @@ export function mountFantasyScene(container, opts = {}) {
       buildingTeardown.destroy();
       buildingTeardown = null;
     }
+    activeForestX = null;
+    activeBuildingX = null;
     for (const td of cliffTeardowns) td.destroy();
     cliffTeardowns = [];
     cliffActive.left = false;
     cliffActive.right = false;
+    cliffSizePx.left = 0;
+    cliffSizePx.right = 0;
     layer.remove();
   }
 
@@ -211,6 +365,7 @@ export function mountFantasyScene(container, opts = {}) {
     const xPercent = side === "left" ? 0 : 100;
 
     cliffActive[side] = true;
+    cliffSizePx[side] = sizePx;
     const teardown = mountFantasyElement(layer, element, {
       reducedMotion,
       xPercent,
@@ -221,6 +376,7 @@ export function mountFantasyScene(container, opts = {}) {
       timing: devTiming,
       onGone: () => {
         cliffActive[side] = false;
+        cliffSizePx[side] = 0;
         cliffTeardowns = cliffTeardowns.filter((t) => t !== teardown);
         if (devKind === "cliffs") {
           if (!cliffActive.left && !cliffActive.right) {
@@ -256,13 +412,29 @@ export function mountFantasyScene(container, opts = {}) {
     buildingTimer = setTimeout(spawnBuilding, gapMs);
   }
 
+  function cliffMarginsForPlacement() {
+    return {
+      cliffLeftPx: cliffActive.left ? cliffSizePx.left : 0,
+      cliffRightPx: cliffActive.right ? cliffSizePx.right : 0,
+    };
+  }
+
   function spawnForest() {
     if (destroyed || !centerDevEnabled.forest || forestTeardown) return;
 
     const variant = forestSpawnVariant;
     forestSpawnVariant += 1;
     const sizePx = computeSizePx("forest");
-    const xPercent = randRange(cycleRng, PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+    const layerWidthPx = layer.clientWidth || 390;
+    const xPercent = pickCenterPlacementX({
+      rng: cycleRng,
+      slot: "forest",
+      otherXPercent: activeBuildingX,
+      layerWidthPx,
+      selfSizePx: sizePx,
+      bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
+    });
+    activeForestX = xPercent;
     const baseSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
     const seed = mixFantasySeed(baseSeed, variant);
 
@@ -291,6 +463,7 @@ export function mountFantasyScene(container, opts = {}) {
       timing,
       onGone: () => {
         forestTeardown = null;
+        activeForestX = null;
         scheduleForestSpawn(timing.gapMs);
       },
     });
@@ -303,7 +476,18 @@ export function mountFantasyScene(container, opts = {}) {
     const variant = buildingSpawnVariant;
     buildingSpawnVariant += 1;
     const sizePx = computeSizePx(kind);
-    const xPercent = randRange(cycleRng, PLACE_LEFT_MIN, PLACE_LEFT_MAX);
+    const layerWidthPx = layer.clientWidth || 390;
+    const xPercent = pickCenterPlacementX({
+      rng: cycleRng,
+      slot: "building",
+      otherXPercent: activeForestX,
+      layerWidthPx,
+      selfSizePx: sizePx,
+      bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
+      avoidEdgeCliffs: true,
+      ...cliffMarginsForPlacement(),
+    });
+    activeBuildingX = xPercent;
     const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
     const faction = devFaction ?? pickFaction(cycleRng, kind === "palace");
 
@@ -333,6 +517,7 @@ export function mountFantasyScene(container, opts = {}) {
       timing,
       onGone: () => {
         buildingTeardown = null;
+        activeBuildingX = null;
         scheduleBuildingSpawn(timing.gapMs);
       },
     });
