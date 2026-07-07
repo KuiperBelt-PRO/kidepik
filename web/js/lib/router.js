@@ -11,8 +11,20 @@ export function registerRoute(pattern, handler) {
   routes.set(pattern, handler);
 }
 
+/**
+ * Ruta interna sin prefijo `#` ni query string (p. ej. `loader` desde `#/loader?foo=1`).
+ * @param {string} [hash]
+ * @returns {string}
+ */
+export function hashRoutePath(hash = window.location.hash) {
+  let path = (hash || "#/loader").replace(/^#\/?/, "") || "loader";
+  const q = path.indexOf("?");
+  if (q >= 0) path = path.slice(0, q);
+  return path || "loader";
+}
+
 function matchRoute(hash) {
-  const path = hash.replace(/^#\/?/, "") || "loader";
+  const path = hashRoutePath(hash);
   for (const [pattern, handler] of routes) {
     const patternParts = pattern.split("/");
     const pathParts = path.split("/");

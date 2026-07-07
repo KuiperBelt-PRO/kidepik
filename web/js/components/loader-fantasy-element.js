@@ -15,6 +15,7 @@
 
 import { generateCastle } from "./loader-fantasy-castle.js";
 import { generateCliffs } from "./loader-fantasy-cliffs.js";
+import { generateCrystals } from "./loader-fantasy-crystals.js";
 import { generateForest } from "./loader-fantasy-forest.js";
 import {
   aperture,
@@ -272,6 +273,14 @@ export function planLifecycleTiming(seed, kind, _partCount) {
       gapMs: Math.round(randRange(rng, 900, 2200)),
     };
   }
+  if (kind === "crystals") {
+    return {
+      partDurationMs: Math.round(randRange(rng, 160, 280)),
+      holdMs: Math.round(randRange(rng, 2500, 4500)),
+      erodeMs: Math.round(randRange(rng, 1400, 2000)),
+      gapMs: Math.round(randRange(rng, 400, 1200)),
+    };
+  }
   const partDurationMs = Math.round(randRange(rng, 580, 920));
   const holdMs = Math.round(randRange(rng, 2000, 5500));
   const erodeMs = Math.round(randRange(rng, 7000, 11000));
@@ -410,12 +419,12 @@ export const FANTASY_BUILDERS = {
   palace: (seed, opts = {}) => generateCastle({ ...opts, seed, palace: true }),
   cliffs: (seed, opts = {}) => generateCliffs({ ...opts, seed, side: opts.side ?? "left" }),
   forest: (seed, opts = {}) => generateForest({ ...opts, seed }),
+  crystals: (seed, opts = {}) => generateCrystals({ ...opts, seed }),
   // Phase 2+:
   tower: null,
   village: null,
   town: null,
   inn: null,
-  crystals: null,
   portal: null,
   menhir: null,
   dolmen: null,

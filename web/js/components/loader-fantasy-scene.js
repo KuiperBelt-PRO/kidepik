@@ -102,6 +102,11 @@ const CLIFF_HEIGHT_FRAC_MAX = 0.42;
 const CLIFF_MIN_HEIGHT_PX = 46;
 const CLIFF_MAX_HEIGHT_PX = 142;
 
+const CRYSTAL_HEIGHT_FRAC_MIN = 0.18;
+const CRYSTAL_HEIGHT_FRAC_MAX = 0.30;
+const CRYSTAL_MIN_HEIGHT_PX = 52;
+const CRYSTAL_MAX_HEIGHT_PX = 115;
+
 let _sessionSeedCounter = Date.now() & 0x7fffffff;
 
 function sessionSeed() {
@@ -248,6 +253,8 @@ export function mountFantasyScene(container, opts = {}) {
   let forestTeardown = null;
   /** @type {{ destroy: () => void } | null} */
   let buildingTeardown = null;
+  /** @type {{ destroy: () => void } | null} */
+  let crystalsTeardown = null;
   /** @type {{ destroy: () => void }[]} */
   let cliffTeardowns = [];
   /** @type {{ left: boolean; right: boolean }} */
@@ -256,9 +263,11 @@ export function mountFantasyScene(container, opts = {}) {
   const cliffSizePx = { left: 0, right: 0 };
   let forestTimer = 0;
   let buildingTimer = 0;
+  let crystalsTimer = 0;
   let cycleRng = createRng(sessionSeed());
   let forestSpawnVariant = 0;
   let buildingSpawnVariant = 0;
+  let crystalsSpawnVariant = 0;
   /** @type {number | null} */
   let activeForestX = null;
   /** @type {number | null} */
@@ -270,6 +279,7 @@ export function mountFantasyScene(container, opts = {}) {
   const centerDevEnabled = {
     forest: !devKind || devKind === "forest",
     building: !devKind || devKind === "castle" || devKind === "palace",
+    crystals: devKind === "crystals",
   };
 
   /** @param {number} cycleSeed */
@@ -284,6 +294,7 @@ export function mountFantasyScene(container, opts = {}) {
     destroyed = true;
     clearTimeout(forestTimer);
     clearTimeout(buildingTimer);
+    clearTimeout(crystalsTimer);
     if (forestTeardown) {
       forestTeardown.destroy();
       forestTeardown = null;
@@ -291,6 +302,10 @@ export function mountFantasyScene(container, opts = {}) {
     if (buildingTeardown) {
       buildingTeardown.destroy();
       buildingTeardown = null;
+    }
+    if (crystalsTeardown) {
+      crystalsTeardown.destroy();
+      crystalsTeardown = null;
     }
     activeForestX = null;
     activeBuildingX = null;
@@ -308,30 +323,43 @@ export function mountFantasyScene(container, opts = {}) {
     const isCastle = kind === "castle" || kind === "palace";
     const isCliff = kind === "cliffs";
     const isForest = kind === "forest";
+    const isCrystals = kind === "crystals";
     const fracMin = isCastle
       ? CASTLE_HEIGHT_FRAC_MIN
       : isCliff
         ? CLIFF_HEIGHT_FRAC_MIN
         : isForest
           ? FOREST_HEIGHT_FRAC_MIN
-          : HEIGHT_FRACTION_MIN;
+          : isCrystals
+            ? CRYSTAL_HEIGHT_FRAC_MIN
+            : HEIGHT_FRACTION_MIN;
     const fracMax = isCastle
       ? CASTLE_HEIGHT_FRAC_MAX
       : isCliff
         ? CLIFF_HEIGHT_FRAC_MAX
         : isForest
           ? FOREST_HEIGHT_FRAC_MAX
-          : HEIGHT_FRACTION_MAX;
+          : isCrystals
+            ? CRYSTAL_HEIGHT_FRAC_MAX
+            : HEIGHT_FRACTION_MAX;
     const frac = randRange(cycleRng, fracMin, fracMax);
     const raw = layerH * frac;
-    const minPx = isCliff ? CLIFF_MIN_HEIGHT_PX : isForest ? FOREST_MIN_HEIGHT_PX : MIN_ELEMENT_HEIGHT_PX;
+    const minPx = isCliff
+      ? CLIFF_MIN_HEIGHT_PX
+      : isForest
+        ? FOREST_MIN_HEIGHT_PX
+        : isCrystals
+          ? CRYSTAL_MIN_HEIGHT_PX
+          : MIN_ELEMENT_HEIGHT_PX;
     const maxPx = isCastle
       ? CASTLE_MAX_HEIGHT_PX
       : isCliff
         ? CLIFF_MAX_HEIGHT_PX
         : isForest
           ? FOREST_MAX_HEIGHT_PX
-          : MAX_ELEMENT_HEIGHT_PX;
+          : isCrystals
+            ? CRYSTAL_MAX_HEIGHT_PX
+            : MAX_ELEMENT_HEIGHT_PX;
     return Math.max(minPx, Math.min(maxPx, raw));
   }
 
@@ -410,6 +438,12 @@ export function mountFantasyScene(container, opts = {}) {
     if (destroyed || !centerDevEnabled.building) return;
     clearTimeout(buildingTimer);
     buildingTimer = setTimeout(spawnBuilding, gapMs);
+  }
+
+  function scheduleCrystalsSpawn(gapMs = 0) {
+    if (destroyed || !centerDevEnabled.crystals) return;
+    clearTimeout(crystalsTimer);
+    crystalsTimer = setTimeout(spawnCrystals, gapMs);
   }
 
   function cliffMarginsForPlacement() {
@@ -523,6 +557,50 @@ export function mountFantasyScene(container, opts = {}) {
     });
   }
 
+  function spawnCrystals() {
+    if (destroyed || !centerDevEnabled.crystals || crystalsTeardown) return;
+
+    const variant = crystalsSpawnVariant;
+    crystalsSpawnVariant += 1;
+    const sizePx = computeSizePx("crystals");
+    const layerWidthPx = layer.clientWidth || 390;
+    const xPercent = pickCenterPlacementX({
+      rng: cycleRng,
+      slot: "building",
+      layerWidthPx,
+      selfSizePx: sizePx,
+      bothSlotsEnabled: false,
+      avoidEdgeCliffs: true,
+      ...cliffMarginsForPlacement(),
+    });
+    const baseSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
+    const seed = mixFantasySeed(baseSeed, variant);
+
+    const element = generateFantasyElement("crystals", { seed });
+    if (!element) {
+      scheduleCrystalsSpawn(2000);
+      return;
+    }
+
+    const baseTiming = planLifecycleTiming(seed, "crystals", element.parts.length);
+    const timing = devKind === "crystals"
+      ? { ...baseTiming, holdMs: 4000, erodeMs: 2200, gapMs: 600 }
+      : baseTiming;
+
+    crystalsTeardown = mountFantasyElement(layer, element, {
+      reducedMotion,
+      xPercent,
+      sizePx,
+      terrainHeightPx,
+      terrainProfile,
+      timing,
+      onGone: () => {
+        crystalsTeardown = null;
+        scheduleCrystalsSpawn(timing.gapMs);
+      },
+    });
+  }
+
   function startCliffDevMode(seed) {
     wallSessionSeed = seed;
     const formation = resolveWallFormation(seed);
@@ -543,6 +621,9 @@ export function mountFantasyScene(container, opts = {}) {
     if (centerDevEnabled.building) {
       const buildingDelay = quick ? 0 : randRange(cycleRng, 200, 1100);
       scheduleBuildingSpawn(baseGap + buildingDelay);
+    }
+    if (centerDevEnabled.crystals) {
+      scheduleCrystalsSpawn(quick ? 0 : baseGap);
     }
   }
 

@@ -34,6 +34,23 @@ function easeOutBack(t) {
 }
 
 /**
+ * Easing con overshoot más marcado (cristalización).
+ * @param {number} t  0..1
+ */
+function easeOutBackCrystal(t) {
+  const c1 = 1.75;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+/**
+ * @param {import('./loader-fantasy-element.js').FantasyKind | undefined} kind
+ */
+function buildEaseForKind(kind) {
+  return kind === "crystals" ? easeOutBackCrystal : easeOutBack;
+}
+
+/**
  * Aplica `transform` SVG de escala (y opcional inclinación) desde el pivote
  * (pivotX, pivotY) en user units. scaleY=0 colapsa el elemento hacia su base.
  * @param {SVGElement} g
@@ -248,6 +265,13 @@ export function castleBuildTimingProfile(element) {
       fillOverlap: 0.12,
     };
   }
+  if (element.kind === "crystals") {
+    return {
+      ...DEFAULT_BUILD_TIMING,
+      fillScale: 0.92,
+      fillOverlap: 0.42,
+    };
+  }
   return DEFAULT_BUILD_TIMING;
 }
 
@@ -307,13 +331,16 @@ export function erosionMaskOffsetForThreshold(threshold) {
 /**
  * Parámetros de turbulencia/displacement para la máscara (más irregular que v1).
  * @param {number} seed
+ * @param {import('./loader-fantasy-element.js').FantasyKind} [kind]
  * @returns {{ baseFrequency: string; numOctaves: number; dispScale: number; noiseSeed: number }}
  */
-export function erosionMaskNoiseParams(seed) {
+export function erosionMaskNoiseParams(seed, kind) {
   const s = seed >>> 0;
-  const freqX = 0.028 + (s % 11) * 0.0025;
-  const freqY = 0.018 + ((s >>> 4) % 9) * 0.002;
-  const dispScale = 38 + (s % 19);
+  let freqMul = 1;
+  if (kind === "crystals") freqMul = 1.45;
+  const freqX = (0.028 + (s % 11) * 0.0025) * freqMul;
+  const freqY = (0.018 + ((s >>> 4) % 9) * 0.002) * freqMul;
+  const dispScale = kind === "crystals" ? 32 + (s % 14) : 38 + (s % 19);
   return {
     baseFrequency: `${freqX.toFixed(4)} ${freqY.toFixed(4)}`,
     numOctaves: 3,
@@ -342,9 +369,9 @@ function applyErosionMaskStops(stopB, stopC, threshold) {
  * @param {{ x: number; width: number; yMin: number; yMax: number }} bounds
  * @returns {{ stopB: SVGStopElement; stopC: SVGStopElement }}
  */
-function createErosionMask(svg, partsGroup, seed, bounds) {
+function createErosionMask(svg, partsGroup, seed, bounds, kind) {
   const uid = `fe-${(seed >>> 0).toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-  const noise = erosionMaskNoiseParams(seed);
+  const noise = erosionMaskNoiseParams(seed, kind);
   const padY = EROSION_MASK_PAD_Y * 1.5;
 
   const defs = document.createElementNS(SVG_NS, "defs");
@@ -560,6 +587,7 @@ export function mountFantasyElement(container, element, opts) {
 
   // ─── Fase BUILDING ────────────────────────────────────────────────────────
   const buildProfile = castleBuildTimingProfile(element);
+  const buildEase = buildEaseForKind(element.kind);
 
   if (isForest && forestTrees) {
     const treeDurationMs = Math.round(timing.partDurationMs * buildProfile.fillScale);
@@ -667,7 +695,7 @@ export function mountFantasyElement(container, element, opts) {
         continue;
       }
       const t = Math.min(1, elapsed / info.durationMs);
-      const sy = easeOutBack(t);
+      const sy = buildEase(t);
       const tilt = (info.part.tiltDeg ?? 0) * t;
       applyPartScale(info.g, info.part.centerX, info.part.baseY, sy, tilt);
       if (t >= 1) {
@@ -695,7 +723,7 @@ export function mountFantasyElement(container, element, opts) {
     if (destroyed) return;
 
     const erosionBounds = erosionClipBoundsFromParts(element.parts);
-    const { stopB, stopC } = createErosionMask(svg, partsGroup, element.seed, erosionBounds);
+    const { stopB, stopC } = createErosionMask(svg, partsGroup, element.seed, erosionBounds, element.kind);
 
     let erodeStartMs = 0;
 

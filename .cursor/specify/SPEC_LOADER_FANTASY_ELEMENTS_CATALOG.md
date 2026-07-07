@@ -68,6 +68,8 @@ Composición de **varias casas** pequeñas: primera vez que un `FantasyElement` 
 
 ## 3. Megalitos: menhires, dólmenes, círculos de piedra (`menhir`, `dolmen`, `stoneCircle`) — Fase 4
 
+> Detalle completo: [SPEC_LOADER_FANTASY_MEGALITH.md](SPEC_LOADER_FANTASY_MEGALITH.md)
+
 Familia de **piedra cruda**: bloques irregulares, sin arcos ni tejados, máxima imperfección de silueta.
 
 **Generación**
@@ -113,6 +115,8 @@ Conjunto **orgánico** de árboles; primera familia sin geometría arquitectóni
 
 ## 5. Formaciones de cristales mágicos (`crystals`) — Fase 6
 
+> Detalle completo: [SPEC_LOADER_FANTASY_CRYSTALS.md](SPEC_LOADER_FANTASY_CRYSTALS.md)
+
 Racimo de **prismas** afilados; estética geométrica brillante (en blanco, mediante facetas).
 
 **Generación**
@@ -134,6 +138,8 @@ Racimo de **prismas** afilados; estética geométrica brillante (en blanco, medi
 ---
 
 ## 6. Portales mágicos y círculos rúnicos (`portal`) — Fase 7
+
+> Detalle completo: [SPEC_LOADER_FANTASY_PORTAL.md](SPEC_LOADER_FANTASY_PORTAL.md)
 
 Elemento con **ciclo de vida especial**: el "estado finalizado" es el **portal activo**, no una construcción estática. Mantiene la misma máquina de estados, reinterpretando las fases.
 
@@ -165,10 +171,10 @@ Elemento con **ciclo de vida especial**: el "estado finalizado" es el **portal a
 | `castle`, `palace` | 1 | `loader-fantasy-castle.js` | base, torres, bloques, arcos, almenas/bóvedas | estándar |
 | `tower` | 2 | `loader-fantasy-tower.js` | fuste, remate, saeteras | estándar (muy vertical) |
 | `village`, `town`, `inn` | 3 | `loader-fantasy-settlement.js` | casas, tejados, chimeneas, anexos | grupo erosionado como unidad |
-| `menhir`, `dolmen`, `stoneCircle` | 4 | `loader-fantasy-megalith.js` | ortostatos, losas, anillo en perspectiva | cobertera asienta al final |
+| `menhir`, `dolmen`, `stoneCircle` | 4 | `loader-fantasy-megalith.js` | ortostatos, losas, anillo en perspectiva | cobertera asienta al final — [spec](SPEC_LOADER_FANTASY_MEGALITH.md) |
 | `forest` | 5 | `loader-fantasy-forest.js` | troncos, copas | "crecimiento" (copas brotan) |
-| `crystals` | 6 | `loader-fantasy-crystals.js` | prismas, facetas, base | "cristalización" / sublimación |
-| `portal` | 7 | `loader-fantasy-portal.js` | marco, vano (hueco), runas | apertura/cierre del vano |
+| `crystals` | 6 | `loader-fantasy-crystals.js` | prismas, facetas, base | "cristalización" / sublimación — [spec](SPEC_LOADER_FANTASY_CRYSTALS.md) |
+| `portal` | 7 | `loader-fantasy-portal.js` | marco, vano (hueco), runas | vano estático (D6) — [spec](SPEC_LOADER_FANTASY_PORTAL.md) |
 
 ## 8. Tests por tipo (patrón común)
 

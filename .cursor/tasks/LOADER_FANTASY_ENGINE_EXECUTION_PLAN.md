@@ -1,6 +1,6 @@
 # Plan de ejecución por fases — Motor de elementos de fantasía (loader)
 
-> Specs: [SPEC_LOADER_FANTASY_ENGINE.md](../specify/SPEC_LOADER_FANTASY_ENGINE.md) · [SPEC_LOADER_FANTASY_CASTLE.md](../specify/SPEC_LOADER_FANTASY_CASTLE.md) · [SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md](../specify/SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md)
+> Specs: [SPEC_LOADER_FANTASY_ENGINE.md](../specify/SPEC_LOADER_FANTASY_ENGINE.md) · [SPEC_LOADER_FANTASY_CASTLE.md](../specify/SPEC_LOADER_FANTASY_CASTLE.md) · [SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md](../specify/SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md) · [SPEC_LOADER_FANTASY_MEGALITH.md](../specify/SPEC_LOADER_FANTASY_MEGALITH.md) · [SPEC_LOADER_FANTASY_CRYSTALS.md](../specify/SPEC_LOADER_FANTASY_CRYSTALS.md) · [SPEC_LOADER_FANTASY_PORTAL.md](../specify/SPEC_LOADER_FANTASY_PORTAL.md)
 > Método: [.cursor/SDD.md](../SDD.md) (Specify → Plan → Task → Implement → Validate) + TDD por fase.
 
 ## Cómo usar este plan
@@ -20,7 +20,7 @@
 | 3 | Aldeas, pueblos, posadas | 1 | `village`, `town`, `inn` | ⏳ no iniciada |
 | 4 | Megalitos | 0 | `menhir`, `dolmen`, `stoneCircle` | ⏳ no iniciada |
 | 5 | Bosques | 0 | `forest` | ⏳ no iniciada |
-| 6 | Cristales mágicos | 0 | `crystals` | ⏳ no iniciada |
+| 6 | Cristales mágicos | 0 | `crystals` | 🔧 implementada (pendiente visto bueno) |
 | 7 | Portales mágicos | 0 (+ D6) | `portal` | ⏳ no iniciada |
 | 8 | Director: secuenciación y pulido | 1–7 | (todos) | ⏳ no iniciada |
 
@@ -121,7 +121,8 @@ Leyenda estado: ⏳ no iniciada · 🔧 en curso · ✅ aprobada por el usuario.
 
 ## Fase 4 — Megalitos (menhir, dolmen, círculo de piedra)
 
-**Objetivo:** familia de piedra cruda (depende solo del núcleo).
+**Objetivo:** familia de piedra cruda (depende solo del núcleo).  
+**Spec:** [SPEC_LOADER_FANTASY_MEGALITH.md](../specify/SPEC_LOADER_FANTASY_MEGALITH.md)
 **Entregables:** `web/js/components/loader-fantasy-megalith.js` (3 builders) + registro + director.
 **Tests:** `web/tests/loader-fantasy-megalith.test.js` (por tipo: determinismo, variación, validez; dolmen = patas + cobertera con cobertera última en build; círculo = 5–9 piedras en perspectiva; rocas con jitter fuerte).
 **Validación:** piedras emergen del suelo; cobertera del dolmen asienta al final; erosión gruesa.
@@ -141,7 +142,8 @@ Leyenda estado: ⏳ no iniciada · 🔧 en curso · ✅ aprobada por el usuario.
 
 ## Fase 6 — Cristales mágicos
 
-**Objetivo:** `crystals` (prismas).
+**Objetivo:** `crystals` (prismas).  
+**Spec:** [SPEC_LOADER_FANTASY_CRYSTALS.md](../specify/SPEC_LOADER_FANTASY_CRYSTALS.md)
 **Entregables:** `web/js/components/loader-fantasy-crystals.js` + registro + director.
 **Tests:** `web/tests/loader-fantasy-crystals.test.js` (4–9 prismas, facetas como sustracción, base común, variantes `style`, asimetría de ángulos/longitudes).
 **Validación:** "cristalización" en build (overshoot); disolución/sublimación en erode.
@@ -151,7 +153,8 @@ Leyenda estado: ⏳ no iniciada · 🔧 en curso · ✅ aprobada por el usuario.
 
 ## Fase 7 — Portales mágicos
 
-**Objetivo:** `portal` con marco erosionable y **vano estático** (D6 = sin animación de hueco).
+**Objetivo:** `portal` con marco erosionable y **vano estático** (D6 = sin animación de hueco).  
+**Spec:** [SPEC_LOADER_FANTASY_PORTAL.md](../specify/SPEC_LOADER_FANTASY_PORTAL.md)
 **Entregables:** `web/js/components/loader-fantasy-portal.js` + registro + director. (No requiere soporte de vano animado en el render.)
 **Tests:** `web/tests/loader-fantasy-portal.test.js` (marco + vano central como sustracción `evenodd` + runas; variantes `style`; vano a tamaño final desde el build).
 **Validación:** marco se levanta de abajo a arriba con el vano ya abierto, reposa (micro-pulso opcional del marco), colapsa por erosión.
