@@ -1,6 +1,7 @@
 import { assetUrl } from "../lib/assets.manifest.js";
 import { parseDevFaction } from "./loader-fantasy-castle-factions.js";
 import { mountFantasyTerrainLayer, measureFantasyTerrainHeightPx } from "./loader-fantasy-terrain.js";
+import { mountFantasyBackdropLayer, parseBackdropKind } from "./loader-fantasy-backdrop.js";
 import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountFantasyCelestialLayer } from "./loader-fantasy-celestial.js";
 import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
@@ -296,7 +297,9 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const meteorDemo = loaderQuery.get("meteorDemo") === "1";
   const cloudDemo = loaderQuery.get("cloudDemo") === "1";
   const celestialDemo = loaderQuery.get("celestialDemo") === "1";
+  const backdropKind = parseBackdropKind(loaderQuery.get("backdropKind"));
   let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
+  let fantasyBackdropTeardown = mountFantasyBackdropLayer(layers, { kind: backdropKind });
   let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
   const terrainProfile = fantasyTerrainTeardown.profile;
   let fantasyCloudsTeardown = mountFantasyCloudsLayer(layers, { reducedMotion, demoFast: cloudDemo });
@@ -428,6 +431,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       document.body.classList.remove("is-loader-active");
       spaceOrbitTeardown.destroy();
       meteorTeardown.destroy();
+      fantasyBackdropTeardown.destroy();
       fantasyTerrainTeardown.destroy();
       fantasyCloudsTeardown.destroy();
       fantasyCelestialTeardown.destroy();

@@ -182,6 +182,24 @@
 }
 
 /* Suelo procedural blanco — base mitad fantasía */
+.loader-layer.loader-layer--fantasy-backdrop {
+  inset: 50% 0 0 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.loader-fantasy-backdrop__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.loader-fantasy-backdrop__fill {
+  fill: #fff;
+}
+
 .loader-layer.loader-layer--fantasy-terrain {
   inset: auto;
   bottom: 0;
