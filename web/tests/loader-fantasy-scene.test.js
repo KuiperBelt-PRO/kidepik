@@ -4,16 +4,21 @@ import { describe, it } from "node:test";
 import {
   CENTER_LEFT_ZONE_MAX,
   CENTER_RIGHT_ZONE_MIN,
+  SCENE_OCCUPIED_EXTRA_PADDING_PCT,
   buildCrystalOccupiedZones,
+  buildSceneOccupiedZones,
   centerSlotForKind,
   computeSafeCenterRange,
+  dominantHemisphereFromOccupiedZones,
   findFreeIntervals,
   mergeBlockedIntervals,
+  pickCenterGapPlacementX,
   pickCenterPlacementX,
   pickGapPlacementX,
   placementOverlapsOccupants,
   planBuildingKind,
   preferredCrystalHemispheres,
+  resolveCenterPlacementHemispheres,
 } from "../js/components/loader-fantasy-scene.js";
 import { createRng } from "../js/components/loader-ship-rng.js";
 
@@ -136,6 +141,132 @@ describe("loader-fantasy-scene / ranuras centrales", () => {
       assert.ok(x <= safeRight.max + 0.01, `seed ${s}: demasiado cerca del risco derecho (${x})`);
     }
   });
+
+  it("resolveCenterPlacementHemispheres separa bosque y edificio", () => {
+    assert.deepEqual(
+      resolveCenterPlacementHemispheres("building", 24, createRng(1), true),
+      ["right"],
+    );
+    assert.deepEqual(
+      resolveCenterPlacementHemispheres("forest", 78, createRng(1), true),
+      ["left"],
+    );
+    assert.equal(resolveCenterPlacementHemispheres("forest", null, createRng(1), false), null);
+  });
+
+  it("resolveCenterPlacementHemispheres evita hemisferio con cristales activos", () => {
+    const zones = buildSceneOccupiedZones({
+      crystalsX: 72,
+      crystalsSizePx: 58,
+      layerWidthPx: 390,
+    });
+    assert.deepEqual(
+      resolveCenterPlacementHemispheres("forest", null, createRng(1), true, zones),
+      ["left"],
+    );
+    assert.deepEqual(
+      resolveCenterPlacementHemispheres("building", null, createRng(1), true, zones),
+      ["left"],
+    );
+  });
+
+  it("dominantHemisphereFromOccupiedZones detecta el lado ocupado", () => {
+    assert.equal(
+      dominantHemisphereFromOccupiedZones(
+        buildSceneOccupiedZones({ forestX: 24, forestSizePx: 72, layerWidthPx: 390 }),
+      ),
+      "left",
+    );
+    assert.equal(
+      dominantHemisphereFromOccupiedZones(
+        buildSceneOccupiedZones({ buildingX: 78, buildingSizePx: 120, layerWidthPx: 390 }),
+      ),
+      "right",
+    );
+  });
+
+  it("pickCenterGapPlacementX no solapa con cristales activos", () => {
+    const occupiedZones = buildSceneOccupiedZones({
+      buildingX: 78,
+      buildingSizePx: 120,
+      crystalsX: 11,
+      crystalsSizePx: 46,
+      layerWidthPx: 390,
+    });
+    let placed = 0;
+    for (let s = 0; s < 40; s++) {
+      const x = pickCenterGapPlacementX({
+        rng: createRng(s + 880),
+        slot: "forest",
+        otherXPercent: 78,
+        layerWidthPx: 390,
+        selfSizePx: 72,
+        bothSlotsEnabled: true,
+        occupiedZones,
+        minGapFactor: 1.55,
+      });
+      if (x == null) continue;
+      placed += 1;
+      assert.ok(x <= CENTER_LEFT_ZONE_MAX, `seed ${s}: bosque no fue a la izquierda (${x})`);
+      assert.ok(
+        !placementOverlapsOccupants(x, 72, 390, occupiedZones),
+        `seed ${s}: bosque solapa (${x})`,
+      );
+    }
+    assert.ok(placed >= 12);
+  });
+
+  it("pickCenterGapPlacementX separa bosque y castillo sin solape", () => {
+    const rng = createRng(99);
+    const forestX = pickCenterGapPlacementX({
+      rng,
+      slot: "forest",
+      layerWidthPx: 390,
+      selfSizePx: 72,
+      bothSlotsEnabled: true,
+      occupiedZones: [],
+      minGapFactor: 1.65,
+    });
+    assert.ok(forestX != null);
+    const buildingX = pickCenterGapPlacementX({
+      rng,
+      slot: "building",
+      otherXPercent: forestX,
+      layerWidthPx: 390,
+      selfSizePx: 120,
+      bothSlotsEnabled: true,
+      minGapFactor: 1.62,
+      occupiedZones: buildSceneOccupiedZones({
+        forestX,
+        forestSizePx: 72,
+        layerWidthPx: 390,
+      }),
+    });
+    assert.ok(buildingX != null);
+    assert.ok(
+      !placementOverlapsOccupants(
+        buildingX,
+        120,
+        390,
+        buildSceneOccupiedZones({ forestX, forestSizePx: 72, layerWidthPx: 390 }),
+      ),
+    );
+    assert.ok(
+      !placementOverlapsOccupants(
+        forestX,
+        72,
+        390,
+        buildSceneOccupiedZones({ buildingX, buildingSizePx: 120, layerWidthPx: 390 }),
+      ),
+    );
+    if (forestX < 50) {
+      assert.ok(forestX <= CENTER_LEFT_ZONE_MAX);
+      assert.ok(buildingX >= CENTER_RIGHT_ZONE_MIN);
+    } else {
+      assert.ok(forestX >= CENTER_RIGHT_ZONE_MIN);
+      assert.ok(buildingX <= CENTER_LEFT_ZONE_MAX);
+    }
+  });
 });
 
 describe("loader-fantasy-scene / huecos para cristales", () => {
@@ -236,7 +367,7 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
         selfSizePx: 58,
         minGapFactor: 1.75,
         zoneMarginFrac: 0.62,
-        occupiedExtraPaddingPct: 3.5,
+        occupiedExtraPaddingPct: SCENE_OCCUPIED_EXTRA_PADDING_PCT,
         allowedHemispheres: ["right"],
         occupiedZones: buildCrystalOccupiedZones({
           forestX: 24,
@@ -273,7 +404,7 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
         selfSizePx: 52,
         minGapFactor: 1.62,
         zoneMarginFrac: 0.62,
-        occupiedExtraPaddingPct: 3.5,
+        occupiedExtraPaddingPct: SCENE_OCCUPIED_EXTRA_PADDING_PCT,
         allowedHemispheres: ["left", "right"],
         occupiedZones,
       });
@@ -298,5 +429,132 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
       ],
     });
     assert.equal(x, null);
+  });
+
+  it("buildSceneOccupiedZones incluye bosque castillo y cristales", () => {
+    const zones = buildSceneOccupiedZones({
+      forestX: 24,
+      forestSizePx: 72,
+      buildingX: 78,
+      buildingSizePx: 120,
+      crystalsX: 52,
+      crystalsSizePx: 60,
+      layerWidthPx: 390,
+    });
+    assert.equal(zones.length, 3);
+  });
+
+  it("simulación de reaparición con cristales activos no solapa", () => {
+    const layerWidthPx = 390;
+    const crystalsX = 72;
+    const crystalsSizePx = 58;
+    const occupiedZones = buildSceneOccupiedZones({
+      crystalsX,
+      crystalsSizePx,
+      layerWidthPx,
+    });
+    let placed = 0;
+    for (let s = 0; s < 50; s++) {
+      const forestX = pickCenterGapPlacementX({
+        rng: createRng(s + 1200),
+        slot: "forest",
+        layerWidthPx,
+        selfSizePx: 72,
+        bothSlotsEnabled: true,
+        occupiedZones,
+        minGapFactor: 1.65,
+      });
+      if (forestX == null) continue;
+      placed += 1;
+      assert.ok(forestX <= CENTER_LEFT_ZONE_MAX, `seed ${s}: bosque no fue a la izquierda (${forestX})`);
+      assert.ok(
+        !placementOverlapsOccupants(forestX, 72, layerWidthPx, occupiedZones),
+        `seed ${s}: bosque solapa cristales (${forestX})`,
+      );
+    }
+    assert.ok(placed >= 10);
+  });
+
+  it("simulación triple bosque castillo cristales sin solapes", () => {
+    const layerWidthPx = 390;
+    for (let s = 0; s < 80; s++) {
+      const rng = createRng(s + 2000);
+      const forestSizePx = 68 + (s % 12);
+      const buildingSizePx = 108 + (s % 18);
+      const crystalsSizePx = 50 + (s % 14);
+
+      const forestX = pickCenterGapPlacementX({
+        rng,
+        slot: "forest",
+        layerWidthPx,
+        selfSizePx: forestSizePx,
+        bothSlotsEnabled: true,
+        occupiedZones: [],
+        minGapFactor: 1.65,
+      });
+      if (forestX == null) continue;
+
+      const zonesForest = buildSceneOccupiedZones({ forestX, forestSizePx, layerWidthPx });
+      const buildingX = pickCenterGapPlacementX({
+        rng,
+        slot: "building",
+        otherXPercent: forestX,
+        layerWidthPx,
+        selfSizePx: buildingSizePx,
+        bothSlotsEnabled: true,
+        occupiedZones: zonesForest,
+        minGapFactor: 1.62,
+      });
+      if (buildingX == null) continue;
+
+      const zonesBoth = buildSceneOccupiedZones({
+        forestX,
+        forestSizePx,
+        buildingX,
+        buildingSizePx,
+        layerWidthPx,
+      });
+      const crystalsX = pickGapPlacementX({
+        rng,
+        layerWidthPx,
+        selfSizePx: crystalsSizePx,
+        minGapFactor: 1.68,
+        zoneMarginFrac: 0.62,
+        occupiedExtraPaddingPct: SCENE_OCCUPIED_EXTRA_PADDING_PCT,
+        allowedHemispheres: preferredCrystalHemispheres(forestX, buildingX),
+        occupiedZones: zonesBoth,
+      });
+      if (crystalsX == null) continue;
+      assert.ok(
+        !placementOverlapsOccupants(crystalsX, crystalsSizePx, layerWidthPx, zonesBoth),
+        `seed ${s}: cristales solapan (${crystalsX})`,
+      );
+      assert.ok(
+        !placementOverlapsOccupants(
+          buildingX,
+          buildingSizePx,
+          layerWidthPx,
+          zonesForest,
+        ),
+        `seed ${s}: castillo solapa bosque`,
+      );
+      const zonesAll = buildSceneOccupiedZones({
+        forestX,
+        forestSizePx,
+        buildingX,
+        buildingSizePx,
+        crystalsX,
+        crystalsSizePx,
+        layerWidthPx,
+      });
+      assert.ok(
+        !placementOverlapsOccupants(forestX, forestSizePx, layerWidthPx, [
+          { center: buildingX, halfWidth: (buildingSizePx * 1.16 / 2 / layerWidthPx) * 100 },
+          { center: crystalsX, halfWidth: (crystalsSizePx * 1.14 / 2 / layerWidthPx) * 100 },
+        ], SCENE_OCCUPIED_EXTRA_PADDING_PCT),
+        `seed ${s}: bosque solapa en triple`,
+      );
+      assert.ok(!placementOverlapsOccupants(crystalsX, crystalsSizePx, layerWidthPx, zonesAll));
+    }
   });
 });

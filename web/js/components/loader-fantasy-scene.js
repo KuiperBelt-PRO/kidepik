@@ -28,16 +28,24 @@ export const CENTER_RIGHT_ZONE_MIN = 50 + CENTER_LOGO_GAP / 2;
 /** Probabilidad de intento de spawn de cristales por ciclo (modo normal). */
 export const CRYSTAL_SPAWN_CHANCE = 0.38;
 
-/** Tamaño máximo usado solo para calcular huecos (no escala el SVG final). */
-const CRYSTAL_GAP_PROBE_MAX_PX = 70;
 /** Margen extra alrededor de bosque/castillo al colocar cristales. */
 const CRYSTAL_GAP_ZONE_MARGIN_FRAC = 0.62;
-/** Padding adicional (% ancho) sobre la silueta de bosque/castillo. */
-const CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT = 3.5;
+/** Padding adicional (% ancho) entre formaciones centrales activas. */
+export const SCENE_OCCUPIED_EXTRA_PADDING_PCT = 4.5;
+/** @deprecated alias histórico */
+const CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT = SCENE_OCCUPIED_EXTRA_PADDING_PCT;
 /** Inflado de la caja de castillo al calcular ocupación (más ancho visual). */
-const CRYSTAL_BUILDING_OCCUPIED_INFLATE = 1.14;
+const SCENE_BUILDING_OCCUPIED_INFLATE = 1.16;
+/** @deprecated alias histórico */
+const CRYSTAL_BUILDING_OCCUPIED_INFLATE = SCENE_BUILDING_OCCUPIED_INFLATE;
 /** Inflado de la caja de bosque al calcular ocupación. */
-const CRYSTAL_FOREST_OCCUPIED_INFLATE = 1.08;
+const SCENE_FOREST_OCCUPIED_INFLATE = 1.12;
+/** @deprecated alias histórico */
+const CRYSTAL_FOREST_OCCUPIED_INFLATE = SCENE_FOREST_OCCUPIED_INFLATE;
+/** Inflado de la caja de racimo de cristales al calcular ocupación. */
+const SCENE_CRYSTAL_OCCUPIED_INFLATE = 1.14;
+/** @deprecated alias histórico */
+const CRYSTAL_CLUSTER_OCCUPIED_INFLATE = SCENE_CRYSTAL_OCCUPIED_INFLATE;
 
 const CENTER_ZONE_MIN_WIDTH_PX = 36;
 /** Margen entre zonas ocupadas al buscar huecos (% del ancho). */
@@ -236,6 +244,147 @@ export function pickCenterPlacementX(options) {
 }
 
 /**
+ * Hemisferio con más ocupación registrada (bosque, castillo o cristales).
+ * @param {OccupiedZone[]} occupiedZones
+ * @returns {'left' | 'right' | null}
+ */
+export function dominantHemisphereFromOccupiedZones(occupiedZones) {
+  if (!occupiedZones.length) return null;
+  let leftWeight = 0;
+  let rightWeight = 0;
+  for (const zone of occupiedZones) {
+    const leftEdge = zone.center - zone.halfWidth;
+    const rightEdge = zone.center + zone.halfWidth;
+    if (leftEdge < CENTER_LEFT_ZONE_MAX) {
+      leftWeight += Math.min(zone.halfWidth, CENTER_LEFT_ZONE_MAX - leftEdge);
+    }
+    if (rightEdge > CENTER_RIGHT_ZONE_MIN) {
+      rightWeight += Math.min(zone.halfWidth, rightEdge - CENTER_RIGHT_ZONE_MIN);
+    }
+  }
+  if (leftWeight > rightWeight + 0.35) return "left";
+  if (rightWeight > leftWeight + 0.35) return "right";
+  return null;
+}
+
+/**
+ * Hemisferio(s) preferidos para bosque o edificio (opuestos entre sí).
+ * @param {CenterSceneSlot} slot
+ * @param {number | null} otherXPercent
+ * @param {() => number} rng
+ * @param {boolean} bothSlotsEnabled
+ * @param {OccupiedZone[]} [occupiedZones]
+ * @returns {readonly ('left' | 'right')[] | null}
+ */
+export function resolveCenterPlacementHemispheres(
+  slot,
+  otherXPercent,
+  rng,
+  bothSlotsEnabled,
+  occupiedZones = [],
+) {
+  if (!bothSlotsEnabled) return null;
+  /** @type {'left' | 'right'} */
+  let targetSide;
+  if (otherXPercent != null) {
+    targetSide = otherXPercent < 50 ? "right" : "left";
+  } else {
+    const dominant = dominantHemisphereFromOccupiedZones(occupiedZones);
+    if (dominant != null) {
+      targetSide = dominant === "left" ? "right" : "left";
+    } else {
+      const forestOnLeft = rng() < 0.5;
+      const selfOnLeft = slot === "forest" ? forestOnLeft : !forestOnLeft;
+      targetSide = selfOnLeft ? "left" : "right";
+    }
+  }
+  return [targetSide];
+}
+
+/**
+ * Coloca bosque o edificio en un hueco libre sin solapar otros elementos activos.
+ * @param {{
+ *   rng: () => number;
+ *   slot: CenterSceneSlot;
+ *   otherXPercent?: number | null;
+ *   layerWidthPx?: number;
+ *   selfSizePx?: number;
+ *   bothSlotsEnabled?: boolean;
+ *   occupiedZones?: OccupiedZone[];
+ *   cliffLeftPx?: number;
+ *   cliffRightPx?: number;
+ *   avoidEdgeCliffs?: boolean;
+ *   minGapFactor?: number;
+ *   zoneMarginFrac?: number;
+ *   occupiedExtraPaddingPct?: number;
+ * }} options
+ * @returns {number | null}
+ */
+export function pickCenterGapPlacementX(options) {
+  const {
+    rng,
+    slot,
+    otherXPercent = null,
+    layerWidthPx = 390,
+    selfSizePx = 96,
+    bothSlotsEnabled = true,
+    occupiedZones = [],
+    cliffLeftPx = 0,
+    cliffRightPx = 0,
+    avoidEdgeCliffs = false,
+    minGapFactor = 1.65,
+    zoneMarginFrac = GAP_ZONE_MARGIN_FRAC,
+    occupiedExtraPaddingPct = SCENE_OCCUPIED_EXTRA_PADDING_PCT,
+  } = options;
+
+  const allowedHemispheres = resolveCenterPlacementHemispheres(
+    slot,
+    otherXPercent,
+    rng,
+    bothSlotsEnabled,
+    occupiedZones,
+  );
+
+  const gapOpts = {
+    rng,
+    layerWidthPx,
+    selfSizePx,
+    occupiedZones,
+    cliffLeftPx,
+    cliffRightPx,
+    avoidEdgeCliffs,
+    minGapFactor,
+    zoneMarginFrac,
+    occupiedExtraPaddingPct,
+    allowedHemispheres: allowedHemispheres ?? undefined,
+  };
+
+  let x = pickGapPlacementX(gapOpts);
+  if (x == null && avoidEdgeCliffs) {
+    x = pickGapPlacementX({ ...gapOpts, avoidEdgeCliffs: false });
+  }
+  if (x == null && allowedHemispheres?.length === 1) {
+    const opposite = allowedHemispheres[0] === "left" ? "right" : "left";
+    x = pickGapPlacementX({
+      ...gapOpts,
+      avoidEdgeCliffs: false,
+      allowedHemispheres: [opposite],
+    });
+  }
+  if (x == null) return null;
+  if (placementOverlapsOccupants(
+    x,
+    selfSizePx,
+    layerWidthPx,
+    occupiedZones,
+    occupiedExtraPaddingPct,
+  )) {
+    return null;
+  }
+  return x;
+}
+
+/**
  * @param {number} selfSizePx
  * @param {number} layerWidthPx
  */
@@ -309,6 +458,52 @@ export function preferredCrystalHemispheres(forestX, buildingX) {
 }
 
 /**
+ * Zonas horizontales ocupadas por bosque, castillo/palacio y cristales.
+ * @param {{
+ *   forestX?: number | null;
+ *   forestSizePx?: number;
+ *   buildingX?: number | null;
+ *   buildingSizePx?: number;
+ *   crystalsX?: number | null;
+ *   crystalsSizePx?: number;
+ *   layerWidthPx?: number;
+ * }} params
+ * @returns {OccupiedZone[]}
+ */
+export function buildSceneOccupiedZones(params) {
+  const {
+    forestX = null,
+    forestSizePx = 0,
+    buildingX = null,
+    buildingSizePx = 0,
+    crystalsX = null,
+    crystalsSizePx = 0,
+    layerWidthPx = 390,
+  } = params;
+  /** @type {OccupiedZone[]} */
+  const zones = [];
+  if (forestX != null) {
+    zones.push({
+      center: forestX,
+      halfWidth: elementHalfWidthPercent(forestSizePx * SCENE_FOREST_OCCUPIED_INFLATE, layerWidthPx),
+    });
+  }
+  if (buildingX != null) {
+    zones.push({
+      center: buildingX,
+      halfWidth: elementHalfWidthPercent(buildingSizePx * SCENE_BUILDING_OCCUPIED_INFLATE, layerWidthPx),
+    });
+  }
+  if (crystalsX != null) {
+    zones.push({
+      center: crystalsX,
+      halfWidth: elementHalfWidthPercent(crystalsSizePx * SCENE_CRYSTAL_OCCUPIED_INFLATE, layerWidthPx),
+    });
+  }
+  return zones;
+}
+
+/**
  * @param {{
  *   forestX?: number | null;
  *   forestSizePx?: number;
@@ -319,28 +514,7 @@ export function preferredCrystalHemispheres(forestX, buildingX) {
  * @returns {OccupiedZone[]}
  */
 export function buildCrystalOccupiedZones(params) {
-  const {
-    forestX = null,
-    forestSizePx = 0,
-    buildingX = null,
-    buildingSizePx = 0,
-    layerWidthPx = 390,
-  } = params;
-  /** @type {OccupiedZone[]} */
-  const zones = [];
-  if (forestX != null) {
-    zones.push({
-      center: forestX,
-      halfWidth: elementHalfWidthPercent(forestSizePx * CRYSTAL_FOREST_OCCUPIED_INFLATE, layerWidthPx),
-    });
-  }
-  if (buildingX != null) {
-    zones.push({
-      center: buildingX,
-      halfWidth: elementHalfWidthPercent(buildingSizePx * CRYSTAL_BUILDING_OCCUPIED_INFLATE, layerWidthPx),
-    });
-  }
-  return zones;
+  return buildSceneOccupiedZones(params);
 }
 
 /**
@@ -355,7 +529,7 @@ export function placementOverlapsOccupants(
   selfSizePx,
   layerWidthPx,
   occupiedZones,
-  extraPaddingPct = CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT,
+  extraPaddingPct = SCENE_OCCUPIED_EXTRA_PADDING_PCT,
 ) {
   const hw = elementHalfWidthPercent(selfSizePx, layerWidthPx);
   for (const zone of occupiedZones) {
@@ -710,11 +884,15 @@ export function mountFantasyScene(container, opts = {}) {
   }
 
   function occupiedZonesForGaps(layerWidthPx) {
-    let zones = [];
-    zones = occupiedZoneFromActive(zones, activeForestX, activeForestSizePx, layerWidthPx);
-    zones = occupiedZoneFromActive(zones, activeBuildingX, activeBuildingSizePx, layerWidthPx);
-    zones = occupiedZoneFromActive(zones, activeCrystalsX, activeCrystalsSizePx, layerWidthPx);
-    return zones;
+    return buildSceneOccupiedZones({
+      forestX: activeForestX,
+      forestSizePx: activeForestSizePx,
+      buildingX: activeBuildingX,
+      buildingSizePx: activeBuildingSizePx,
+      crystalsX: activeCrystalsX,
+      crystalsSizePx: activeCrystalsSizePx,
+      layerWidthPx,
+    });
   }
 
   function scheduleCrystalsSpawn(gapMs = 0) {
@@ -737,14 +915,22 @@ export function mountFantasyScene(container, opts = {}) {
     forestSpawnVariant += 1;
     const sizePx = computeSizePx("forest");
     const layerWidthPx = layer.clientWidth || 390;
-    const xPercent = pickCenterPlacementX({
+    const xPercent = pickCenterGapPlacementX({
       rng: cycleRng,
       slot: "forest",
       otherXPercent: activeBuildingX,
       layerWidthPx,
       selfSizePx: sizePx,
       bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
+      occupiedZones: occupiedZonesForGaps(layerWidthPx),
+      avoidEdgeCliffs: true,
+      minGapFactor: 1.65,
+      ...cliffMarginsForPlacement(),
     });
+    if (xPercent == null) {
+      scheduleForestSpawn(randRange(cycleRng, 800, 1800));
+      return;
+    }
     activeForestX = xPercent;
     activeForestSizePx = sizePx;
     const baseSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
@@ -757,6 +943,8 @@ export function mountFantasyScene(container, opts = {}) {
       terrainHeightPx,
     });
     if (!element) {
+      activeForestX = null;
+      activeForestSizePx = 0;
       scheduleForestSpawn(2000);
       return;
     }
@@ -790,16 +978,22 @@ export function mountFantasyScene(container, opts = {}) {
     buildingSpawnVariant += 1;
     const sizePx = computeSizePx(kind);
     const layerWidthPx = layer.clientWidth || 390;
-    const xPercent = pickCenterPlacementX({
+    const xPercent = pickCenterGapPlacementX({
       rng: cycleRng,
       slot: "building",
       otherXPercent: activeForestX,
       layerWidthPx,
       selfSizePx: sizePx,
       bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
+      occupiedZones: occupiedZonesForGaps(layerWidthPx),
       avoidEdgeCliffs: true,
+      minGapFactor: 1.62,
       ...cliffMarginsForPlacement(),
     });
+    if (xPercent == null) {
+      scheduleBuildingSpawn(randRange(cycleRng, 800, 1800));
+      return;
+    }
     activeBuildingX = xPercent;
     activeBuildingSizePx = sizePx;
     const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
@@ -813,6 +1007,8 @@ export function mountFantasyScene(container, opts = {}) {
       castleSizePx: sizePx,
     });
     if (!element) {
+      activeBuildingX = null;
+      activeBuildingSizePx = 0;
       scheduleBuildingSpawn(2000);
       return;
     }
@@ -839,32 +1035,22 @@ export function mountFantasyScene(container, opts = {}) {
   }
 
   function occupiedZonesForCrystalGaps(layerWidthPx) {
-    return buildCrystalOccupiedZones({
-      forestX: activeForestX,
-      forestSizePx: activeForestSizePx,
-      buildingX: activeBuildingX,
-      buildingSizePx: activeBuildingSizePx,
-      layerWidthPx,
-    });
+    return occupiedZonesForGaps(layerWidthPx);
   }
 
   function pickCrystalsPlacementX(layerWidthPx, sizePx) {
     const bothOccupied = activeForestX != null && activeBuildingX != null;
-    const gapProbePx = Math.min(
-      sizePx,
-      bothOccupied ? 58 : CRYSTAL_GAP_PROBE_MAX_PX,
-    );
     const occupiedZones = occupiedZonesForCrystalGaps(layerWidthPx);
     const cliffMargins = cliffMarginsForPlacement();
     const preferred = preferredCrystalHemispheres(activeForestX, activeBuildingX);
     const gapOpts = {
       rng: cycleRng,
       layerWidthPx,
-      selfSizePx: gapProbePx,
+      selfSizePx: sizePx,
       occupiedZones,
-      minGapFactor: bothOccupied ? 1.62 : 1.75,
+      minGapFactor: bothOccupied ? 1.68 : 1.82,
       zoneMarginFrac: CRYSTAL_GAP_ZONE_MARGIN_FRAC,
-      occupiedExtraPaddingPct: CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT,
+      occupiedExtraPaddingPct: SCENE_OCCUPIED_EXTRA_PADDING_PCT,
       allowedHemispheres: preferred,
       ...cliffMargins,
     };
@@ -873,15 +1059,8 @@ export function mountFantasyScene(container, opts = {}) {
     if (xPercent == null) {
       xPercent = pickGapPlacementX({ ...gapOpts, avoidEdgeCliffs: false });
     }
-    if (xPercent == null && preferred.length === 1) {
-      xPercent = pickGapPlacementX({
-        ...gapOpts,
-        avoidEdgeCliffs: false,
-        allowedHemispheres: ["left", "right"],
-      });
-    }
     if (xPercent == null) return null;
-    if (placementOverlapsOccupants(xPercent, gapProbePx, layerWidthPx, occupiedZones)) {
+    if (placementOverlapsOccupants(xPercent, sizePx, layerWidthPx, occupiedZones)) {
       return null;
     }
     return xPercent;
