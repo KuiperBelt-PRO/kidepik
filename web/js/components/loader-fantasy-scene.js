@@ -25,11 +25,8 @@ export const CENTER_LEFT_ZONE_MAX = 50 - CENTER_LOGO_GAP / 2;
 /** Límite inferior de la franja derecha (%). */
 export const CENTER_RIGHT_ZONE_MIN = 50 + CENTER_LOGO_GAP / 2;
 
-/** Probabilidad de intento de spawn de cristales por ciclo (modo normal). */
-export const CRYSTAL_SPAWN_CHANCE = 0.38;
-
-/** Margen extra alrededor de bosque/castillo al colocar cristales. */
-const CRYSTAL_GAP_ZONE_MARGIN_FRAC = 0.62;
+/** Margen de hueco compartido por bosque, castillo y cristales en modo triple. */
+export const TRIO_CENTER_MIN_GAP_FACTOR = 1.58;
 /** Padding adicional (% ancho) entre formaciones centrales activas. */
 export const SCENE_OCCUPIED_EXTRA_PADDING_PCT = 4.5;
 /** @deprecated alias histórico */
@@ -382,6 +379,183 @@ export function pickCenterGapPlacementX(options) {
     return null;
   }
   return x;
+}
+
+/**
+ * Los tres tipos centrales (bosque, castillo, cristales) están activos.
+ * @param {{ forest?: boolean; building?: boolean; crystals?: boolean }} enabled
+ * @returns {boolean}
+ */
+export function isTrioCenterMode(enabled) {
+  return Boolean(enabled?.forest && enabled?.building && enabled?.crystals);
+}
+
+/**
+ * Colocación por hueco libre sin priorizar hemisferio ni tipo.
+ * @param {{
+ *   rng: () => number;
+ *   layerWidthPx?: number;
+ *   selfSizePx?: number;
+ *   occupiedZones?: OccupiedZone[];
+ *   cliffLeftPx?: number;
+ *   cliffRightPx?: number;
+ *   minGapFactor?: number;
+ *   zoneMarginFrac?: number;
+ *   occupiedExtraPaddingPct?: number;
+ * }} options
+ * @returns {number | null}
+ */
+export function pickFairGapPlacementX(options) {
+  const {
+    rng,
+    layerWidthPx = 390,
+    selfSizePx = 80,
+    occupiedZones = [],
+    cliffLeftPx = 0,
+    cliffRightPx = 0,
+    minGapFactor = TRIO_CENTER_MIN_GAP_FACTOR,
+    zoneMarginFrac = GAP_ZONE_MARGIN_FRAC,
+    occupiedExtraPaddingPct = SCENE_OCCUPIED_EXTRA_PADDING_PCT,
+  } = options;
+
+  const gapOpts = {
+    rng,
+    layerWidthPx,
+    selfSizePx,
+    occupiedZones,
+    cliffLeftPx,
+    cliffRightPx,
+    minGapFactor,
+    zoneMarginFrac,
+    occupiedExtraPaddingPct,
+  };
+
+  let x = pickGapPlacementX({ ...gapOpts, avoidEdgeCliffs: true });
+  if (x == null) {
+    x = pickGapPlacementX({ ...gapOpts, avoidEdgeCliffs: false });
+  }
+  if (x == null) return null;
+  if (placementOverlapsOccupants(
+    x,
+    selfSizePx,
+    layerWidthPx,
+    occupiedZones,
+    occupiedExtraPaddingPct,
+  )) {
+    return null;
+  }
+  return x;
+}
+
+/**
+ * Colocación en modo triple: si ya hay un elemento, intenta empaquetar en el
+ * mismo hemisferio antes de ocupar el lado opuesto (deja hueco para el tercero).
+ * @param {{
+ *   rng: () => number;
+ *   layerWidthPx?: number;
+ *   selfSizePx?: number;
+ *   occupiedZones?: OccupiedZone[];
+ *   cliffLeftPx?: number;
+ *   cliffRightPx?: number;
+ *   minGapFactor?: number;
+ *   zoneMarginFrac?: number;
+ *   occupiedExtraPaddingPct?: number;
+ * }} options
+ * @returns {number | null}
+ */
+export function pickTrioScenePlacementX(options) {
+  const {
+    rng,
+    layerWidthPx = 390,
+    selfSizePx = 80,
+    occupiedZones = [],
+    cliffLeftPx = 0,
+    cliffRightPx = 0,
+    minGapFactor = TRIO_CENTER_MIN_GAP_FACTOR,
+    zoneMarginFrac = GAP_ZONE_MARGIN_FRAC,
+    occupiedExtraPaddingPct = SCENE_OCCUPIED_EXTRA_PADDING_PCT,
+  } = options;
+
+  const gapBase = {
+    rng,
+    layerWidthPx,
+    selfSizePx,
+    occupiedZones,
+    cliffLeftPx,
+    cliffRightPx,
+    minGapFactor,
+    zoneMarginFrac,
+    occupiedExtraPaddingPct,
+  };
+
+  if (occupiedZones.length === 0) {
+    for (const preferSide of ["left", "right"]) {
+      const safe = computeSafeCenterRange(
+        layerWidthPx,
+        selfSizePx,
+        cliffLeftPx,
+        cliffRightPx,
+        preferSide,
+      );
+      const zoneMin = preferSide === "left" ? PLACE_LEFT_MIN : CENTER_RIGHT_ZONE_MIN;
+      const zoneMax = preferSide === "left" ? CENTER_LEFT_ZONE_MAX : PLACE_LEFT_MAX;
+      const placeMin = Math.max(zoneMin, safe.min);
+      const placeMax = Math.min(zoneMax, safe.max);
+      if (placeMin >= placeMax) continue;
+
+      const span = placeMax - placeMin;
+      const edgeSlice = span * 0.42;
+      const edgeMin = preferSide === "left" ? placeMin : placeMax - edgeSlice;
+      const edgeMax = preferSide === "left" ? placeMin + edgeSlice : placeMax;
+      const x = randRange(rng, edgeMin, edgeMax);
+      if (!placementOverlapsOccupants(
+        x,
+        selfSizePx,
+        layerWidthPx,
+        occupiedZones,
+        occupiedExtraPaddingPct,
+      )) {
+        return x;
+      }
+    }
+    return pickFairGapPlacementX(options);
+  }
+
+  if (occupiedZones.length === 1) {
+    const existing = occupiedZones[0];
+    const existingOnLeft = existing.center <= CENTER_LEFT_ZONE_MAX;
+    /** @type {readonly ('left' | 'right')[]} */
+    const sameHemi = existingOnLeft ? ["left"] : ["right"];
+    /** @type {readonly ('left' | 'right')[]} */
+    const oppHemi = existingOnLeft ? ["right"] : ["left"];
+
+    for (const hemis of [sameHemi, oppHemi]) {
+      let x = pickGapPlacementX({
+        ...gapBase,
+        allowedHemispheres: hemis,
+        avoidEdgeCliffs: true,
+      });
+      if (x == null) {
+        x = pickGapPlacementX({
+          ...gapBase,
+          allowedHemispheres: hemis,
+          avoidEdgeCliffs: false,
+        });
+      }
+      if (x != null && !placementOverlapsOccupants(
+        x,
+        selfSizePx,
+        layerWidthPx,
+        occupiedZones,
+        occupiedExtraPaddingPct,
+      )) {
+        return x;
+      }
+    }
+    return null;
+  }
+
+  return pickFairGapPlacementX(options);
 }
 
 /**
@@ -921,6 +1095,8 @@ export function mountFantasyScene(container, opts = {}) {
     };
   }
 
+  const trioCenterMode = isTrioCenterMode(centerDevEnabled);
+
   function spawnForest() {
     if (destroyed || !centerDevEnabled.forest || forestTeardown) return;
 
@@ -928,18 +1104,29 @@ export function mountFantasyScene(container, opts = {}) {
     forestSpawnVariant += 1;
     const sizePx = computeSizePx("forest");
     const layerWidthPx = layer.clientWidth || 390;
-    const xPercent = pickCenterGapPlacementX({
-      rng: cycleRng,
-      slot: "forest",
-      otherXPercent: activeBuildingX,
-      layerWidthPx,
-      selfSizePx: sizePx,
-      bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
-      occupiedZones: occupiedZonesForGaps(layerWidthPx),
-      avoidEdgeCliffs: true,
-      minGapFactor: 1.65,
-      ...cliffMarginsForPlacement(),
-    });
+    const occupiedZones = occupiedZonesForGaps(layerWidthPx);
+    const cliffMargins = cliffMarginsForPlacement();
+    const xPercent = trioCenterMode
+      ? pickTrioScenePlacementX({
+        rng: cycleRng,
+        layerWidthPx,
+        selfSizePx: sizePx,
+        occupiedZones,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+        ...cliffMargins,
+      })
+      : pickCenterGapPlacementX({
+        rng: cycleRng,
+        slot: "forest",
+        otherXPercent: activeBuildingX,
+        layerWidthPx,
+        selfSizePx: sizePx,
+        bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
+        occupiedZones,
+        avoidEdgeCliffs: true,
+        minGapFactor: 1.65,
+        ...cliffMargins,
+      });
     if (xPercent == null) {
       scheduleForestSpawn(randRange(cycleRng, 800, 1800));
       return;
@@ -988,18 +1175,29 @@ export function mountFantasyScene(container, opts = {}) {
     buildingSpawnVariant += 1;
     const sizePx = computeSizePx(kind);
     const layerWidthPx = layer.clientWidth || 390;
-    const xPercent = pickCenterGapPlacementX({
-      rng: cycleRng,
-      slot: "building",
-      otherXPercent: activeForestX,
-      layerWidthPx,
-      selfSizePx: sizePx,
-      bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
-      occupiedZones: occupiedZonesForGaps(layerWidthPx),
-      avoidEdgeCliffs: true,
-      minGapFactor: 1.62,
-      ...cliffMarginsForPlacement(),
-    });
+    const occupiedZones = occupiedZonesForGaps(layerWidthPx);
+    const cliffMargins = cliffMarginsForPlacement();
+    const xPercent = trioCenterMode
+      ? pickTrioScenePlacementX({
+        rng: cycleRng,
+        layerWidthPx,
+        selfSizePx: sizePx,
+        occupiedZones,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+        ...cliffMargins,
+      })
+      : pickCenterGapPlacementX({
+        rng: cycleRng,
+        slot: "building",
+        otherXPercent: activeForestX,
+        layerWidthPx,
+        selfSizePx: sizePx,
+        bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
+        occupiedZones,
+        avoidEdgeCliffs: true,
+        minGapFactor: 1.62,
+        ...cliffMargins,
+      });
     if (xPercent == null) {
       scheduleBuildingSpawn(randRange(cycleRng, 800, 1800));
       return;
@@ -1046,17 +1244,28 @@ export function mountFantasyScene(container, opts = {}) {
   }
 
   function pickCrystalsPlacementX(layerWidthPx, sizePx) {
-    const bothOccupied = activeForestX != null && activeBuildingX != null;
     const occupiedZones = occupiedZonesForCrystalGaps(layerWidthPx);
     const cliffMargins = cliffMarginsForPlacement();
+
+    if (trioCenterMode) {
+      return pickTrioScenePlacementX({
+        rng: cycleRng,
+        layerWidthPx,
+        selfSizePx: sizePx,
+        occupiedZones,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+        ...cliffMargins,
+      });
+    }
+
     const preferred = preferredCrystalHemispheres(activeForestX, activeBuildingX);
     const gapOpts = {
       rng: cycleRng,
       layerWidthPx,
       selfSizePx: sizePx,
       occupiedZones,
-      minGapFactor: bothOccupied ? 1.68 : 1.82,
-      zoneMarginFrac: CRYSTAL_GAP_ZONE_MARGIN_FRAC,
+      minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+      zoneMarginFrac: GAP_ZONE_MARGIN_FRAC,
       occupiedExtraPaddingPct: SCENE_OCCUPIED_EXTRA_PADDING_PCT,
       allowedHemispheres: preferred,
       ...cliffMargins,
@@ -1074,17 +1283,9 @@ export function mountFantasyScene(container, opts = {}) {
   }
 
   function spawnCrystals() {
-    if (destroyed || !centerDevEnabled.crystals || crystalsTeardown) {
-      scheduleCrystalsSpawn(randRange(cycleRng, 1800, 3600));
-      return;
-    }
+    if (destroyed || !centerDevEnabled.crystals || crystalsTeardown) return;
 
     const crystalsDev = devKind === "crystals";
-    if (!crystalsDev && cycleRng() > CRYSTAL_SPAWN_CHANCE) {
-      scheduleCrystalsSpawn(randRange(cycleRng, 1600, 3800));
-      return;
-    }
-
     const variant = crystalsSpawnVariant;
     crystalsSpawnVariant += 1;
     const sizePx = computeSizePx("crystals");
@@ -1092,7 +1293,7 @@ export function mountFantasyScene(container, opts = {}) {
     const xPercent = pickCrystalsPlacementX(layerWidthPx, sizePx);
 
     if (xPercent == null) {
-      scheduleCrystalsSpawn(randRange(cycleRng, 900, 2000));
+      scheduleCrystalsSpawn(randRange(cycleRng, 800, 1800));
       return;
     }
 
@@ -1122,10 +1323,7 @@ export function mountFantasyScene(container, opts = {}) {
         crystalsTeardown = null;
         activeCrystalsX = null;
         activeCrystalsSizePx = 0;
-        const retryGap = crystalsDev
-          ? timing.gapMs
-          : timing.gapMs + randRange(cycleRng, 2400, 5600);
-        scheduleCrystalsSpawn(retryGap);
+        scheduleCrystalsSpawn(timing.gapMs);
       },
     }));
   }

@@ -14,11 +14,15 @@ import {
   mergeBlockedIntervals,
   pickCenterGapPlacementX,
   pickCenterPlacementX,
+  pickFairGapPlacementX,
   pickGapPlacementX,
+  pickTrioScenePlacementX,
   placementOverlapsOccupants,
   planBuildingKind,
   preferredCrystalHemispheres,
   resolveCenterPlacementHemispheres,
+  isTrioCenterMode,
+  TRIO_CENTER_MIN_GAP_FACTOR,
 } from "../js/components/loader-fantasy-scene.js";
 import { createRng } from "../js/components/loader-ship-rng.js";
 
@@ -353,6 +357,62 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
     assert.ok(strictFound <= relaxedFound);
   });
 
+  it("isTrioCenterMode requiere bosque castillo y cristales", () => {
+    assert.equal(isTrioCenterMode({ forest: true, building: true, crystals: true }), true);
+    assert.equal(isTrioCenterMode({ forest: true, building: true, crystals: false }), false);
+    assert.equal(isTrioCenterMode({ forest: false, building: true, crystals: true }), false);
+  });
+
+  it("pickTrioScenePlacementX permite triple cuando hay sitio", () => {
+    const layerWidthPx = 390;
+    let triples = 0;
+    for (let s = 0; s < 50; s++) {
+      const rng = createRng(s + 900);
+      const forestX = pickTrioScenePlacementX({
+        rng,
+        layerWidthPx,
+        selfSizePx: 64,
+        occupiedZones: [],
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+      });
+      if (forestX == null) continue;
+      const zonesF = buildSceneOccupiedZones({
+        forestX,
+        forestSizePx: 64,
+        layerWidthPx,
+      });
+      const buildingX = pickTrioScenePlacementX({
+        rng,
+        layerWidthPx,
+        selfSizePx: 100,
+        occupiedZones: zonesF,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+      });
+      if (buildingX == null) continue;
+      const zonesBoth = buildSceneOccupiedZones({
+        forestX,
+        forestSizePx: 64,
+        buildingX,
+        buildingSizePx: 100,
+        layerWidthPx,
+      });
+      const crystalsX = pickTrioScenePlacementX({
+        rng,
+        layerWidthPx,
+        selfSizePx: 52,
+        occupiedZones: zonesBoth,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+      });
+      if (crystalsX == null) continue;
+      triples += 1;
+      assert.ok(
+        !placementOverlapsOccupants(crystalsX, 52, layerWidthPx, zonesBoth),
+        `seed ${s}: cristales solapan`,
+      );
+    }
+    assert.ok(triples >= 10, `solo ${triples} triples en 50 intentos`);
+  });
+
   it("preferredCrystalHemispheres evita el lado del bosque o castillo", () => {
     assert.deepEqual(preferredCrystalHemispheres(24, null), ["right"]);
     assert.deepEqual(preferredCrystalHemispheres(null, 78), ["left"]);
@@ -477,33 +537,29 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
 
   it("simulación triple bosque castillo cristales sin solapes", () => {
     const layerWidthPx = 390;
+    let triples = 0;
     for (let s = 0; s < 80; s++) {
       const rng = createRng(s + 2000);
       const forestSizePx = 68 + (s % 12);
       const buildingSizePx = 108 + (s % 18);
       const crystalsSizePx = 50 + (s % 14);
 
-      const forestX = pickCenterGapPlacementX({
+      const forestX = pickTrioScenePlacementX({
         rng,
-        slot: "forest",
         layerWidthPx,
         selfSizePx: forestSizePx,
-        bothSlotsEnabled: true,
         occupiedZones: [],
-        minGapFactor: 1.65,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
       });
       if (forestX == null) continue;
 
       const zonesForest = buildSceneOccupiedZones({ forestX, forestSizePx, layerWidthPx });
-      const buildingX = pickCenterGapPlacementX({
+      const buildingX = pickTrioScenePlacementX({
         rng,
-        slot: "building",
-        otherXPercent: forestX,
         layerWidthPx,
         selfSizePx: buildingSizePx,
-        bothSlotsEnabled: true,
         occupiedZones: zonesForest,
-        minGapFactor: 1.62,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
       });
       if (buildingX == null) continue;
 
@@ -514,17 +570,15 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
         buildingSizePx,
         layerWidthPx,
       });
-      const crystalsX = pickGapPlacementX({
+      const crystalsX = pickTrioScenePlacementX({
         rng,
         layerWidthPx,
         selfSizePx: crystalsSizePx,
-        minGapFactor: 1.68,
-        zoneMarginFrac: 0.62,
-        occupiedExtraPaddingPct: SCENE_OCCUPIED_EXTRA_PADDING_PCT,
-        allowedHemispheres: preferredCrystalHemispheres(forestX, buildingX),
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
         occupiedZones: zonesBoth,
       });
       if (crystalsX == null) continue;
+      triples += 1;
       assert.ok(
         !placementOverlapsOccupants(crystalsX, crystalsSizePx, layerWidthPx, zonesBoth),
         `seed ${s}: cristales solapan (${crystalsX})`,
@@ -538,15 +592,6 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
         ),
         `seed ${s}: castillo solapa bosque`,
       );
-      const zonesAll = buildSceneOccupiedZones({
-        forestX,
-        forestSizePx,
-        buildingX,
-        buildingSizePx,
-        crystalsX,
-        crystalsSizePx,
-        layerWidthPx,
-      });
       assert.ok(
         !placementOverlapsOccupants(forestX, forestSizePx, layerWidthPx, [
           { center: buildingX, halfWidth: (buildingSizePx * 1.16 / 2 / layerWidthPx) * 100 },
@@ -554,7 +599,7 @@ describe("loader-fantasy-scene / huecos para cristales", () => {
         ], SCENE_OCCUPIED_EXTRA_PADDING_PCT),
         `seed ${s}: bosque solapa en triple`,
       );
-      assert.ok(!placementOverlapsOccupants(crystalsX, crystalsSizePx, layerWidthPx, zonesAll));
     }
+    assert.ok(triples >= 20, `solo ${triples} triples en 80 intentos`);
   });
 });
