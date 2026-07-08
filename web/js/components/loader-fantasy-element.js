@@ -276,8 +276,8 @@ export function planLifecycleTiming(seed, kind, _partCount) {
   if (kind === "crystals") {
     return {
       partDurationMs: Math.round(randRange(rng, 160, 280)),
-      holdMs: Math.round(randRange(rng, 2500, 4500)),
-      erodeMs: Math.round(randRange(rng, 1400, 2000)),
+      holdMs: Math.round(randRange(rng, 5500, 9000)),
+      erodeMs: Math.round(randRange(rng, 2200, 3400)),
       gapMs: Math.round(randRange(rng, 400, 1200)),
     };
   }

@@ -2,17 +2,30 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  anchorCrystalToParent,
   anchorCrystalToRock,
   buildCrystalAt,
   buildElongatedHexCrystal,
   buildIrregularRock,
+  buildSecondaryCrystalAt,
+  crystalHeightFromOuter,
   crystalParts,
   crystalPlantLine,
   generateCrystals,
+  isCrystalInsertedInHost,
+  parentHeightFractionAtY,
+  parentLengthSpan,
+  parentXOnFaceAtHeight,
   planCrystalStyle,
+  planSecondaryCrystalCount,
+  planSecondaryCrystalHeight,
+  pickParentForSecondary,
   rockCrestYAt,
   rockTopYAt,
   rotatePoints,
+  sampleParentAttachPoint,
+  SECONDARY_ATTACH_FRAC_MAX,
+  SECONDARY_ATTACH_FRAC_MIN,
 } from "../js/components/loader-fantasy-crystals.js";
 import {
   generateFantasyElement,
@@ -27,6 +40,17 @@ function rockBasePart(el) {
   const part = el.parts.find((p) => p.role === "rock_base");
   assert.ok(part);
   return part;
+}
+
+/** @param {import('../js/components/loader-fantasy-element.js').FantasyPart} part */
+function partToOuter(part) {
+  const nums = part.d.match(/-?[\d.]+/g)?.map(Number) ?? [];
+  /** @type {import('../js/components/loader-fantasy-geom.js').FPoint[]} */
+  const pts = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    pts.push({ x: nums[i], y: nums[i + 1] });
+  }
+  return pts;
 }
 
 /** @param {import('../js/components/loader-fantasy-element.js').FantasyPart} part */
@@ -73,15 +97,21 @@ describe("loader-fantasy-crystals / validez", () => {
 });
 
 describe("loader-fantasy-crystals / estructura", () => {
-  it("exactamente 1 rock_base y 4–10 cristales hexagonales", () => {
+  it("exactamente 1 rock_base y 5–16 cristales hexagonales", () => {
     for (let s = 0; s < 25; s++) {
       const el = generateCrystals({ seed: s + 100 });
       const bases = el.parts.filter((p) => p.role === "rock_base");
       const crystals = crystalParts(el);
       assert.equal(bases.length, 1, `seed ${s}`);
-      assert.ok(crystals.length >= 4, `seed ${s}`);
-      assert.ok(crystals.length <= 10, `seed ${s}`);
+      assert.ok(crystals.length >= 5, `seed ${s}: ${crystals.length}`);
+      assert.ok(crystals.length <= 16, `seed ${s}: ${crystals.length}`);
       assert.equal(el.meta.crystalCount, crystals.length);
+      assert.ok(el.meta.primaryCrystalCount >= 5);
+      assert.ok(el.meta.secondaryCrystalCount >= 0);
+      assert.equal(
+        el.meta.primaryCrystalCount + el.meta.secondaryCrystalCount,
+        crystals.length,
+      );
     }
   });
 
@@ -104,16 +134,78 @@ describe("loader-fantasy-crystals / estructura", () => {
     }
   });
 
-  it("cristales anclados en la cresta de la roca (sin flotar)", () => {
+  it("cristales primarios anclados en la cresta de la roca (sin flotar)", () => {
     let ok = 0;
     for (let s = 0; s < 30; s++) {
       const el = generateCrystals({ seed: s + 300, style: "shard" });
       const rock = rockBasePart(el);
       const crestY = minYInPath(rock);
-      const rooted = crystalParts(el).filter((p) => p.baseY >= crestY - 0.5);
-      if (rooted.length === el.meta.crystalCount) ok += 1;
+      const primaryCount = el.meta.primaryCrystalCount;
+      const primaries = crystalParts(el).slice(0, primaryCount);
+      const rooted = primaries.filter((p) => p.baseY >= crestY - 0.5);
+      if (rooted.length === primaryCount) ok += 1;
     }
     assert.ok(ok >= 28);
+  });
+
+  it("incluye cristales secundarios mas pequeños en la mayoria de semillas", () => {
+    let withSecondary = 0;
+    let smallerOk = 0;
+    for (let s = 0; s < 40; s++) {
+      const el = generateCrystals({ seed: s + 500 });
+      if (el.meta.secondaryCrystalCount > 0) {
+        withSecondary += 1;
+        const heights = crystalParts(el).map((part) => {
+          const nums = part.d.match(/-?[\d.]+/g)?.map(Number) ?? [];
+          const ys = nums.filter((_, i) => i % 2 === 1);
+          return Math.max(...ys) - Math.min(...ys);
+        });
+        const primaryHeights = heights.slice(0, el.meta.primaryCrystalCount);
+        const secondaryHeights = heights.slice(el.meta.primaryCrystalCount);
+        const maxPrimary = Math.max(...primaryHeights);
+        const maxSecondary = Math.max(...secondaryHeights);
+        if (maxSecondary < maxPrimary * 0.78) smallerOk += 1;
+      }
+    }
+    assert.ok(withSecondary >= 30);
+    assert.ok(smallerOk >= 25);
+  });
+
+  it("cristales secundarios insertados en un primario", () => {
+    let ok = 0;
+    for (let s = 0; s < 50; s++) {
+      const el = generateCrystals({ seed: s + 1200 });
+      if (el.meta.secondaryCrystalCount === 0) continue;
+      const flags = /** @type {boolean[]} */ (el.meta.secondaryInsertFlags ?? []);
+      const allAnchored = flags.length === el.meta.secondaryCrystalCount
+        && flags.every(Boolean);
+      if (allAnchored) ok += 1;
+    }
+    assert.ok(ok >= 45);
+  });
+
+  it("cristales secundarios anclados entre 40% y 75% del padre", () => {
+    let ok = 0;
+    for (let s = 0; s < 50; s++) {
+      const el = generateCrystals({ seed: s + 1400 });
+      if (el.meta.secondaryCrystalCount === 0) continue;
+      const fracs = /** @type {number[]} */ (el.meta.secondaryAttachFracs ?? []);
+      const allInBand = fracs.length === el.meta.secondaryCrystalCount
+        && fracs.every((frac) => frac >= SECONDARY_ATTACH_FRAC_MIN - 0.03
+          && frac <= SECONDARY_ATTACH_FRAC_MAX + 0.03);
+      if (allInBand) ok += 1;
+    }
+    assert.ok(ok >= 45);
+  });
+
+  it("cristales secundarios construyen despues de los primarios", () => {
+    const el = generateCrystals({ seed: 8181, style: "geode" });
+    assert.ok(el.meta.secondaryCrystalCount > 0);
+    const primaries = crystalParts(el).slice(0, el.meta.primaryCrystalCount);
+    const secondaries = crystalParts(el).slice(el.meta.primaryCrystalCount);
+    const maxPrimarySeq = Math.max(...primaries.map((p) => p.buildSequence ?? 0));
+    const minSecondarySeq = Math.min(...secondaries.map((p) => p.buildSequence ?? 0));
+    assert.ok(minSecondarySeq > maxPrimarySeq);
   });
 
   it("rock_base construye primero", () => {
@@ -217,11 +309,61 @@ describe("loader-fantasy-crystals / geometría hexagonal", () => {
     assert.ok(maxH > minH * 1.45);
   });
 
+  it("sampleParentAttachPoint elige altura en franja 40-75%", () => {
+    const rng = createRng(3);
+    const { outer: rockOuter } = buildIrregularRock(createRng(1), 40, 10);
+    const parent = buildCrystalAt(rng, 20, rockTopYAt(rockOuter, 20), 34, 4, 12, rockOuter);
+    for (let i = 0; i < 15; i++) {
+      const { attachY } = sampleParentAttachPoint(createRng(i + 20), parent, 20);
+      const frac = parentHeightFractionAtY(parent, attachY);
+      assert.ok(frac >= 0.4 && frac <= 0.75, `frac=${frac}`);
+    }
+  });
+
+  it("anchorCrystalToParent inserta sobre el padre", () => {
+    const rng = createRng(19);
+    const { outer: rockOuter } = buildIrregularRock(createRng(3), 40, 10);
+    const parent = buildCrystalAt(rng, 20, rockTopYAt(rockOuter, 20), 30, 4, 8, rockOuter);
+    const { attachX, attachY, outwardSide } = sampleParentAttachPoint(createRng(5), parent, 20);
+    const child = buildSecondaryCrystalAt(createRng(7), attachX, attachY, 18, 2.2, outwardSide * 12, parent);
+    assert.ok(isCrystalInsertedInHost(child, parent));
+    const frac = parentHeightFractionAtY(parent, crystalPlantLine(child).apexY);
+    assert.ok(frac >= SECONDARY_ATTACH_FRAC_MIN - 0.03 && frac <= SECONDARY_ATTACH_FRAC_MAX + 0.03);
+    assert.ok(crystalHeightFromOuter(child) < crystalHeightFromOuter(parent) * 0.85);
+  });
+
+  it("planSecondaryCrystalCount escala con primarios", () => {
+    const rng = createRng(33);
+    assert.equal(planSecondaryCrystalCount(rng, 1), 0);
+    const n = planSecondaryCrystalCount(createRng(44), 8);
+    assert.ok(n >= 2 && n <= 6);
+  });
+
+  it("seed 4242 genera secundarios visibles", () => {
+    const el = generateCrystals({ seed: 4242 });
+    assert.ok(el.meta.secondaryCrystalCount >= 2);
+    const heights = crystalParts(el).map((part) => {
+      const nums = part.d.match(/-?[\d.]+/g)?.map(Number) ?? [];
+      const ys = nums.filter((_, i) => i % 2 === 1);
+      return Math.max(...ys) - Math.min(...ys);
+    });
+    const secondaryHeights = heights.slice(el.meta.primaryCrystalCount);
+    assert.ok(secondaryHeights.every((h) => h >= 18), secondaryHeights.join(", "));
+    assert.ok(Math.max(...secondaryHeights) >= 22);
+  });
+
+  it("planSecondaryCrystalHeight respeta suelo mínimo", () => {
+    const rng = createRng(9);
+    const h = planSecondaryCrystalHeight(12, 50, rng);
+    assert.ok(h >= 18);
+    assert.ok(h >= 10);
+  });
+
   it("planLifecycleTiming crystals en rango de spec", () => {
     const t = planLifecycleTiming(77, "crystals", 8);
     assert.ok(t.partDurationMs >= 160 && t.partDurationMs <= 280);
-    assert.ok(t.holdMs >= 2500 && t.holdMs <= 4500);
-    assert.ok(t.erodeMs >= 1400 && t.erodeMs <= 2000);
+    assert.ok(t.holdMs >= 5500 && t.holdMs <= 9000);
+    assert.ok(t.erodeMs >= 2200 && t.erodeMs <= 3400);
   });
 
   it("erosionMaskNoiseParams más fino para crystals", () => {

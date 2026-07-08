@@ -25,7 +25,23 @@ export const CENTER_LEFT_ZONE_MAX = 50 - CENTER_LOGO_GAP / 2;
 /** Límite inferior de la franja derecha (%). */
 export const CENTER_RIGHT_ZONE_MIN = 50 + CENTER_LOGO_GAP / 2;
 
+/** Probabilidad de intento de spawn de cristales por ciclo (modo normal). */
+export const CRYSTAL_SPAWN_CHANCE = 0.38;
+
+/** Tamaño máximo usado solo para calcular huecos (no escala el SVG final). */
+const CRYSTAL_GAP_PROBE_MAX_PX = 70;
+/** Margen extra alrededor de bosque/castillo al colocar cristales. */
+const CRYSTAL_GAP_ZONE_MARGIN_FRAC = 0.62;
+/** Padding adicional (% ancho) sobre la silueta de bosque/castillo. */
+const CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT = 3.5;
+/** Inflado de la caja de castillo al calcular ocupación (más ancho visual). */
+const CRYSTAL_BUILDING_OCCUPIED_INFLATE = 1.14;
+/** Inflado de la caja de bosque al calcular ocupación. */
+const CRYSTAL_FOREST_OCCUPIED_INFLATE = 1.08;
+
 const CENTER_ZONE_MIN_WIDTH_PX = 36;
+/** Margen entre zonas ocupadas al buscar huecos (% del ancho). */
+const GAP_ZONE_MARGIN_FRAC = 0.35;
 
 /**
  * Rango seguro (centro del elemento) evitando riscos laterales y el propio ancho.
@@ -220,6 +236,250 @@ export function pickCenterPlacementX(options) {
 }
 
 /**
+ * @param {number} selfSizePx
+ * @param {number} layerWidthPx
+ */
+export function elementHalfWidthPercent(selfSizePx, layerWidthPx) {
+  if (layerWidthPx <= 0) return 0;
+  return (selfSizePx / 2 / layerWidthPx) * 100;
+}
+
+/**
+ * @typedef {{ center: number; halfWidth: number }} OccupiedZone
+ */
+
+/**
+ * @param {{ min: number; max: number }[]} intervals
+ */
+export function mergeBlockedIntervals(intervals) {
+  const sorted = intervals
+    .filter((iv) => iv.max > iv.min)
+    .sort((a, b) => a.min - b.min);
+  /** @type {{ min: number; max: number }[]} */
+  const merged = [];
+  for (const iv of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && iv.min <= last.max) {
+      last.max = Math.max(last.max, iv.max);
+    } else {
+      merged.push({ min: iv.min, max: iv.max });
+    }
+  }
+  return merged;
+}
+
+/**
+ * @param {{ min: number; max: number }[]} blocked merged
+ * @param {number} min
+ * @param {number} max
+ */
+export function findFreeIntervals(blocked, min, max) {
+  /** @type {{ min: number; max: number }[]} */
+  const free = [];
+  let cursor = min;
+  for (const iv of blocked) {
+    if (iv.min > cursor) free.push({ min: cursor, max: iv.min });
+    cursor = Math.max(cursor, iv.max);
+  }
+  if (cursor < max) free.push({ min: cursor, max: max });
+  return free.filter((iv) => iv.max > iv.min);
+}
+
+/**
+ * Hemisferios libres de bosque/castillo para cristales.
+ * @param {number | null} forestX
+ * @param {number | null} buildingX
+ * @returns {readonly ('left' | 'right')[]}
+ */
+export function preferredCrystalHemispheres(forestX, buildingX) {
+  /** @type {('left' | 'right')[]} */
+  const hemis = [];
+  const forestOnLeft = forestX != null && forestX <= CENTER_LEFT_ZONE_MAX;
+  const forestOnRight = forestX != null && forestX >= CENTER_RIGHT_ZONE_MIN;
+  const buildingOnLeft = buildingX != null && buildingX <= CENTER_LEFT_ZONE_MAX;
+  const buildingOnRight = buildingX != null && buildingX >= CENTER_RIGHT_ZONE_MIN;
+
+  const leftTaken = forestOnLeft || buildingOnLeft;
+  const rightTaken = forestOnRight || buildingOnRight;
+
+  if (!leftTaken) hemis.push("left");
+  if (!rightTaken) hemis.push("right");
+  if (leftTaken && rightTaken) return ["left", "right"];
+  return hemis.length > 0 ? hemis : ["left", "right"];
+}
+
+/**
+ * @param {{
+ *   forestX?: number | null;
+ *   forestSizePx?: number;
+ *   buildingX?: number | null;
+ *   buildingSizePx?: number;
+ *   layerWidthPx?: number;
+ * }} params
+ * @returns {OccupiedZone[]}
+ */
+export function buildCrystalOccupiedZones(params) {
+  const {
+    forestX = null,
+    forestSizePx = 0,
+    buildingX = null,
+    buildingSizePx = 0,
+    layerWidthPx = 390,
+  } = params;
+  /** @type {OccupiedZone[]} */
+  const zones = [];
+  if (forestX != null) {
+    zones.push({
+      center: forestX,
+      halfWidth: elementHalfWidthPercent(forestSizePx * CRYSTAL_FOREST_OCCUPIED_INFLATE, layerWidthPx),
+    });
+  }
+  if (buildingX != null) {
+    zones.push({
+      center: buildingX,
+      halfWidth: elementHalfWidthPercent(buildingSizePx * CRYSTAL_BUILDING_OCCUPIED_INFLATE, layerWidthPx),
+    });
+  }
+  return zones;
+}
+
+/**
+ * @param {number} xPercent
+ * @param {number} selfSizePx
+ * @param {number} layerWidthPx
+ * @param {OccupiedZone[]} occupiedZones
+ * @param {number} [extraPaddingPct]
+ */
+export function placementOverlapsOccupants(
+  xPercent,
+  selfSizePx,
+  layerWidthPx,
+  occupiedZones,
+  extraPaddingPct = CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT,
+) {
+  const hw = elementHalfWidthPercent(selfSizePx, layerWidthPx);
+  for (const zone of occupiedZones) {
+    const gap = Math.abs(xPercent - zone.center) - zone.halfWidth - hw - extraPaddingPct;
+    if (gap < 0) return true;
+  }
+  return false;
+}
+
+/**
+ * @param {{ min: number; max: number }} interval
+ * @param {number} hw
+ * @param {OccupiedZone[]} occupiedZones
+ */
+function gapSeparationScore(interval, hw, occupiedZones) {
+  const mid = (interval.min + interval.max) / 2;
+  let minClear = interval.max - interval.min;
+  for (const zone of occupiedZones) {
+    const clear = Math.abs(mid - zone.center) - zone.halfWidth - hw;
+    if (clear < minClear) minClear = clear;
+  }
+  return minClear;
+}
+
+/**
+ * Coloca un elemento en el hueco libre más amplio (bosque/castillo/logo/riscos).
+ * @param {{
+ *   rng: () => number;
+ *   layerWidthPx?: number;
+ *   selfSizePx?: number;
+ *   occupiedZones?: OccupiedZone[];
+ *   cliffLeftPx?: number;
+ *   cliffRightPx?: number;
+ *   avoidEdgeCliffs?: boolean;
+ *   minGapFactor?: number;
+ *   zoneMarginFrac?: number;
+ *   occupiedExtraPaddingPct?: number;
+ *   allowedHemispheres?: readonly ('left' | 'right')[];
+ * }} options
+ * @returns {number | null} centro en % o null si no cabe
+ */
+export function pickGapPlacementX(options) {
+  const {
+    rng,
+    layerWidthPx = 390,
+    selfSizePx = 80,
+    occupiedZones = [],
+    cliffLeftPx = 0,
+    cliffRightPx = 0,
+    avoidEdgeCliffs = true,
+    minGapFactor = 2.1,
+    zoneMarginFrac = GAP_ZONE_MARGIN_FRAC,
+    occupiedExtraPaddingPct = 0,
+    allowedHemispheres = null,
+  } = options;
+
+  const hw = elementHalfWidthPercent(selfSizePx, layerWidthPx);
+  const margin = hw * zoneMarginFrac;
+  const minGap = hw * minGapFactor;
+
+  const blocked = mergeBlockedIntervals([
+    { min: CENTER_LEFT_ZONE_MAX, max: CENTER_RIGHT_ZONE_MIN },
+    ...occupiedZones.map((z) => ({
+      min: z.center - z.halfWidth - margin - occupiedExtraPaddingPct,
+      max: z.center + z.halfWidth + margin + occupiedExtraPaddingPct,
+    })),
+  ]);
+
+  /** @type {{ min: number; max: number }[]} */
+  const candidates = [];
+  /** @type {readonly { preferSide: 'left' | 'right'; zoneMin: number; zoneMax: number }[]} */
+  const allHemispheres = [
+    { preferSide: "left", zoneMin: PLACE_LEFT_MIN, zoneMax: CENTER_LEFT_ZONE_MAX },
+    { preferSide: "right", zoneMin: CENTER_RIGHT_ZONE_MIN, zoneMax: PLACE_LEFT_MAX },
+  ];
+  const hemispheres = allowedHemispheres?.length
+    ? allHemispheres.filter((h) => allowedHemispheres.includes(h.preferSide))
+    : allHemispheres;
+
+  for (const { preferSide, zoneMin, zoneMax } of hemispheres) {
+    const safe = computeSafeCenterRange(
+      layerWidthPx,
+      selfSizePx,
+      avoidEdgeCliffs ? cliffLeftPx : 0,
+      avoidEdgeCliffs ? cliffRightPx : 0,
+      avoidEdgeCliffs ? preferSide : null,
+    );
+    const placeMin = Math.max(zoneMin, safe.min);
+    const placeMax = Math.min(zoneMax, safe.max);
+    if (placeMin >= placeMax) continue;
+
+    const free = findFreeIntervals(blocked, placeMin, placeMax)
+      .filter((iv) => iv.max - iv.min >= minGap);
+    candidates.push(...free);
+  }
+
+  if (candidates.length === 0) return null;
+
+  candidates.sort((a, b) => {
+    const sepA = gapSeparationScore(a, hw, occupiedZones);
+    const sepB = gapSeparationScore(b, hw, occupiedZones);
+    if (Math.abs(sepB - sepA) > 0.5) return sepB - sepA;
+    return (b.max - b.min) - (a.max - a.min);
+  });
+  const pickIdx = Math.min(candidates.length - 1, Math.floor(rng() * Math.min(3, candidates.length)));
+  const gap = candidates[pickIdx];
+  return randRange(rng, gap.min + hw, gap.max - hw);
+}
+
+/**
+ * @param {OccupiedZone[]} zones
+ * @param {number | null | undefined} center
+ * @param {number} sizePx
+ * @param {number} layerWidthPx
+ */
+export function occupiedZoneFromActive(zones, center, sizePx, layerWidthPx) {
+  if (center == null) return zones;
+  return [
+    ...zones,
+    { center, halfWidth: elementHalfWidthPercent(sizePx, layerWidthPx) },
+  ];
+}
+
+/**
  * @param {HTMLElement} container
  * @param {{
  *   reducedMotion?: boolean;
@@ -270,8 +530,13 @@ export function mountFantasyScene(container, opts = {}) {
   let crystalsSpawnVariant = 0;
   /** @type {number | null} */
   let activeForestX = null;
+  let activeForestSizePx = 0;
   /** @type {number | null} */
   let activeBuildingX = null;
+  let activeBuildingSizePx = 0;
+  /** @type {number | null} */
+  let activeCrystalsX = null;
+  let activeCrystalsSizePx = 0;
   let wallSessionSeed = sessionSeed();
   /** @type {import('./loader-fantasy-cliffs.js').CliffFormationType | undefined} */
   let wallFormationType;
@@ -279,7 +544,7 @@ export function mountFantasyScene(container, opts = {}) {
   const centerDevEnabled = {
     forest: !devKind || devKind === "forest",
     building: !devKind || devKind === "castle" || devKind === "palace",
-    crystals: devKind === "crystals",
+    crystals: !devKind || devKind === "crystals",
   };
 
   /** @param {number} cycleSeed */
@@ -308,7 +573,11 @@ export function mountFantasyScene(container, opts = {}) {
       crystalsTeardown = null;
     }
     activeForestX = null;
+    activeForestSizePx = 0;
     activeBuildingX = null;
+    activeBuildingSizePx = 0;
+    activeCrystalsX = null;
+    activeCrystalsSizePx = 0;
     for (const td of cliffTeardowns) td.destroy();
     cliffTeardowns = [];
     cliffActive.left = false;
@@ -440,6 +709,14 @@ export function mountFantasyScene(container, opts = {}) {
     buildingTimer = setTimeout(spawnBuilding, gapMs);
   }
 
+  function occupiedZonesForGaps(layerWidthPx) {
+    let zones = [];
+    zones = occupiedZoneFromActive(zones, activeForestX, activeForestSizePx, layerWidthPx);
+    zones = occupiedZoneFromActive(zones, activeBuildingX, activeBuildingSizePx, layerWidthPx);
+    zones = occupiedZoneFromActive(zones, activeCrystalsX, activeCrystalsSizePx, layerWidthPx);
+    return zones;
+  }
+
   function scheduleCrystalsSpawn(gapMs = 0) {
     if (destroyed || !centerDevEnabled.crystals) return;
     clearTimeout(crystalsTimer);
@@ -469,6 +746,7 @@ export function mountFantasyScene(container, opts = {}) {
       bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
     });
     activeForestX = xPercent;
+    activeForestSizePx = sizePx;
     const baseSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
     const seed = mixFantasySeed(baseSeed, variant);
 
@@ -498,6 +776,7 @@ export function mountFantasyScene(container, opts = {}) {
       onGone: () => {
         forestTeardown = null;
         activeForestX = null;
+        activeForestSizePx = 0;
         scheduleForestSpawn(timing.gapMs);
       },
     });
@@ -522,6 +801,7 @@ export function mountFantasyScene(container, opts = {}) {
       ...cliffMarginsForPlacement(),
     });
     activeBuildingX = xPercent;
+    activeBuildingSizePx = sizePx;
     const seed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
     const faction = devFaction ?? pickFaction(cycleRng, kind === "palace");
 
@@ -552,39 +832,100 @@ export function mountFantasyScene(container, opts = {}) {
       onGone: () => {
         buildingTeardown = null;
         activeBuildingX = null;
+        activeBuildingSizePx = 0;
         scheduleBuildingSpawn(timing.gapMs);
       },
     });
   }
 
+  function occupiedZonesForCrystalGaps(layerWidthPx) {
+    return buildCrystalOccupiedZones({
+      forestX: activeForestX,
+      forestSizePx: activeForestSizePx,
+      buildingX: activeBuildingX,
+      buildingSizePx: activeBuildingSizePx,
+      layerWidthPx,
+    });
+  }
+
+  function pickCrystalsPlacementX(layerWidthPx, sizePx) {
+    const bothOccupied = activeForestX != null && activeBuildingX != null;
+    const gapProbePx = Math.min(
+      sizePx,
+      bothOccupied ? 58 : CRYSTAL_GAP_PROBE_MAX_PX,
+    );
+    const occupiedZones = occupiedZonesForCrystalGaps(layerWidthPx);
+    const cliffMargins = cliffMarginsForPlacement();
+    const preferred = preferredCrystalHemispheres(activeForestX, activeBuildingX);
+    const gapOpts = {
+      rng: cycleRng,
+      layerWidthPx,
+      selfSizePx: gapProbePx,
+      occupiedZones,
+      minGapFactor: bothOccupied ? 1.62 : 1.75,
+      zoneMarginFrac: CRYSTAL_GAP_ZONE_MARGIN_FRAC,
+      occupiedExtraPaddingPct: CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT,
+      allowedHemispheres: preferred,
+      ...cliffMargins,
+    };
+
+    let xPercent = pickGapPlacementX({ ...gapOpts, avoidEdgeCliffs: true });
+    if (xPercent == null) {
+      xPercent = pickGapPlacementX({ ...gapOpts, avoidEdgeCliffs: false });
+    }
+    if (xPercent == null && preferred.length === 1) {
+      xPercent = pickGapPlacementX({
+        ...gapOpts,
+        avoidEdgeCliffs: false,
+        allowedHemispheres: ["left", "right"],
+      });
+    }
+    if (xPercent == null) return null;
+    if (placementOverlapsOccupants(xPercent, gapProbePx, layerWidthPx, occupiedZones)) {
+      return null;
+    }
+    return xPercent;
+  }
+
   function spawnCrystals() {
-    if (destroyed || !centerDevEnabled.crystals || crystalsTeardown) return;
+    if (destroyed || !centerDevEnabled.crystals || crystalsTeardown) {
+      scheduleCrystalsSpawn(randRange(cycleRng, 1800, 3600));
+      return;
+    }
+
+    const crystalsDev = devKind === "crystals";
+    if (!crystalsDev && cycleRng() > CRYSTAL_SPAWN_CHANCE) {
+      scheduleCrystalsSpawn(randRange(cycleRng, 1600, 3800));
+      return;
+    }
 
     const variant = crystalsSpawnVariant;
     crystalsSpawnVariant += 1;
     const sizePx = computeSizePx("crystals");
     const layerWidthPx = layer.clientWidth || 390;
-    const xPercent = pickCenterPlacementX({
-      rng: cycleRng,
-      slot: "building",
-      layerWidthPx,
-      selfSizePx: sizePx,
-      bothSlotsEnabled: false,
-      avoidEdgeCliffs: true,
-      ...cliffMarginsForPlacement(),
-    });
+    const xPercent = pickCrystalsPlacementX(layerWidthPx, sizePx);
+
+    if (xPercent == null) {
+      scheduleCrystalsSpawn(randRange(cycleRng, 900, 2000));
+      return;
+    }
+
+    activeCrystalsX = xPercent;
+    activeCrystalsSizePx = sizePx;
     const baseSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
     const seed = mixFantasySeed(baseSeed, variant);
 
     const element = generateFantasyElement("crystals", { seed });
     if (!element) {
+      activeCrystalsX = null;
+      activeCrystalsSizePx = 0;
       scheduleCrystalsSpawn(2000);
       return;
     }
 
     const baseTiming = planLifecycleTiming(seed, "crystals", element.parts.length);
-    const timing = devKind === "crystals"
-      ? { ...baseTiming, holdMs: 4000, erodeMs: 2200, gapMs: 600 }
+    const timing = crystalsDev
+      ? { ...baseTiming, holdMs: 8000, erodeMs: 3200, gapMs: 600 }
       : baseTiming;
 
     crystalsTeardown = mountFantasyElement(layer, element, {
@@ -596,7 +937,12 @@ export function mountFantasyScene(container, opts = {}) {
       timing,
       onGone: () => {
         crystalsTeardown = null;
-        scheduleCrystalsSpawn(timing.gapMs);
+        activeCrystalsX = null;
+        activeCrystalsSizePx = 0;
+        const retryGap = crystalsDev
+          ? timing.gapMs
+          : timing.gapMs + randRange(cycleRng, 2400, 5600);
+        scheduleCrystalsSpawn(retryGap);
       },
     });
   }
@@ -623,7 +969,8 @@ export function mountFantasyScene(container, opts = {}) {
       scheduleBuildingSpawn(baseGap + buildingDelay);
     }
     if (centerDevEnabled.crystals) {
-      scheduleCrystalsSpawn(quick ? 0 : baseGap);
+      const crystalDelay = quick ? 0 : randRange(cycleRng, 250, 1100);
+      scheduleCrystalsSpawn(baseGap + crystalDelay);
     }
   }
 

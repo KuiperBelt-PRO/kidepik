@@ -15,8 +15,8 @@ import { createRng, randRange } from "./loader-ship-rng.js";
 
 const STYLE_CONFIG = {
   shard: {
-    crystalMin: 4,
-    crystalMax: 6,
+    crystalMin: 5,
+    crystalMax: 8,
     layoutMin: 34,
     layoutMax: 48,
     rockHMin: 8,
@@ -26,8 +26,8 @@ const STYLE_CONFIG = {
     floatCount: 0,
   },
   geode: {
-    crystalMin: 6,
-    crystalMax: 9,
+    crystalMin: 8,
+    crystalMax: 12,
     layoutMin: 40,
     layoutMax: 54,
     rockHMin: 10,
@@ -37,8 +37,8 @@ const STYLE_CONFIG = {
     floatCount: 0,
   },
   floatingShards: {
-    crystalMin: 4,
-    crystalMax: 7,
+    crystalMin: 5,
+    crystalMax: 9,
     layoutMin: 36,
     layoutMax: 50,
     rockHMin: 8,
@@ -49,8 +49,19 @@ const STYLE_CONFIG = {
   },
 };
 
+/** @typedef {{ outer: import('./loader-fantasy-geom.js').FPoint[]; cx: number; height: number; halfWidth: number; tilt: number }} PlacedCrystal */
+
 /** @type {readonly string[]} */
 export const CRYSTAL_PART_ROLES = ["crystal"];
+
+const SECONDARY_HEIGHT_FRAC_MIN = 0.38;
+const SECONDARY_HEIGHT_FRAC_MAX = 0.62;
+/** Altura mínima del secundario como fracción del clúster (viewBox). */
+const SECONDARY_MIN_CLUSTER_FRAC = 0.2;
+const SECONDARY_MIN_HEIGHT_ABS = 18;
+/** Fracción de la longitud del padre donde puede anclarse un secundario. */
+export const SECONDARY_ATTACH_FRAC_MIN = 0.4;
+export const SECONDARY_ATTACH_FRAC_MAX = 0.75;
 
 /**
  * Semi-ancho aleatorio con sesgo a prismas estrechos, medios y anchos.
@@ -285,6 +296,209 @@ export function anchorCrystalToRock(outer, rockOuter, penetration = 0) {
 }
 
 /**
+ * @param {number} x
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} hostOuter
+ * @param {number} [marginFrac]
+ */
+export function clampAttachXToHost(x, hostOuter, marginFrac = 0.12) {
+  const xs = hostOuter.map((p) => p.x);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const margin = (maxX - minX) * marginFrac;
+  return Math.max(minX + margin, Math.min(maxX - margin, x));
+}
+
+/**
+ * Comprueba que la base del cristal queda insertada en el macizo anfitrión (roca o padre).
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} outer
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} hostOuter
+ * @param {number} [tolerance]
+ */
+export function isCrystalInsertedInHost(outer, hostOuter, tolerance = 0.4) {
+  const { plantY, plantX, apexY, apexX } = crystalPlantLine(outer);
+  const surfaceAtPlant = rockTopYAt(hostOuter, plantX);
+  const surfaceAtApex = rockTopYAt(hostOuter, apexX);
+  if (plantY > surfaceAtPlant + tolerance) return false;
+  if (apexY > surfaceAtApex + tolerance) return false;
+  return true;
+}
+
+/**
+ * Ancla un cristal secundario sobre la envolvente de un cristal padre.
+ * Con `targetAttachY`, fija el punto de enganche lateral (40–75 % del padre)
+ * en la punta inferior del secundario; sin él, alinea la base con la cresta superior.
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} outer
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} parentOuter
+ * @param {number} [penetration]
+ * @param {number} [targetAttachY]
+ */
+export function anchorCrystalToParent(outer, parentOuter, penetration = 0, targetAttachY) {
+  const { plantY, plantX, apexY } = crystalPlantLine(outer);
+  const useLateralAttach = Number.isFinite(targetAttachY);
+  const referenceY = useLateralAttach ? apexY : plantY;
+  const targetY = useLateralAttach
+    ? targetAttachY
+    : rockTopYAt(parentOuter, clampAttachXToHost(plantX, parentOuter, 0.08)) - penetration;
+  const dy = targetY - referenceY;
+  if (Math.abs(dy) < 0.001) return outer;
+  return outer.map((p) => ({ x: p.x, y: p.y + dy }));
+}
+
+/**
+ * Longitud visible del prisma padre: desde la línea de implantación hasta la punta.
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} parentOuter
+ */
+export function parentLengthSpan(parentOuter) {
+  const topY = Math.max(...parentOuter.map((p) => p.y));
+  const { plantY } = crystalPlantLine(parentOuter);
+  const bottomY = plantY;
+  const span = Math.max(topY - bottomY, 1e-6);
+  return { bottomY, topY, span };
+}
+
+/**
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} parentOuter
+ * @param {number} y
+ */
+export function parentHeightFractionAtY(parentOuter, y) {
+  const { bottomY, span } = parentLengthSpan(parentOuter);
+  if (span <= 0) return 0;
+  return (y - bottomY) / span;
+}
+
+/**
+ * Abscisa en la cara lateral del padre a una altura dada (y-up).
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} parentOuter
+ * @param {number} parentCx
+ * @param {number} targetY
+ * @param {-1 | 1} outwardSide
+ */
+export function parentXOnFaceAtHeight(parentOuter, parentCx, targetY, outwardSide) {
+  /** @type {number[]} */
+  const xsAtY = [];
+  for (let i = 0; i < parentOuter.length; i += 1) {
+    const a = parentOuter[i];
+    const b = parentOuter[(i + 1) % parentOuter.length];
+    const edgeMinY = Math.min(a.y, b.y);
+    const edgeMaxY = Math.max(a.y, b.y);
+    if (targetY < edgeMinY - 1e-6 || targetY > edgeMaxY + 1e-6) continue;
+    const dy = b.y - a.y;
+    if (Math.abs(dy) < 1e-9) {
+      if (Math.abs(a.y - targetY) < 1e-6) xsAtY.push(a.x, b.x);
+      continue;
+    }
+    const t = (targetY - a.y) / dy;
+    if (t >= 0 && t <= 1) xsAtY.push(a.x + (b.x - a.x) * t);
+  }
+
+  if (xsAtY.length === 0) {
+    const xs = parentOuter.map((p) => p.x);
+    const hw = (Math.max(...xs) - Math.min(...xs)) * 0.5;
+    return parentCx + outwardSide * hw * 0.62;
+  }
+
+  const onSide = outwardSide < 0
+    ? xsAtY.filter((x) => x <= parentCx + 0.01)
+    : xsAtY.filter((x) => x >= parentCx - 0.01);
+  const pool = onSide.length > 0 ? onSide : xsAtY;
+  return outwardSide < 0 ? Math.min(...pool) : Math.max(...pool);
+}
+
+/**
+ * Punto de implantación de un secundario entre el 40 % y 75 % de la longitud del padre.
+ * @param {() => number} rng
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} parentOuter
+ * @param {number} parentCx
+ * @returns {{ attachX: number; attachY: number; outwardSide: -1 | 1 }}
+ */
+export function sampleParentAttachPoint(rng, parentOuter, parentCx) {
+  const { bottomY, span } = parentLengthSpan(parentOuter);
+  const targetY = bottomY + randRange(
+    rng,
+    span * SECONDARY_ATTACH_FRAC_MIN,
+    span * SECONDARY_ATTACH_FRAC_MAX,
+  );
+  /** @type {-1 | 1} */
+  const outwardSide = rng() < 0.5 ? -1 : 1;
+  const attachX = clampAttachXToHost(
+    parentXOnFaceAtHeight(parentOuter, parentCx, targetY, outwardSide),
+    parentOuter,
+    0.1,
+  );
+  return { attachX, attachY: targetY, outwardSide };
+}
+
+/**
+ * Elige un cristal padre con sesgo hacia los más altos (mejor soporte visual).
+ * @param {() => number} rng
+ * @param {PlacedCrystal[]} placedPrimaries
+ */
+export function pickParentForSecondary(rng, placedPrimaries) {
+  if (placedPrimaries.length === 1) return placedPrimaries[0];
+  const weights = placedPrimaries.map((p) => crystalHeightFromOuter(p.outer));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  let roll = rng() * total;
+  for (let i = 0; i < placedPrimaries.length; i += 1) {
+    roll -= weights[i];
+    if (roll <= 0) return placedPrimaries[i];
+  }
+  return placedPrimaries[placedPrimaries.length - 1];
+}
+
+/**
+ * @param {number} parentHeight
+ * @param {number} clusterHeight
+ * @param {() => number} rng
+ */
+export function planSecondaryCrystalHeight(parentHeight, clusterHeight, rng) {
+  const frac = randRange(rng, SECONDARY_HEIGHT_FRAC_MIN, SECONDARY_HEIGHT_FRAC_MAX);
+  return Math.max(
+    parentHeight * frac,
+    clusterHeight * SECONDARY_MIN_CLUSTER_FRAC,
+    SECONDARY_MIN_HEIGHT_ABS,
+  );
+}
+
+/**
+ * @param {() => number} rng
+ * @param {number} primaryCount
+ */
+export function planSecondaryCrystalCount(rng, primaryCount) {
+  if (primaryCount < 2) return 0;
+  const ratio = randRange(rng, 0.26, 0.4);
+  let count = Math.floor(primaryCount * ratio);
+  if (count < 1 && rng() < 0.62) count = 1;
+  return Math.min(count, primaryCount + 3);
+}
+
+/**
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} outer
+ */
+export function crystalHeightFromOuter(outer) {
+  const { plantY } = crystalPlantLine(outer);
+  const tipY = Math.max(...outer.map((p) => p.y));
+  return tipY - plantY;
+}
+
+/**
+ * @param {() => number} rng
+ * @param {number} attachX
+ * @param {number} attachY
+ * @param {number} height
+ * @param {number} halfWidth
+ * @param {number} tiltDeg
+ * @param {import('./loader-fantasy-geom.js').FPoint[]} parentOuter
+ */
+export function buildSecondaryCrystalAt(rng, attachX, attachY, height, halfWidth, tiltDeg, parentOuter) {
+  const clampedX = clampAttachXToHost(attachX, parentOuter, 0.1);
+  const capDepth = height * randRange(rng, 0.08, 0.14);
+
+  let outer = buildElongatedHexCrystal(clampedX, attachY, height, halfWidth, capDepth);
+  outer = rotatePoints(outer, clampedX, attachY, tiltDeg);
+  return anchorCrystalToParent(outer, parentOuter, 0, attachY);
+}
+
+/**
  * @param {() => number} rng
  * @param {number} cx
  * @param {number} baseY
@@ -327,7 +541,8 @@ export function generateCrystals(options) {
 
   const layoutWidth = randRange(rng, cfg.layoutMin, cfg.layoutMax);
   const rockDepth = randRange(rng, cfg.rockHMin, cfg.rockHMax);
-  const crystalCount = cfg.crystalMin + Math.floor(rng() * (cfg.crystalMax - cfg.crystalMin + 1));
+  const primaryCount = cfg.crystalMin + Math.floor(rng() * (cfg.crystalMax - cfg.crystalMin + 1));
+  const secondaryCount = planSecondaryCrystalCount(rng, primaryCount);
   const clusterHeight = randRange(rng, 38, 58) * cfg.heightMul;
 
   const rock = buildIrregularRock(rng, layoutWidth, rockDepth);
@@ -339,9 +554,11 @@ export function generateCrystals(options) {
   let maxCrystalHeight = 0;
   let crystalCxSum = 0;
   const spread = layoutWidth * cfg.spreadMul;
+  /** @type {PlacedCrystal[]} */
+  const placedPrimaries = [];
 
-  for (let i = 0; i < crystalCount; i += 1) {
-    const cx = sampleCrystalOffsetX(rng, i, crystalCount, rockCx, spread, imperfection);
+  for (let i = 0; i < primaryCount; i += 1) {
+    const cx = sampleCrystalOffsetX(rng, i, primaryCount, rockCx, spread, imperfection);
     crystalCxSum += cx;
 
     const isHero = i === 0 || (i === 1 && rng() < 0.35);
@@ -361,6 +578,15 @@ export function generateCrystals(options) {
     const crystal = buildCrystalAt(
       rng, cx, crestY, height, halfWidth, tilt, rock.outer,
     );
+    const actualHeight = crystalHeightFromOuter(crystal);
+
+    placedPrimaries.push({
+      outer: crystal,
+      cx,
+      height: actualHeight,
+      halfWidth,
+      tilt,
+    });
 
     asm.addPart("crystal", crystal, [], {
       buildSequence: 100 + i,
@@ -368,8 +594,48 @@ export function generateCrystals(options) {
     });
   }
 
+  /** @type {number[]} */
+  const secondaryAttachFracs = [];
+  /** @type {boolean[]} */
+  const secondaryInsertFlags = [];
+
+  for (let j = 0; j < secondaryCount; j += 1) {
+    const parent = pickParentForSecondary(rng, placedPrimaries);
+    const { attachX, attachY, outwardSide } = sampleParentAttachPoint(rng, parent.outer, parent.cx);
+    crystalCxSum += attachX;
+
+    const parentHeight = crystalHeightFromOuter(parent.outer);
+    const height = planSecondaryCrystalHeight(parentHeight, clusterHeight, rng);
+    maxCrystalHeight = Math.max(maxCrystalHeight, attachY + height);
+
+    const halfWidth = Math.max(
+      parent.halfWidth * randRange(rng, 0.52, 0.78),
+      sampleCrystalHalfWidth(rng, 0.45) * 0.72,
+    );
+    const tilt = parent.tilt
+      + outwardSide * randRange(rng, 10, 30)
+      + (rng() - 0.5) * imperfection * 14;
+
+    const crystal = buildSecondaryCrystalAt(
+      rng, attachX, attachY, height, halfWidth, tilt, parent.outer,
+    );
+    secondaryAttachFracs.push(parentHeightFractionAtY(parent.outer, attachY));
+    secondaryInsertFlags.push(isCrystalInsertedInHost(crystal, parent.outer));
+
+    asm.addPart("crystal", crystal, [], {
+      buildSequence: 200 + j,
+      tiltDeg: (rng() - 0.5) * imperfection * 3,
+    });
+  }
+
+  const crystalCount = primaryCount + secondaryCount;
+
   return asm.build("crystals", seed, style, {
     crystalCount,
+    primaryCrystalCount: primaryCount,
+    secondaryCrystalCount: secondaryCount,
+    secondaryAttachFracs,
+    secondaryInsertFlags,
     fallenCount: 0,
     floatCount: 0,
     layoutWidth,
