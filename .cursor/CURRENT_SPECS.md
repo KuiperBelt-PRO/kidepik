@@ -29,6 +29,10 @@
   - **Cristales mágicos:** [specify/SPEC_LOADER_FANTASY_CRYSTALS.md](specify/SPEC_LOADER_FANTASY_CRYSTALS.md) — implementada jul 2026 (Fase 6)
   - **Portales rúnicos:** [specify/SPEC_LOADER_FANTASY_PORTAL.md](specify/SPEC_LOADER_FANTASY_PORTAL.md) — propuesta jul 2026 (Fase 7)
   - Plan de ejecución por fases: [tasks/LOADER_FANTASY_ENGINE_EXECUTION_PLAN.md](tasks/LOADER_FANTASY_ENGINE_EXECUTION_PLAN.md)
+- **Loader — motor FX anclado (implementado jul 2026):** efectos mágicos / sci-fi sobre hosts procedurales (cristales como piloto), sincronizados con ciclo de vida build/hold/erode.
+  - Arquitectura: [specify/SPEC_LOADER_FX_ENGINE.md](specify/SPEC_LOADER_FX_ENGINE.md)
+  - Piloto cristales: [specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md](specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md)
+  - Plan: [tasks/LOADER_FX_EXECUTION_PLAN.md](tasks/LOADER_FX_EXECUTION_PLAN.md)
 - **Preview dev móvil:** [specify/SPEC_WEB_DEV_PREVIEW.md](specify/SPEC_WEB_DEV_PREVIEW.md) — Electron 390×844 + Playwright.
 - **Capacitor shell (fase posterior):** [specify/SPEC_CAPACITOR_MOBILE_SHELL.md](specify/SPEC_CAPACITOR_MOBILE_SHELL.md).
 - **Plan de ejecución pivot:** [tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md](tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md).

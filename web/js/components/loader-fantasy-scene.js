@@ -663,6 +663,8 @@ export function occupiedZoneFromActive(zones, center, sizePx, layerWidthPx) {
  *   devSeed?: number;
  *   devFormation?: import('./loader-fantasy-cliffs.js').CliffFormationType;
  *   terrainProfile?: import('./loader-fantasy-terrain.js').TerrainProfile;
+ *   fxEnabled?: boolean;
+ *   fxIntensity?: number;
  * }} [opts]
  * @returns {{ destroy: () => void }}
  */
@@ -675,7 +677,21 @@ export function mountFantasyScene(container, opts = {}) {
     devSeed,
     devFormation,
     terrainProfile,
+    fxEnabled = true,
+    fxIntensity = 1,
   } = opts;
+
+  /** @param {Record<string, unknown>} [extra] */
+  function baseElementMountOpts(extra = {}) {
+    return {
+      reducedMotion,
+      terrainHeightPx,
+      terrainProfile,
+      fxEnabled,
+      fxIntensity,
+      ...extra,
+    };
+  }
 
   const layer = document.createElement("div");
   layer.className = "loader-layer loader-layer--fantasy-scene";
@@ -837,13 +853,10 @@ export function mountFantasyScene(container, opts = {}) {
 
     cliffActive[side] = true;
     cliffSizePx[side] = sizePx;
-    const teardown = mountFantasyElement(layer, element, {
-      reducedMotion,
+    const teardown = mountFantasyElement(layer, element, baseElementMountOpts({
       xPercent,
       anchor: side,
       sizePx,
-      terrainHeightPx,
-      terrainProfile,
       timing: devTiming,
       onGone: () => {
         cliffActive[side] = false;
@@ -857,7 +870,7 @@ export function mountFantasyScene(container, opts = {}) {
         }
         spawnCliffWall(side, sessionSeed(), wallFormationType);
       },
-    });
+    }));
     cliffTeardowns.push(teardown);
   }
 
@@ -954,12 +967,9 @@ export function mountFantasyScene(container, opts = {}) {
       ? { ...baseTiming, holdMs: 3200, gapMs: 500 }
       : baseTiming;
 
-    forestTeardown = mountFantasyElement(layer, element, {
-      reducedMotion,
+    forestTeardown = mountFantasyElement(layer, element, baseElementMountOpts({
       xPercent,
       sizePx,
-      terrainHeightPx,
-      terrainProfile,
       timing,
       onGone: () => {
         forestTeardown = null;
@@ -967,7 +977,7 @@ export function mountFantasyScene(container, opts = {}) {
         activeForestSizePx = 0;
         scheduleForestSpawn(timing.gapMs);
       },
-    });
+    }));
   }
 
   function spawnBuilding() {
@@ -1018,12 +1028,9 @@ export function mountFantasyScene(container, opts = {}) {
       ? { ...baseTiming, holdMs: 2200, gapMs: 500 }
       : baseTiming;
 
-    buildingTeardown = mountFantasyElement(layer, element, {
-      reducedMotion,
+    buildingTeardown = mountFantasyElement(layer, element, baseElementMountOpts({
       xPercent,
       sizePx,
-      terrainHeightPx,
-      terrainProfile,
       timing,
       onGone: () => {
         buildingTeardown = null;
@@ -1031,7 +1038,7 @@ export function mountFantasyScene(container, opts = {}) {
         activeBuildingSizePx = 0;
         scheduleBuildingSpawn(timing.gapMs);
       },
-    });
+    }));
   }
 
   function occupiedZonesForCrystalGaps(layerWidthPx) {
@@ -1107,12 +1114,9 @@ export function mountFantasyScene(container, opts = {}) {
       ? { ...baseTiming, holdMs: 8000, erodeMs: 3200, gapMs: 600 }
       : baseTiming;
 
-    crystalsTeardown = mountFantasyElement(layer, element, {
-      reducedMotion,
+    crystalsTeardown = mountFantasyElement(layer, element, baseElementMountOpts({
       xPercent,
       sizePx,
-      terrainHeightPx,
-      terrainProfile,
       timing,
       onGone: () => {
         crystalsTeardown = null;
@@ -1123,7 +1127,7 @@ export function mountFantasyScene(container, opts = {}) {
           : timing.gapMs + randRange(cycleRng, 2400, 5600);
         scheduleCrystalsSpawn(retryGap);
       },
-    });
+    }));
   }
 
   function startCliffDevMode(seed) {

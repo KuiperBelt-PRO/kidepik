@@ -11,6 +11,9 @@
  */
 
 import { erosionThresholdAt, planLifecycleTiming } from "./loader-fantasy-element.js";
+import { planFxRecipe } from "./loader-fx-engine.js";
+import { mountFxBundle } from "./loader-fx-render.js";
+import "./loader-fx-crystals.js";
 import {
   computeTreeTerrainLiftSvg,
   measureFantasyTerrainHeightPx,
@@ -448,7 +451,7 @@ function createErosionMask(svg, partsGroup, seed, bounds, kind) {
 
   partsGroup.setAttribute("mask", `url(#em-${uid})`);
 
-  return { stopB, stopC };
+  return { stopB, stopC, maskId: `em-${uid}` };
 }
 
 /**
@@ -465,6 +468,8 @@ function createErosionMask(svg, partsGroup, seed, bounds, kind) {
  *   terrainProfile?: import('./loader-fantasy-terrain.js').TerrainProfile;
  *   timing?: ReturnType<import('./loader-fantasy-element.js').planLifecycleTiming>;
  *   onGone?: () => void;
+ *   fxEnabled?: boolean;
+ *   fxIntensity?: number;
  * }} opts
  * @returns {{ destroy: () => void }}
  */
@@ -477,6 +482,8 @@ export function mountFantasyElement(container, element, opts) {
     anchor = "center",
     terrainProfile,
     onGone,
+    fxEnabled = true,
+    fxIntensity = 1,
   } = opts;
 
   const timing = opts.timing ?? planLifecycleTiming(element.seed, element.kind, element.parts.length);
@@ -520,6 +527,16 @@ export function mountFantasyElement(container, element, opts) {
   el.appendChild(svg);
   container.appendChild(el);
 
+  const fxProfile = typeof element.meta?.fxProfile === "string" ? element.meta.fxProfile : undefined;
+  const fxRecipe = fxEnabled && !reducedMotion
+    ? planFxRecipe(element.kind, element, {
+      seed: element.seed,
+      intensity: fxIntensity,
+      fxProfile,
+    })
+    : null;
+  const fx = fxRecipe ? mountFxBundle(el, svg, fxRecipe, { reducedMotion, displayScalePx: sizePx }) : null;
+
   const sceneWidthPx = container.clientWidth || 390;
   const resolvedTerrainH = measureFantasyTerrainHeightPx(container.parentElement ?? container);
 
@@ -553,6 +570,7 @@ export function mountFantasyElement(container, element, opts) {
     destroyed = true;
     cancelAnimationFrame(rafId);
     clearTimeout(phaseTimer);
+    fx?.destroy();
     el.remove();
   }
 
@@ -711,6 +729,9 @@ export function mountFantasyElement(container, element, opts) {
       return;
     }
 
+    fx?.onPhase("building_end");
+    fx?.onPhase("holding");
+
     // ─── Fase HOLDING ─────────────────────────────────────────────────────
     phaseTimer = setTimeout(() => {
       if (destroyed) return;
@@ -722,8 +743,11 @@ export function mountFantasyElement(container, element, opts) {
   function startEroding() {
     if (destroyed) return;
 
+    fx?.onPhase("eroding");
+
     const erosionBounds = erosionClipBoundsFromParts(element.parts);
-    const { stopB, stopC } = createErosionMask(svg, partsGroup, element.seed, erosionBounds, element.kind);
+    const { stopB, stopC, maskId } = createErosionMask(svg, partsGroup, element.seed, erosionBounds, element.kind);
+    fx?.setErosionMask(`url(#${maskId})`);
 
     let erodeStartMs = 0;
 
@@ -736,8 +760,10 @@ export function mountFantasyElement(container, element, opts) {
       const threshold = erosionThresholdAt(tRaw, element.seed);
 
       applyErosionMaskStops(stopB, stopC, threshold);
+      fx?.setErosionProgress(tRaw);
 
       if (tRaw >= 1) {
+        fx?.onPhase("gone");
         destroy();
         onGone?.();
         return;

@@ -315,6 +315,12 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const fantasyFormation = fantasyFormationRaw === "cliff" || fantasyFormationRaw === "rocks"
     ? fantasyFormationRaw
     : undefined;
+  const fxIntensityRaw = loaderQuery.get("fxIntensity");
+  const fxIntensityParsed = fxIntensityRaw != null && fxIntensityRaw !== ""
+    ? Number.parseFloat(fxIntensityRaw)
+    : NaN;
+  const fxIntensity = Number.isFinite(fxIntensityParsed) ? fxIntensityParsed : 1;
+  const fxEnabled = loaderQuery.get("fxDev") !== "0";
   const fantasyTerrainH = measureFantasyTerrainHeightPx(layers);
   let fantasySceneTeardown = mountFantasyScene(layers, {
     reducedMotion,
@@ -324,6 +330,8 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     devFaction: fantasyFaction,
     devSeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,
     devFormation: fantasyFormation,
+    fxEnabled,
+    fxIntensity,
   });
 
   let destroyed = false;

@@ -398,6 +398,34 @@
   transform: translateX(-50%);
   pointer-events: none;
   will-change: contents;
+  --fx-fantasy-primary: #ffffff;
+  --fx-fantasy-secondary: #ffffff;
+  --fx-fantasy-glow: rgba(255, 255, 255, 0.55);
+  --fx-pulse: 0.45;
+}
+
+.loader-fx-layer {
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.loader-fx-reflections {
+  pointer-events: none;
+}
+
+.loader-fx-particle {
+  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.85));
+}
+
+@keyframes loader-fx-pulse {
+  0%,
+  100% {
+    --fx-pulse: 0.25;
+  }
+  50% {
+    --fx-pulse: 0.45;
+  }
 }
 
 /* SVG del elemento */

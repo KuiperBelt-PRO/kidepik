@@ -133,8 +133,8 @@ Build total orientativo: **1300–2100 ms**.
 
 ### Holding
 
-- Sin pulso obligatorio en v1.
-- Opcional: micro-brillo de opacidad 0.92–1.0 en el clúster completo (solo si no impacta rendimiento).
+- Sin pulso obligatorio en la silueta blanca en v1.
+- **FX mágico (piloto):** ver [SPEC_LOADER_FX_CRYSTALS_MAGIC.md](SPEC_LOADER_FX_CRYSTALS_MAGIC.md) — shimmer en aristas, motas y burst al terminar el build (capa separada, no altera el fill `#fff`).
 
 ### Reduced motion
 
