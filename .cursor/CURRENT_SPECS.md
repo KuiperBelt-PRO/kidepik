@@ -8,7 +8,13 @@
 ## Producto
 
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
-- **POC local arquitectura (validada jun 2026):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md) — FastAPI + Supabase local + MinIO (R2) + cliente `web/`.
+- **Pivot POC PHP + DreamHost (jul 2026):**
+  - Arquitectura POC: [specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) — PHP + Supabase + media local; hosting DreamHost.
+  - Docker local (única vía dev): [specify/SPEC_POC_DOCKER_LOCAL_DEV.md](specify/SPEC_POC_DOCKER_LOCAL_DEV.md) — nginx + php-fpm, hot reload, puerto **8082**.
+  - Backend PHP: [specify/SPEC_PHP_BACKEND_ARCHITECTURE.md](specify/SPEC_PHP_BACKEND_ARCHITECTURE.md) — estructura, contratos, hoja de ruta RAG.
+  - **Media (filesystem local, migrable a R2):** [specify/SPEC_MEDIA_STORAGE.md](specify/SPEC_MEDIA_STORAGE.md) — `web/media/`, `StorageDriver`, sin Cloudflare en MVP.
+  - MVP hosting: [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) — DreamHost + Supabase (actualizada jul 2026).
+- **POC local FastAPI (histórica, superseded):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
 - **Pivot frontend web-first (implementado jun 2026):** [specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md](specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md) — `web/` HTML/CSS/JS, puerto **8082**.
 - **Sistema visual v3 web premium:** [specify/SPEC_APP_VISUAL_DESIGN_V3.md](specify/SPEC_APP_VISUAL_DESIGN_V3.md)
 - **Pantalla Loader (splash dual mundo):** [specify/SPEC_LOADER_SCREEN.md](specify/SPEC_LOADER_SCREEN.md) — implementada jun 2026; prompts IA: [specify/LOADER_SCREEN_AI_PROMPTS.md](specify/LOADER_SCREEN_AI_PROMPTS.md)
@@ -37,15 +43,16 @@
 - **Capacitor shell (fase posterior):** [specify/SPEC_CAPACITOR_MOBILE_SHELL.md](specify/SPEC_CAPACITOR_MOBILE_SHELL.md).
 - **Plan de ejecución pivot:** [tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md](tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md).
 
-## Infraestructura Oracle Cloud (en curso)
+## Infraestructura Oracle Cloud (en pausa — no MVP activo jul 2026)
 
-Validar VM ARM Oracle + operar MCP. **MVP hosting:** [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) (Supabase + R2 + Cloud Run / Oracle Micro).
+Validar VM ARM Oracle + operar MCP. **MVP hosting activo:** DreamHost PHP + Supabase + media local — [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
-**Estado OCI:** MCP OK; launch ARM `OUT_OF_CAPACITY` en MAD. **Estado MVP:** stack free-tier documentado; compute backend TBD.
+**Estado OCI:** MCP OK; launch ARM `OUT_OF_CAPACITY` en MAD. **Estado MVP:** DreamHost PHP + Supabase + `web/media/`; sin Cloudflare R2 en MVP.
 
 | Spec | Descripción |
 | --- | --- |
-| [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) | **MVP activo:** Supabase, R2, FastAPI, Cloud Run u Oracle Micro |
+| [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) | **MVP activo:** DreamHost PHP, Supabase, media local |
+| [specify/SPEC_MEDIA_STORAGE.md](specify/SPEC_MEDIA_STORAGE.md) | Driver local + migración futura R2 |
 | [specify/SPEC_OCI_INFRA_ALWAYS_FREE.md](specify/SPEC_OCI_INFRA_ALWAYS_FREE.md) | North star: VM ARM 1 OCPU/6 GB en `eu-madrid-1` |
 | [specify/SPEC_OCI_MCP_SERVER.md](specify/SPEC_OCI_MCP_SERVER.md) | Servidor MCP FastMCP + OCI SDK (`oci-kidepik`) |
 

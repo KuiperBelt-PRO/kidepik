@@ -1,7 +1,7 @@
 # Spec: Preview de desarrollo web (Electron + Playwright móvil)
 
-> Estado: **borrador para aprobación** (junio 2026)  
-> Relacionado: [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md)
+> Estado: **actualizada** (julio 2026) — URL única Docker `:8082`  
+> Relacionado: [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md)
 
 ## Objetivo
 
@@ -20,7 +20,7 @@ Dos canales complementarios:
 | --- | --- |
 | 1 | Viewport canónico dev: **390 × 844** (iPhone 14 logical; relación ~19.5:9). |
 | 2 | Viewport alternativo documentado: **360 × 780** (Android medio) — solo para smoke opcional. |
-| 3 | URL por defecto: `http://localhost:8082` (servidor estático de `web/`). Configurable por env. |
+| 3 | URL por defecto: `http://localhost:8082` (nginx Docker — app + API PHP). Configurable por env. **Precondición:** `./scripts/poc-up.ps1` en verde. |
 | 4 | Electron en `tools/preview-electron/` — paquete pnpm independiente. |
 | 5 | Playwright: MCP `playwright` del hub con `viewport` fijo; capturas en `tmp/playwright-output/`. |
 | 6 | No sustituye prueba en dispositivo real (Capacitor fase posterior). |
@@ -30,7 +30,7 @@ Dos canales complementarios:
 ### Comportamiento
 
 - Ventana **no redimensionable** (390×844 + chrome mínimo) o área útil exacta 390×844.
-- Carga URL del servidor estático (misma que el navegador).
+- Carga URL del stack Docker (misma que el navegador en `:8082`).
 - Recarga con `Ctrl+R` / `F5`.
 - Título: `KidepiK Preview (390×844)`.
 - `nodeIntegration: false`, `contextIsolation: true`.
@@ -38,7 +38,7 @@ Dos canales complementarios:
 ### Scripts (objetivo)
 
 ```powershell
-./scripts/poc-web-preview.ps1          # arranca serve si no está + Electron
+./scripts/poc-web-preview.ps1          # requiere poc-up; abre Electron contra :8082
 ```
 
 ### Variables
@@ -67,18 +67,18 @@ Nueva regla `.cursor/rules/web-mobile-preview.mdc`:
 | Mockup diálogo | Panel + texto legible |
 | Sin backend | Galería carga sin error en consola |
 
-## Integración con `poc-web-dev.ps1`
+## Integración con arranque POC
 
-1. `poc-up.ps1` — solo si se prueba POC arquitectura.
-2. `poc-web-dev.ps1` — sirve carpeta `web/` en **8082**.
-3. `poc-web-preview.ps1` — Electron, o agente Playwright contra 8082.
+1. `poc-up.ps1` — **obligatorio** (Supabase contenedores + Docker nginx/php/minio).
+2. ~~`poc-web-dev.ps1`~~ — **deprecado** (no usar `npx serve` en host).
+3. `poc-web-preview.ps1` — Electron, o agente Playwright contra `http://localhost:8082`.
 
 ## Criterios de aceptación
 
 1. `pnpm install` en `tools/preview-electron/` + script raíz abre ventana 390×844.
 2. Agente documenta: MCP, URL, viewport, pasos.
 3. Captura PNG de galería en `tmp/playwright-output/`.
-4. Documentado en `docs/POC_LOCAL.md` y README.
+4. Documentado en `docs/POC_LOCAL.md` (pendiente renombrar a `docs/POC_DOCKER.md`) y README.
 
 ## Excluido
 

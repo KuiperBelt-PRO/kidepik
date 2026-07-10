@@ -40,3 +40,12 @@ tmp/playwright-output/
 .playwright-mcp/
 test-results/
 playwright-report/
+
+# Media subida (mantener .gitkeep)
+web/media/**/*
+!web/media/**/.gitkeep
+web/media/.tokens/
+
+# PHP
+api/vendor/
+api/.phpunit.cache/

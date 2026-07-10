@@ -5,20 +5,22 @@ Repositorio **kidepik** — producto en fase de arranque bajo la org GitHub `Kui
 ## Estado actual
 
 - Ramas: `master` (release), `develop` (integración).
-- **POC local validada** (jun 2026): FastAPI + Supabase CLI + MinIO (R2) — ver [docs/POC_LOCAL.md](../../docs/POC_LOCAL.md).
+- **Pivot POC (jul 2026):** PHP + DreamHost (prod) + Docker local (dev) + Supabase + media en `web/media/` — ver [specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md).
 - **Cliente producto:** `web/` (HTML/CSS/JS). Capacitor para tiendas en fase posterior.
-- Spec: [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
+- **Backend POC:** `api/` + `shared/` (PHP). `backend/` FastAPI = legacy, no extender.
+- POC FastAPI histórica: [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../specify/SPEC_POC_LOCAL_ARCHITECTURE.md) (supersedida).
 
-## URLs locales (POC)
+## URLs locales (POC Docker)
 
-| Servicio | Host (PC) | Cliente web (PC / agentes) |
+| Servicio | Host (PC) | Notas |
 | --- | --- | --- |
-| App | — | `http://localhost:8082` |
-| FastAPI | `http://localhost:8080` | `http://localhost:8080` |
-| Supabase API | `http://localhost:54321` | `http://localhost:54321` |
-| MinIO (R2 sim) | `http://localhost:9000` · consola `:9001` | igual |
+| **App (web + API PHP)** | `http://localhost:8082` | nginx Docker — **única URL de producto** |
+| Media | `http://localhost:8082/media/...` | Ficheros en `web/media/` |
+| Supabase API | `http://localhost:54321` | Contenedores vía `supabase start` |
 
-Arranque backend: `./scripts/poc-up.ps1` · App web: `./scripts/poc-web-dev.ps1` · Preview móvil PC: `./scripts/poc-web-preview.ps1` · Electron viewport 390×844.
+Arranque: `./scripts/poc-up.ps1` · Preview móvil PC: `./scripts/poc-web-preview.ps1` · Electron viewport 390×844.
+
+**No usar:** `poc-web-dev.ps1` (deprecado), `localhost:8080` (FastAPI legacy), MinIO `:9000` (descartado MVP).
 
 ## Documentación de agentes
 
@@ -33,4 +35,4 @@ codegraph init .
 codegraph status .
 ```
 
-El MCP `codegraph` del hub `Vibe-Coding` indexa por `projectPath` cuando el workspace multi-root está abierto. Hasta que exista código fuente (PHP, Python, TS, etc.), el índice puede estar vacío.
+El MCP `codegraph` del hub `Vibe-Coding` indexa por `projectPath` cuando el workspace multi-root está abierto.

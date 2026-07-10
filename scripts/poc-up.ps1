@@ -1,17 +1,20 @@
-# Levanta la POC local completa: Supabase CLI + Docker (FastAPI + MinIO/R2)
+# Levanta la POC: Supabase CLI + Docker (nginx + PHP)
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
 
-Write-Host "==> KidepiK POC — arranque" -ForegroundColor Cyan
+Write-Host "==> KidepiK POC - arranque" -ForegroundColor Cyan
 
-if (-not (Get-Command supabase -ErrorAction SilentlyContinue)) {
-    if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-        function supabase { pnpm dlx supabase @args }
-        Write-Host "Usando 'pnpm dlx supabase' (CLI no global)." -ForegroundColor Yellow
+function Invoke-Supabase {
+    if (Get-Command supabase -ErrorAction SilentlyContinue) {
+        & supabase @args 2>&1 | ForEach-Object { Write-Host $_ }
+        return $LASTEXITCODE
+    } elseif (Get-Command pnpm -ErrorAction SilentlyContinue) {
+        pnpm dlx supabase @args 2>&1 | ForEach-Object { Write-Host $_ }
+        return $LASTEXITCODE
     } else {
-        Write-Host "Instala Supabase CLI o pnpm: https://supabase.com/docs/guides/local-development/cli/getting-started" -ForegroundColor Red
+        Write-Host "Instala Supabase CLI o pnpm." -ForegroundColor Red
         exit 1
     }
 }
@@ -22,12 +25,12 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "==> Supabase local (Postgres + Auth + REST)..." -ForegroundColor Yellow
-supabase start
+$null = Invoke-Supabase start
 
 Write-Host "==> Aplicando migraciones..." -ForegroundColor Yellow
-supabase db reset --local --no-seed 2>$null
+$null = Invoke-Supabase db reset --local --no-seed
 if ($LASTEXITCODE -ne 0) {
-    supabase migration up --local
+    $null = Invoke-Supabase migration up --local
 }
 
 $envFile = Join-Path $Root ".env.poc"
@@ -37,18 +40,20 @@ if (-not (Test-Path $envFile)) {
     Write-Host "Creado .env.poc desde plantilla." -ForegroundColor Green
 }
 
-Write-Host "==> Docker Compose (FastAPI + MinIO)..." -ForegroundColor Yellow
-docker compose --env-file $envFile -f (Join-Path $Root "docker/compose.yaml") up -d --build
+& (Join-Path $Root "scripts\poc-write-config.ps1")
+
+Write-Host "==> Docker Compose (nginx + PHP)..." -ForegroundColor Yellow
+docker compose --env-file $envFile -f (Join-Path $Root "docker\compose.yaml") up -d --build
 
 Write-Host ""
 Write-Host "==> Estado Supabase" -ForegroundColor Cyan
-supabase status
+$null = Invoke-Supabase status
 
 Write-Host ""
-Write-Host "==> Endpoints (emulador Android usa 10.0.2.2)" -ForegroundColor Cyan
-Write-Host "  FastAPI:   http://10.0.2.2:8080/health"
-Write-Host "  Supabase:  http://10.0.2.2:54321"
-Write-Host "  MinIO:     http://10.0.2.2:9000  (consola :9001)"
+Write-Host "==> Endpoints" -ForegroundColor Cyan
+Write-Host "  App (web + API):  http://localhost:8082"
+Write-Host "  API health:       http://localhost:8082/api/v1/health"
+Write-Host "  Media:            http://localhost:8082/media/"
+Write-Host "  Supabase:         http://localhost:54321"
 Write-Host ""
-Write-Host "Siguiente paso — cliente web:" -ForegroundColor Green
-Write-Host "  ./scripts/poc-web-dev.ps1   → http://localhost:8082"
+Write-Host "Preview movil: ./scripts/poc-web-preview.ps1" -ForegroundColor Green

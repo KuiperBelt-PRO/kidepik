@@ -12,7 +12,7 @@ globs:
 ## URLs
 
 - App: `http://localhost:8082`
-- Arranque: `./scripts/poc-web-dev.ps1`
+- Arranque: `./scripts/poc-up.ps1`
 - Electron: `./scripts/poc-web-preview.ps1`
 
 ## Agente (Playwright MCP)

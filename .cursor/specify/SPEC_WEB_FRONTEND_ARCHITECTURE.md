@@ -10,7 +10,7 @@ Migrar el **cliente de producto** a una **aplicación web** en **HTML + CSS + Ja
 
 1. **Desarrollo y pruebas** en navegador y shell Electron (viewport móvil fijo).
 2. **Distribución móvil** vía **Capacitor** (Android/iOS) cuando corresponda — empaqueta los mismos ficheros estáticos.
-3. **Backend sin cambios**: FastAPI + Supabase + R2/MinIO siguen siendo la fuente de verdad.
+3. **Backend (jul 2026):** API **PHP** en el mismo origen que `web/`; Supabase + R2/MinIO como fuente de datos y media. Ver [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md).
 
 ## ¿Hace falta Vite (u otro bundler)?
 
@@ -20,7 +20,7 @@ Vite (o Webpack, Parcel, etc.) son herramientas que suelen hacer tres cosas:
 
 | Qué hace Vite | ¿Lo necesitamos? | Alternativa en este proyecto |
 | --- | --- | --- |
-| Servidor local con recarga al guardar | Útil, no imprescindible | `npx serve web -p 8082` o script `poc-web-dev.ps1`; F5 en el navegador |
+| Servidor local con recarga al guardar | Útil, no imprescindible | **Docker nginx** en `:8082` con bind mount ([SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md)); F5 en el navegador |
 | Unir muchos ficheros en uno (bundle) | No al inicio | Ficheros estáticos servidos tal cual; ES modules entre `<script type="module">` |
 | Variables `import.meta.env` | No | `web/js/config.js` (copia de `config.sample.js`, gitignored en local) |
 | PWA / Service Worker automático | Fase offline | `sw.js` manual o Workbox en fase posterior |
@@ -50,12 +50,12 @@ Si en el futuro el número de módulos o el tamaño del JS lo exigen, se puede a
 | 7 | **3D (post-MVP avatar):** Three.js solo si hace falta; fuera de fase 1. |
 | 8 | **Cliente móvil tiendas:** Capacitor envolviendo `web/` — fase posterior. |
 | 9 | **Auth:** `@supabase/supabase-js` desde CDN o `npm` en `web/package.json` solo para dependencias JS (Supabase, Rive, Lottie). |
-| 10 | **Config:** `web/js/config.js` con `API_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (plantilla versionada `config.sample.js`). |
+| 10 | **Config:** `web/js/config.js` con `API_URL` (relativo `/api/v1` en mismo origen), `SUPABASE_URL`, `SUPABASE_ANON_KEY` (plantilla `config.sample.js`). |
 
 ### Incluido (fase 1 — tras aprobación)
 
 - Carpeta `web/` con `index.html`, CSS, JS modular, temas fantasy / space opera.
-- Script `scripts/poc-web-dev.ps1` → sirve `web/` en **`http://localhost:8082`**.
+- Stack Docker (`./scripts/poc-up.ps1`) → sirve `web/` + API PHP en **`http://localhost:8082`** (ver [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md)).
 - Preview Electron + Playwright ([SPEC_WEB_DEV_PREVIEW.md](SPEC_WEB_DEV_PREVIEW.md)).
 - Offline mínimo (Service Worker en `web/sw.js`).
 
@@ -102,21 +102,22 @@ kidepik/
     package.json              # solo deps JS (supabase, @rive-app/canvas, lottie-web)
   tools/
     preview-electron/
+  api/                      # Backend PHP (mismo origen en prod)
   scripts/
-    poc-web-dev.ps1
+    poc-up.ps1              # Docker: web + PHP + MinIO
     poc-web-preview.ps1
 ```
 
-## Contratos con backend (sin cambio)
+## Contratos con backend (API PHP)
 
 | Origen web | Destino |
 | --- | --- |
-| `GET /health` | Smoke |
+| `GET /api/v1/health` | Smoke |
 | `GET /api/v1/architecture/*` | POC arquitectura |
 | Supabase Auth + `poc_health` | POC datos |
-| `POST /api/v1/storage/presign-upload` | POC storage |
+| `POST /api/v1/storage/prepare-upload` | POC storage (driver local) |
 
-**CORS:** FastAPI debe permitir `http://localhost:8082` (y origen Electron en dev).
+**CORS:** Mínimo — cliente y API comparten origen (`localhost:8082` en Docker, dominio DreamHost en prod). Sin puerto API separado.
 
 ## Offline mínimo (fase 1)
 
@@ -139,7 +140,7 @@ kidepik/
 
 ## Criterios de éxito (fase 1)
 
-1. `./scripts/poc-web-dev.ps1` → app en `http://localhost:8082`.
+1. `./scripts/poc-up.ps1` → app en `http://localhost:8082` (nginx Docker).
 2. Loader → galería → mockups; toggle fantasy / space opera.
 3. Electron preview 390×844 OK.
 4. Playwright agente con viewport móvil + capturas en `tmp/playwright-output/`.
@@ -152,7 +153,7 @@ kidepik/
 | --- | --- |
 | JS disperso sin estructura | Carpetas `scenes/`, `components/`, convenciones en patterns.md |
 | `file://` no sirve para ES modules | Siempre HTTP local (script dev) |
-| CORS backend | Añadir `:8082` en FastAPI |
+| CORS backend | Mismo origen vía nginx; evitar API en puerto distinto |
 | Tamaño muchos JS sueltos | Bundler opcional en fase 2 si hace falta |
 
 ## Aprobación

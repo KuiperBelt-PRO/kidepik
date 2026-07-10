@@ -23,16 +23,16 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 ## Ámbito del repositorio
 
-- Código bajo **kidepik**: `backend/` (FastAPI), `web/` (cliente HTML/CSS/JS), `supabase/`, `docker/`, scripts `scripts/poc-*.ps1`.
+- Código bajo **kidepik**: `api/` + `shared/` (PHP), `web/` (cliente HTML/CSS/JS), `supabase/`, `docker/`, scripts `scripts/poc-*.ps1`. `backend/` (FastAPI) = **legacy**, no extender.
 - Specs formales en [.cursor/specify/](../../specify/) y enlazadas desde [CURRENT_SPECS.md](../../CURRENT_SPECS.md).
 - Fases del repo documentadas en [.cursor/SDD.md](../../SDD.md) (Specify → Plan → Task → Implement → Validate).
-- Respeta versiones en `backend/pyproject.toml`, `web/package.json` y manifiestos del stack POC.
+- Respeta versiones en `api/composer.json`, `web/package.json` y manifiestos del stack POC.
 
 ---
 
 ## Cuándo usar (además de los criterios del hub)
 
-- Implementar o extender el **POC local** (FastAPI + Supabase CLI + MinIO + cliente `web/`).
+- Implementar o extender el **POC** (PHP + Docker nginx/php-fpm + Supabase + MinIO + cliente `web/`).
 - Añadir rutas API, auth JWT Supabase, storage S3-compatible, migraciones SQL o pantallas móvil con contrato en spec.
 - El usuario pide SDD/TDD y el cambio vive claramente en este repo.
 
@@ -48,15 +48,16 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 | Capa | Tecnología | Código típico |
 | --- | --- | --- |
-| API | FastAPI, Pydantic, pytest | `backend/app/`, `backend/tests/` |
-| Datos / auth | Supabase (Postgres, Auth, PostgREST) | `supabase/migrations/`, `supabase/config.toml` |
-| Object storage (POC) | MinIO (S3-compatible) | `docker/compose.yaml`, `backend/app/storage.py` |
+| API | **PHP 8.2+**, Composer, PHPUnit | `api/src/`, `api/tests/`, `shared/` |
+| Datos / auth | Supabase (Postgres, Auth) | `supabase/migrations/`, `supabase/config.toml` |
+| Object storage (POC) | Filesystem `web/media/` | `shared/Storage/LocalFilesystemDriver.php` — ver [SPEC_MEDIA_STORAGE.md](../../specify/SPEC_MEDIA_STORAGE.md) |
 | Cliente producto | **HTML + CSS + JS** (ES modules); Capacitor fase posterior | `web/` |
-| Preview dev móvil | Electron + Playwright viewport 390×844 | `tools/preview-electron/`, scripts `poc-web-*` |
-| Orquestación local | Docker Compose + Supabase CLI | `docker/compose.yaml`, `scripts/poc-up.ps1` |
+| Preview dev móvil | Electron + Playwright viewport 390×844 | `tools/preview-electron/`, `poc-up.ps1`, `poc-web-preview.ps1` |
+| Orquestación local | Docker Compose (nginx+php) + Supabase CLI (contenedores) | `docker/compose.yaml`, `scripts/poc-up.ps1` |
+| Hosting prod | DreamHost PHP | ver SPEC_HOSTING_FREE_TIER_STACK |
 
-**Spec de referencia del POC:** [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../../specify/SPEC_POC_LOCAL_ARCHITECTURE.md).  
-**URLs y arranque local:** [.cursor/plan/PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md), [docs/POC_LOCAL.md](../../../docs/POC_LOCAL.md).
+**Specs POC (jul 2026):** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](../../specify/SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md), [SPEC_MEDIA_STORAGE.md](../../specify/SPEC_MEDIA_STORAGE.md).  
+**URLs y arranque local:** [.cursor/plan/PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md) — app única en `http://localhost:8082`.
 
 ---
 
@@ -73,41 +74,39 @@ Tras leer cada fase en `spec-driven-dev`, aplica estos matices:
 
 | Superficie | Tests / código |
 | --- | --- |
-| API | `backend/tests/test_*.py` junto a `backend/app/` |
+| API | `api/tests/*Test.php` junto a `api/src/` |
 | SQL | Nueva migración en `supabase/migrations/` con nombre timestamp |
 | Web / UI | `web/` — Playwright viewport 390×844 o checklist en spec |
-| Compose / env | Cambios en `docker/compose.yaml`, `.env.poc.sample` — documentar impacto en `docs/POC_LOCAL.md` si afecta al arranque |
+| Compose / env | Cambios en `docker/compose.yaml`, `.env.poc.sample` — documentar impacto si afecta al arranque |
 
-Estructura backend actual: paquete `app/` bajo `backend/`, tests en `backend/tests/` (ver [patterns.md](patterns.md#estructura-de-archivos)).
+Estructura backend: `api/public/index.php` + `api/src/` + `shared/` (ver [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md)).
 
 ### Fase 3 — Test First
 
-**Backend (pytest):** desde `backend/`, con dependencias dev instaladas:
+**Backend (PHPUnit):** con stack Docker levantado (`./scripts/poc-up.ps1`):
 
 ```powershell
-cd backend
-python -m pytest tests/test_modulo.py::test_nombre -x
-python -m pytest tests/
+docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/phpunit
 ```
 
-- Usar `httpx` / `TestClient` de FastAPI para rutas HTTP; `pytest-asyncio` ya configurado (`asyncio_mode = auto` en `pyproject.toml`).
-- Para integración con Postgres/MinIO en POC: levantar stack con `./scripts/poc-up.ps1` o mockear según la spec (preferir mocks en tests unitarios; reservar integración para casos explícitos).
+- Tests de integración HTTP contra `http://localhost:8082/api/v1/*` con stack levantado; mocks en unitarios.
+- Para integración con Postgres/MinIO: `./scripts/poc-up.ps1` obligatorio.
 
 **Supabase:** validar migraciones con `supabase db reset` / stack local antes de dar por cerrada la fase.
 
-**Web:** validación con `./scripts/poc-web-dev.ps1` y MCP browser según [web-mobile-preview](../web-mobile-preview/SKILL.md).
+**Web:** `./scripts/poc-up.ps1` + MCP browser según [web-mobile-preview](../web-mobile-preview/SKILL.md) — **no** `poc-web-dev.ps1`.
 
 ### Fase 4 — Validar cobertura y superficie observable
 
 1. Cruzar requisitos de spec ↔ tests (tabla del hub y [patterns.md](patterns.md#checklist-de-cruce-spec-tests)).
-2. **API:** `GET http://localhost:8080/health` y rutas de la spec con stack levantado.
-3. **UI / demos:** reglas en [cursor-browser-mcp-testing.mdc](../../rules/cursor-browser-mcp-testing.mdc) y canónica `Vibe-Coding/.cursor/rules/cursor-browser-mcp-testing-ide.mdc`. **Cliente web** (`./scripts/poc-web-dev.ps1` → `http://localhost:8082`) vía skill [web-mobile-preview](../web-mobile-preview/SKILL.md). Capturas solo bajo `tmp/playwright-output/`.
+2. **API:** `GET http://localhost:8082/api/v1/health` y rutas de la spec con stack Docker levantado.
+3. **UI / demos:** reglas en [cursor-browser-mcp-testing.mdc](../../rules/cursor-browser-mcp-testing.mdc). **Cliente web** (`poc-up.ps1` → `http://localhost:8082`) vía skill [web-mobile-preview](../web-mobile-preview/SKILL.md). Capturas solo bajo `tmp/playwright-output/`.
 4. **Preview móvil PC:** `./scripts/poc-web-preview.ps1` (Electron 390×844) cuando haga falta validar viewport.
 
 ### Fase 5 — Cerrar
 
 - Actualizar [CURRENT_SPECS.md](../../CURRENT_SPECS.md) si cambia comportamiento o contratos.
-- Linter/type checker del backend si está configurado; suite `pytest` del módulo tocado.
+- Suite `PHPUnit` del módulo tocado (en contenedor PHP).
 - Resumen al usuario según la skill del hub (implementación, tests, cobertura de spec, validación navegador/móvil).
 
 ---

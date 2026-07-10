@@ -1,6 +1,9 @@
 # Spec: POC local — arquitectura FastAPI + Supabase + R2
 
-> Estado: **validada** (junio 2026) — cliente `web/` + tres capas en verde  
+> ⚠️ **SUPERSEDIDA** (julio 2026) — No usar para trabajo nuevo.  
+> **Reemplazo:** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) + [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md) + [SPEC_PHP_BACKEND_ARCHITECTURE.md](SPEC_PHP_BACKEND_ARCHITECTURE.md)
+
+> Estado histórico: **validada** (junio 2026) — cliente `web/` + tres capas en verde  
 > Relacionado: [SPEC_HOSTING_FREE_TIER_STACK.md](SPEC_HOSTING_FREE_TIER_STACK.md), [docs/kidepik.md](../../docs/kidepik.md) §10, [docs/POC_LOCAL.md](../../docs/POC_LOCAL.md)
 
 ## Objetivo

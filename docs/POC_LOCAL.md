@@ -1,65 +1,44 @@
 # POC local — arranque, URLs y cliente web
 
-> **Estado:** validada (junio 2026) — tres integraciones en verde con cliente `web/`.
+> **Estado:** julio 2026 — PHP + Docker nginx (`:8082`) + Supabase CLI.
 
-Ver spec: [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md)
+Ver specs: [.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md)
 
 ## Requisitos
 
 - Docker Desktop
 - [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) o `pnpm dlx supabase`
-- Node.js 20+ y pnpm
 
-## Arranque rápido (backend)
+## Arranque
 
 ```powershell
 cd kidepik
 ./scripts/poc-up.ps1
 ```
 
-| Servicio | Simula | Puerto |
-| --- | --- | --- |
-| Supabase | DB + Auth | 54321 |
-| `api` (Docker) | Cloud Run | 8080 |
-| `minio` (Docker) | R2 | 9000 |
+| Servicio | URL |
+| --- | --- |
+| **App (web + API PHP)** | `http://localhost:8082` |
+| API health | `http://localhost:8082/api/v1/health` |
+| Media | `http://localhost:8082/media/` |
+| Supabase API | `http://localhost:54321` |
 
-## Cliente web (producto)
-
-```powershell
-./scripts/poc-web-dev.ps1
-```
-
-Abre **`http://localhost:8082`** (loader → galería → mockups). Con POC arquitectura:
-
-```powershell
-./scripts/poc-web-dev.ps1 -Backend
-```
-
-Preview móvil en PC (Electron 390×844):
+Preview móvil PC (Electron 390×844):
 
 ```powershell
 ./scripts/poc-web-preview.ps1
 ```
 
-Capturas de agentes: `tmp/playwright-output/`. Spec preview: [.cursor/specify/SPEC_WEB_DEV_PREVIEW.md](../.cursor/specify/SPEC_WEB_DEV_PREVIEW.md).
+**No usar:** `poc-web-dev.ps1` (redirige a `poc-up`), `localhost:8080` (FastAPI legacy).
 
-### Config del cliente
+## Config del cliente
 
-El script `poc-web-dev.ps1` genera `web/js/config.js` con URLs `localhost` y la publishable key de Supabase (`supabase status`).
+`scripts/poc-up.ps1` genera `web/js/config.js` con rutas relativas (`apiUrl: "/api/v1"`).
 
-### Notas técnicas
-
-- **JWT Supabase (ES256):** el backend valida tokens llamando a `GET /auth/v1/user`, no decodificando JWT en local.
-- **Presigned MinIO:** en desarrollo local con `localhost` en el navegador del PC; para dispositivo físico en la misma red, ajustar `.env.poc` con IP LAN (`S3_PUBLIC_BASE_URL`, `S3_EXTERNAL_ENDPOINT_URL`).
-- Publishable key local: `supabase status` → `Publishable`.
-
-## Tests backend
+## Tests API (PHPUnit en contenedor)
 
 ```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\pip install -e ".[dev]"
-pytest
+docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/phpunit
 ```
 
 ## Parar
@@ -68,15 +47,16 @@ pytest
 ./scripts/poc-down.ps1
 ```
 
-## Estructura del repo (POC)
+## Estructura POC
 
 ```
-backend/     # FastAPI (Cloud Run sim)
-docker/      # compose: api + minio
-web/         # Cliente HTML/CSS/JS
-scripts/     # poc-up, poc-down, poc-web-dev, poc-web-preview
-supabase/    # config + migraciones
-.env.poc.sample
+api/          # Backend PHP
+shared/       # StorageDriver, Config
+web/          # Cliente + web/media/
+docker/       # compose.yaml (nginx + php)
+supabase/
+scripts/
+backend/      # LEGACY FastAPI — no usar
 ```
 
-Archivos locales no versionados: `.env.poc`, `web/js/config.js`, `tmp/`, `supabase/.temp/`.
+Archivos locales no versionados: `.env.poc`, `web/js/config.js`, `web/media/**` (salvo `.gitkeep`), `tmp/`.

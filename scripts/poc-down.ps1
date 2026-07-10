@@ -1,4 +1,4 @@
-# Para la POC local (FastAPI + MinIO)
+# Para la POC local (nginx + PHP)
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
