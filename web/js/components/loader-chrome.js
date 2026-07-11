@@ -7,6 +7,7 @@ import { mountFantasyCelestialLayer } from "./loader-fantasy-celestial.js";
 import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
+import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 
 export const LOADER_SLOGAN = "Dos mundos. Un viaje épico.";
 
@@ -242,6 +243,11 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const bg = document.createElement("div");
   bg.className = "loader-layer loader-layer--bg";
 
+  const bgAttenuate = document.createElement("div");
+  bgAttenuate.className = "loader-bg-attenuate";
+  bgAttenuate.setAttribute("aria-hidden", "true");
+  bg.appendChild(bgAttenuate);
+
   const accentFantasy = document.createElement("div");
   accentFantasy.className = "loader-layer loader-layer--accent loader-layer--fantasy";
 
@@ -292,19 +298,11 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   app.appendChild(scene);
   document.body.classList.add("is-loader-active");
 
-  let spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
   const loaderQuery = getLoaderQueryParams();
   const meteorDemo = loaderQuery.get("meteorDemo") === "1";
   const cloudDemo = loaderQuery.get("cloudDemo") === "1";
   const celestialDemo = loaderQuery.get("celestialDemo") === "1";
   const backdropKind = parseBackdropKind(loaderQuery.get("backdropKind"));
-  let meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
-  let fantasyBackdropTeardown = mountFantasyBackdropLayer(layers, { kind: backdropKind });
-  let fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
-  const terrainProfile = fantasyTerrainTeardown.profile;
-  let fantasyCloudsTeardown = mountFantasyCloudsLayer(layers, { reducedMotion, demoFast: cloudDemo });
-  let fantasyCelestialTeardown = mountFantasyCelestialLayer(layers, { reducedMotion, demoFast: celestialDemo });
-
   const fantasyDev = loaderQuery.get("fantasyDev") || undefined;
   const fantasyFaction = parseDevFaction(loaderQuery.get("fantasyFaction"));
   const fantasySeedRaw = loaderQuery.get("fantasySeed");
@@ -321,34 +319,79 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     : NaN;
   const fxIntensity = Number.isFinite(fxIntensityParsed) ? fxIntensityParsed : 1;
   const fxEnabled = loaderQuery.get("fxDev") !== "0";
-  const fantasyTerrainH = measureFantasyTerrainHeightPx(layers);
-  let fantasySceneTeardown = mountFantasyScene(layers, {
-    reducedMotion,
-    terrainHeightPx: fantasyTerrainH,
-    terrainProfile,
-    devKind: fantasyDev,
-    devFaction: fantasyFaction,
-    devSeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,
-    devFormation: fantasyFormation,
-    fxEnabled,
-    fxIntensity,
-  });
+
+  /** @type {{ destroy: () => void } | null} */
+  let spaceOrbitTeardown = null;
+  /** @type {{ destroy: () => void } | null} */
+  let meteorTeardown = null;
+  /** @type {{ destroy: () => void; kind?: string; layers?: unknown } | null} */
+  let fantasyBackdropTeardown = null;
+  /** @type {{ destroy: () => void; profile?: import('./loader-fantasy-terrain.js').TerrainProfile } | null} */
+  let fantasyTerrainTeardown = null;
+  /** @type {{ destroy: () => void } | null} */
+  let fantasyCloudsTeardown = null;
+  /** @type {{ destroy: () => void } | null} */
+  let fantasyCelestialTeardown = null;
+  /** @type {{ destroy: () => void } | null} */
+  let fantasySceneTeardown = null;
+  let fantasyLayersMounted = false;
+  let spaceLayersMounted = false;
+
+  function mountFantasyWorldLayers() {
+    if (fantasyLayersMounted) return;
+    fantasyLayersMounted = true;
+    fantasyBackdropTeardown = mountFantasyBackdropLayer(layers, { kind: backdropKind });
+    fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
+    const terrainProfile = fantasyTerrainTeardown.profile;
+    fantasyCloudsTeardown = mountFantasyCloudsLayer(layers, { reducedMotion, demoFast: cloudDemo });
+    fantasyCelestialTeardown = mountFantasyCelestialLayer(layers, { reducedMotion, demoFast: celestialDemo });
+    const fantasyTerrainH = measureFantasyTerrainHeightPx(layers);
+    fantasySceneTeardown = mountFantasyScene(layers, {
+      reducedMotion,
+      terrainHeightPx: fantasyTerrainH,
+      terrainProfile,
+      devKind: fantasyDev,
+      devFaction: fantasyFaction,
+      devSeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,
+      devFormation: fantasyFormation,
+      fxEnabled,
+      fxIntensity,
+    });
+    void mountOptionalImage(accentFantasy, "loader.accent.fantasy");
+  }
+
+  function mountSpaceWorldLayers() {
+    if (spaceLayersMounted) return;
+    spaceLayersMounted = true;
+    spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
+    meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
+    void mountOptionalImage(accentSpace, "loader.accent.space");
+  }
 
   let destroyed = false;
   let progress = 0;
   let rafId = 0;
   let startTime = 0;
   let orbitActive = false;
+  let progressStarted = false;
+  let logoRevealStageReached = false;
+  let logoAssetReady = false;
 
   const markMissingBg = () => {
     scene.classList.add("is-placeholder-art");
   };
 
-  const revealLogo = () => {
+  const revealLogoIfReady = () => {
+    if (!logoRevealStageReached || !logoAssetReady) return;
     logoWrap.classList.add("is-ready");
     if (!reducedMotion) {
       logoWrap.classList.add("is-ambi-active");
     }
+  };
+
+  const markLogoAssetReady = () => {
+    logoAssetReady = true;
+    revealLogoIfReady();
   };
 
   void (async () => {
@@ -367,23 +410,39 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
           () => {
             logoImg.hidden = false;
             logoFallback.hidden = true;
-            revealLogo();
+            markLogoAssetReady();
           },
           { once: true },
         );
         logoImg.src = logoSrc;
       } else {
         logoImg.hidden = true;
-        logoWrap.classList.add("is-ready");
+        markLogoAssetReady();
       }
     } else {
       logoImg.hidden = true;
-      logoWrap.classList.add("is-ready");
+      markLogoAssetReady();
     }
-
-    await mountOptionalImage(accentFantasy, "loader.accent.fantasy");
-    await mountOptionalImage(accentSpace, "loader.accent.space");
   })();
+
+  const revealSequence = startLoaderRevealSequence(scene, {
+    reducedMotion,
+    onStage(stage) {
+      if (stage === "logo") {
+        logoRevealStageReached = true;
+        revealLogoIfReady();
+      }
+      if (stage === "ring") {
+        startProgressLoop();
+      }
+      if (stage === "fantasy") {
+        mountFantasyWorldLayers();
+      }
+      if (stage === "space") {
+        mountSpaceWorldLayers();
+      }
+    },
+  });
 
   if (pingHealth) {
     void pingHealth();
@@ -426,10 +485,14 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     rafId = requestAnimationFrame(tick);
   }
 
-  if (reducedMotion) {
-    progress = 1;
-    updateProgressVisual(1);
-  } else {
+  function startProgressLoop() {
+    if (progressStarted || destroyed) return;
+    progressStarted = true;
+    if (reducedMotion) {
+      progress = 1;
+      updateProgressVisual(1);
+      return;
+    }
     rafId = requestAnimationFrame(tick);
   }
 
@@ -437,13 +500,14 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     destroy() {
       destroyed = true;
       document.body.classList.remove("is-loader-active");
-      spaceOrbitTeardown.destroy();
-      meteorTeardown.destroy();
-      fantasyBackdropTeardown.destroy();
-      fantasyTerrainTeardown.destroy();
-      fantasyCloudsTeardown.destroy();
-      fantasyCelestialTeardown.destroy();
-      fantasySceneTeardown.destroy();
+      revealSequence.destroy();
+      spaceOrbitTeardown?.destroy();
+      meteorTeardown?.destroy();
+      fantasyBackdropTeardown?.destroy();
+      fantasyTerrainTeardown?.destroy();
+      fantasyCloudsTeardown?.destroy();
+      fantasyCelestialTeardown?.destroy();
+      fantasySceneTeardown?.destroy();
       if (rafId) cancelAnimationFrame(rafId);
     },
   };

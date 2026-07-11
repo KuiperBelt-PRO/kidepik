@@ -53,6 +53,22 @@
   );
 }
 
+.loader-bg-attenuate {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse 100% 55% at 50% 0%, rgba(0, 8, 24, 0.38), transparent 72%),
+    radial-gradient(ellipse 100% 55% at 50% 100%, rgba(0, 12, 8, 0.32), transparent 72%),
+    radial-gradient(ellipse 92% 88% at 50% 50%, transparent 36%, rgba(0, 0, 0, 0.28) 100%);
+  transition: opacity 1s ease;
+}
+
+.scene-loader.is-reveal-bg .loader-bg-attenuate {
+  opacity: 1;
+}
+
 .loader-layer--bg::before,
 .loader-layer--bg::after {
   content: "";
@@ -93,6 +109,15 @@
 
 .loader-layer--accent {
   mix-blend-mode: screen;
+  opacity: 0;
+  transition: opacity 0.9s ease;
+}
+
+.scene-loader.is-reveal-fantasy .loader-layer--fantasy {
+  opacity: 0.85;
+}
+
+.scene-loader.is-reveal-space .loader-layer--space {
   opacity: 0.85;
 }
 
@@ -114,6 +139,8 @@
   bottom: auto;
   z-index: 1;
   overflow: visible;
+  opacity: 0;
+  transition: opacity 0.95s ease;
   --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
   mask-image: radial-gradient(
     circle at 50% calc(100% + 40px),
@@ -138,6 +165,8 @@
   z-index: 2;
   overflow: visible;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.95s ease;
   --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
   mask-image: radial-gradient(
     circle at 50% calc(100% + 40px),
@@ -149,6 +178,11 @@
     transparent var(--orbit-logo-mask-r),
     #000 calc(var(--orbit-logo-mask-r) + 3px)
   );
+}
+
+.scene-loader.is-reveal-space .loader-layer.loader-layer--space-orbit,
+.scene-loader.is-reveal-space .loader-layer.loader-layer--meteor-shower {
+  opacity: 1;
 }
 
 .loader-meteor {
@@ -187,6 +221,8 @@
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.95s ease;
 }
 
 .loader-fantasy-backdrop__svg {
@@ -209,6 +245,8 @@
   z-index: 1;
   overflow: visible;
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.95s ease;
 }
 
 .loader-fantasy-terrain__svg {
@@ -228,6 +266,8 @@
   z-index: 1;
   pointer-events: none;
   overflow: visible;
+  opacity: 0;
+  transition: opacity 0.95s ease;
   --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
   mask-image: radial-gradient(
     circle at 50% -40px,
@@ -279,6 +319,8 @@
   z-index: 1;
   pointer-events: none;
   overflow: visible;
+  opacity: 0;
+  transition: opacity 0.95s ease;
   --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
   mask-image: radial-gradient(
     circle at 50% -40px,
@@ -386,8 +428,18 @@
   z-index: 2;
   pointer-events: none;
   overflow: visible;
+  opacity: 0;
+  transition: opacity 0.95s ease;
   /* Reserva el espacio del terreno mediante variable (misma altura que --fantasy-terrain) */
   --fantasy-terrain-h: clamp(36px, 7vh, 66px);
+}
+
+.scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-backdrop,
+.scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-terrain,
+.scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-clouds,
+.scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-celestial,
+.scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-scene {
+  opacity: 1;
 }
 
 /* Contenedor de un elemento de fantasía individual */
@@ -645,6 +697,12 @@
   width: 100%;
   height: 100%;
   color: #fff;
+  opacity: 0;
+  transition: opacity 0.75s ease;
+}
+
+.scene-loader.is-reveal-ring .loader-ring {
+  opacity: 1;
 }
 
 .loader-ring-base {
@@ -721,7 +779,7 @@
   transition: opacity 0.9s ease;
 }
 
-.loader-logo-wrap.is-ready {
+.scene-loader.is-reveal-logo .loader-logo-wrap.is-ready {
   opacity: 1;
 }
 
@@ -776,11 +834,44 @@
   }
 
   .loader-layer__img,
-  .loader-logo-wrap {
+  .loader-logo-wrap,
+  .loader-ring,
+  .loader-bg-attenuate,
+  .loader-layer.loader-layer--fantasy-backdrop,
+  .loader-layer.loader-layer--fantasy-terrain,
+  .loader-layer.loader-layer--fantasy-clouds,
+  .loader-layer.loader-layer--fantasy-celestial,
+  .loader-layer.loader-layer--fantasy-scene,
+  .loader-layer.loader-layer--space-orbit,
+  .loader-layer.loader-layer--meteor-shower,
+  .loader-layer--accent {
     transition: none;
   }
 
-  .loader-logo-wrap.is-ready {
+  .scene-loader.is-reveal-logo .loader-logo-wrap.is-ready {
+    opacity: 1;
+  }
+
+  .scene-loader.is-reveal-ring .loader-ring {
+    opacity: 1;
+  }
+
+  .scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-backdrop,
+  .scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-terrain,
+  .scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-clouds,
+  .scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-celestial,
+  .scene-loader.is-reveal-fantasy .loader-layer.loader-layer--fantasy-scene,
+  .scene-loader.is-reveal-fantasy .loader-layer--fantasy {
+    opacity: 1;
+  }
+
+  .scene-loader.is-reveal-space .loader-layer.loader-layer--space-orbit,
+  .scene-loader.is-reveal-space .loader-layer.loader-layer--meteor-shower,
+  .scene-loader.is-reveal-space .loader-layer--space {
+    opacity: 1;
+  }
+
+  .scene-loader.is-reveal-bg .loader-bg-attenuate {
     opacity: 1;
   }
 
