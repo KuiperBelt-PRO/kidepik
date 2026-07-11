@@ -1,3 +1,4 @@
+import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { generateShipForSlot, randomRollSeed } from "./loader-ship-procedural.js";
 import {
   collectPlanetPositions,
@@ -175,6 +176,17 @@ function shipProgress(spec, now) {
   return { t: along, opacity: fadeAtEnds(local) };
 }
 
+function pathLengthCached(path) {
+  const raw = path.dataset.loaderPathLen;
+  if (raw) {
+    const n = Number(raw);
+    if (n > 0) return n;
+  }
+  const length = path.getTotalLength() || 0;
+  if (length > 0) path.dataset.loaderPathLen = String(length);
+  return length;
+}
+
 /**
  * @param {SVGPathElement} path
  * @param {HTMLElement} layer
@@ -182,7 +194,7 @@ function shipProgress(spec, now) {
  * @param {number} offsetPx
  */
 function placeOnParallelPath(path, layer, t, offsetPx) {
-  const length = path.getTotalLength();
+  const length = pathLengthCached(path);
   if (!length) return null;
 
   const w = layer.clientWidth;
@@ -255,8 +267,6 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
     };
   }
 
-  let rafId = 0;
-
   /**
    * @param {HTMLElement} shipEl
    * @param {HTMLElement} layerEl
@@ -273,8 +283,9 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
   /**
    * @param {typeof ships[number]} ship
    * @param {number} shipOpacity
+   * @param {{ id: string; x: number; y: number; radius: number }[]} planets
    */
-  function updateProximityHud(ship, shipOpacity) {
+  function updateProximityHud(ship, shipOpacity, planets) {
     const hud = ship.hud;
     if (!hud) return;
 
@@ -285,7 +296,6 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
     }
 
     const center = shipCenterInLayer(ship.el, layer);
-    const planets = collectPlanetPositions(layer);
     const match = nearestPlanetProximity(center, planets);
 
     if (!match) {
@@ -322,12 +332,13 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
     const w = layer.clientWidth;
     const h = layer.clientHeight;
     if (w && h) proximityLines.resize(w, h);
+    const planets = collectPlanetPositions(layer);
 
     for (const ship of ships) {
       const orbit = orbitById.get(ship.spec.orbitId);
       if (!orbit) {
         ship.el.style.opacity = "0";
-        updateProximityHud(ship, 0);
+        updateProximityHud(ship, 0, planets);
         continue;
       }
       const pos = placeOnParallelPath(
@@ -339,27 +350,28 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
       if (!pos) continue;
       placeShip(ship, pos);
       const opacity = parseFloat(ship.el.style.opacity) || 0;
-      updateProximityHud(ship, opacity);
+      updateProximityHud(ship, opacity, planets);
     }
   }
 
-  function frame(now) {
+  let unsub = subscribeLoaderAnimationFrame((now) => {
     const w = layer.clientWidth;
     const h = layer.clientHeight;
     if (w && h) proximityLines.resize(w, h);
+    const planets = collectPlanetPositions(layer);
 
     for (const ship of ships) {
       const orbit = orbitById.get(ship.spec.orbitId);
       if (!orbit) {
         ship.el.style.opacity = "0";
-        updateProximityHud(ship, 0);
+        updateProximityHud(ship, 0, planets);
         continue;
       }
 
       const state = shipProgress(ship.spec, now);
       if (!state) {
         ship.el.style.opacity = "0";
-        updateProximityHud(ship, 0);
+        updateProximityHud(ship, 0, planets);
         continue;
       }
 
@@ -371,24 +383,22 @@ export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = 
         ship.spec.parallelOffset,
       );
       if (!pos) {
-        updateProximityHud(ship, 0);
+        updateProximityHud(ship, 0, planets);
         continue;
       }
 
       placeShip(ship, pos);
       ship.el.style.opacity = String(state.opacity);
-      updateProximityHud(ship, state.opacity);
+      updateProximityHud(ship, state.opacity, planets);
     }
-    rafId = requestAnimationFrame(frame);
-  }
+  });
 
   sync();
-  rafId = requestAnimationFrame(frame);
 
   return {
     sync,
     destroy() {
-      if (rafId) cancelAnimationFrame(rafId);
+      unsub();
       proximityLines.destroy();
       for (const ship of ships) {
         ship.hud.remove();

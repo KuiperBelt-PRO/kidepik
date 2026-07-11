@@ -33,7 +33,7 @@
   - Catálogo del resto de tipos: [specify/SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md](specify/SPEC_LOADER_FANTASY_ELEMENTS_CATALOG.md)
   - **Megalitos (menhir, dolmen, círculo):** [specify/SPEC_LOADER_FANTASY_MEGALITH.md](specify/SPEC_LOADER_FANTASY_MEGALITH.md) — propuesta jul 2026 (Fase 4)
   - **Cristales mágicos:** [specify/SPEC_LOADER_FANTASY_CRYSTALS.md](specify/SPEC_LOADER_FANTASY_CRYSTALS.md) — implementada jul 2026 (Fase 6)
-  - **Portales rúnicos:** [specify/SPEC_LOADER_FANTASY_PORTAL.md](specify/SPEC_LOADER_FANTASY_PORTAL.md) — propuesta jul 2026 (Fase 7)
+  - **Portales mágicos (dolmen v1):** [specify/SPEC_LOADER_FANTASY_PORTAL.md](specify/SPEC_LOADER_FANTASY_PORTAL.md) — dolmen + FX apertura/cierre (jul 2026, Fase 7)
   - Plan de ejecución por fases: [tasks/LOADER_FANTASY_ENGINE_EXECUTION_PLAN.md](tasks/LOADER_FANTASY_ENGINE_EXECUTION_PLAN.md)
 - **Loader — motor FX anclado (implementado jul 2026):** efectos mágicos / sci-fi sobre hosts procedurales (cristales como piloto), sincronizados con ciclo de vida build/hold/erode.
   - Arquitectura: [specify/SPEC_LOADER_FX_ENGINE.md](specify/SPEC_LOADER_FX_ENGINE.md)

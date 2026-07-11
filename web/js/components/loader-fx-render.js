@@ -6,8 +6,10 @@
 
 import {
   adjustSceneParticleBudget,
-  MAX_PARTICLES_PER_HOST,
+  maxParticlesPerHost,
+  maxParticlesScene,
 } from "./loader-fx-engine.js";
+import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -21,6 +23,8 @@ const BURST_FADE_IN_MS = 240;
 const BURST_FADE_OUT_MS = 200;
 const SCATTER_FADE_IN_MS = 300;
 const SCATTER_FADE_OUT_MS = 340;
+const PORTAL_INFLOW_FADE_IN_MS = 100;
+const PORTAL_INFLOW_FADE_OUT_MS = 220;
 
 /**
  * @param {number} t 0..1
@@ -54,6 +58,9 @@ function fmt(n) {
  *   fadeInMs: number;
  *   fadeOutMs: number;
  *   retireAt: number;
+ *   targetX?: number;
+ *   targetY?: number;
+ *   lastOpacity?: number;
  * }} FxParticle
  */
 
@@ -111,19 +118,30 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
   }
 
   const budget = recipe.effects.reduce((s, e) => s + (e.particleBudget ?? 0), 0);
-  if (budget > MAX_PARTICLES_PER_HOST) {
+  const hostParticleCap = maxParticlesPerHost(recipe.hostKind);
+  const sceneParticleCap = maxParticlesScene(recipe.hostKind);
+  if (budget > hostParticleCap) {
     return createNoopBundle(recipe);
   }
 
+  function adjustHostSceneBudget(delta) {
+    adjustSceneParticleBudget(delta, sceneParticleCap);
+  }
+
   let destroyed = false;
-  let rafId = 0;
+  let unsubFrame = () => {};
+  let loopActive = false;
   let phase = "building";
   let erosionT = 0;
   let fxStartMs = 0;
   let scatterCooldown = 0;
   let activeParticles = 0;
+  let portalInflowCount = 0;
   let erosionMaskUrl = null;
   let reflectionStartMs = 0;
+  let portalSpawnAccum = 0;
+
+  const hasPortalInflow = recipe.effects.some((e) => e.type === "portal_inflow");
 
   const rng = createRng(recipe.seed ^ 0xf09e21);
   const intensity = recipe.intensity ?? 1;
@@ -246,7 +264,7 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
   const particles = [];
 
   function spawnParticle(x, y, vx, vy, lifeMs, kind, radius = 0.8) {
-    if (destroyed || activeParticles >= MAX_PARTICLES_PER_HOST) return;
+    if (destroyed || activeParticles >= hostParticleCap) return;
     const circle = document.createElementNS(SVG_NS, "circle");
     circle.setAttribute("cx", fmt(x));
     circle.setAttribute("cy", fmt(y));
@@ -286,7 +304,7 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
       retireAt,
     });
     activeParticles += 1;
-    adjustSceneParticleBudget(1);
+    adjustHostSceneBudget(1);
   }
 
   /**
@@ -410,10 +428,89 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
     );
   }
 
-  function tick(now) {
+  function resetPortalInflowParticle(p) {
+    const spawns = recipe.anchors.filter((a) => a.role === "portal_rock_spawn");
+    const target = recipe.anchors.find((a) => a.role === "portal_aperture");
+    if (!spawns.length || !target) return false;
+
+    const src = spawns[Math.floor(rng() * spawns.length)];
+    p.x = src.x + randRange(rng, -0.7, 0.7);
+    p.y = src.y + randRange(rng, -0.7, 0.7);
+    p.targetX = target.x + randRange(rng, -1.4, 1.4);
+    p.targetY = target.y + randRange(rng, -1.4, 1.4);
+    const dx = p.targetX - p.x;
+    const dy = p.targetY - p.y;
+    const dist = Math.hypot(dx, dy) || 1;
+    const speed = randRange(rng, 0.95, 1.75) * intensity;
+    p.vx = (dx / dist) * speed;
+    p.vy = (dy / dist) * speed;
+    p.age = 0;
+    p.wobble = rng() * Math.PI * 2;
+    p.lastOpacity = 0;
+    p.el.setAttribute("transform", `translate(${fmt(p.x)} ${fmt(p.y)})`);
+    p.el.style.opacity = "0";
+    return true;
+  }
+
+  function spawnPortalInflow() {
+    if (destroyed || activeParticles >= hostParticleCap) return;
+    const spawns = recipe.anchors.filter((a) => a.role === "portal_rock_spawn");
+    const target = recipe.anchors.find((a) => a.role === "portal_aperture");
+    if (!spawns.length || !target) return;
+
+    const radiusMin = typeof recipe.meta?.particleRadiusMin === "number"
+      ? recipe.meta.particleRadiusMin
+      : 0.85;
+    const radiusMax = typeof recipe.meta?.particleRadiusMax === "number"
+      ? recipe.meta.particleRadiusMax
+      : 1.45;
+
+    const circle = document.createElementNS(SVG_NS, "circle");
+    circle.setAttribute("cx", "0");
+    circle.setAttribute("cy", "0");
+    circle.setAttribute("r", fmt(randRange(rng, radiusMin, radiusMax)));
+    circle.setAttribute("fill", FX_WHITE);
+    circle.setAttribute("class", "loader-fx-particle loader-fx-portal-particle");
+    circle.style.opacity = "0";
+    particleGroup.appendChild(circle);
+
+    /** @type {FxParticle} */
+    const p = {
+      el: circle,
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      life: PERPETUAL_LIFE,
+      maxLife: PERPETUAL_LIFE,
+      kind: "portal_inflow",
+      targetX: 0,
+      targetY: 0,
+      wobble: 0,
+      age: 0,
+      fadeInMs: PORTAL_INFLOW_FADE_IN_MS,
+      fadeOutMs: PORTAL_INFLOW_FADE_OUT_MS,
+      retireAt: PERPETUAL_LIFE,
+    };
+    resetPortalInflowParticle(p);
+    particles.push(p);
+    activeParticles += 1;
+    portalInflowCount += 1;
+    adjustHostSceneBudget(1);
+  }
+
+  function portalInflowBudgetForPhase() {
+    const fx = recipe.effects.find(
+      (e) => e.type === "portal_inflow" && e.phase === phase,
+    );
+    return fx?.particleBudget ?? 0;
+  }
+
+  function tick(now, dt = 16) {
     if (destroyed) return;
     if (fxStartMs === 0) fxStartMs = now;
     const elapsed = (now - fxStartMs) / 1000;
+    const frameDt = Math.min(48, Math.max(1, dt));
     const isAlive = phase === "holding" || phase === "eroding";
     const erosionFade = erosionMaskUrl
       ? 1
@@ -448,14 +545,37 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
       spawnScatter();
       scatterCooldown = randRange(rng, 35, 65);
     }
-    scatterCooldown = Math.max(0, scatterCooldown - 16);
+    scatterCooldown = Math.max(0, scatterCooldown - frameDt);
+
+    if (hasPortalInflow && (phase === "holding" || phase === "eroding")) {
+      const budget = portalInflowBudgetForPhase();
+      let inflowCount = portalInflowCount;
+      const spawnInterval = typeof recipe.meta?.spawnIntervalMs === "number"
+        ? recipe.meta.spawnIntervalMs
+        : 4;
+      const spawnBurst = typeof recipe.meta?.spawnBurst === "number"
+        ? recipe.meta.spawnBurst
+        : 1;
+      portalSpawnAccum += frameDt;
+      while (
+        portalSpawnAccum >= spawnInterval
+        && inflowCount < budget
+        && activeParticles < hostParticleCap
+      ) {
+        for (let b = 0; b < spawnBurst && inflowCount < budget && activeParticles < hostParticleCap; b += 1) {
+          spawnPortalInflow();
+          inflowCount += 1;
+        }
+        portalSpawnAccum -= spawnInterval;
+      }
+    }
 
     for (let i = particles.length - 1; i >= 0; i -= 1) {
       const p = particles[i];
-      p.age += 16;
+      p.age += frameDt;
 
       if (Number.isFinite(p.life)) {
-        p.life -= 16;
+        p.life -= frameDt;
       }
 
       if (p.kind === "mote" && isAlive) {
@@ -479,10 +599,55 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
         p.vy *= 0.94;
       } else if (p.kind === "scatter") {
         p.vy -= 0.004 * intensity;
+      } else if (p.kind === "portal_inflow") {
+        const tx = p.targetX ?? p.x;
+        const ty = p.targetY ?? p.y;
+        const dx = tx - p.x;
+        const dy = ty - p.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist > 0.35) {
+          const pull = 0.11 * intensity;
+          p.vx += (dx / dist) * pull;
+          p.vy += (dy / dist) * pull;
+          const sp = Math.hypot(p.vx, p.vy);
+          const maxSp = 2.4 * intensity;
+          if (sp > maxSp) {
+            p.vx = (p.vx / sp) * maxSp;
+            p.vy = (p.vy / sp) * maxSp;
+          }
+        }
+        const wobble = Math.sin(elapsed * 4.2 + p.wobble) * 0.014 * intensity;
+        p.vx += wobble;
+        p.vy += Math.cos(elapsed * 3.6 + p.wobble) * 0.012 * intensity;
       }
 
       p.x += p.vx;
       p.y += p.vy;
+
+      if (p.kind === "portal_inflow") {
+        const tx = p.targetX ?? p.x;
+        const ty = p.targetY ?? p.y;
+        const dist = Math.hypot(tx - p.x, ty - p.y);
+        const nearCore = dist < 2.2;
+        const fadeIn = smoothstep(p.age / p.fadeInMs);
+        const coreFade = nearCore ? Math.max(0.08, dist / 2.2) : 1;
+        const op = fadeIn * coreFade * 0.88 * intensity * erosionFade;
+        if (Math.abs((p.lastOpacity ?? -1) - op) > 0.02) {
+          p.lastOpacity = op;
+          p.el.style.opacity = String(op);
+        }
+        p.el.setAttribute("transform", `translate(${fmt(p.x)} ${fmt(p.y)})`);
+        if (nearCore && phase === "holding") {
+          resetPortalInflowParticle(p);
+        } else if (nearCore || (phase === "eroding" && erosionFade < 0.12)) {
+          p.el.remove();
+          particles.splice(i, 1);
+          activeParticles -= 1;
+          portalInflowCount -= 1;
+          adjustHostSceneBudget(-1);
+        }
+        continue;
+      }
 
       if (p.kind === "mote") {
         wrapParticle(p);
@@ -492,7 +657,7 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
           p.el.remove();
           particles.splice(i, 1);
           activeParticles -= 1;
-          adjustSceneParticleBudget(-1);
+          adjustHostSceneBudget(-1);
           continue;
         }
       } else if (p.kind === "scatter") {
@@ -510,26 +675,32 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
         p.el.remove();
         particles.splice(i, 1);
         activeParticles -= 1;
-        adjustSceneParticleBudget(-1);
+        adjustHostSceneBudget(-1);
       }
     }
-
-    rafId = requestAnimationFrame(tick);
   }
 
   function startLoop() {
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(tick);
+    if (loopActive) return;
+    loopActive = true;
+    unsubFrame = subscribeLoaderAnimationFrame(tick);
+  }
+
+  function stopLoop() {
+    if (!loopActive) return;
+    loopActive = false;
+    unsubFrame();
+    unsubFrame = () => {};
   }
 
   function destroy() {
     if (destroyed) return;
     destroyed = true;
-    cancelAnimationFrame(rafId);
+    stopLoop();
     setReflectionMaskActive(false);
     while (particles.length > 0) {
       particles.pop()?.el.remove();
-      adjustSceneParticleBudget(-1);
+      adjustHostSceneBudget(-1);
     }
     activeParticles = 0;
     reflectionOverlayRoot.remove();
@@ -546,6 +717,7 @@ export function mountFxBundle(hostEl, hostSvg, recipe, opts = {}) {
       if (nextPhase === "holding") {
         phase = "holding";
         reflectionStartMs = 0;
+        portalSpawnAccum = 0;
         setReflectionMaskActive(true);
         ensureMotes(recipe.effects.find((e) => e.type === "mote")?.particleBudget ?? 12);
         startLoop();

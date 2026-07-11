@@ -11,9 +11,11 @@
  */
 
 import { erosionThresholdAt, planLifecycleTiming } from "./loader-fantasy-element.js";
+import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { planFxRecipe } from "./loader-fx-engine.js";
 import { mountFxBundle } from "./loader-fx-render.js";
 import "./loader-fx-crystals.js";
+import "./loader-fx-portal.js";
 import {
   computeTreeTerrainLiftSvg,
   measureFantasyTerrainHeightPx,
@@ -275,6 +277,13 @@ export function castleBuildTimingProfile(element) {
       fillOverlap: 0.42,
     };
   }
+  if (element.kind === "portal") {
+    return {
+      ...DEFAULT_BUILD_TIMING,
+      fillScale: 0.88,
+      fillOverlap: 0.35,
+    };
+  }
   return DEFAULT_BUILD_TIMING;
 }
 
@@ -489,8 +498,13 @@ export function mountFantasyElement(container, element, opts) {
   const timing = opts.timing ?? planLifecycleTiming(element.seed, element.kind, element.parts.length);
 
   let destroyed = false;
-  let rafId = 0;
+  let unsubFrame = () => {};
   let phaseTimer = 0;
+
+  function stopFrame() {
+    unsubFrame();
+    unsubFrame = () => {};
+  }
 
   // ─── Contenedor del elemento ─────────────────────────────────────────────
   const el = document.createElement("div");
@@ -568,7 +582,7 @@ export function mountFantasyElement(container, element, opts) {
   // ─── Función de limpieza ──────────────────────────────────────────────────
   function destroy() {
     destroyed = true;
-    cancelAnimationFrame(rafId);
+    stopFrame();
     clearTimeout(phaseTimer);
     fx?.destroy();
     el.remove();
@@ -649,17 +663,17 @@ export function mountFantasyElement(container, element, opts) {
       }
 
       if (!allDone) {
-        rafId = requestAnimationFrame(tickForestBuild);
         return;
       }
 
+      stopFrame();
       phaseTimer = setTimeout(() => {
         if (destroyed) return;
         startEroding();
       }, timing.holdMs);
     }
 
-    rafId = requestAnimationFrame(tickForestBuild);
+    unsubFrame = subscribeLoaderAnimationFrame(tickForestBuild);
     return { destroy };
   }
 
@@ -725,10 +739,10 @@ export function mountFantasyElement(container, element, opts) {
     }
 
     if (!allDone) {
-      rafId = requestAnimationFrame(tickBuild);
       return;
     }
 
+    stopFrame();
     fx?.onPhase("building_end");
     fx?.onPhase("holding");
 
@@ -763,20 +777,20 @@ export function mountFantasyElement(container, element, opts) {
       fx?.setErosionProgress(tRaw);
 
       if (tRaw >= 1) {
+        stopFrame();
         fx?.onPhase("gone");
         destroy();
         onGone?.();
         return;
       }
-
-      rafId = requestAnimationFrame(tickErode);
     }
 
-    rafId = requestAnimationFrame(tickErode);
+    stopFrame();
+    unsubFrame = subscribeLoaderAnimationFrame(tickErode);
   }
 
   // ─── Arranque ─────────────────────────────────────────────────────────────
-  rafId = requestAnimationFrame(tickBuild);
+  unsubFrame = subscribeLoaderAnimationFrame(tickBuild);
 
   return { destroy };
 }

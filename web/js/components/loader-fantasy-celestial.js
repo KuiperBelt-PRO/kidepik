@@ -1,3 +1,4 @@
+import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
 
 /** @typedef {'sun' | 'moon'} CelestialKind */
@@ -609,7 +610,7 @@ export function mountFantasyCelestialLayer(container, { reducedMotion = false, r
   const random = rng ?? createRng(Date.now() >>> 0);
 
   let destroyed = false;
-  let rafId = 0;
+  let unsub = () => {};
   let layoutReady = false;
   /** @type {CelestialKind} */
   let nextKind = "sun";
@@ -663,7 +664,6 @@ export function mountFantasyCelestialLayer(container, { reducedMotion = false, r
 
     if (!layoutReady) {
       if (layer.clientWidth < 1 || layer.clientHeight < 1) {
-        rafId = requestAnimationFrame(tick);
         return;
       }
       layoutReady = true;
@@ -699,16 +699,14 @@ export function mountFantasyCelestialLayer(container, { reducedMotion = false, r
         }
       }
     }
-
-    rafId = requestAnimationFrame(tick);
   }
 
-  rafId = requestAnimationFrame(tick);
+  unsub = subscribeLoaderAnimationFrame(tick);
 
   return {
     destroy() {
       destroyed = true;
-      if (rafId) cancelAnimationFrame(rafId);
+      unsub();
       if (active) active.el.remove();
       active = null;
       layer.remove();

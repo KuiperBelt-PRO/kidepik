@@ -26,7 +26,7 @@ import { createRng } from "./loader-ship-rng.js";
 
 /**
  * @typedef {{
- *   type: 'sparkle' | 'mote' | 'edge_shimmer' | 'internal_reflection' | 'burst' | 'scatter';
+ *   type: 'sparkle' | 'mote' | 'edge_shimmer' | 'internal_reflection' | 'burst' | 'scatter' | 'portal_inflow';
  *   phase: FxPhase;
  *   intensity?: number;
  *   durationMs?: number;
@@ -48,6 +48,25 @@ import { createRng } from "./loader-ship-rng.js";
 
 export const MAX_PARTICLES_PER_HOST = 40;
 export const MAX_PARTICLES_SCENE = 48;
+/** Presupuesto ampliado solo para portales (flujo denso de partículas). */
+export const MAX_PARTICLES_PER_HOST_PORTAL = 400;
+export const MAX_PARTICLES_SCENE_PORTAL = 420;
+
+/**
+ * @param {string} [hostKind]
+ * @returns {number}
+ */
+export function maxParticlesPerHost(hostKind) {
+  return hostKind === "portal" ? MAX_PARTICLES_PER_HOST_PORTAL : MAX_PARTICLES_PER_HOST;
+}
+
+/**
+ * @param {string} [hostKind]
+ * @returns {number}
+ */
+export function maxParticlesScene(hostKind) {
+  return hostKind === "portal" ? MAX_PARTICLES_SCENE_PORTAL : MAX_PARTICLES_SCENE;
+}
 
 /** @type {Record<string, (hostModel: object, seed: number, opts?: { intensity?: number }) => FxRecipe | null>} */
 export const FX_RECIPE_BUILDERS = {};
@@ -59,9 +78,9 @@ export function getSceneParticleBudget() {
   return sceneParticleBudget;
 }
 
-/** @param {number} delta */
-export function adjustSceneParticleBudget(delta) {
-  sceneParticleBudget = Math.max(0, Math.min(MAX_PARTICLES_SCENE, sceneParticleBudget + delta));
+/** @param {number} delta @param {number} [cap] */
+export function adjustSceneParticleBudget(delta, cap = MAX_PARTICLES_SCENE) {
+  sceneParticleBudget = Math.max(0, Math.min(cap, sceneParticleBudget + delta));
 }
 
 /** Reinicia contador global (tests). */
@@ -84,7 +103,7 @@ export function isValidFxRecipe(recipe) {
   if (!recipe?.id || !recipe.hostKind || !Array.isArray(recipe.effects) || !Array.isArray(recipe.anchors)) {
     return false;
   }
-  if (totalParticleBudget(recipe) > MAX_PARTICLES_PER_HOST) return false;
+  if (totalParticleBudget(recipe) > maxParticlesPerHost(recipe.hostKind)) return false;
   const validPhases = new Set(["building", "holding", "eroding", "gone", "building_end"]);
   for (const fx of recipe.effects) {
     if (!validPhases.has(fx.phase)) return false;

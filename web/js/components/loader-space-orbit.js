@@ -1,3 +1,4 @@
+import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { mountSpaceShips } from "./loader-space-ships.js";
 
 /**
@@ -483,15 +484,18 @@ function attachPathMotion(
   layer,
   { durationMs, delayMs, still, reducedMotion, motionHandles, planetId },
 ) {
-  let rafId = 0;
+  let cachedLength = path.getTotalLength() || 0;
   let startTime = 0;
   let lastProgress = reducedMotion ? still : 0;
+  let unsub = () => {};
 
   function placeAt(progress) {
     lastProgress = progress;
-    const length = path.getTotalLength();
-    if (!length) return;
-    const point = path.getPointAtLength(length * progress);
+    if (!cachedLength) {
+      cachedLength = path.getTotalLength() || 0;
+      if (!cachedLength) return;
+    }
+    const point = path.getPointAtLength(cachedLength * progress);
     const w = layer.clientWidth;
     const h = layer.clientHeight;
     if (!w || !h) return;
@@ -500,15 +504,12 @@ function attachPathMotion(
     runner.style.top = `${(point.y / h) * 100}%`;
   }
 
-  motionHandles.set(planetId, { sync: () => placeAt(lastProgress) });
-
-  function frame(now) {
-    if (!startTime) startTime = now;
-    const elapsed = now - startTime - delayMs;
-    const t = ((elapsed % durationMs) + durationMs) % durationMs / durationMs;
-    placeAt(t);
-    rafId = requestAnimationFrame(frame);
-  }
+  motionHandles.set(planetId, {
+    sync: () => {
+      cachedLength = path.getTotalLength() || 0;
+      placeAt(lastProgress);
+    },
+  });
 
   if (reducedMotion) {
     placeAt(still);
@@ -517,9 +518,15 @@ function attachPathMotion(
     };
   }
 
-  rafId = requestAnimationFrame(frame);
+  unsub = subscribeLoaderAnimationFrame((now) => {
+    if (!startTime) startTime = now;
+    const elapsed = now - startTime - delayMs;
+    const t = ((elapsed % durationMs) + durationMs) % durationMs / durationMs;
+    placeAt(t);
+  });
+
   return () => {
+    unsub();
     motionHandles.delete(planetId);
-    if (rafId) cancelAnimationFrame(rafId);
   };
 }

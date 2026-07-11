@@ -1,3 +1,4 @@
+import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
 
 /** @typedef {'micro' | 'small' | 'medium' | 'bright'} MeteorSizeClass */
@@ -154,7 +155,7 @@ export function mountMeteorShowerLayer(container, { reducedMotion = false, rng, 
   /** @type {{ el: HTMLElement; params: MeteorParams; startMs: number; durationMs: number }[]} */
   let active = [];
   let destroyed = false;
-  let rafId = 0;
+  let unsub = () => {};
   let nextBurstAt = performance.now() + planNextBurstDelayMs(random, true);
   /** @type {number[]} */
   let pendingSpawns = [];
@@ -212,7 +213,6 @@ export function mountMeteorShowerLayer(container, { reducedMotion = false, rng, 
 
     if (!layoutReady) {
       if (layer.clientWidth < 1 || layer.clientHeight < 1) {
-        rafId = requestAnimationFrame(tick);
         return;
       }
       layoutReady = true;
@@ -240,16 +240,14 @@ export function mountMeteorShowerLayer(container, { reducedMotion = false, rng, 
       item.el.style.opacity = String(pose.opacity);
       return true;
     });
-
-    rafId = requestAnimationFrame(tick);
   }
 
-  rafId = requestAnimationFrame(tick);
+  unsub = subscribeLoaderAnimationFrame(tick);
 
   return {
     destroy() {
       destroyed = true;
-      if (rafId) cancelAnimationFrame(rafId);
+      unsub();
       pendingSpawns = [];
       for (const item of active) item.el.remove();
       active = [];
