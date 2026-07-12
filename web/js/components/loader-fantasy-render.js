@@ -17,6 +17,7 @@ import { mountFxBundle } from "./loader-fx-render.js";
 import "./loader-fx-crystals.js";
 import "./loader-fx-portal.js";
 import {
+  computePortalGroundBottomPx,
   computeTreeTerrainLiftSvg,
   measureFantasyTerrainHeightPx,
 } from "./loader-fantasy-terrain.js";
@@ -508,7 +509,7 @@ export function mountFantasyElement(container, element, opts) {
 
   // ─── Contenedor del elemento ─────────────────────────────────────────────
   const el = document.createElement("div");
-  el.className = "loader-fantasy-el";
+  el.className = `loader-fantasy-el loader-fantasy-el--${element.kind}`;
   el.style.left = `${xPercent}%`;
   if (anchor === "left") {
     el.style.transform = "translateX(0)";
@@ -527,6 +528,24 @@ export function mountFantasyElement(container, element, opts) {
   const svgW = sizePx;
   el.style.width = `${svgW}px`;
   el.style.height = `${svgH}px`;
+
+  const sceneWidthPx = container.clientWidth || 390;
+  const resolvedTerrainH = measureFantasyTerrainHeightPx(container.parentElement ?? container);
+  const terrainH = resolvedTerrainH || terrainHeightPx;
+
+  if (element.kind === "portal" && terrainProfile?.length) {
+    const { maxY: footY } = svgBoundsFromParts(element.parts);
+    const bottomPx = computePortalGroundBottomPx(
+      terrainProfile,
+      xPercent,
+      footY,
+      sizePx,
+      terrainH,
+    );
+    if (bottomPx > 0) {
+      el.style.bottom = `${bottomPx}px`;
+    }
+  }
 
   const { svg, partsGroup, partGs, forestTrees } = createElementSvg(element);
   const isForest = element.kind === "forest" && forestTrees?.length;
@@ -550,9 +569,6 @@ export function mountFantasyElement(container, element, opts) {
     })
     : null;
   const fx = fxRecipe ? mountFxBundle(el, svg, fxRecipe, { reducedMotion, displayScalePx: sizePx }) : null;
-
-  const sceneWidthPx = container.clientWidth || 390;
-  const resolvedTerrainH = measureFantasyTerrainHeightPx(container.parentElement ?? container);
 
   if (isForest && forestTrees && terrainProfile?.length) {
     for (const tree of forestTrees) {

@@ -113,9 +113,13 @@ export class ElementAssembler {
       return { kind, style, seed, viewBox: "0 0 100 100", parts: [], width: 0, height: 0, footprint: 0, meta };
     }
 
-    const scaleBy = /** @type {'max'|'height'} */ (
+    const scaleBy = /** @type {'max'|'height'|'heightCapWidth'} */ (
       normalizeOpts.scaleBy
-      ?? (meta.normalizeScaleBy === "height" ? "height" : "max")
+      ?? (meta.normalizeScaleBy === "height"
+        ? "height"
+        : meta.normalizeScaleBy === "heightCapWidth"
+          ? "heightCapWidth"
+          : "max")
     );
     const bottomInset = Number(meta.normalizeBottomInset) || normalizeOpts.bottomInset || 0;
     const heightFloor = Number(meta.normalizeHeightFloor) || normalizeOpts.heightFloor || 0;
@@ -268,10 +272,10 @@ export function planLifecycleTiming(seed, kind, _partCount) {
   }
   if (kind === "forest") {
     return {
-      partDurationMs: Math.round(randRange(rng, 240, 420)),
-      holdMs: Math.round(randRange(rng, 16000, 26000)),
-      erodeMs: Math.round(randRange(rng, 5500, 9000)),
-      gapMs: Math.round(randRange(rng, 900, 2200)),
+      partDurationMs: Math.round(randRange(rng, 220, 380)),
+      holdMs: Math.round(randRange(rng, 7500, 11500)),
+      erodeMs: Math.round(randRange(rng, 3800, 6200)),
+      gapMs: Math.round(randRange(rng, 550, 1300)),
     };
   }
   if (kind === "crystals") {

@@ -36,11 +36,17 @@ const SCENE_BUILDING_OCCUPIED_INFLATE = 1.16;
 /** @deprecated alias histórico */
 const CRYSTAL_BUILDING_OCCUPIED_INFLATE = SCENE_BUILDING_OCCUPIED_INFLATE;
 /** Inflado de la caja de bosque al calcular ocupación. */
-const SCENE_FOREST_OCCUPIED_INFLATE = 1.12;
+const SCENE_FOREST_OCCUPIED_INFLATE = 1.22;
+/** Margen extra al buscar hueco libre para un bosque. */
+export const SCENE_FOREST_PLACEMENT_INFLATE = 1.26;
+/** Colchón sobre el ancho normalizado del bosque (viewBox). */
+export const FOREST_FOOTPRINT_PAD = 1.06;
 /** @deprecated alias histórico */
 const CRYSTAL_FOREST_OCCUPIED_INFLATE = SCENE_FOREST_OCCUPIED_INFLATE;
 /** Inflado de la caja de racimo de cristales al calcular ocupación. */
 const SCENE_CRYSTAL_OCCUPIED_INFLATE = 1.14;
+/** Inflado de la caja de portal al calcular ocupación. */
+const SCENE_PORTAL_OCCUPIED_INFLATE = 1.13;
 /** @deprecated alias histórico */
 const CRYSTAL_CLUSTER_OCCUPIED_INFLATE = SCENE_CRYSTAL_OCCUPIED_INFLATE;
 
@@ -112,10 +118,10 @@ const CASTLE_HEIGHT_FRAC_MIN = 0.23;
 const CASTLE_HEIGHT_FRAC_MAX = 0.4;
 const CASTLE_MAX_HEIGHT_PX = 168;
 
-const FOREST_HEIGHT_FRAC_MIN = 0.12;
-const FOREST_HEIGHT_FRAC_MAX = 0.22;
-const FOREST_MIN_HEIGHT_PX = 40;
-const FOREST_MAX_HEIGHT_PX = 96;
+const FOREST_HEIGHT_FRAC_MIN = 0.28;
+const FOREST_HEIGHT_FRAC_MAX = 0.42;
+const FOREST_MIN_HEIGHT_PX = 74;
+const FOREST_MAX_HEIGHT_PX = 144;
 
 // Muros laterales (costura en x 0 % / 100 %).
 const CLIFF_HEIGHT_FRAC_MIN = 0.26;
@@ -140,7 +146,26 @@ function sessionSeed() {
   return _sessionSeedCounter;
 }
 
-/** @typedef {'forest' | 'building'} CenterSceneSlot */
+/** @typedef {'forest' | 'building' | 'crystals' | 'portal'} CenterSceneSlot */
+
+/** Ranuras centrales del loader (no incluye riscos laterales). */
+export const CENTER_SCENE_SLOTS = /** @type {const} */ ([
+  "forest",
+  "building",
+  "crystals",
+  "portal",
+]);
+
+/** Máximo de elementos centrales visibles a la vez en el loader general. */
+export const CENTER_SCENE_MAX_CONCURRENT = 3;
+
+/** Peso relativo al elegir el siguiente tipo (más bosques en escena). */
+export const CENTER_SCENE_SLOT_WEIGHTS = /** @type {const} */ ({
+  forest: 2.4,
+  building: 1,
+  crystals: 1,
+  portal: 1,
+});
 
 /**
  * Ranura del centro que corresponde a un kind de fantasía.
@@ -396,6 +421,175 @@ export function isTrioCenterMode(enabled) {
 }
 
 /**
+ * @param {{ forest?: boolean; building?: boolean; crystals?: boolean; portal?: boolean }} enabled
+ * @returns {CenterSceneSlot[]}
+ */
+export function listEnabledCenterSlots(enabled) {
+  return CENTER_SCENE_SLOTS.filter((slot) => Boolean(enabled?.[slot]));
+}
+
+/**
+ * Loader general: elige al azar entre tipos habilitados (máx. 3 en escena).
+ * @param {string | undefined} devKind
+ * @param {{ forest?: boolean; building?: boolean; crystals?: boolean; portal?: boolean }} enabled
+ * @returns {boolean}
+ */
+export function isCenterDirectorMode(devKind, enabled) {
+  if (devKind) return false;
+  return listEnabledCenterSlots(enabled).length > 1;
+}
+
+/**
+ * @param {{ forest?: boolean; building?: boolean; crystals?: boolean; portal?: boolean }} active
+ * @returns {number}
+ */
+export function countActiveCenterSlots(active) {
+  return CENTER_SCENE_SLOTS.reduce((n, slot) => n + (active?.[slot] ? 1 : 0), 0);
+}
+
+/**
+ * Elige la siguiente ranura central al azar (evita repetir la última si hay alternativas).
+ * @param {() => number} rng
+ * @param {{ forest?: boolean; building?: boolean; crystals?: boolean; portal?: boolean }} enabled
+ * @param {{ forest?: boolean; building?: boolean; crystals?: boolean; portal?: boolean }} active
+ * @param {CenterSceneSlot | null} [lastSlot]
+ * @returns {CenterSceneSlot | null}
+ */
+export function pickRandomCenterSlot(rng, enabled, active, lastSlot = null) {
+  let pool = listEnabledCenterSlots(enabled).filter((slot) => !active?.[slot]);
+  if (pool.length === 0) return null;
+  if (lastSlot && pool.length > 1) {
+    const without = pool.filter((s) => s !== lastSlot);
+    if (without.length > 0) pool = without;
+  }
+  const weights = pool.map((slot) => CENTER_SCENE_SLOT_WEIGHTS[slot] ?? 1);
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  let roll = rng() * total;
+  for (let i = 0; i < pool.length; i += 1) {
+    roll -= weights[i];
+    if (roll <= 0) return pool[i];
+  }
+  return pool[pool.length - 1];
+}
+
+/**
+ * Colocación por huecos libres (director o modo triple legacy).
+ * @param {string | undefined} devKind
+ * @param {{ forest?: boolean; building?: boolean; crystals?: boolean; portal?: boolean }} enabled
+ * @returns {boolean}
+ */
+export function usesFairGapPlacement(devKind, enabled) {
+  return isCenterDirectorMode(devKind, enabled) || isTrioCenterMode(enabled);
+}
+
+/**
+ * Ancho horizontal efectivo del bosque en px (respeta viewBox 0–100 con overflow recortado).
+ * @param {number} sizePx
+ * @param {import('./loader-fantasy-element.js').FantasyElement | null | undefined} [element]
+ * @returns {number}
+ */
+export function forestFootprintWidthPx(sizePx, element) {
+  if (sizePx <= 0) return 0;
+  if (!element?.width) return sizePx * SCENE_FOREST_OCCUPIED_INFLATE;
+  const spanNorm = Math.min(220, element.width * FOREST_FOOTPRINT_PAD);
+  return (sizePx * spanNorm) / 100;
+}
+
+/**
+ * Ancho de colocación para huecos (ligeramente mayor que la huella visible).
+ * @param {number} sizePx
+ * @param {import('./loader-fantasy-element.js').FantasyElement | null | undefined} [element]
+ * @returns {number}
+ */
+export function forestPlacementWidthPx(sizePx, element) {
+  return forestFootprintWidthPx(sizePx, element) * (SCENE_FOREST_PLACEMENT_INFLATE / SCENE_FOREST_OCCUPIED_INFLATE);
+}
+
+/**
+ * @param {number} sizePx
+ * @param {import('./loader-fantasy-element.js').FantasyElement | null | undefined} element
+ * @param {number} layerWidthPx
+ * @returns {number}
+ */
+export function forestFootprintHalfWidthPercent(sizePx, element, layerWidthPx) {
+  if (layerWidthPx <= 0) return 0;
+  return (forestFootprintWidthPx(sizePx, element) / 2 / layerWidthPx) * 100;
+}
+
+/**
+ * Bosque demasiado ancho para un hemisferio (logo + acantilados).
+ * @param {number} spanPx
+ * @param {number} layerWidthPx
+ * @returns {boolean}
+ */
+export function forestNeedsWidePlacement(spanPx, layerWidthPx) {
+  if (layerWidthPx <= 0 || spanPx <= 0) return false;
+  const footprintPct = (spanPx / layerWidthPx) * 100;
+  const hemisphereSpan = Math.min(
+    CENTER_LEFT_ZONE_MAX - PLACE_LEFT_MIN,
+    PLACE_LEFT_MAX - CENTER_RIGHT_ZONE_MIN,
+  );
+  return footprintPct > hemisphereSpan - CENTER_LOGO_GAP * 0.25;
+}
+
+/**
+ * Coloca bosques anchos centrados, solapando el hueco del logo si hace falta.
+ * @param {{
+ *   rng: () => number;
+ *   layerWidthPx?: number;
+ *   spanPx: number;
+ *   occupiedZones?: OccupiedZone[];
+ *   occupiedExtraPaddingPct?: number;
+ * }} options
+ * @returns {number | null}
+ */
+export function pickWideForestCenterX(options) {
+  const {
+    rng,
+    layerWidthPx = 390,
+    spanPx,
+    occupiedZones = [],
+    occupiedExtraPaddingPct = SCENE_OCCUPIED_EXTRA_PADDING_PCT + 1.5,
+  } = options;
+  if (spanPx <= 0) return null;
+
+  const safe = computeSafeCenterRange(layerWidthPx, spanPx, 0, 0, null);
+  if (safe.min >= safe.max) return 50;
+
+  /** @type {number[]} */
+  const candidates = [50];
+  for (let i = 0; i < 8; i += 1) {
+    candidates.push(randRange(rng, safe.min, safe.max));
+  }
+
+  for (const x of candidates) {
+    if (!placementOverlapsOccupants(
+      x,
+      spanPx,
+      layerWidthPx,
+      occupiedZones,
+      occupiedExtraPaddingPct,
+    )) {
+      return x;
+    }
+  }
+
+  for (const x of candidates) {
+    if (!placementOverlapsOccupants(
+      x,
+      spanPx,
+      layerWidthPx,
+      occupiedZones,
+      SCENE_OCCUPIED_EXTRA_PADDING_PCT,
+    )) {
+      return x;
+    }
+  }
+
+  return randRange(rng, safe.min, safe.max);
+}
+
+/**
  * Colocación por hueco libre sin priorizar hemisferio ni tipo.
  * @param {{
  *   rng: () => number;
@@ -637,7 +831,7 @@ export function preferredCrystalHemispheres(forestX, buildingX) {
 }
 
 /**
- * Zonas horizontales ocupadas por bosque, castillo/palacio y cristales.
+ * Zonas horizontales ocupadas por bosque, castillo/palacio, cristales y portal.
  * @param {{
  *   forestX?: number | null;
  *   forestSizePx?: number;
@@ -645,6 +839,9 @@ export function preferredCrystalHemispheres(forestX, buildingX) {
  *   buildingSizePx?: number;
  *   crystalsX?: number | null;
  *   crystalsSizePx?: number;
+ *   portalX?: number | null;
+ *   portalSizePx?: number;
+ *   forestHalfWidthPct?: number | null;
  *   layerWidthPx?: number;
  * }} params
  * @returns {OccupiedZone[]}
@@ -657,6 +854,9 @@ export function buildSceneOccupiedZones(params) {
     buildingSizePx = 0,
     crystalsX = null,
     crystalsSizePx = 0,
+    portalX = null,
+    portalSizePx = 0,
+    forestHalfWidthPct = null,
     layerWidthPx = 390,
   } = params;
   /** @type {OccupiedZone[]} */
@@ -664,7 +864,10 @@ export function buildSceneOccupiedZones(params) {
   if (forestX != null) {
     zones.push({
       center: forestX,
-      halfWidth: elementHalfWidthPercent(forestSizePx * SCENE_FOREST_OCCUPIED_INFLATE, layerWidthPx),
+      halfWidth: forestHalfWidthPct ?? elementHalfWidthPercent(
+        forestSizePx * SCENE_FOREST_OCCUPIED_INFLATE,
+        layerWidthPx,
+      ),
     });
   }
   if (buildingX != null) {
@@ -677,6 +880,12 @@ export function buildSceneOccupiedZones(params) {
     zones.push({
       center: crystalsX,
       halfWidth: elementHalfWidthPercent(crystalsSizePx * SCENE_CRYSTAL_OCCUPIED_INFLATE, layerWidthPx),
+    });
+  }
+  if (portalX != null) {
+    zones.push({
+      center: portalX,
+      halfWidth: elementHalfWidthPercent(portalSizePx * SCENE_PORTAL_OCCUPIED_INFLATE, layerWidthPx),
     });
   }
   return zones;
@@ -910,6 +1119,11 @@ export function mountFantasyScene(container, opts = {}) {
   /** @type {number | null} */
   let activeCrystalsX = null;
   let activeCrystalsSizePx = 0;
+  /** @type {number | null} */
+  let activePortalX = null;
+  let activePortalSizePx = 0;
+  /** @type {number | null} */
+  let activeForestHalfWidthPct = null;
   let wallSessionSeed = sessionSeed();
   /** @type {import('./loader-fantasy-cliffs.js').CliffFormationType | undefined} */
   let wallFormationType;
@@ -918,8 +1132,14 @@ export function mountFantasyScene(container, opts = {}) {
     forest: !devKind || devKind === "forest",
     building: !devKind || devKind === "castle" || devKind === "palace",
     crystals: !devKind || devKind === "crystals",
-    portal: devKind === "portal",
+    portal: !devKind || devKind === "portal",
   };
+
+  const centerDirectorMode = isCenterDirectorMode(devKind, centerDevEnabled);
+  const gapPlacementMode = usesFairGapPlacement(devKind, centerDevEnabled);
+  let directorTimer = 0;
+  /** @type {CenterSceneSlot | null} */
+  let lastSpawnedSlot = null;
 
   /** @param {number} cycleSeed */
   function resolveWallFormation(cycleSeed) {
@@ -935,6 +1155,7 @@ export function mountFantasyScene(container, opts = {}) {
     clearTimeout(buildingTimer);
     clearTimeout(crystalsTimer);
     clearTimeout(portalTimer);
+    clearTimeout(directorTimer);
     if (forestTeardown) {
       forestTeardown.destroy();
       forestTeardown = null;
@@ -953,6 +1174,7 @@ export function mountFantasyScene(container, opts = {}) {
     }
     activeForestX = null;
     activeForestSizePx = 0;
+    activeForestHalfWidthPct = null;
     activeBuildingX = null;
     activeBuildingSizePx = 0;
     activeCrystalsX = null;
@@ -1082,6 +1304,93 @@ export function mountFantasyScene(container, opts = {}) {
     }
   }
 
+  function activeCenterSlotState() {
+    return {
+      forest: Boolean(forestTeardown),
+      building: Boolean(buildingTeardown),
+      crystals: Boolean(crystalsTeardown),
+      portal: Boolean(portalTeardown),
+    };
+  }
+
+  function countLiveCenterElements() {
+    return countActiveCenterSlots(activeCenterSlotState());
+  }
+
+  function scheduleDirectorSpawn(gapMs = 0) {
+    if (destroyed || !centerDirectorMode) return;
+    clearTimeout(directorTimer);
+    directorTimer = setTimeout(tryDirectorSpawn, gapMs);
+  }
+
+  function tryDirectorSpawn() {
+    if (destroyed || !centerDirectorMode) return;
+    if (countLiveCenterElements() >= CENTER_SCENE_MAX_CONCURRENT) return;
+
+    const active = activeCenterSlotState();
+    const next = pickRandomCenterSlot(cycleRng, centerDevEnabled, active, lastSpawnedSlot);
+    if (!next) {
+      scheduleDirectorSpawn(randRange(cycleRng, 700, 1600));
+      return;
+    }
+
+    const spawned = spawnCenterSlot(next);
+    if (spawned) {
+      lastSpawnedSlot = next;
+      if (countLiveCenterElements() < CENTER_SCENE_MAX_CONCURRENT) {
+        scheduleDirectorSpawn(randRange(cycleRng, 350, 1000));
+      }
+      return;
+    }
+    scheduleDirectorSpawn(randRange(cycleRng, 800, 1800));
+  }
+
+  /**
+   * @param {CenterSceneSlot} slot
+   * @returns {boolean}
+   */
+  function spawnCenterSlot(slot) {
+    switch (slot) {
+      case "forest":
+        return spawnForest();
+      case "building":
+        return spawnBuilding();
+      case "crystals":
+        return spawnCrystals();
+      case "portal":
+        return spawnPortal();
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * @param {CenterSceneSlot} slot
+   * @param {number} gapMs
+   */
+  function onCenterElementGone(slot, gapMs) {
+    if (centerDirectorMode) {
+      scheduleDirectorSpawn(gapMs);
+      return;
+    }
+    switch (slot) {
+      case "forest":
+        scheduleForestSpawn(gapMs);
+        break;
+      case "building":
+        scheduleBuildingSpawn(gapMs);
+        break;
+      case "crystals":
+        scheduleCrystalsSpawn(gapMs);
+        break;
+      case "portal":
+        schedulePortalSpawn(gapMs);
+        break;
+      default:
+        break;
+    }
+  }
+
   function scheduleForestSpawn(gapMs = 0) {
     if (destroyed || !centerDevEnabled.forest) return;
     clearTimeout(forestTimer);
@@ -1098,10 +1407,13 @@ export function mountFantasyScene(container, opts = {}) {
     return buildSceneOccupiedZones({
       forestX: activeForestX,
       forestSizePx: activeForestSizePx,
+      forestHalfWidthPct: activeForestHalfWidthPct,
       buildingX: activeBuildingX,
       buildingSizePx: activeBuildingSizePx,
       crystalsX: activeCrystalsX,
       crystalsSizePx: activeCrystalsSizePx,
+      portalX: activePortalX,
+      portalSizePx: activePortalSizePx,
       layerWidthPx,
     });
   }
@@ -1119,10 +1431,13 @@ export function mountFantasyScene(container, opts = {}) {
     };
   }
 
-  const trioCenterMode = isTrioCenterMode(centerDevEnabled);
+  const trioCenterMode = gapPlacementMode;
 
+  /**
+   * @returns {boolean}
+   */
   function spawnForest() {
-    if (destroyed || !centerDevEnabled.forest || forestTeardown) return;
+    if (destroyed || !centerDevEnabled.forest || forestTeardown) return false;
 
     const variant = forestSpawnVariant;
     forestSpawnVariant += 1;
@@ -1130,69 +1445,115 @@ export function mountFantasyScene(container, opts = {}) {
     const layerWidthPx = layer.clientWidth || 390;
     const occupiedZones = occupiedZonesForGaps(layerWidthPx);
     const cliffMargins = cliffMarginsForPlacement();
-    const xPercent = trioCenterMode
-      ? pickTrioScenePlacementX({
-        rng: cycleRng,
-        layerWidthPx,
-        selfSizePx: sizePx,
-        occupiedZones,
-        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
-        ...cliffMargins,
-      })
-      : pickCenterGapPlacementX({
-        rng: cycleRng,
-        slot: "forest",
-        otherXPercent: activeBuildingX,
-        layerWidthPx,
-        selfSizePx: sizePx,
-        bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
-        occupiedZones,
-        avoidEdgeCliffs: true,
-        minGapFactor: 1.65,
-        ...cliffMargins,
-      });
-    if (xPercent == null) {
-      scheduleForestSpawn(randRange(cycleRng, 800, 1800));
-      return;
-    }
-    activeForestX = xPercent;
-    activeForestSizePx = sizePx;
+    const placementSpanPx = sizePx * SCENE_FOREST_OCCUPIED_INFLATE;
     const baseSeed = Number.isFinite(devSeed) ? (devSeed >>> 0) : sessionSeed();
     const seed = mixFantasySeed(baseSeed, variant);
 
-    const element = generateFantasyElement("forest", {
-      seed,
-      terrainProfile,
-      forestCenterXNorm: xPercent / 100,
-      terrainHeightPx,
-    });
-    if (!element) {
-      activeForestX = null;
-      activeForestSizePx = 0;
-      scheduleForestSpawn(2000);
-      return;
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const roomy = occupiedZones.length === 0 && countLiveCenterElements() === 0;
+      const spacious = !roomy
+        && occupiedZones.length <= 2
+        && countLiveCenterElements() <= 2;
+
+      const element = generateFantasyElement("forest", {
+        seed: mixFantasySeed(seed, attempt),
+        roomy,
+        spacious,
+        terrainProfile,
+        forestCenterXNorm: 0.5,
+        terrainHeightPx,
+      });
+      if (!element) continue;
+
+      const spanPx = forestFootprintWidthPx(sizePx, element);
+      const wideForest = roomy || spacious || forestNeedsWidePlacement(spanPx, layerWidthPx);
+
+      const xPercent = wideForest
+        ? pickWideForestCenterX({
+          rng: cycleRng,
+          layerWidthPx,
+          spanPx,
+          occupiedZones,
+        })
+        : trioCenterMode
+          ? pickTrioScenePlacementX({
+            rng: cycleRng,
+            layerWidthPx,
+            selfSizePx: placementSpanPx,
+            occupiedZones,
+            minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+            ...cliffMargins,
+          })
+          : pickCenterGapPlacementX({
+            rng: cycleRng,
+            slot: "forest",
+            otherXPercent: activeBuildingX,
+            layerWidthPx,
+            selfSizePx: placementSpanPx,
+            bothSlotsEnabled: centerDevEnabled.forest && centerDevEnabled.building,
+            occupiedZones,
+            avoidEdgeCliffs: true,
+            minGapFactor: 1.85,
+            ...cliffMargins,
+          });
+      if (xPercent == null) continue;
+
+      const forestCenterXNorm = xPercent / 100;
+      const mountedElement = Math.abs(forestCenterXNorm - 0.5) < 0.015
+        ? element
+        : generateFantasyElement("forest", {
+          seed: mixFantasySeed(seed, attempt),
+          roomy,
+          spacious,
+          terrainProfile,
+          forestCenterXNorm,
+          terrainHeightPx,
+        });
+      if (!mountedElement) continue;
+
+      if (placementOverlapsOccupants(
+        xPercent,
+        spanPx,
+        layerWidthPx,
+        occupiedZones,
+        SCENE_OCCUPIED_EXTRA_PADDING_PCT + 1.5,
+      )) {
+        continue;
+      }
+
+      activeForestX = xPercent;
+      activeForestSizePx = sizePx;
+      activeForestHalfWidthPct = forestFootprintHalfWidthPercent(sizePx, mountedElement, layerWidthPx);
+
+      const baseTiming = planLifecycleTiming(mountedElement.seed, "forest", mountedElement.parts.length);
+      const timing = devKind || devFaction
+        ? { ...baseTiming, holdMs: 3200, gapMs: 500 }
+        : baseTiming;
+
+      forestTeardown = mountFantasyElement(layer, mountedElement, baseElementMountOpts({
+        xPercent,
+        sizePx,
+        timing,
+        onGone: () => {
+          forestTeardown = null;
+          activeForestX = null;
+          activeForestSizePx = 0;
+          activeForestHalfWidthPct = null;
+          onCenterElementGone("forest", timing.gapMs);
+        },
+      }));
+      return true;
     }
 
-    const baseTiming = planLifecycleTiming(seed, "forest", element.parts.length);
-    const timing = devKind || devFaction
-      ? { ...baseTiming, holdMs: 3200, gapMs: 500 }
-      : baseTiming;
-
-    forestTeardown = mountFantasyElement(layer, element, baseElementMountOpts({
-      xPercent,
-      sizePx,
-      timing,
-      onGone: () => {
-        forestTeardown = null;
-        activeForestX = null;
-        activeForestSizePx = 0;
-        scheduleForestSpawn(timing.gapMs);
-      },
-    }));
+    if (!centerDirectorMode) scheduleForestSpawn(randRange(cycleRng, 800, 1800));
+    return false;
   }
 
+  /**
+   * @returns {boolean}
+   */
   function spawnBuilding() {
-    if (destroyed || !centerDevEnabled.building || buildingTeardown) return;
+    if (destroyed || !centerDevEnabled.building || buildingTeardown) return false;
 
     const kind = planBuildingKind(cycleRng, devKind);
     const variant = buildingSpawnVariant;
@@ -1223,8 +1584,8 @@ export function mountFantasyScene(container, opts = {}) {
         ...cliffMargins,
       });
     if (xPercent == null) {
-      scheduleBuildingSpawn(randRange(cycleRng, 800, 1800));
-      return;
+      if (!centerDirectorMode) scheduleBuildingSpawn(randRange(cycleRng, 800, 1800));
+      return false;
     }
     activeBuildingX = xPercent;
     activeBuildingSizePx = sizePx;
@@ -1241,8 +1602,8 @@ export function mountFantasyScene(container, opts = {}) {
     if (!element) {
       activeBuildingX = null;
       activeBuildingSizePx = 0;
-      scheduleBuildingSpawn(2000);
-      return;
+      if (!centerDirectorMode) scheduleBuildingSpawn(2000);
+      return false;
     }
 
     const baseTiming = planLifecycleTiming(seed, kind, element.parts.length);
@@ -1258,9 +1619,10 @@ export function mountFantasyScene(container, opts = {}) {
         buildingTeardown = null;
         activeBuildingX = null;
         activeBuildingSizePx = 0;
-        scheduleBuildingSpawn(timing.gapMs);
+        onCenterElementGone("building", timing.gapMs);
       },
     }));
+    return true;
   }
 
   function occupiedZonesForCrystalGaps(layerWidthPx) {
@@ -1306,8 +1668,11 @@ export function mountFantasyScene(container, opts = {}) {
     return xPercent;
   }
 
+  /**
+   * @returns {boolean}
+   */
   function spawnCrystals() {
-    if (destroyed || !centerDevEnabled.crystals || crystalsTeardown) return;
+    if (destroyed || !centerDevEnabled.crystals || crystalsTeardown) return false;
 
     const crystalsDev = devKind === "crystals";
     const variant = crystalsSpawnVariant;
@@ -1317,8 +1682,8 @@ export function mountFantasyScene(container, opts = {}) {
     const xPercent = pickCrystalsPlacementX(layerWidthPx, sizePx);
 
     if (xPercent == null) {
-      scheduleCrystalsSpawn(randRange(cycleRng, 800, 1800));
-      return;
+      if (!centerDirectorMode) scheduleCrystalsSpawn(randRange(cycleRng, 800, 1800));
+      return false;
     }
 
     activeCrystalsX = xPercent;
@@ -1330,8 +1695,8 @@ export function mountFantasyScene(container, opts = {}) {
     if (!element) {
       activeCrystalsX = null;
       activeCrystalsSizePx = 0;
-      scheduleCrystalsSpawn(2000);
-      return;
+      if (!centerDirectorMode) scheduleCrystalsSpawn(2000);
+      return false;
     }
 
     const baseTiming = planLifecycleTiming(seed, "crystals", element.parts.length);
@@ -1347,9 +1712,10 @@ export function mountFantasyScene(container, opts = {}) {
         crystalsTeardown = null;
         activeCrystalsX = null;
         activeCrystalsSizePx = 0;
-        scheduleCrystalsSpawn(timing.gapMs);
+        onCenterElementGone("crystals", timing.gapMs);
       },
     }));
+    return true;
   }
 
   function startCliffDevMode(seed) {
@@ -1363,6 +1729,30 @@ export function mountFantasyScene(container, opts = {}) {
   }
 
   function pickPortalPlacementX(layerWidthPx, sizePx) {
+    if (gapPlacementMode) {
+      const occupiedZones = occupiedZonesForGaps(layerWidthPx);
+      const cliffMargins = cliffMarginsForPlacement();
+      let xPercent = pickTrioScenePlacementX({
+        rng: cycleRng,
+        layerWidthPx,
+        selfSizePx: sizePx,
+        occupiedZones,
+        minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+        ...cliffMargins,
+      });
+      if (xPercent == null) {
+        xPercent = pickFairGapPlacementX({
+          rng: cycleRng,
+          layerWidthPx,
+          selfSizePx: sizePx,
+          occupiedZones,
+          minGapFactor: TRIO_CENTER_MIN_GAP_FACTOR,
+          ...cliffMargins,
+        });
+      }
+      return xPercent;
+    }
+
     const cliffMargins = cliffMarginsForPlacement();
     const safe = computeSafeCenterRange(
       layerWidthPx,
@@ -1382,8 +1772,11 @@ export function mountFantasyScene(container, opts = {}) {
     portalTimer = setTimeout(spawnPortal, gapMs);
   }
 
+  /**
+   * @returns {boolean}
+   */
   function spawnPortal() {
-    if (destroyed || !centerDevEnabled.portal || portalTeardown) return;
+    if (destroyed || !centerDevEnabled.portal || portalTeardown) return false;
 
     const variant = portalSpawnVariant;
     portalSpawnVariant += 1;
@@ -1393,10 +1786,20 @@ export function mountFantasyScene(container, opts = {}) {
     const layerWidthPx = layer.clientWidth || 390;
     const xPercent = pickPortalPlacementX(layerWidthPx, sizePx);
 
+    if (xPercent == null) {
+      if (!centerDirectorMode) schedulePortalSpawn(randRange(cycleRng, 800, 1800));
+      return false;
+    }
+
+    activePortalX = xPercent;
+    activePortalSizePx = sizePx;
+
     const element = generateFantasyElement("portal", { seed });
     if (!element) {
-      schedulePortalSpawn(2000);
-      return;
+      activePortalX = null;
+      activePortalSizePx = 0;
+      if (!centerDirectorMode) schedulePortalSpawn(2000);
+      return false;
     }
 
     const baseTiming = planLifecycleTiming(seed, "portal", element.parts.length);
@@ -1410,12 +1813,24 @@ export function mountFantasyScene(container, opts = {}) {
       timing,
       onGone: () => {
         portalTeardown = null;
-        schedulePortalSpawn(timing.gapMs);
+        activePortalX = null;
+        activePortalSizePx = 0;
+        onCenterElementGone("portal", timing.gapMs);
       },
     }));
+    return true;
   }
 
   function bootstrapCenterSpawns() {
+    if (centerDirectorMode) {
+      const initialCount = randRange(cycleRng, 1, CENTER_SCENE_MAX_CONCURRENT);
+      const baseGap = 900;
+      for (let i = 0; i < initialCount; i += 1) {
+        scheduleDirectorSpawn(baseGap + randRange(cycleRng, i * 180, i * 180 + 520));
+      }
+      return;
+    }
+
     const quick = Boolean(devKind || devFaction);
     const baseGap = quick ? 200 : 900;
     if (centerDevEnabled.forest) {

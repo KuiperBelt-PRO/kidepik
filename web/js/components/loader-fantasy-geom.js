@@ -1474,7 +1474,7 @@ export function scaleFantasyPartsLocal(parts, axis, scale) {
  * Normaliza grupos de puntos en espacio local y-up al espacio SVG (y-down) 0..100.
  * Por defecto ancla el suelo local (minY) al borde inferior del viewBox (y=100).
  * @param {FPoint[][]} groups
- * @param {{ anchorY?: 'bottom' | 'center'; scaleBy?: 'max' | 'height'; bottomInset?: number; heightFloor?: number; anchorX?: 'center' | 'left' | 'right' }} [opts]
+ * @param {{ anchorY?: 'bottom' | 'center'; scaleBy?: 'max' | 'height' | 'heightCapWidth'; bottomInset?: number; heightFloor?: number; anchorX?: 'center' | 'left' | 'right' }} [opts]
  * @returns {FPoint[][]}
  */
 export function normalizeFantasyGroups(groups, opts = {}) {
@@ -1490,11 +1490,20 @@ export function normalizeFantasyGroups(groups, opts = {}) {
   const { minX, minY, maxX, maxY } = boundsOfFantasyGroups(groups);
   const contentW = maxX - minX || 1;
   const contentH = maxY - minY || 1;
-  const size = scaleBy === "height"
-    ? Math.max(contentH, heightFloor)
-    : Math.max(contentW, contentH, heightFloor);
   const usable = Math.max(1, 100 - bottomInset);
-  const scale = usable / size;
+  let scale;
+  if (scaleBy === "heightCapWidth") {
+    const hSize = Math.max(contentH, heightFloor);
+    scale = usable / hSize;
+    if (contentW * scale > usable) {
+      scale = usable / contentW;
+    }
+  } else {
+    const size = scaleBy === "height"
+      ? Math.max(contentH, heightFloor)
+      : Math.max(contentW, contentH, heightFloor);
+    scale = usable / size;
+  }
   const scaledW = contentW * scale;
   let padX;
   if (anchorX === "left") {

@@ -16,6 +16,8 @@ import {
   terrainCrestOffsetPx,
   computeTreeScreenXPercent,
   computeTreeTerrainLiftSvg,
+  computeElementTerrainLiftSvg,
+  computePortalGroundBottomPx,
 } from "../js/components/loader-fantasy-terrain.js";
 import { createRng } from "../js/components/loader-ship-rng.js";
 
@@ -106,6 +108,16 @@ describe("loader-fantasy-terrain", () => {
     assert.ok(Math.abs(lift) < 0.5, "base alineada con cresta → lift ~0");
     const liftHigh = computeTreeTerrainLiftSvg(profile, 50, 50, 92, 96, 390, 48);
     assert.ok(liftHigh > 0, "árbol con base por encima del suelo necesita lift positivo");
+  });
+
+  it("computePortalGroundBottomPx apoya portal con ligero hundimiento", () => {
+    const profile = [{ x: 0, y: 0.45 }, { x: 1, y: 0.45 }];
+    const crestPx = terrainCrestOffsetPx(profile, 40, 48);
+    const bottom = computePortalGroundBottomPx(profile, 40, 100, 72, 48);
+    assert.ok(bottom > 0);
+    assert.ok(bottom < crestPx, "no debe flotar por encima de la cresta");
+    const liftSvg = computeElementTerrainLiftSvg(profile, 40, 100, 72, 48);
+    assert.ok(bottom < (liftSvg / 100) * 72, "menos elevación que el lift SVG bruto");
   });
 
   it("computeTreeScreenXPercent desplaza según pivot en viewBox", () => {

@@ -6,7 +6,7 @@
 
 import { ElementAssembler } from "./loader-fantasy-element.js";
 import { sampleTerrainCrestYNorm } from "./loader-fantasy-terrain.js";
-import { generateTree, TREE_SPECIES_POOL } from "./loader-fantasy-trees.js";
+import { generateTree, TREE_SIZE_FACTOR, TREE_SPECIES_POOL } from "./loader-fantasy-trees.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
 
 /** @typedef {'compact' | 'extensive'} ForestExtent */
@@ -14,9 +14,24 @@ import { createRng, randRange } from "./loader-ship-rng.js";
 /** @typedef {import('./loader-fantasy-terrain.js').TerrainProfile} TerrainProfile */
 
 const EXTENT_CONFIG = {
-  compact: { treeMin: 14, treeMax: 20, spanMin: 48, spanMax: 68 },
-  extensive: { treeMin: 26, treeMax: 38, spanMin: 78, spanMax: 96 },
+  compact: { treeMin: 18, treeMax: 24, spanMin: 58, spanMax: 78, gapMin: 0.026, gapMax: 0.046 },
+  extensive: { treeMin: 26, treeMax: 36, spanMin: 78, spanMax: 104, gapMin: 0.024, gapMax: 0.042 },
 };
+
+/** Bosque amplio cuando la escena central tiene hueco (sin vecinos). */
+export const ROOMY_FOREST_CONFIG = {
+  treeMin: 34, treeMax: 46, spanMin: 108, spanMax: 142, gapMin: 0.022, gapMax: 0.038,
+};
+
+/** Bosque extendido con poco ocupado alrededor. */
+export const SPACIOUS_FOREST_CONFIG = {
+  treeMin: 28, treeMax: 38, spanMin: 92, spanMax: 122, gapMin: 0.023, gapMax: 0.04,
+};
+
+/**
+ * Altura moderada-alta en bosque (sin rellenar el viewBox entero).
+ */
+export const FOREST_TREE_SCALE_BOOST = 0.72 / TREE_SIZE_FACTOR;
 
 /**
  * @param {number} seed
@@ -24,7 +39,17 @@ const EXTENT_CONFIG = {
  */
 export function planForestExtent(seed) {
   const rng = createRng(seed >>> 0);
-  return rng() < 0.45 ? "compact" : "extensive";
+  return rng() < 0.32 ? "compact" : "extensive";
+}
+
+/**
+ * @param {number} seed
+ * @param {{ roomy?: boolean }} [opts]
+ * @returns {ForestExtent | "roomy"}
+ */
+export function planForestSceneExtent(seed, opts = {}) {
+  if (opts.roomy) return "roomy";
+  return planForestExtent(seed);
 }
 
 /**
@@ -53,19 +78,27 @@ export function planForestSpeciesMix(seed) {
  * @param {() => number} rng
  * @param {number} treeCount
  * @param {number} layoutWidth
+ * @param {{ gapFracMin?: number; gapFracMax?: number }} [opts]
  * @returns {number[]}
  */
-export function planForestTreePositions(rng, treeCount, layoutWidth) {
-  const minGap = layoutWidth * randRange(rng, 0.024, 0.042);
-  const xMin = layoutWidth * 0.05;
-  const xMax = layoutWidth * 0.95;
+export function planForestTreePositions(rng, treeCount, layoutWidth, opts = {}) {
+  const gapMin = opts.gapFracMin ?? 0.026;
+  const gapMax = opts.gapFracMax ?? 0.044;
+  const xMin = layoutWidth * 0.02;
+  const xMax = layoutWidth * 0.98;
+  const usable = xMax - xMin;
+  const idealStep = treeCount > 1 ? usable / (treeCount - 1) : usable;
+  const minGap = Math.min(
+    layoutWidth * randRange(rng, gapMin, gapMax),
+    idealStep * 0.92,
+  );
   /** @type {number[]} */
   const positions = [];
 
   for (let i = 0; i < treeCount; i += 1) {
     let cx = randRange(rng, xMin, xMax);
     let attempts = 0;
-    while (attempts < 16 && positions.some((p) => Math.abs(p - cx) < minGap)) {
+    while (attempts < 24 && positions.some((p) => Math.abs(p - cx) < minGap)) {
       cx = randRange(rng, xMin, xMax);
       attempts += 1;
     }
@@ -133,7 +166,9 @@ export function terrainAdjustedBaseY(baseY, cx, layoutWidth, profile, centerXNor
 /**
  * @param {{
  *   seed: number;
- *   extent?: ForestExtent;
+ *   extent?: ForestExtent | "roomy";
+ *   roomy?: boolean;
+ *   spacious?: boolean;
  *   speciesMix?: TreeSpecies[];
  *   terrainProfile?: TerrainProfile;
  *   forestCenterXNorm?: number;
@@ -143,14 +178,24 @@ export function terrainAdjustedBaseY(baseY, cx, layoutWidth, profile, centerXNor
 export function generateForest(options) {
   const { seed } = options;
   const rng = createRng(seed >>> 0);
-  const extent = options.extent ?? planForestExtent(seed);
+  const sceneExtent = options.extent ?? planForestSceneExtent(seed, { roomy: options.roomy });
+  const roomy = sceneExtent === "roomy" || Boolean(options.roomy);
+  const spacious = !roomy && Boolean(options.spacious);
+  const extent = roomy ? "extensive" : /** @type {ForestExtent} */ (sceneExtent);
   const speciesMix = options.speciesMix ?? planForestSpeciesMix(seed);
-  const cfg = EXTENT_CONFIG[extent];
+  const cfg = roomy
+    ? ROOMY_FOREST_CONFIG
+    : spacious
+      ? SPACIOUS_FOREST_CONFIG
+      : EXTENT_CONFIG[extent];
   const layoutWidth = randRange(rng, cfg.spanMin, cfg.spanMax);
   const centerXNorm = options.forestCenterXNorm ?? 0.5;
   const treeCount = cfg.treeMin + Math.floor(rng() * (cfg.treeMax - cfg.treeMin + 1));
   const treeSpecies = assignForestTreeSpecies(speciesMix, treeCount, seed);
-  const treePositions = planForestTreePositions(rng, treeCount, layoutWidth);
+  const treePositions = planForestTreePositions(rng, treeCount, layoutWidth, {
+    gapFracMin: cfg.gapMin,
+    gapFracMax: cfg.gapMax,
+  });
 
   const asm = new ElementAssembler();
   /** @type {TreeSpecies[]} */
@@ -166,9 +211,9 @@ export function generateForest(options) {
       species,
       cx,
       baseY,
-      scale: depth * randRange(rng, 0.78, 1.08),
+      scale: depth * randRange(rng, 0.9, 1.1) * FOREST_TREE_SCALE_BOOST,
       leanDeg: (rng() - 0.5) * 9,
-      canopyScale: 0.86,
+      canopyScale: roomy ? 0.98 : spacious ? 0.96 : extent === "extensive" ? 0.94 : 0.9,
     });
 
     for (const part of tree.parts) {
@@ -181,15 +226,20 @@ export function generateForest(options) {
     }
   }
 
-  const style = extent === "compact" ? "grove" : "woodland";
+  const style = roomy || extent === "extensive" ? "woodland" : "grove";
 
   return asm.build("forest", seed, style, {
-    extent,
+    extent: roomy ? "roomy" : spacious ? "spacious" : extent,
+    roomy,
+    spacious,
     speciesMix: [...new Set(usedSpecies)],
     treeSpeciesAssigned: treeSpecies,
     treeCount,
     layoutWidth,
     forestCenterXNorm: centerXNorm,
+    // Altura moderada; el ancho desborda si hace falta (overflow visible).
     normalizeScaleBy: "height",
+    normalizeHeightFloor: 30,
+    normalizeBottomInset: 8,
   });
 }

@@ -114,6 +114,52 @@ export function computeTreeTerrainLiftSvg(
 }
 
 /**
+ * Desplazamiento SVG para apoyar un elemento centrado en la cresta del terreno.
+ * @param {TerrainProfile} profile
+ * @param {number} xPercent 0..100 en escena
+ * @param {number} footYViewBox coordenada y del suelo del elemento en viewBox (mayor = más abajo)
+ * @param {number} sizePx tamaño CSS del SVG
+ * @param {number} terrainHeightPx
+ * @returns {number}
+ */
+export function computeElementTerrainLiftSvg(
+  profile,
+  xPercent,
+  footYViewBox,
+  sizePx,
+  terrainHeightPx,
+) {
+  if (!profile?.length || sizePx <= 0 || terrainHeightPx <= 0) return 0;
+  const targetFromBottomPx = terrainCrestOffsetPx(profile, xPercent, terrainHeightPx);
+  const currentFromBottomPx = ((100 - footYViewBox) / 100) * sizePx;
+  const liftPx = targetFromBottomPx - currentFromBottomPx;
+  return (liftPx / sizePx) * 100;
+}
+
+/**
+ * Offset CSS `bottom` para apoyar un portal (pies + FX) en la cresta del terreno.
+ * @param {TerrainProfile} profile
+ * @param {number} xPercent
+ * @param {number} footYViewBox
+ * @param {number} sizePx
+ * @param {number} terrainHeightPx
+ * @returns {number}
+ */
+export function computePortalGroundBottomPx(
+  profile,
+  xPercent,
+  footYViewBox,
+  sizePx,
+  terrainHeightPx,
+) {
+  if (!profile?.length || sizePx <= 0 || terrainHeightPx <= 0) return 0;
+  const crestPx = terrainCrestOffsetPx(profile, xPercent, terrainHeightPx);
+  const footInsetPx = ((100 - footYViewBox) / 100) * sizePx;
+  const embedPx = Math.min(5, terrainHeightPx * 0.08);
+  return Math.max(0, crestPx - footInsetPx - embedPx);
+}
+
+/**
  * Altura real en px de la capa de terreno (o fallback CSS).
  * @param {ParentNode} [layersRoot]
  * @returns {number}

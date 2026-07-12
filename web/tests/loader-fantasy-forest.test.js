@@ -4,7 +4,9 @@ import { describe, it } from "node:test";
 import {
   assignForestTreeSpecies,
   generateForest,
+  FOREST_TREE_SCALE_BOOST,
   planForestExtent,
+  planForestSceneExtent,
   planForestSpeciesMix,
   planForestTreePositions,
   terrainAdjustedBaseY,
@@ -61,7 +63,7 @@ describe("loader-fantasy-forest / estructura", () => {
     const el = generateForest({ seed: 88, extent: "compact" });
     const trunks = el.parts.filter((p) => p.role === "trunk");
     const canopies = el.parts.filter((p) => p.role === "canopy");
-    assert.ok(trunks.length >= 14);
+    assert.ok(trunks.length >= 18);
     assert.ok(canopies.length >= trunks.length);
     assert.equal(el.meta.treeCount, trunks.length);
   });
@@ -69,7 +71,7 @@ describe("loader-fantasy-forest / estructura", () => {
   it("extensive tiene muchos más árboles que compact", () => {
     const compact = generateForest({ seed: 5, extent: "compact" });
     const extensive = generateForest({ seed: 5, extent: "extensive" });
-    assert.ok(compact.meta.treeCount >= 14);
+    assert.ok(compact.meta.treeCount >= 18);
     assert.ok(extensive.meta.treeCount >= 26);
     assert.ok(compact.meta.treeCount < extensive.meta.treeCount);
     assert.ok(compact.parts.length < extensive.parts.length);
@@ -93,12 +95,12 @@ describe("loader-fantasy-forest / estructura", () => {
     for (let i = 1; i < positions.length; i += 1) {
       assert.ok(positions[i] >= positions[i - 1]);
     }
-    const minGap = 80 * 0.024;
+    const minGap = 80 * 0.022;
     let closePairs = 0;
     for (let i = 1; i < positions.length; i += 1) {
       if (positions[i] - positions[i - 1] < minGap) closePairs += 1;
     }
-    assert.ok(closePairs <= 2, "la mayoría de pares deberían respetar separación mínima");
+    assert.ok(closePairs <= 4, "la mayoría de pares deberían respetar separación mínima");
   });
 
   it("assignForestTreeSpecies reparte todas las especies del mix", () => {
@@ -115,6 +117,23 @@ describe("loader-fantasy-forest / estructura", () => {
     const a = assignForestTreeSpecies(mix, 18, 100);
     const b = assignForestTreeSpecies(mix, 18, 101);
     assert.notDeepEqual(a, b);
+  });
+
+  it("planForestSceneExtent usa roomy cuando hay hueco", () => {
+    assert.equal(planForestSceneExtent(7, { roomy: true }), "roomy");
+    assert.ok(planForestSceneExtent(7).length > 0);
+  });
+
+  it("bosque roomy es más ancho y denso que extensive", () => {
+    const roomy = generateForest({ seed: 42, roomy: true });
+    const spacious = generateForest({ seed: 42, spacious: true });
+    const extensive = generateForest({ seed: 42, extent: "extensive" });
+    assert.equal(roomy.meta.extent, "roomy");
+    assert.equal(spacious.meta.extent, "spacious");
+    assert.ok(roomy.meta.treeCount >= 34);
+    assert.ok(roomy.meta.layoutWidth >= 108);
+    assert.ok(spacious.meta.layoutWidth > extensive.meta.layoutWidth);
+    assert.ok(roomy.meta.layoutWidth > spacious.meta.layoutWidth);
   });
 
   it("planForestExtent alterna compact y extensive", () => {
@@ -142,6 +161,31 @@ describe("loader-fantasy-forest / build order", () => {
   it("cada bosque puede tener una sola especie", () => {
     const el = generateForest({ seed: 42, speciesMix: ["pine"] });
     assert.deepEqual(el.meta?.speciesMix, ["pine"]);
+  });
+
+  it("bosque denso, ancho y con altura moderada", () => {
+    assert.ok(FOREST_TREE_SCALE_BOOST > 2.5);
+    let minH = 100;
+    let maxH = 0;
+    let maxTrees = 0;
+    let maxLayout = 0;
+    for (let s = 0; s < 20; s += 1) {
+      const el = generateForest({ seed: s + 100 });
+      minH = Math.min(minH, el.height);
+      maxH = Math.max(maxH, el.height);
+      maxTrees = Math.max(maxTrees, el.meta.treeCount);
+      maxLayout = Math.max(maxLayout, el.meta.layoutWidth);
+      assert.ok(el.height >= 84, `seed ${s}: altura ${el.height} demasiado baja`);
+      assert.ok(el.height <= 94, `seed ${s}: altura ${el.height} demasiado alta`);
+    }
+    const roomy = generateForest({ seed: 77, roomy: true });
+    assert.ok(minH >= 84);
+    assert.ok(maxH <= 94);
+    assert.ok(maxTrees >= 26);
+    assert.ok(maxLayout >= 78);
+    assert.ok(roomy.meta.treeCount >= 34);
+    assert.ok(roomy.meta.layoutWidth >= 108);
+    assert.ok(roomy.width > 100, "bosque roomy desborda en ancho");
   });
 
   it("copas no coníferas exportan path con curvas suaves", () => {
@@ -193,12 +237,13 @@ describe("loader-fantasy-forest / terreno", () => {
 });
 
 describe("loader-fantasy-forest / ciclo de vida", () => {
-  it("forest tiene ciclo prolongado (hold y erosión amplios)", () => {
+  it("forest tiene ciclo acortado respecto a edificios", () => {
     const forest = planLifecycleTiming(42, "forest", 12);
     const castle = planLifecycleTiming(42, "castle", 12);
-    assert.ok(forest.holdMs >= 16000 && forest.holdMs <= 26000);
-    assert.ok(forest.erodeMs >= 5500 && forest.erodeMs <= 9000);
-    assert.ok(forest.holdMs > castle.holdMs * 2);
+    assert.ok(forest.holdMs >= 7500 && forest.holdMs <= 11500);
+    assert.ok(forest.erodeMs >= 3800 && forest.erodeMs <= 6200);
+    assert.ok(forest.holdMs > castle.holdMs);
+    assert.ok(forest.holdMs < castle.holdMs * 3);
   });
 });
 
