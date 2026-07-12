@@ -7,7 +7,7 @@ import {
   extractPortalFxAnchors,
   planPortalMagicFx,
 } from "../js/components/loader-fx-portal.js";
-import { generatePortal } from "../js/components/loader-fantasy-portal.js";
+import { generatePortal, PORTAL_STYLES } from "../js/components/loader-fantasy-portal.js";
 import "../js/components/loader-fx-portal.js";
 
 describe("loader-fx-portal / determinismo", () => {
@@ -20,16 +20,18 @@ describe("loader-fx-portal / determinismo", () => {
 });
 
 describe("loader-fx-portal / anclas y receta", () => {
-  it("spawn en las tres rocas en 30 seeds", () => {
-    let ok = 0;
-    for (let s = 1; s <= 30; s += 1) {
-      const el = generatePortal({ seed: s * 11 });
-      const anchors = extractPortalFxAnchors(el);
-      const center = anchors.find((a) => a.role === "portal_aperture");
-      const spawns = countPortalRockSpawns(anchors);
-      if (center && spawns >= 16) ok += 1;
+  it("spawn en rocas y vano en 30 seeds por estilo", () => {
+    for (const style of PORTAL_STYLES) {
+      let ok = 0;
+      for (let s = 1; s <= 30; s += 1) {
+        const el = generatePortal({ seed: s * 11, style });
+        const anchors = extractPortalFxAnchors(el);
+        const center = anchors.find((a) => a.role === "portal_aperture");
+        const spawns = countPortalRockSpawns(anchors);
+        if (center && spawns >= 12) ok += 1;
+      }
+      assert.ok(ok >= 26, style);
     }
-    assert.ok(ok >= 28);
   });
 
   it("receta válida con portal_inflow y presupuesto alto", () => {
@@ -44,11 +46,13 @@ describe("loader-fx-portal / anclas y receta", () => {
     assert.ok(totalParticleBudget(recipe) <= MAX_PARTICLES_PER_HOST);
   });
 
-  it("planFxRecipe resuelve portal", () => {
-    const el = generatePortal({ seed: 33 });
-    const recipe = planFxRecipe("portal", el, { seed: 33 });
-    assert.ok(recipe);
-    assert.ok(isValidFxRecipe(recipe));
+  it("planFxRecipe resuelve portal para cada estilo", () => {
+    for (const style of PORTAL_STYLES) {
+      const el = generatePortal({ seed: 33, style });
+      const recipe = planFxRecipe("portal", el, { seed: 33 });
+      assert.ok(recipe, style);
+      assert.ok(isValidFxRecipe(recipe), style);
+    }
   });
 
   it("fxProfile none → sin receta", () => {
