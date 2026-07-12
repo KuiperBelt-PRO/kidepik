@@ -598,7 +598,7 @@ export function mountFantasyCelestialLayer(container, { reducedMotion = false, r
   }
 
   const layer = document.createElement("div");
-  layer.className = "loader-layer loader-layer--fantasy-celestial";
+  layer.className = "loader-layer loader-layer--fantasy-celestial loader-layer--logo-masked";
   layer.setAttribute("aria-hidden", "true");
   container.appendChild(layer);
 

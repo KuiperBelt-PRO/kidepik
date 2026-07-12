@@ -218,7 +218,7 @@ export function mountFantasyCloudsLayer(container, { reducedMotion = false, rng,
   }
 
   const layer = document.createElement("div");
-  layer.className = "loader-layer loader-layer--fantasy-clouds";
+  layer.className = "loader-layer loader-layer--fantasy-clouds loader-layer--logo-masked";
   layer.setAttribute("aria-hidden", "true");
   container.appendChild(layer);
 

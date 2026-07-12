@@ -8,6 +8,7 @@ import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
+import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
 
 export const LOADER_SLOGAN = "Dos mundos. Un viaje épico.";
 
@@ -298,6 +299,8 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   app.appendChild(scene);
   document.body.classList.add("is-loader-active");
 
+  const teardownLogoMaskSync = mountLoaderLogoMaskSync(scene, focal);
+
   const loaderQuery = getLoaderQueryParams();
   const meteorDemo = loaderQuery.get("meteorDemo") === "1";
   const cloudDemo = loaderQuery.get("cloudDemo") === "1";
@@ -358,6 +361,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       fxIntensity,
     });
     void mountOptionalImage(accentFantasy, "loader.accent.fantasy");
+    syncLoaderLogoMask(scene, focal);
   }
 
   function mountSpaceWorldLayers() {
@@ -366,6 +370,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
     meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
     void mountOptionalImage(accentSpace, "loader.accent.space");
+    syncLoaderLogoMask(scene, focal);
   }
 
   let destroyed = false;
@@ -501,6 +506,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       destroyed = true;
       document.body.classList.remove("is-loader-active");
       revealSequence.destroy();
+      teardownLogoMaskSync();
       spaceOrbitTeardown?.destroy();
       meteorTeardown?.destroy();
       fantasyBackdropTeardown?.destroy();

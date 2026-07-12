@@ -304,7 +304,7 @@ function orbitGeometry(spec, w, h, logoY) {
  */
 export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) {
   const layer = document.createElement("div");
-  layer.className = "loader-layer loader-layer--space-orbit";
+  layer.className = "loader-layer loader-layer--space-orbit loader-layer--logo-masked";
   layer.setAttribute("aria-hidden", "true");
 
   const cleanups = [];

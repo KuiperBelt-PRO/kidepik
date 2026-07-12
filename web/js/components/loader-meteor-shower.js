@@ -146,7 +146,7 @@ export function mountMeteorShowerLayer(container, { reducedMotion = false, rng, 
   }
 
   const layer = document.createElement("div");
-  layer.className = "loader-layer loader-layer--meteor-shower";
+  layer.className = "loader-layer loader-layer--meteor-shower loader-layer--logo-masked";
   layer.setAttribute("aria-hidden", "true");
   container.appendChild(layer);
 

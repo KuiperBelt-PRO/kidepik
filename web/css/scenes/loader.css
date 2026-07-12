@@ -23,6 +23,24 @@
   --loader-space: #4da3ff;
   --loader-space-cyan: #7ec8ff;
   --loader-ring-size: clamp(200px, 66vmin, min(76vw, 320px));
+  --loader-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.40625 + 4px);
+  --loader-logo-mask-feather: 3px;
+  --loader-logo-mask-cx: 50%;
+  --loader-logo-mask-cy: 50%;
+}
+
+/* Agujero circular alineado al disco del anillo/logo (centro vía JS en capas enmascaradas). */
+.loader-layer--logo-masked {
+  mask-image: radial-gradient(
+    circle at var(--loader-logo-mask-cx) var(--loader-logo-mask-cy),
+    transparent var(--loader-logo-mask-r),
+    #000 calc(var(--loader-logo-mask-r) + var(--loader-logo-mask-feather))
+  );
+  -webkit-mask-image: radial-gradient(
+    circle at var(--loader-logo-mask-cx) var(--loader-logo-mask-cy),
+    transparent var(--loader-logo-mask-r),
+    #000 calc(var(--loader-logo-mask-r) + var(--loader-logo-mask-feather))
+  );
 }
 
 /* Sin scanlines retro del tema space opera sobre el splash */
@@ -141,17 +159,6 @@
   overflow: visible;
   opacity: 0;
   transition: opacity 0.95s ease;
-  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
-  mask-image: radial-gradient(
-    circle at 50% calc(100% + 40px),
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
-  -webkit-mask-image: radial-gradient(
-    circle at 50% calc(100% + 40px),
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
 }
 
 /* Estelas fugaces horizontales — franja superior space */
@@ -167,17 +174,6 @@
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.95s ease;
-  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
-  mask-image: radial-gradient(
-    circle at 50% calc(100% + 40px),
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
-  -webkit-mask-image: radial-gradient(
-    circle at 50% calc(100% + 40px),
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
 }
 
 .scene-loader.is-reveal-space .loader-layer.loader-layer--space-orbit,
@@ -268,17 +264,6 @@
   overflow: visible;
   opacity: 0;
   transition: opacity 0.95s ease;
-  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
-  mask-image: radial-gradient(
-    circle at 50% -40px,
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
-  -webkit-mask-image: radial-gradient(
-    circle at 50% -40px,
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
 }
 
 .loader-cloud {
@@ -321,17 +306,6 @@
   overflow: visible;
   opacity: 0;
   transition: opacity 0.95s ease;
-  --orbit-logo-mask-r: calc(var(--loader-ring-size, 276px) * 0.52);
-  mask-image: radial-gradient(
-    circle at 50% -40px,
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
-  -webkit-mask-image: radial-gradient(
-    circle at 50% -40px,
-    transparent var(--orbit-logo-mask-r),
-    #000 calc(var(--orbit-logo-mask-r) + 3px)
-  );
 }
 
 .loader-celestial {
