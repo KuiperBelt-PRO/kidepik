@@ -1,4 +1,4 @@
-const CACHE = "kidepik-web-v82";
+const CACHE = "kidepik-web-v97";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -6,20 +6,23 @@ const PRECACHE = [
   "/css/layout.css",
   "/css/components.css",
   "/css/scenes/loader.css",
+  "/css/scenes/auth.css",
   "/js/main.js",
   "/js/config.js",
   "/js/config.sample.js",
   "/js/lib/router.js",
   "/js/lib/theme.js",
   "/js/lib/assets.manifest.js",
+  "/js/lib/supabase.js",
   "/js/components/loader-chrome.js",
-  "/js/components/loader-fantasy-terrain.js",
-  "/js/components/loader-meteor-shower.js",
-  "/js/components/loader-space-orbit.js",
-  "/js/components/loader-space-ships.js",
-  "/js/components/loader-ship-procedural.js",
-  "/js/components/loader-ship-rng.js",
+  "/js/components/loader-gate.js",
+  "/js/components/loader-gate-constants.js",
+  "/js/components/loader-auth-morph.js",
+  "/js/components/auth-panel.js",
   "/js/scenes/loader.js",
+  "/js/scenes/auth.js",
+  "/js/scenes/auth-callback.js",
+  "/js/scenes/home.js",
   "/assets/shared/screens/loader-bg-plain.png",
   "/assets/shared/logo/wordmark-ambigram-light.png",
 ];
@@ -45,10 +48,14 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   const isJs = url.pathname.startsWith("/js/");
+  const isHtml =
+    url.pathname === "/" ||
+    url.pathname.endsWith(".html") ||
+    (request.headers.get("accept") || "").includes("text/html");
   const isAssetImage =
     url.pathname.startsWith("/assets/") && url.pathname.match(/\.(png|webp|jpg|jpeg|svg)$/i);
 
-  if (isJs || url.pathname.startsWith("/css/scenes/")) {
+  if (isHtml || isJs || url.pathname.startsWith("/css/scenes/")) {
     event.respondWith(
       fetch(request)
         .then((response) => {

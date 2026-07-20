@@ -1,6 +1,9 @@
 import { registerRoute, startRouter } from "./lib/router.js";
 import { initTheme } from "./lib/theme.js";
 import { renderLoader } from "./scenes/loader.js";
+import { renderAuth } from "./scenes/auth.js";
+import { renderAuthCallback } from "./scenes/auth-callback.js";
+import { renderHome } from "./scenes/home.js";
 
 function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");
@@ -22,6 +25,9 @@ function boot() {
   initTheme();
 
   registerRoute("loader", () => renderLoader());
+  registerRoute("auth", () => renderAuth());
+  registerRoute("auth/callback", () => renderAuthCallback());
+  registerRoute("home", () => renderHome());
 
   startRouter();
 

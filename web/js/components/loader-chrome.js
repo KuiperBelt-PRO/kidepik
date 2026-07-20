@@ -9,10 +9,12 @@ import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
+import { mountLoaderGate } from "./loader-gate.js";
 
 export const LOADER_SLOGAN = "Dos mundos. Un viaje épico.";
 
 const DURATION_MS = 4500;
+const DURATION_DEMO_MS = 800;
 const RING_RADIUS = 50;
 const RING_STROKE = 2.5;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
@@ -322,6 +324,8 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     : NaN;
   const fxIntensity = Number.isFinite(fxIntensityParsed) ? fxIntensityParsed : 1;
   const fxEnabled = loaderQuery.get("fxDev") !== "0";
+  const gateDemo = loaderQuery.get("gateDemo") === "1";
+  const progressDurationMs = gateDemo ? DURATION_DEMO_MS : DURATION_MS;
 
   /** @type {{ destroy: () => void } | null} */
   let spaceOrbitTeardown = null;
@@ -381,6 +385,16 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   let progressStarted = false;
   let logoRevealStageReached = false;
   let logoAssetReady = false;
+
+  const gate = mountLoaderGate({
+    scene,
+    chrome,
+    focal,
+    ringWrap,
+    logoWrap,
+    reducedMotion,
+    demo: gateDemo,
+  });
 
   const markMissingBg = () => {
     scene.classList.add("is-placeholder-art");
@@ -470,16 +484,19 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   }
 
   function startOrbit() {
-    if (orbitActive || reducedMotion) return;
+    if (orbitActive) return;
     orbitActive = true;
-    ringSpin.classList.add("is-orbiting");
+    if (!reducedMotion) {
+      ringSpin.classList.add("is-orbiting");
+    }
+    gate.onLoadingComplete();
   }
 
   function tick(now) {
     if (destroyed || orbitActive) return;
     if (!startTime) startTime = now;
     const elapsed = now - startTime;
-    const t = Math.min(1, elapsed / DURATION_MS);
+    const t = Math.min(1, elapsed / progressDurationMs);
     progress = easeOutCubic(t);
     updateProgressVisual(progress);
 
@@ -496,6 +513,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     if (reducedMotion) {
       progress = 1;
       updateProgressVisual(1);
+      startOrbit();
       return;
     }
     rafId = requestAnimationFrame(tick);
@@ -505,6 +523,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     destroy() {
       destroyed = true;
       document.body.classList.remove("is-loader-active");
+      gate.destroy();
       revealSequence.destroy();
       teardownLogoMaskSync();
       spaceOrbitTeardown?.destroy();
