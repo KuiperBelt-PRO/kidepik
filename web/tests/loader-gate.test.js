@@ -22,13 +22,13 @@ describe("loader-gate-constants", () => {
     assert.equal(GATE_COPY.sloganLine2, "UN VIAJE ÉPICO.");
   });
 
-  it("hint delay: 5s normal, 1s reduced, 200ms demo", () => {
+  it("hint delay: 500ms normal, 150ms reduced, 100ms demo", () => {
     assert.equal(resolveGateHintDelay(false), GATE_HINT_DELAY_MS);
-    assert.equal(GATE_HINT_DELAY_MS, 5000);
+    assert.equal(GATE_HINT_DELAY_MS, 500);
     assert.equal(resolveGateHintDelay(true), GATE_HINT_DELAY_REDUCED_MS);
-    assert.equal(GATE_HINT_DELAY_REDUCED_MS, 1000);
+    assert.equal(GATE_HINT_DELAY_REDUCED_MS, 150);
     assert.equal(resolveGateHintDelay(false, { demo: true }), GATE_HINT_DELAY_DEMO_MS);
-    assert.equal(GATE_HINT_DELAY_DEMO_MS, 200);
+    assert.equal(GATE_HINT_DELAY_DEMO_MS, 100);
   });
 
   it("overrideMs gana sobre demo y reduced", () => {

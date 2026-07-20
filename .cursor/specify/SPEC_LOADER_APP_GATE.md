@@ -56,16 +56,16 @@ loading ──► ready ──► exiting ──► (session?) ──► app
 
 | Requisito | Valor |
 | --- | --- |
-| **Cuándo aparece** | **5,0 s** después de que el progreso del anillo llegue al 100 % (≈ 9,5 s desde inicio de progreso si no hay skip) |
+| **Cuándo aparece** | **0,5 s** después de que el progreso del anillo (círculo de letras) llegue al 100 % |
 | **Copy completo** | «Pulsa para comenzar tu viaje épico» |
-| **Tipografía dual** | Dos segmentos inline, **mismas familias que el anillo**: |
+| **Tipografía dual** | Dos segmentos, **mismas familias que el anillo**: |
 | | • «Pulsa para comenzar» → **Bruno Ace / Orbitron** |
 | | • «tu viaje épico» → **Uncial Antiqua / Cinzel** (peso display) |
 | **Posición** | Debajo del disco central, dentro de `loader-chrome`, centrado horizontalmente |
-| **Animación entrada** | Fade + slide 8 px desde abajo, 400 ms ease-out |
+| **Animación entrada** | Fade + slide 8 px: primero «PULSA PARA COMENZAR», luego (~400 ms) «TU VIAJE ÉPICO» |
 | **Pulso opcional** | Opacidad 0,85↔1 en 2,5 s loop (desactivado con `prefers-reduced-motion`) |
-| **Zona táctil** | `loader-focal` completo: anillo + logo + padding invisible hasta el borde del disco (`--loader-ring-size`) |
-| `pointer-events` | Pasar a `auto` en `loader-focal` cuando estado = `ready` |
+| **Zona táctil** | Tras el 100 % del anillo: `loader-focal` (disco) de inmediato; al mostrar el hint, también el texto |
+| `pointer-events` | `auto` en `loader-focal` al completar el anillo; en `.loader-gate-hint` al mostrarse |
 
 **Accesibilidad del hint:**
 

@@ -85,15 +85,10 @@ export function mountLoaderGate({
   });
   const morphMs = resolveGateMorphDuration(reducedMotion);
 
-  function setReady() {
+  function enableTap() {
     if (destroyed || state !== "loading") return;
     state = "ready";
     scene.classList.add("is-gate-ready");
-    hint.hidden = false;
-    hint.classList.add("is-visible");
-    if (!reducedMotion) {
-      hint.classList.add("is-pulse");
-    }
     focal.classList.add("is-gate-tappable");
     focal.setAttribute("role", "button");
     focal.setAttribute("tabindex", "0");
@@ -105,10 +100,27 @@ export function mountLoaderGate({
     scene.setAttribute("aria-label", GATE_COPY.aria);
   }
 
+  function showHint() {
+    if (destroyed || state !== "ready") return;
+    hint.hidden = false;
+    // Primero la línea sci-fi; la fantasía entra con delay CSS.
+    hint.classList.add("is-visible");
+    if (!reducedMotion) {
+      hint.classList.add("is-pulse");
+    }
+    hint.classList.add("is-gate-tappable");
+    hint.setAttribute("role", "button");
+    hint.setAttribute("tabindex", "0");
+    hint.setAttribute("aria-label", GATE_COPY.aria);
+  }
+
   function onLoadingComplete() {
     if (destroyed || state !== "loading") return;
+    // El disco ya se puede pulsar en cuanto termina el círculo de letras.
+    enableTap();
     if (hintTimer != null) clearTimeout(hintTimer);
-    hintTimer = setTimeout(setReady, delay);
+    // El texto del hint aparece medio segundo después.
+    hintTimer = setTimeout(showHint, delay);
   }
 
   /**
@@ -120,7 +132,10 @@ export function mountLoaderGate({
     state = "exiting";
     scene.classList.remove("is-gate-ready");
     scene.classList.add("is-gate-exiting");
-    hint.classList.remove("is-visible", "is-pulse");
+    hint.classList.remove("is-visible", "is-pulse", "is-gate-tappable");
+    hint.removeAttribute("role");
+    hint.removeAttribute("tabindex");
+    hint.removeAttribute("aria-label");
     focal.classList.remove("is-gate-tappable");
     focal.removeAttribute("role");
     focal.removeAttribute("tabindex");
@@ -173,6 +188,8 @@ export function mountLoaderGate({
 
   focal.addEventListener("click", handleEnter);
   focal.addEventListener("keydown", onKeyDown);
+  hint.addEventListener("click", handleEnter);
+  hint.addEventListener("keydown", onKeyDown);
 
   return {
     onLoadingComplete,
@@ -182,6 +199,8 @@ export function mountLoaderGate({
       if (hintTimer != null) clearTimeout(hintTimer);
       focal.removeEventListener("click", handleEnter);
       focal.removeEventListener("keydown", onKeyDown);
+      hint.removeEventListener("click", handleEnter);
+      hint.removeEventListener("keydown", onKeyDown);
       hint.remove();
     },
   };

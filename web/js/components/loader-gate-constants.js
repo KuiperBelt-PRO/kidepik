@@ -3,9 +3,9 @@
  * @module loader-gate-constants
  */
 
-export const GATE_HINT_DELAY_MS = 5000;
-export const GATE_HINT_DELAY_REDUCED_MS = 1000;
-export const GATE_HINT_DELAY_DEMO_MS = 200;
+export const GATE_HINT_DELAY_MS = 500;
+export const GATE_HINT_DELAY_REDUCED_MS = 150;
+export const GATE_HINT_DELAY_DEMO_MS = 100;
 export const GATE_MORPH_MS = 800;
 export const GATE_MORPH_REDUCED_MS = 150;
 

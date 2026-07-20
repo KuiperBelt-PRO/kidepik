@@ -900,6 +900,7 @@
   transform: translate(-50%, 8px);
   margin: 0;
   width: min(90vw, 320px);
+  min-height: 48px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -908,7 +909,7 @@
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.4s ease-out, transform 0.4s ease-out;
-  z-index: 3;
+  z-index: 5;
   text-shadow:
     0 0 12px rgba(0, 0, 0, 0.85),
     0 2px 8px rgba(0, 0, 0, 0.7);
@@ -917,6 +918,17 @@
 .loader-gate-hint.is-visible {
   opacity: 1;
   transform: translate(-50%, 0);
+}
+
+/* Listo: el texto del hint también recibe taps (además del disco). */
+.scene-loader.is-gate-ready .loader-gate-hint {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.loader-gate-hint.is-gate-tappable {
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 .loader-gate-hint.is-pulse {
@@ -933,26 +945,42 @@
   }
 }
 
-.loader-gate-hint__sci {
+.loader-gate-hint__sci,
+.loader-gate-hint__fantasy {
   display: block;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.45s ease-out,
+    transform 0.45s ease-out;
+  color: #fff;
+  text-transform: uppercase;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+}
+
+.loader-gate-hint.is-visible .loader-gate-hint__sci {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.loader-gate-hint.is-visible .loader-gate-hint__fantasy {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.4s;
+}
+
+.loader-gate-hint__sci {
   font-family: "Bruno Ace", "Orbitron", sans-serif;
   font-size: clamp(0.85rem, 3.6vw, 1rem);
   font-weight: 600;
   letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
 }
 
 .loader-gate-hint__fantasy {
-  display: block;
   font-family: "Uncial Antiqua", "Cinzel", Georgia, serif;
   font-size: clamp(0.9rem, 3.8vw, 1.05rem);
   font-weight: 700;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: #fff;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
 }
 
 .scene-loader.is-gate-exiting .loader-gate-hint,
@@ -991,7 +1019,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.15rem;
   pointer-events: none;
 }
 
@@ -1024,6 +1052,8 @@
   text-align: center;
   text-transform: uppercase;
   opacity: 0;
+  /* Acerca el eslogan al wordmark (el wrap del logo es cuadrado con aire inferior). */
+  margin-top: -0.85rem;
 }
 
 .loader-auth-slogan.is-visible,
@@ -1195,12 +1225,15 @@
   }
 
   .loader-gate-hint,
+  .loader-gate-hint__sci,
+  .loader-gate-hint__fantasy,
   .loader-ring.is-auth-exit .loader-ring-base,
   .scene-loader.is-auth-morph .loader-ring-base,
   .loader-logo-wrap.is-auth-positioned,
   .loader-auth-slogan__glyph,
   .auth-panel--embedded {
     transition-duration: 0.15s !important;
+    transition-delay: 0s !important;
     animation: none;
   }
 
