@@ -996,18 +996,22 @@
 .loader-auth-stack {
   position: absolute;
   left: 50%;
-  top: 0;
-  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
   width: min(92vw, 320px);
-  /* Entre órbitas y centro del disco: no tan alto ni tan bajo. */
-  padding-top: clamp(190px, 29vh, 260px);
+  max-width: calc(100% - 2rem);
+  /* Bloque completo (logo → legal) centrado en altura; sin padding-top fijo. */
+  padding: 0;
+  margin: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.85rem;
+  justify-content: center;
+  gap: clamp(0.65rem, 1.8vh, 0.95rem);
   z-index: 4;
   pointer-events: none;
   overflow: visible;
+  box-sizing: border-box;
 }
 
 .loader-auth-brand {
@@ -1028,7 +1032,7 @@
   left: auto;
   top: auto;
   transform: none;
-  margin-bottom: 1.25rem;
+  margin-bottom: clamp(0.65rem, 1.6vh, 1.1rem);
 }
 
 .loader-auth-brand.is-static .loader-logo-wrap.is-auth-positioned {
@@ -1134,6 +1138,21 @@
   opacity: 0;
   transform: translateY(10px);
   animation: auth-panel-enter 0.55s cubic-bezier(0.4, 0, 0.2, 1) 0.05s forwards;
+}
+
+.auth-panel--embedded.is-awaiting-reveal {
+  /* Ocupa espacio en layout (evita salto) pero invisible hasta el reveal. */
+  opacity: 0;
+  transform: translateY(10px);
+  animation: none;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.auth-panel--embedded.is-revealed {
+  visibility: visible;
+  pointer-events: auto;
+  animation: auth-panel-enter 0.55s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
 @keyframes auth-panel-enter {

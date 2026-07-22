@@ -83,9 +83,10 @@ final class Config
     {
         $value = getenv($key);
         if ($value === false || $value === '') {
-            return $default;
+            $fromEnv = $_ENV[$key] ?? $_SERVER[$key] ?? null;
+            $value = is_string($fromEnv) ? $fromEnv : '';
         }
 
-        return $value;
+        return $value !== '' ? $value : $default;
     }
 }

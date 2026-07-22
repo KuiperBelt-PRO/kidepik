@@ -11,8 +11,8 @@ import {
   resolveGateHintDelay,
   resolveGateMorphDuration,
 } from "./loader-gate-constants.js";
-import { runLoaderAuthMorph } from "./loader-auth-morph.js";
-import { mountAuthPanel } from "./auth-panel.js";
+import { runLoaderAuthMorph } from "./loader-auth-morph.js?v=109";
+import { mountAuthPanel } from "./auth-panel.js?v=109";
 
 /** @typedef {'loading' | 'ready' | 'exiting' | 'auth-morph' | 'auth-idle'} GateState */
 
@@ -148,6 +148,24 @@ export function mountLoaderGate({
 
     state = "auth-morph";
 
+    // Reservar altura final del panel ANTES del morph para que el FLIP
+    // apunte a la posición centrada definitiva (sin salto al montar el CTA).
+    let authStack = chrome.querySelector(".loader-auth-stack");
+    if (!(authStack instanceof HTMLElement)) {
+      authStack = document.createElement("div");
+      authStack.className = "loader-auth-stack";
+      chrome.appendChild(authStack);
+    }
+    if (!authStack.querySelector(".loader-auth-brand")) {
+      const brand = document.createElement("div");
+      brand.className = "loader-auth-brand";
+      authStack.appendChild(brand);
+    }
+    const authPanel = mountAuthPanel(authStack, {
+      embedded: true,
+      deferredReveal: true,
+    });
+
     await new Promise((resolve) => {
       runLoaderAuthMorph({
         scene,
@@ -159,11 +177,15 @@ export function mountLoaderGate({
       });
     });
 
-    if (destroyed) return;
+    if (destroyed) {
+      authPanel.destroy();
+      return;
+    }
 
     const session = await sessionPromise;
 
     if (isSessionValid(session)) {
+      authPanel.destroy();
       navigate("/home");
       return;
     }
@@ -171,10 +193,7 @@ export function mountLoaderGate({
     state = "auth-idle";
     scene.classList.add("is-auth-idle");
     scene.classList.remove("is-gate-exiting");
-    const authStack = chrome.querySelector(".loader-auth-stack");
-    mountAuthPanel(authStack instanceof HTMLElement ? authStack : chrome, {
-      embedded: true,
-    });
+    authPanel.reveal();
   }
 
   /**

@@ -9,6 +9,7 @@ use GuzzleHttp\Exception\GuzzleException;
 use Kidepik\Api\Http\JsonResponse;
 use Kidepik\Api\Services\DatabaseService;
 use Kidepik\Shared\Config;
+use Kidepik\Shared\Database\MigrationRunner;
 use Kidepik\Shared\Storage\StorageDriverFactory;
 
 final class ArchitectureController
@@ -46,6 +47,12 @@ final class ArchitectureController
 
         $db = $this->database ?? new DatabaseService();
         $storage = StorageDriverFactory::create()->status();
+        $migrationStatus = MigrationRunner::fromEnv()->status();
+        $migrations = [
+            'pending_count' => count($migrationStatus['pending'] ?? []),
+            'applied_count' => count($migrationStatus['applied'] ?? []),
+            'ok' => (bool) ($migrationStatus['ok'] ?? false),
+        ];
 
         return JsonResponse::ok([
             'api' => ['ok' => true, 'service' => Config::appName()],
@@ -53,6 +60,7 @@ final class ArchitectureController
             'postgres' => ['ok' => $db->isReachable()],
             'poc_health' => $db->pocHealthMessage(),
             'storage' => $storage,
+            'migrations' => $migrations,
         ]);
     }
 }

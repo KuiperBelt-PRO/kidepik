@@ -6,7 +6,7 @@
  * @module loader-auth-morph
  */
 
-import { GATE_COPY, GATE_MORPH_MS } from "./loader-gate-constants.js";
+import { GATE_COPY, GATE_MORPH_MS } from "./loader-gate-constants.js?v=109";
 
 const EASE = "cubic-bezier(0.4, 0, 0.2, 1)";
 
@@ -405,6 +405,7 @@ export function runLoaderAuthMorph({
       timer = setTimeout(() => {
         for (const a of anims) {
           try {
+            if (typeof a.commitStyles === "function") a.commitStyles();
             a.cancel();
           } catch {
             /* ignore */

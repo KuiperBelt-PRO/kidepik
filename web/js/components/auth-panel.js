@@ -15,14 +15,19 @@ export const AUTH_COPY = {
 
 /**
  * @param {HTMLElement} container
- * @param {{ embedded?: boolean }} [options]
- * @returns {{ destroy: () => void }}
+ * @param {{ embedded?: boolean; deferredReveal?: boolean }} [options]
+ * @returns {{ root: HTMLElement; reveal: () => void; destroy: () => void }}
  */
-export function mountAuthPanel(container, { embedded = false } = {}) {
+export function mountAuthPanel(container, { embedded = false, deferredReveal = false } = {}) {
   const root = document.createElement("div");
   root.className = embedded
     ? "auth-panel auth-panel--embedded"
     : "auth-panel";
+
+  if (embedded && deferredReveal) {
+    root.classList.add("is-awaiting-reveal");
+    root.setAttribute("aria-hidden", "true");
+  }
 
   const subtitle = document.createElement("p");
   subtitle.className = "auth-panel__subtitle";
@@ -37,6 +42,10 @@ export function mountAuthPanel(container, { embedded = false } = {}) {
   button.type = "button";
   button.className = "auth-panel__google";
   button.setAttribute("aria-label", AUTH_COPY.google);
+  if (deferredReveal) {
+    button.tabIndex = -1;
+    button.disabled = true;
+  }
 
   const icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   icon.setAttribute("class", "auth-panel__google-icon");
@@ -63,6 +72,7 @@ export function mountAuthPanel(container, { embedded = false } = {}) {
   container.appendChild(root);
 
   let busy = false;
+  let revealed = !deferredReveal;
 
   /**
    * @param {string} message
@@ -73,7 +83,7 @@ export function mountAuthPanel(container, { embedded = false } = {}) {
   }
 
   async function onGoogleClick() {
-    if (busy) return;
+    if (!revealed || busy) return;
     busy = true;
     button.disabled = true;
     button.classList.add("is-loading");
@@ -88,7 +98,6 @@ export function mountAuthPanel(container, { embedded = false } = {}) {
         error.message === "offline" ? AUTH_COPY.errorOffline : AUTH_COPY.errorGeneric,
       );
     }
-    // Si no hay error, el navegador redirige a Google.
   }
 
   function onClick() {
@@ -97,7 +106,19 @@ export function mountAuthPanel(container, { embedded = false } = {}) {
 
   button.addEventListener("click", onClick);
 
+  function reveal() {
+    if (revealed) return;
+    revealed = true;
+    root.classList.remove("is-awaiting-reveal");
+    root.classList.add("is-revealed");
+    root.removeAttribute("aria-hidden");
+    button.disabled = false;
+    button.removeAttribute("tabindex");
+  }
+
   return {
+    root,
+    reveal,
     destroy() {
       button.removeEventListener("click", onClick);
       root.remove();

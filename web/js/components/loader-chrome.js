@@ -9,7 +9,7 @@ import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js";
 import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
-import { mountLoaderGate } from "./loader-gate.js?v=101";
+import { mountLoaderGate } from "./loader-gate.js?v=109";
 
 export const LOADER_SLOGAN = "Dos mundos. Un viaje épico.";
 

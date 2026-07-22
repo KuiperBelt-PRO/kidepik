@@ -1,6 +1,6 @@
 import { registerRoute, startRouter } from "./lib/router.js";
 import { initTheme } from "./lib/theme.js";
-import { renderLoader } from "./scenes/loader.js?v=101";
+import { renderLoader } from "./scenes/loader.js?v=109";
 import { renderAuth } from "./scenes/auth.js";
 import { renderAuthCallback } from "./scenes/auth-callback.js";
 import { renderHome } from "./scenes/home.js";

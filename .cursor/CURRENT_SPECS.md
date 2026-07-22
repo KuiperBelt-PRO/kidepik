@@ -20,6 +20,7 @@
 - **Pantalla Loader (splash dual mundo):** [specify/SPEC_LOADER_SCREEN.md](specify/SPEC_LOADER_SCREEN.md) — implementada jun 2026; prompts IA: [specify/LOADER_SCREEN_AI_PROMPTS.md](specify/LOADER_SCREEN_AI_PROMPTS.md)
 - **Loader → App / Auth (puerta de entrada):** [specify/SPEC_LOADER_APP_GATE.md](specify/SPEC_LOADER_APP_GATE.md) — **aprobada** jul 2026; hint 5 s post-100 %, morph in-place, tap disco central
 - **Auth cuenta padre/tutor (Supabase):** [specify/SPEC_APP_AUTH.md](specify/SPEC_APP_AUTH.md) — **aprobada** jul 2026; Google solamente en MVP
+- **Migraciones PHP + documentos legales:** [specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md) — **aprobada** jul 2026; auto-apply en bootstrap, historial compartido con Supabase, Términos/Privacidad versionados
 - **Loader — lluvia de meteoritos (franja superior):** [specify/SPEC_LOADER_METEOR_SHOWER.md](specify/SPEC_LOADER_METEOR_SHOWER.md) — implementada jun 2026
 - **Loader — terreno fantasía (base inferior):** [specify/SPEC_LOADER_FANTASY_TERRAIN.md](specify/SPEC_LOADER_FANTASY_TERRAIN.md) — implementada jun 2026
 - **Loader — motor de elementos de fantasía (propuesta jun 2026):** arquitectura del motor procedural (castillos, aldeas, torres, bosques, cristales, megalitos, portales) con construcción progresiva y erosión.
