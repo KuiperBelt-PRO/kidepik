@@ -32,7 +32,7 @@ import {
   registerWorldSession,
 } from "../lib/world-session.js";
 import { mountWorldLogo } from "./world-layers.js?v=138";
-import { bindLegalLinkTransitions } from "../scenes/legal.js?v=138";
+import { bindLegalLinkTransitions } from "../scenes/legal.js?v=142";
 
 /**
  * @param {HTMLElement} logoWrap

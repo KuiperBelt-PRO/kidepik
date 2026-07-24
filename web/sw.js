@@ -1,4 +1,4 @@
-const CACHE = "kidepik-web-v138";
+const CACHE = "kidepik-web-v145";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -52,6 +52,9 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+
+  // API: siempre red (evita latencia/fallos del handler genérico del SW).
+  if (url.pathname.startsWith("/api/")) return;
 
   const isJs = url.pathname.startsWith("/js/");
   const isHtml =

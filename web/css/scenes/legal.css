@@ -36,11 +36,13 @@
   --legal-logo-size: clamp(104px, 24vw, 140px);
   --legal-logo-top: calc(21dvh + clamp(0.25rem, 1.5vh, 1rem));
   --legal-fab-size: 32px;
-  /* Fade superior: un poco bajo el logo, ramp progresivo (no cortante). */
-  --legal-fade-top-start: calc(var(--legal-logo-top) + var(--legal-logo-size) * 0.88);
-  --legal-fade-top-end: calc(var(--legal-logo-top) + var(--legal-logo-size) + clamp(0.75rem, 2.2vh, 1.5rem));
-  --legal-text-pad-top: calc(var(--legal-fade-top-end) + 0.35rem);
-  --legal-text-pad-bottom: calc(24dvh + 1.25rem);
+  --legal-scrollbar-size: 6px;
+  /* Rampas de opacidad del texto (anclajes medidos en JS). */
+  --legal-fade-ramp-h: clamp(56px, 14dvh, 112px);
+  --legal-fade-bottom-overshoot: clamp(12px, 2.5dvh, 28px);
+  --legal-scroll-top: var(--legal-space-band);
+  --legal-text-pad-top: calc(var(--legal-logo-top) + var(--legal-logo-size) + 0.35rem - var(--legal-scroll-top));
+  --legal-text-pad-bottom: 1.25rem;
 }
 
 @property --legal-space-band {
@@ -99,7 +101,7 @@
 
 /* Legal: tipografía / logo (bandas ya unificadas en is-world-band-legal) */
 .scene.scene-legal.scene-world.is-world-band-legal {
-  --legal-text-pad-bottom: calc(24dvh + 1.25rem);
+  --legal-text-pad-bottom: 1.25rem;
 }
 
 /* Terreno fantasía: misma variable que usan los anclajes de bosques/portales */
@@ -255,6 +257,16 @@
   letter-spacing: 0.08em;
 }
 
+.legal-scroll-port {
+  position: absolute;
+  top: var(--legal-scroll-top, var(--legal-space-band));
+  right: 0;
+  bottom: calc(var(--legal-fantasy-band) - var(--legal-fade-bottom-overshoot));
+  left: 0;
+  min-height: 0;
+  pointer-events: none;
+}
+
 .legal-scroll {
   position: absolute;
   inset: 0;
@@ -269,23 +281,27 @@
   pointer-events: auto;
   scrollbar-width: thin;
   scrollbar-color: #fff rgba(255, 255, 255, 0.12);
-  /* Fade superior debajo del logo (progresivo); inferior al inicio del footer fantasía */
+  /* Fade en el viewport de scroll; anclas en px (--legal-fade-mask-*-start/end) desde legal.js. */
   -webkit-mask-image: linear-gradient(
     to bottom,
-    transparent 0,
-    transparent var(--legal-fade-top-start),
-    #000 var(--legal-fade-top-end),
-    #000 calc(100% - var(--legal-fantasy-band)),
-    transparent 100%
+    transparent var(--legal-fade-mask-top-start, 0px),
+    #000 calc(var(--legal-fade-mask-top-start, 0px) + var(--legal-fade-ramp-h)),
+    #000 calc(var(--legal-fade-mask-bottom-end, 100%) - var(--legal-fade-ramp-h)),
+    transparent var(--legal-fade-mask-bottom-end, 100%)
   );
   mask-image: linear-gradient(
     to bottom,
-    transparent 0,
-    transparent var(--legal-fade-top-start),
-    #000 var(--legal-fade-top-end),
-    #000 calc(100% - var(--legal-fantasy-band)),
-    transparent 100%
+    transparent var(--legal-fade-mask-top-start, 0px),
+    #000 calc(var(--legal-fade-mask-top-start, 0px) + var(--legal-fade-ramp-h)),
+    #000 calc(var(--legal-fade-mask-bottom-end, 100%) - var(--legal-fade-ramp-h)),
+    transparent var(--legal-fade-mask-bottom-end, 100%)
   );
+  -webkit-mask-size: calc(100% - var(--legal-scrollbar-size)) 100%;
+  mask-size: calc(100% - var(--legal-scrollbar-size)) 100%;
+  -webkit-mask-position: 0 0;
+  mask-position: 0 0;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
 .legal-scroll::-webkit-scrollbar {
@@ -367,6 +383,25 @@
   opacity: 0.85;
 }
 
+.legal-body__error-actions {
+  margin-top: 0.75rem;
+  text-align: center;
+}
+
+.legal-body__retry {
+  font: inherit;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+}
+
+.legal-body__retry:active {
+  transform: scale(0.98);
+}
+
 .legal-fab {
   position: absolute;
   z-index: 5;
@@ -405,7 +440,7 @@
 
 .legal-fab--top {
   right: max(0.75rem, env(safe-area-inset-right));
-  bottom: calc(var(--legal-fantasy-band) + max(0.65rem, env(safe-area-inset-bottom)));
+  bottom: var(--legal-fantasy-band);
   opacity: 0;
   transform: translateY(8px);
   pointer-events: none;

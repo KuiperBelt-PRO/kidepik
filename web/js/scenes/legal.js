@@ -93,25 +93,68 @@ function createFab(label, kind) {
   return btn;
 }
 
+const LEGAL_FETCH_BASE_BACKOFF_MS = 400;
+const LEGAL_FETCH_MAX_BACKOFF_MS = 8_000;
+
+/**
+ * @param {AbortSignal | undefined} signal
+ * @param {number} attempt
+ * @returns {Promise<void>}
+ */
+function waitLegalFetchBackoff(signal, attempt) {
+  const delay = Math.min(LEGAL_FETCH_MAX_BACKOFF_MS, LEGAL_FETCH_BASE_BACKOFF_MS * (2 ** attempt));
+  return new Promise((resolve) => {
+    const wait = setTimeout(resolve, delay);
+    signal?.addEventListener("abort", () => {
+      clearTimeout(wait);
+      resolve(undefined);
+    }, { once: true });
+  });
+}
+
 /**
  * @param {string} routeSlug
+ * @param {{ signal?: AbortSignal; retries?: number }} [options]
  * @returns {Promise<{ title: string; body_markdown: string } | null>}
  */
-async function fetchLegalDoc(routeSlug) {
+async function fetchLegalDoc(routeSlug, options = {}) {
   const apiSlug = apiSlugForRoute(routeSlug);
   if (!apiSlug) return null;
 
-  try {
-    const res = await fetch(`${config.apiUrl}/legal/${apiSlug}`, {
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data?.title || !data?.body_markdown) return null;
-    return data;
-  } catch {
-    return null;
+  const { signal, retries = 3 } = options;
+  const url = `${config.apiUrl}/legal/${apiSlug}`;
+
+  for (let attempt = 0; attempt < retries; attempt++) {
+    if (signal?.aborted) return null;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12_000);
+    const onParentAbort = () => controller.abort();
+    signal?.addEventListener("abort", onParentAbort);
+
+    try {
+      const res = await fetch(url, {
+        signal: controller.signal,
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (!data?.title || !data?.body_markdown) continue;
+      return data;
+    } catch {
+      if (signal?.aborted) return null;
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onParentAbort);
+    }
+
+    if (attempt < retries - 1) {
+      await waitLegalFetchBackoff(signal, attempt);
+    }
   }
+
+  return null;
 }
 
 /**
@@ -164,6 +207,9 @@ export function renderLegal({ slug }) {
   header.appendChild(backFab);
   header.appendChild(logoWrap);
 
+  const scrollPort = document.createElement("div");
+  scrollPort.className = "legal-scroll-port";
+
   const scroll = document.createElement("div");
   scroll.className = "legal-scroll";
   scroll.tabIndex = 0;
@@ -173,7 +219,8 @@ export function renderLegal({ slug }) {
   article.innerHTML = '<p class="legal-body__loading">Cargando…</p>';
 
   scroll.appendChild(article);
-  chrome.append(header, scroll, topFab);
+  scrollPort.appendChild(scroll);
+  chrome.append(header, scrollPort, topFab);
   scene.append(chrome);
   if (getWorldLayers() && !scene.contains(getWorldLayers())) {
     scene.insertBefore(getWorldLayers(), chrome);
@@ -185,6 +232,8 @@ export function renderLegal({ slug }) {
 
   let destroyed = false;
   let backing = false;
+  let loadSeq = 0;
+  const loadAbort = new AbortController();
   /** @type {Promise<void>} */
   let enterPromise = Promise.resolve();
 
@@ -203,20 +252,72 @@ export function renderLegal({ slug }) {
     scene.classList.add("is-legal-entered");
     article.style.transition = `opacity ${durationMs}ms ${WORLD_TRANSITION_EASE}`;
     article.style.opacity = "1";
+    scheduleScrollFadeMask();
   });
 
   article.style.opacity = fromAuth ? "0" : "1";
 
-  void (async () => {
-    const doc = await fetchLegalDoc(routeSlug);
-    if (destroyed) return;
+  function showLoadError() {
+    article.innerHTML = `
+      <p class="legal-body__error">No hemos podido cargar este documento.</p>
+      <p class="legal-body__error-actions">
+        <button type="button" class="legal-body__retry">Reintentar</button>
+      </p>
+    `;
+    article.querySelector(".legal-body__retry")?.addEventListener("click", () => {
+      void loadDocument();
+    });
+  }
+
+  async function loadDocument() {
+    const seq = ++loadSeq;
+    article.innerHTML = '<p class="legal-body__loading">Cargando…</p>';
+    const doc = await fetchLegalDoc(routeSlug, { signal: loadAbort.signal });
+    if (destroyed || seq !== loadSeq) return;
     if (!doc) {
-      article.innerHTML = '<p class="legal-body__error">No hemos podido cargar este documento.</p>';
+      showLoadError();
       return;
     }
     article.innerHTML = renderMarkdown(doc.body_markdown);
     scene.setAttribute("aria-label", doc.title);
-  })();
+    scheduleScrollFadeMask();
+  }
+
+  void loadDocument();
+
+  /** Ancla ramps de mask al borde superior del logo y al borde del footer fantasía. */
+  function syncScrollFadeMask() {
+    if (destroyed) return;
+    const fantasy = scene.querySelector(".loader-layer--fantasy-scene")
+      ?? scene.querySelector(".loader-layer--fantasy");
+    if (!fantasy) return;
+
+    const scrollRect = scroll.getBoundingClientRect();
+    const logoRect = logoWrap.getBoundingClientRect();
+
+    const topStart = logoRect.top - scrollRect.top;
+    /* El port ya invade un poco la banda fantasía; el borde inferior del scroll = fantasía + overshoot. */
+    const bottomEnd = scrollRect.height;
+
+    scroll.style.setProperty("--legal-fade-mask-top-start", `${topStart}px`);
+    scroll.style.setProperty("--legal-fade-mask-bottom-end", `${bottomEnd}px`);
+  }
+
+  let fadeMaskFrame = 0;
+  function scheduleScrollFadeMask() {
+    if (fadeMaskFrame) cancelAnimationFrame(fadeMaskFrame);
+    fadeMaskFrame = requestAnimationFrame(() => {
+      fadeMaskFrame = 0;
+      syncScrollFadeMask();
+    });
+  }
+
+  const fadeMaskObserver = new ResizeObserver(() => scheduleScrollFadeMask());
+  fadeMaskObserver.observe(scene);
+  fadeMaskObserver.observe(scroll);
+  fadeMaskObserver.observe(logoWrap);
+  window.addEventListener("resize", scheduleScrollFadeMask, { passive: true });
+  scheduleScrollFadeMask();
 
   function onScroll() {
     const showTop = scroll.scrollTop > 120;
@@ -319,7 +420,12 @@ export function renderLegal({ slug }) {
   return {
     destroy() {
       destroyed = true;
+      loadSeq += 1;
+      loadAbort.abort();
       document.body.classList.remove("is-legal-active");
+      fadeMaskObserver.disconnect();
+      window.removeEventListener("resize", scheduleScrollFadeMask);
+      if (fadeMaskFrame) cancelAnimationFrame(fadeMaskFrame);
       scroll.removeEventListener("scroll", onScroll);
       backFab.removeEventListener("click", onBack);
       topFab.removeEventListener("click", onTop);
