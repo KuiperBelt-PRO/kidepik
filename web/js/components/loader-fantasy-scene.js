@@ -1054,7 +1054,7 @@ export function occupiedZoneFromActive(zones, center, sizePx, layerWidthPx) {
  *   fxEnabled?: boolean;
  *   fxIntensity?: number;
  * }} [opts]
- * @returns {{ destroy: () => void }}
+ * @returns {{ destroy: () => void; relayout?: () => void }}
  */
 export function mountFantasyScene(container, opts = {}) {
   const {
@@ -1087,15 +1087,15 @@ export function mountFantasyScene(container, opts = {}) {
   container.appendChild(layer);
 
   let destroyed = false;
-  /** @type {{ destroy: () => void } | null} */
+  /** @type {{ destroy: () => void; relayoutGround?: () => void } | null} */
   let forestTeardown = null;
-  /** @type {{ destroy: () => void } | null} */
+  /** @type {{ destroy: () => void; relayoutGround?: () => void } | null} */
   let buildingTeardown = null;
-  /** @type {{ destroy: () => void } | null} */
+  /** @type {{ destroy: () => void; relayoutGround?: () => void } | null} */
   let crystalsTeardown = null;
-  /** @type {{ destroy: () => void } | null} */
+  /** @type {{ destroy: () => void; relayoutGround?: () => void } | null} */
   let portalTeardown = null;
-  /** @type {{ destroy: () => void }[]} */
+  /** @type {{ destroy: () => void; relayoutGround?: () => void }[]} */
   let cliffTeardowns = [];
   /** @type {{ left: boolean; right: boolean }} */
   const cliffActive = { left: false, right: false };
@@ -1861,5 +1861,15 @@ export function mountFantasyScene(container, opts = {}) {
     bootstrapCenterSpawns();
   }
 
-  return { destroy };
+  return {
+    relayout() {
+      if (destroyed) return;
+      forestTeardown?.relayoutGround?.();
+      buildingTeardown?.relayoutGround?.();
+      crystalsTeardown?.relayoutGround?.();
+      portalTeardown?.relayoutGround?.();
+      for (const cliff of cliffTeardowns) cliff.relayoutGround?.();
+    },
+    destroy,
+  };
 }

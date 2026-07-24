@@ -6,6 +6,7 @@
 import { mountAuthPanel } from "../components/auth-panel.js";
 import { assetUrl } from "../lib/assets.manifest.js";
 import { GATE_COPY } from "../components/loader-gate-constants.js";
+import { bindLegalLinkTransitions } from "./legal.js";
 
 /**
  * @returns {{ destroy: () => void }}
@@ -63,6 +64,7 @@ export function renderAuth() {
   chrome.appendChild(brand);
 
   const panel = mountAuthPanel(chrome, { embedded: false });
+  bindLegalLinkTransitions(panel.root);
   scene.append(bg, chrome);
   app.appendChild(scene);
 

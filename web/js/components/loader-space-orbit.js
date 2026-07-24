@@ -1,5 +1,10 @@
 import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { mountSpaceShips } from "./loader-space-ships.js";
+import {
+  computeSpaceLayoutScale,
+  measureOrbitLogoCenterY,
+  scaleOrbitSystemSpec,
+} from "./loader-space-layout.js";
 
 /**
  * Arco circular (radio igual en X e Y). Centro fuera de pantalla.
@@ -119,15 +124,7 @@ const ORBIT_SYSTEMS = [
  * @param {HTMLElement} layer
  */
 function measureLogoCenterY(layer) {
-  const scene = layer.closest(".scene-loader");
-  const focal = scene?.querySelector(".loader-focal");
-  if (focal) {
-    const layerRect = layer.getBoundingClientRect();
-    const focalRect = focal.getBoundingClientRect();
-    return focalRect.top + focalRect.height / 2 - layerRect.top;
-  }
-  const sceneHeight = scene?.clientHeight ?? window.innerHeight;
-  return sceneHeight * 0.5;
+  return measureOrbitLogoCenterY(layer);
 }
 
 /**
@@ -298,11 +295,26 @@ function orbitGeometry(spec, w, h, logoY) {
 }
 
 /**
+ * @param {HTMLElement} layer
+ * @returns {'loader' | 'legal'}
+ */
+function resolveSpaceLayout(layer) {
+  const scene = layer.closest(".scene-legal, .scene-loader");
+  if (!scene) return "loader";
+  // Durante la transición de bandas (paused) hay que escalar por altura actual
+  // (modo "legal" en computeSpaceLayoutScale). Forzar "loader" dejaba scale=1
+  // y el header sci-fi solo se recortaba, sin animación suave de tamaño.
+  if (scene.classList.contains("is-orbit-layout-paused")) return "legal";
+  return scene.classList.contains("scene-legal") ? "legal" : "loader";
+}
+
+/**
  * Capa orbital: arcos izq→dcha y planetas con lunas.
  * @param {HTMLElement} container
- * @param {{ reducedMotion?: boolean }} [options]
+ * @param {{ reducedMotion?: boolean; layout?: 'loader' | 'legal' }} [options]
  */
-export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) {
+export function mountSpaceOrbitLayer(container, { reducedMotion = false, layout = "loader" } = {}) {
+  void layout;
   const layer = document.createElement("div");
   layer.className = "loader-layer loader-layer--space-orbit loader-layer--logo-masked";
   layer.setAttribute("aria-hidden", "true");
@@ -334,18 +346,27 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
 
   function layoutOrbit() {
     const w = layer.clientWidth;
-    const h = layer.clientHeight;
+    const styleH = parseFloat(getComputedStyle(layer).height);
+    const rect = layer.getBoundingClientRect();
+    const h = Number.isFinite(styleH) && styleH > 0 ? styleH : rect.height;
     if (!w || !h) return;
 
+    const activeLayout = resolveSpaceLayout(layer);
+    const layoutScale = computeSpaceLayoutScale(layer, activeLayout);
+    const planetMultiplier = 1;
     svg.setAttribute("viewBox", `0 0 ${w} ${h}`);
     const logoY = measureLogoCenterY(layer);
 
     for (const { spec, path } of systems) {
-      const g = orbitGeometry(spec, w, h, logoY);
+      const scaledSpec = /** @type {typeof ORBIT_SYSTEMS[number]} */ (
+        scaleOrbitSystemSpec(spec, layoutScale, { planetMultiplier })
+      );
+      const g = orbitGeometry(scaledSpec, w, h, logoY);
       path.setAttribute(
         "d",
         orbitArc(g.cx, g.cy, g.r, g.startDeg, g.endDeg, g.sweep),
       );
+      applyScaledPlanetVisuals(layer, spec.id, scaledSpec);
       motionHandles.get(spec.id)?.sync();
     }
     motionHandles.get("__ships__")?.sync();
@@ -353,7 +374,7 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
 
   const resizeObserver = new ResizeObserver(() => layoutOrbit());
   resizeObserver.observe(layer);
-  const scene = container.closest(".scene-loader") ?? container.parentElement;
+  const scene = container.closest(".scene-loader, .scene-legal") ?? container.parentElement;
   if (scene) resizeObserver.observe(scene);
   cleanups.push(() => resizeObserver.disconnect());
 
@@ -364,6 +385,7 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
 
   const shipsTeardown = mountSpaceShips(layer, {
     reducedMotion,
+    layoutScale: () => computeSpaceLayoutScale(layer, resolveSpaceLayout(layer)),
     orbits: systems.map(({ spec, path }) => ({
       id: spec.id,
       path,
@@ -375,6 +397,7 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false } = {}) 
   motionHandles.set("__ships__", { sync: () => shipsTeardown.sync() });
 
   return {
+    relayout: layoutOrbit,
     destroy() {
       for (const cleanup of cleanups) cleanup();
       layer.remove();
@@ -463,6 +486,46 @@ function buildPlanetCluster(spec, reducedMotion) {
   }
 
   return cluster;
+}
+
+/**
+ * @param {HTMLElement} layer
+ * @param {string} specId
+ * @param {typeof ORBIT_SYSTEMS[number]} scaledSpec
+ */
+function applyScaledPlanetVisuals(layer, specId, scaledSpec) {
+  const track = layer.querySelector(`.loader-orbit-track--${specId}`);
+  if (!(track instanceof HTMLElement)) return;
+
+  track.style.setProperty("--planet-size", `${scaledSpec.planet}px`);
+  const cluster = track.querySelector(".loader-orbit-cluster");
+  if (!(cluster instanceof HTMLElement)) return;
+
+  const maxR = scaledSpec.moonBands.length
+    ? Math.max(...scaledSpec.moonBands.map((b) => b.orbitR))
+    : Math.ceil(scaledSpec.planet / 2);
+  cluster.style.setProperty("--cluster-r", `${maxR}px`);
+
+  const rings = cluster.querySelectorAll(".loader-moon-orbit-ring");
+  scaledSpec.moonBands.forEach((band, i) => {
+    const ring = rings[i];
+    if (ring instanceof HTMLElement) {
+      ring.style.setProperty("--moon-orbit-r", `${band.orbitR}px`);
+    }
+  });
+
+  const arms = cluster.querySelectorAll(".loader-moon-arm");
+  let armIndex = 0;
+  for (const band of scaledSpec.moonBands) {
+    for (const moon of band.moons) {
+      const arm = arms[armIndex];
+      if (arm instanceof HTMLElement) {
+        arm.style.setProperty("--moon-orbit-r", `${band.orbitR}px`);
+        arm.style.setProperty("--moon-size", `${moon.size}px`);
+      }
+      armIndex += 1;
+    }
+  }
 }
 
 /**

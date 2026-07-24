@@ -532,20 +532,26 @@ export function mountFantasyElement(container, element, opts) {
   const sceneWidthPx = container.clientWidth || 390;
   const resolvedTerrainH = measureFantasyTerrainHeightPx(container.parentElement ?? container);
   const terrainH = resolvedTerrainH || terrainHeightPx;
+  const portalFootY = element.kind === "portal"
+    ? svgBoundsFromParts(element.parts).maxY
+    : 100;
 
-  if (element.kind === "portal" && terrainProfile?.length) {
-    const { maxY: footY } = svgBoundsFromParts(element.parts);
+  function applyPortalGround(terrainHeight) {
+    if (element.kind !== "portal" || !terrainProfile?.length) {
+      el.style.bottom = "0";
+      return;
+    }
     const bottomPx = computePortalGroundBottomPx(
       terrainProfile,
       xPercent,
-      footY,
+      portalFootY,
       sizePx,
-      terrainH,
+      terrainHeight,
     );
-    if (bottomPx > 0) {
-      el.style.bottom = `${bottomPx}px`;
-    }
+    el.style.bottom = bottomPx > 0 ? `${bottomPx}px` : "0";
   }
+
+  applyPortalGround(terrainH);
 
   const { svg, partsGroup, partGs, forestTrees } = createElementSvg(element);
   const isForest = element.kind === "forest" && forestTrees?.length;
@@ -570,7 +576,12 @@ export function mountFantasyElement(container, element, opts) {
     : null;
   const fx = fxRecipe ? mountFxBundle(el, svg, fxRecipe, { reducedMotion, displayScalePx: sizePx }) : null;
 
-  if (isForest && forestTrees && terrainProfile?.length) {
+  /** @type {{ g: SVGGElement; pivotX: number; pivotY: number; tiltDeg: number; liftSvg: number; durationMs?: number; done?: boolean; _delay?: number }[] | null} */
+  let liveForestInfos = null;
+
+  function recomputeForestLifts(terrainHeight) {
+    if (!isForest || !forestTrees || !terrainProfile?.length) return;
+    const widthPx = container.clientWidth || sceneWidthPx;
     for (const tree of forestTrees) {
       tree.liftSvg = computeTreeTerrainLiftSvg(
         terrainProfile,
@@ -578,10 +589,42 @@ export function mountFantasyElement(container, element, opts) {
         tree.pivotX,
         tree.pivotY,
         sizePx,
-        sceneWidthPx,
-        resolvedTerrainH || terrainHeightPx,
+        widthPx,
+        terrainHeight,
       );
     }
+    if (liveForestInfos) {
+      for (let i = 0; i < liveForestInfos.length; i += 1) {
+        liveForestInfos[i].liftSvg = forestTrees[i]?.liftSvg ?? 0;
+      }
+    }
+  }
+
+  function paintForestGround(scale = 1) {
+    if (!isForest || !forestTrees) return;
+    if (liveForestInfos) {
+      for (const info of liveForestInfos) {
+        if (!info.done) continue;
+        applyForestTreeTransform(info.g, info.pivotX, info.pivotY, 1, info.tiltDeg, info.liftSvg);
+      }
+      return;
+    }
+    for (const tree of forestTrees) {
+      applyForestTreeTransform(tree.g, tree.pivotX, tree.pivotY, scale, tree.tiltDeg * scale, tree.liftSvg ?? 0);
+    }
+  }
+
+  function relayoutGround() {
+    if (destroyed) return;
+    const nextTerrainH = measureFantasyTerrainHeightPx(container.parentElement ?? container)
+      || terrainHeightPx;
+    applyPortalGround(nextTerrainH);
+    recomputeForestLifts(nextTerrainH);
+    paintForestGround(1);
+  }
+
+  if (isForest && forestTrees && terrainProfile?.length) {
+    recomputeForestLifts(resolvedTerrainH || terrainHeightPx);
   }
 
   // ─── Inicializar partes con escala 0 ──────────────────────────────────────
@@ -630,7 +673,7 @@ export function mountFantasyElement(container, element, opts) {
       }, 500);
     }, timing.holdMs);
 
-    return { destroy };
+    return { destroy, relayoutGround };
   }
 
   // ─── Fase BUILDING ────────────────────────────────────────────────────────
@@ -651,6 +694,7 @@ export function mountFantasyElement(container, element, opts) {
       done: false,
       _delay: buildDelays[i] ?? 0,
     }));
+    liveForestInfos = treeBuildInfos;
 
     let buildStartMs = 0;
 
@@ -690,7 +734,7 @@ export function mountFantasyElement(container, element, opts) {
     }
 
     unsubFrame = subscribeLoaderAnimationFrame(tickForestBuild);
-    return { destroy };
+    return { destroy, relayoutGround };
   }
 
   /** @type {{ g: SVGGElement; part: import('./loader-fantasy-element.js').FantasyPart; startMs: number; durationMs: number; done: boolean }[]} */
@@ -808,5 +852,5 @@ export function mountFantasyElement(container, element, opts) {
   // ─── Arranque ─────────────────────────────────────────────────────────────
   unsubFrame = subscribeLoaderAnimationFrame(tickBuild);
 
-  return { destroy };
+  return { destroy, relayoutGround };
 }

@@ -10,6 +10,7 @@ import {
   PROXIMITY_VISUAL_OPACITY,
   rectCenterInLayer,
 } from "./loader-ship-proximity-hud.js";
+import { scaleShipFlightSpec } from "./loader-space-layout.js";
 
 /**
  * @typedef {'fighter' | 'interceptor' | 'gunship' | 'shuttle'} ShipArchetype
@@ -118,11 +119,13 @@ const SPACESHIPS = [
 /**
  * @param {ShipFlightSpec} spec
  * @param {number} rollSeed
+ * @param {number} [layoutScale]
  */
-function createShipElement(spec, rollSeed) {
-  const generated = generateShipForSlot(spec.id, rollSeed, {
-    hintArchetype: spec.archetype,
-    baseSize: spec.size,
+function createShipElement(spec, rollSeed, layoutScale = 1) {
+  const scaled = /** @type {ShipFlightSpec} */ (scaleShipFlightSpec(spec, layoutScale));
+  const generated = generateShipForSlot(scaled.id, rollSeed, {
+    hintArchetype: scaled.archetype,
+    baseSize: scaled.size,
   });
   const ship = document.createElement("div");
   ship.className = `loader-spaceship loader-spaceship--${spec.id} loader-spaceship--${generated.archetype}`;
@@ -224,21 +227,23 @@ function placeOnParallelPath(path, layer, t, offsetPx) {
 /**
  * Naves procedurales en carriles paralelos a los arcos orbitales.
  * @param {HTMLElement} layer
- * @param {{ reducedMotion?: boolean; orbits?: OrbitPathBinding[] }} [options]
+ * @param {{ reducedMotion?: boolean; layoutScale?: () => number; orbits?: OrbitPathBinding[] }} [options]
  */
-export function mountSpaceShips(layer, { reducedMotion = false, orbits = [] } = {}) {
+export function mountSpaceShips(layer, { reducedMotion = false, layoutScale = () => 1, orbits = [] } = {}) {
   const orbitById = new Map(orbits.map((o) => [o.id, o]));
   const rollSeed = randomRollSeed();
+  const initialScale = layoutScale();
 
   const ships = SPACESHIPS.map((spec) => {
-    const el = createShipElement(spec, rollSeed);
+    const scaledSpec = /** @type {ShipFlightSpec} */ (scaleShipFlightSpec(spec, initialScale));
+    const el = createShipElement(spec, rollSeed, initialScale);
     const hud = createShipProximityHud(spec.id);
     hud.style.setProperty("--ship-w", el.style.getPropertyValue("--ship-w"));
     hud.style.setProperty("--ship-h", el.style.getPropertyValue("--ship-h"));
     hud.style.setProperty("--ship-size", el.style.getPropertyValue("--ship-size"));
     hud.style.setProperty("--hud-scale", String(HUD_SIZE_SCALE));
     return {
-      spec,
+      spec: scaledSpec,
       el,
       body: /** @type {HTMLElement} */ (el.querySelector(".loader-spaceship__body")),
       hud,

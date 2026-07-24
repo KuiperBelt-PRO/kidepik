@@ -1,0 +1,435 @@
+/* Legal — mismo mundo que el loader, bandas comprimidas y texto central */
+
+#app:has(.scene-legal) {
+  display: block;
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  height: 100dvh;
+  background: #000;
+}
+
+.scene.scene-legal,
+.scene.scene-loader.scene-world {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100dvh;
+  overflow: hidden;
+  background: #000;
+  --legal-space-band: 48%;
+  --legal-space-band-frac: 0.48;
+  --legal-fantasy-band: 52%;
+  --legal-fantasy-top: 48%;
+  --legal-fantasy-top-frac: 0.48;
+  --legal-terrain-h: clamp(36px, 7vh, 66px);
+  transition:
+    --legal-space-band 0.72s cubic-bezier(0.4, 0, 0.2, 1),
+    --legal-space-band-frac 0.72s cubic-bezier(0.4, 0, 0.2, 1),
+    --legal-fantasy-band 0.72s cubic-bezier(0.4, 0, 0.2, 1),
+    --legal-fantasy-top 0.72s cubic-bezier(0.4, 0, 0.2, 1),
+    --legal-fantasy-top-frac 0.72s cubic-bezier(0.4, 0, 0.2, 1),
+    --legal-terrain-h 0.72s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.scene-legal {
+  --legal-logo-size: clamp(104px, 24vw, 140px);
+  --legal-logo-top: calc(21dvh + clamp(0.25rem, 1.5vh, 1rem));
+  --legal-fab-size: 32px;
+  /* Fade superior: un poco bajo el logo, ramp progresivo (no cortante). */
+  --legal-fade-top-start: calc(var(--legal-logo-top) + var(--legal-logo-size) * 0.88);
+  --legal-fade-top-end: calc(var(--legal-logo-top) + var(--legal-logo-size) + clamp(0.75rem, 2.2vh, 1.5rem));
+  --legal-text-pad-top: calc(var(--legal-fade-top-end) + 0.35rem);
+  --legal-text-pad-bottom: calc(24dvh + 1.25rem);
+}
+
+@property --legal-space-band {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 48%;
+}
+
+@property --legal-space-band-frac {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.48;
+}
+
+@property --legal-fantasy-top {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 48%;
+}
+
+@property --legal-fantasy-top-frac {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0.48;
+}
+
+@property --legal-fantasy-band {
+  syntax: "<percentage>";
+  inherits: true;
+  initial-value: 52%;
+}
+
+@property --legal-terrain-h {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 36px;
+}
+
+.scene-world.is-world-band-legal {
+  --legal-space-band: 24%;
+  --legal-space-band-frac: 0.24;
+  --legal-fantasy-band: 24%;
+  --legal-fantasy-top: 76%;
+  --legal-fantasy-top-frac: 0.76;
+  --legal-terrain-h: clamp(20px, 3.6vh, 34px);
+}
+
+.scene-world.is-world-band-loader {
+  --legal-space-band: 48%;
+  --legal-space-band-frac: 0.48;
+  --legal-fantasy-band: 52%;
+  --legal-fantasy-top: 48%;
+  --legal-fantasy-top-frac: 0.48;
+  --legal-terrain-h: clamp(36px, 7vh, 66px);
+}
+
+/* Legal: tipografía / logo (bandas ya unificadas en is-world-band-legal) */
+.scene.scene-legal.scene-world.is-world-band-legal {
+  --legal-text-pad-bottom: calc(24dvh + 1.25rem);
+}
+
+/* Terreno fantasía: misma variable que usan los anclajes de bosques/portales */
+.scene-world .loader-layer.loader-layer--fantasy-scene {
+  --fantasy-terrain-h: var(--legal-terrain-h);
+}
+
+[data-theme="spaceOpera"] body.is-legal-active.scanlines::after {
+  display: none;
+}
+
+/* Paridad visual con loader (fondo, viñeta, acentos) */
+.scene-legal.is-reveal-bg .loader-bg-attenuate {
+  opacity: 1;
+}
+
+.scene-legal.is-bg-ready .loader-layer__img {
+  opacity: 1;
+}
+
+.scene-legal.is-reveal-fantasy .loader-layer--fantasy {
+  opacity: 0.85;
+}
+
+.scene-legal.is-reveal-space .loader-layer--space {
+  opacity: 0.85;
+}
+
+.scene-legal.is-placeholder-art .loader-layer--bg {
+  background: linear-gradient(
+    180deg,
+    #0b1530 0%,
+    #1a3d5c 28%,
+    #2d6b4a 58%,
+    #3a8f3a 78%,
+    #c9a83a 100%
+  );
+}
+
+/* Bandas espacio (arriba) — compartido loader/legal */
+.scene-world .loader-layer--space {
+  clip-path: inset(0 0 calc(100% - var(--legal-space-band)) 0);
+}
+
+.scene-world .loader-layer.loader-layer--space-orbit,
+.scene-world .loader-layer.loader-layer--meteor-shower {
+  /* Altura gobernada por --legal-space-band-frac (@property ya anima) */
+  height: calc(var(--legal-space-band-frac) * 100%);
+  bottom: auto;
+}
+
+/* Bandas fantasía (abajo) */
+.scene-world .loader-layer--fantasy {
+  clip-path: inset(var(--legal-fantasy-top) 0 0 0);
+}
+
+.scene-world .loader-layer.loader-layer--fantasy-backdrop,
+.scene-world .loader-layer.loader-layer--fantasy-clouds,
+.scene-world .loader-layer.loader-layer--fantasy-celestial,
+.scene-world .loader-layer.loader-layer--fantasy-scene {
+  top: var(--legal-fantasy-top);
+  bottom: 0;
+  height: auto;
+  /* Sin transition:top — pelea con @property --legal-fantasy-top y deja el
+     footer congelado en legal; al handoff a auth salta de golpe. */
+}
+
+/* En legal comprimido, no dejar que castillos/riscos/bosques invadan el texto */
+.scene.scene-legal.is-world-band-legal .loader-layer.loader-layer--fantasy-scene {
+  overflow: hidden;
+}
+
+.scene-world .loader-layer.loader-layer--fantasy-terrain {
+  /* Altura gobernada por --legal-terrain-h (@property ya anima); sin transition:height para no desincronizar */
+  height: var(--legal-terrain-h) !important;
+}
+
+.scene-legal.is-reveal-fantasy .loader-layer.loader-layer--fantasy-backdrop,
+.scene-legal.is-reveal-fantasy .loader-layer.loader-layer--fantasy-terrain,
+.scene-legal.is-reveal-fantasy .loader-layer.loader-layer--fantasy-clouds,
+.scene-legal.is-reveal-fantasy .loader-layer.loader-layer--fantasy-celestial,
+.scene-legal.is-reveal-fantasy .loader-layer.loader-layer--fantasy-scene,
+.scene-legal.is-reveal-space .loader-layer.loader-layer--space-orbit,
+.scene-legal.is-reveal-space .loader-layer.loader-layer--meteor-shower {
+  opacity: 1;
+}
+
+.scene-legal .loader-layer--logo-masked {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+.legal-chrome {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.legal-header {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--legal-logo-top, calc(17dvh + clamp(1.75rem, 5vh, 3rem)));
+  z-index: 4;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.legal-logo-wrap.is-logo-morphing {
+  pointer-events: none;
+}
+
+.world-logo-placeholder {
+  flex: 0 0 auto;
+  visibility: hidden;
+}
+
+.legal-logo-wrap {
+  position: relative;
+  inset: auto;
+  left: auto;
+  right: auto;
+  top: auto;
+  bottom: auto;
+  width: var(--legal-logo-size);
+  height: auto;
+  opacity: 1;
+  transform: none;
+  animation: none;
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.55));
+  will-change: transform;
+}
+
+.legal-logo-wrap .loader-logo,
+.legal-logo-wrap .loader-logo-fallback {
+  width: 100%;
+  height: auto;
+}
+
+.legal-logo-wrap .loader-logo-fallback {
+  margin: 0;
+  text-align: center;
+  font-family: "Bruno Ace", "Orbitron", sans-serif;
+  font-size: clamp(1.35rem, 6vw, 1.75rem);
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.legal-scroll {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding:
+    var(--legal-text-pad-top)
+    max(0.85rem, env(safe-area-inset-right))
+    var(--legal-text-pad-bottom)
+    max(0.85rem, env(safe-area-inset-left));
+  pointer-events: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #fff rgba(255, 255, 255, 0.12);
+  /* Fade superior debajo del logo (progresivo); inferior al inicio del footer fantasía */
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent var(--legal-fade-top-start),
+    #000 var(--legal-fade-top-end),
+    #000 calc(100% - var(--legal-fantasy-band)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent var(--legal-fade-top-start),
+    #000 var(--legal-fade-top-end),
+    #000 calc(100% - var(--legal-fantasy-band)),
+    transparent 100%
+  );
+}
+
+.legal-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.legal-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+}
+
+.legal-scroll::-webkit-scrollbar-thumb {
+  background: #fff;
+  border-radius: 999px;
+}
+
+.legal-body {
+  width: min(100%, 42rem);
+  margin: 0 auto;
+  color: #fff;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: clamp(0.875rem, 3.6vw, 0.98rem);
+  line-height: 1.55;
+}
+
+.legal-body__title {
+  margin: 0 0 1rem;
+  font-family: "Bruno Ace", "Orbitron", sans-serif;
+  font-size: clamp(1.05rem, 4.4vw, 1.25rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.55);
+}
+
+.legal-body h1,
+.legal-body h2,
+.legal-body h3 {
+  font-family: "Bruno Ace", "Orbitron", sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+
+.legal-body h1 {
+  font-size: 1.1em;
+  margin: 1.35rem 0 0.65rem;
+}
+
+.legal-body h2 {
+  font-size: 1.02em;
+  margin: 1.15rem 0 0.55rem;
+}
+
+.legal-body h3 {
+  font-size: 0.98em;
+  margin: 1rem 0 0.45rem;
+}
+
+.legal-body p,
+.legal-body ul {
+  margin: 0 0 0.85rem;
+}
+
+.legal-body ul {
+  padding-left: 1.15rem;
+}
+
+.legal-body a {
+  color: #fff;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.legal-body__loading,
+.legal-body__error {
+  text-align: center;
+  opacity: 0.85;
+}
+
+.legal-fab {
+  position: absolute;
+  z-index: 5;
+  width: var(--legal-fab-size);
+  height: var(--legal-fab-size);
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.28);
+  transition: transform 0.2s ease, opacity 0.25s ease;
+}
+
+.legal-fab:active {
+  transform: scale(0.96);
+}
+
+.legal-fab__svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.legal-fab--back {
+  position: absolute;
+  top: 50%;
+  left: max(0.75rem, env(safe-area-inset-left));
+  transform: translateY(-50%);
+}
+
+.legal-fab--back:active {
+  transform: translateY(-50%) scale(0.96);
+}
+
+.legal-fab--top {
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: calc(var(--legal-fantasy-band) + max(0.65rem, env(safe-area-inset-bottom)));
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+.legal-fab--top.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-legal,
+  .legal-fab--top {
+    transition-duration: 0.12s !important;
+  }
+}
+
+@media (min-width: 431px) {
+  body:has(.scene-legal) {
+    background: #000;
+  }
+
+  #app:has(.scene-legal) {
+    box-shadow: none;
+  }
+}

@@ -1,5 +1,6 @@
 import { subscribeLoaderAnimationFrame } from "./loader-animation-frame.js";
 import { createRng, randRange } from "./loader-ship-rng.js";
+import { computeSpaceLayoutScale } from "./loader-space-layout.js";
 
 /** @typedef {'micro' | 'small' | 'medium' | 'bright'} MeteorSizeClass */
 
@@ -135,14 +136,19 @@ function createMeteorElement(params) {
   return el;
 }
 
-/**
- * @param {HTMLElement} container
- * @param {{ reducedMotion?: boolean; rng?: () => number; demoBurst?: boolean }} [options]
- * @returns {{ destroy: () => void }}
- */
-export function mountMeteorShowerLayer(container, { reducedMotion = false, rng, demoBurst = false } = {}) {
+export function mountMeteorShowerLayer(container, { reducedMotion = false, rng, demoBurst = false, layout = "loader" } = {}) {
+  void layout;
   if (reducedMotion) {
     return { destroy() {} };
+  }
+
+  /**
+   * @param {HTMLElement} meteorLayer
+   * @returns {'loader' | 'legal'}
+   */
+  function resolveSpaceLayout(meteorLayer) {
+    const scene = meteorLayer.closest(".scene-legal, .scene-loader");
+    return scene?.classList.contains("scene-legal") ? "legal" : "loader";
   }
 
   const layer = document.createElement("div");
@@ -184,6 +190,11 @@ export function mountMeteorShowerLayer(container, { reducedMotion = false, rng, 
     if (layerW < 1 || layerH < 1) return false;
 
     const params = createMeteorParams(random);
+    const scale = computeSpaceLayoutScale(layer, resolveSpaceLayout(layer));
+    if (scale < 0.999) {
+      params.lengthPx = Math.max(8, Math.round(params.lengthPx * scale));
+      params.thicknessPx = Math.max(0.8, Math.round(params.thicknessPx * scale * 10) / 10);
+    }
     const el = createMeteorElement(params);
     layer.appendChild(el);
 

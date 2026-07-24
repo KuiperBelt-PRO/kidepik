@@ -13,6 +13,7 @@ import {
 } from "./loader-gate-constants.js";
 import { runLoaderAuthMorph } from "./loader-auth-morph.js?v=109";
 import { mountAuthPanel } from "./auth-panel.js?v=109";
+import { bindLegalLinkTransitions } from "../scenes/legal.js";
 
 /** @typedef {'loading' | 'ready' | 'exiting' | 'auth-morph' | 'auth-idle'} GateState */
 
@@ -165,6 +166,7 @@ export function mountLoaderGate({
       embedded: true,
       deferredReveal: true,
     });
+    bindLegalLinkTransitions(authPanel.root);
 
     await new Promise((resolve) => {
       runLoaderAuthMorph({

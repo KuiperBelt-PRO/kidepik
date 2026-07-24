@@ -204,18 +204,12 @@ Ejemplo `GET /api/v1/legal/terms`:
 
 ### Cliente web
 
-> **Estado UI (jul 2026):** la pantalla `#/legal/*` se ha **retirado** a la espera de un rediseño con instrucciones del producto. Se mantienen la API, la migración SQL y los datos versionados. Los enlaces del panel auth pueden seguir apuntando a `#/legal/terminos` y `#/legal/privacidad` como placeholders.
-
 | Ruta hash | Comportamiento |
 | --- | --- |
-| `#/legal/terminos` | *(pendiente de UI)* |
-| `#/legal/privacidad` | *(pendiente de UI)* |
+| `#/legal/terminos` | Pantalla legal con mundo loader (bandas comprimidas), logo animado, markdown desde API, scroll custom blanco, FAB volver y subir |
+| `#/legal/privacidad` | Igual para política de privacidad |
 
-**Conservado (no tocar en el rediseño UI):**
-
-- Migraciones PHP + historial Supabase
-- Tabla `legal_documents` y seed
-- `GET /api/v1/legal/{slug}` y `GET /api/v1/migrations/status`
+Transiciones animadas (FLIP) al entrar/salir desde el panel auth del loader; bandas fantasía/espacio se comprimen sin deformar proporciones.
 
 ### Versionado futuro
 
