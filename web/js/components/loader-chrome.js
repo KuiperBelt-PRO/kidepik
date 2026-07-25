@@ -1,7 +1,6 @@
 import { assetUrl } from "../lib/assets.manifest.js";
-import { parseDevFaction } from "./loader-fantasy-castle-factions.js";
 import { mountFantasyTerrainLayer, measureFantasyTerrainHeightPx } from "./loader-fantasy-terrain.js";
-import { mountFantasyBackdropLayer, parseBackdropKind } from "./loader-fantasy-backdrop.js";
+import { mountFantasyBackdropLayer } from "./loader-fantasy-backdrop.js";
 import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountFantasyCelestialLayer } from "./loader-fantasy-celestial.js";
 import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
@@ -11,6 +10,11 @@ import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
 import { mountLoaderGate } from "./loader-gate.js?v=109";
 import { mountAuthPanel } from "./auth-panel.js?v=109";
+import {
+  mountOptionalImage,
+  parseWorldLayerQuery,
+  probeImage,
+} from "./loader-world-utils.js";
 import {
   captureRect,
   clearLogoPinStyles,
@@ -81,61 +85,6 @@ function getLoaderQueryParams() {
   const q = hash.indexOf("?");
   if (q >= 0) return new URLSearchParams(hash.slice(q + 1));
   return fromSearch;
-}
-
-/**
- * @param {string} src
- * @returns {Promise<boolean>}
- */
-function probeImage(src) {
-  return new Promise((resolve) => {
-    const probe = new Image();
-    probe.onload = () => resolve(true);
-    probe.onerror = () => resolve(false);
-    probe.src = src;
-  });
-}
-
-/**
- * @param {HTMLElement} layer
- * @param {string} slotId
- * @param {{ fit?: "cover" | "contain"; onLoad?: () => void; onError?: () => void }} [options]
- * @returns {Promise<boolean>}
- */
-async function mountOptionalImage(layer, slotId, options = {}) {
-  const { fit = "cover", onLoad, onError } = options;
-  const src = assetUrl(slotId);
-  if (!src) return false;
-
-  const img = document.createElement("img");
-  img.className = "loader-layer__img";
-  img.alt = "";
-  img.decoding = "async";
-  img.style.objectFit = fit;
-
-  const loaded = await new Promise((resolve) => {
-    img.addEventListener(
-      "load",
-      () => {
-        onLoad?.();
-        resolve(true);
-      },
-      { once: true },
-    );
-    img.addEventListener(
-      "error",
-      () => {
-        onError?.();
-        resolve(false);
-      },
-      { once: true },
-    );
-    img.src = src;
-  });
-
-  if (!loaded) return false;
-  layer.appendChild(img);
-  return true;
 }
 
 /**
@@ -380,26 +329,19 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const teardownLogoMaskSync = mountLoaderLogoMaskSync(scene, focal);
 
   const loaderQuery = getLoaderQueryParams();
-  const meteorDemo = loaderQuery.get("meteorDemo") === "1";
-  const cloudDemo = loaderQuery.get("cloudDemo") === "1";
-  const celestialDemo = loaderQuery.get("celestialDemo") === "1";
-  const backdropKind = parseBackdropKind(loaderQuery.get("backdropKind"));
-  const fantasyDev = loaderQuery.get("fantasyDev") || undefined;
-  const fantasyFaction = parseDevFaction(loaderQuery.get("fantasyFaction"));
-  const fantasySeedRaw = loaderQuery.get("fantasySeed");
-  const fantasySeed = fantasySeedRaw != null && fantasySeedRaw !== ""
-    ? Number.parseInt(fantasySeedRaw, 10)
-    : undefined;
-  const fantasyFormationRaw = loaderQuery.get("fantasyFormation");
-  const fantasyFormation = fantasyFormationRaw === "cliff" || fantasyFormationRaw === "rocks"
-    ? fantasyFormationRaw
-    : undefined;
-  const fxIntensityRaw = loaderQuery.get("fxIntensity");
-  const fxIntensityParsed = fxIntensityRaw != null && fxIntensityRaw !== ""
-    ? Number.parseFloat(fxIntensityRaw)
-    : NaN;
-  const fxIntensity = Number.isFinite(fxIntensityParsed) ? fxIntensityParsed : 1;
-  const fxEnabled = loaderQuery.get("fxDev") !== "0";
+  const worldOpts = parseWorldLayerQuery(loaderQuery);
+  const {
+    meteorDemo,
+    cloudDemo,
+    celestialDemo,
+    backdropKind,
+    fantasyDev,
+    fantasyFaction,
+    fantasySeed,
+    fantasyFormation,
+    fxIntensity,
+    fxEnabled,
+  } = worldOpts;
   const gateDemo = loaderQuery.get("gateDemo") === "1";
   const progressDurationMs = gateDemo ? DURATION_DEMO_MS : DURATION_MS;
 
@@ -497,12 +439,11 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       terrainProfile,
       devKind: fantasyDev,
       devFaction: fantasyFaction,
-      devSeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,
+      devSeed: fantasySeed,
       devFormation: fantasyFormation,
       fxEnabled,
       fxIntensity,
     });
-    void mountOptionalImage(accentFantasy, "loader.accent.fantasy");
     syncLoaderLogoMask(scene, focal);
     syncWorldSessionState();
   }
@@ -512,7 +453,6 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     spaceLayersMounted = true;
     spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion });
     meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: meteorDemo });
-    void mountOptionalImage(accentSpace, "loader.accent.space");
     syncLoaderLogoMask(scene, focal);
     syncWorldSessionState();
   }

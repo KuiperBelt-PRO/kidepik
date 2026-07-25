@@ -29,26 +29,18 @@ export const CENTER_RIGHT_ZONE_MIN = 50 + CENTER_LOGO_GAP / 2;
 export const TRIO_CENTER_MIN_GAP_FACTOR = 1.58;
 /** Padding adicional (% ancho) entre formaciones centrales activas. */
 export const SCENE_OCCUPIED_EXTRA_PADDING_PCT = 4.5;
-/** @deprecated alias histórico */
-const CRYSTAL_OCCUPIED_EXTRA_PADDING_PCT = SCENE_OCCUPIED_EXTRA_PADDING_PCT;
 /** Inflado de la caja de castillo al calcular ocupación (más ancho visual). */
 const SCENE_BUILDING_OCCUPIED_INFLATE = 1.16;
-/** @deprecated alias histórico */
-const CRYSTAL_BUILDING_OCCUPIED_INFLATE = SCENE_BUILDING_OCCUPIED_INFLATE;
 /** Inflado de la caja de bosque al calcular ocupación. */
 const SCENE_FOREST_OCCUPIED_INFLATE = 1.22;
 /** Margen extra al buscar hueco libre para un bosque. */
 export const SCENE_FOREST_PLACEMENT_INFLATE = 1.26;
 /** Colchón sobre el ancho normalizado del bosque (viewBox). */
 export const FOREST_FOOTPRINT_PAD = 1.06;
-/** @deprecated alias histórico */
-const CRYSTAL_FOREST_OCCUPIED_INFLATE = SCENE_FOREST_OCCUPIED_INFLATE;
 /** Inflado de la caja de racimo de cristales al calcular ocupación. */
 const SCENE_CRYSTAL_OCCUPIED_INFLATE = 1.14;
 /** Inflado de la caja de portal al calcular ocupación. */
 const SCENE_PORTAL_OCCUPIED_INFLATE = 1.13;
-/** @deprecated alias histórico */
-const CRYSTAL_CLUSTER_OCCUPIED_INFLATE = SCENE_CRYSTAL_OCCUPIED_INFLATE;
 
 const CENTER_ZONE_MIN_WIDTH_PX = 36;
 /** Margen entre zonas ocupadas al buscar huecos (% del ancho). */

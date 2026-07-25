@@ -17,18 +17,6 @@ import { bindLegalLinkTransitions } from "../scenes/legal.js";
 
 /** @typedef {'loading' | 'ready' | 'exiting' | 'auth-morph' | 'auth-idle'} GateState */
 
-export {
-  GATE_COPY,
-  GATE_HINT_DELAY_MS,
-  GATE_HINT_DELAY_REDUCED_MS,
-  GATE_HINT_DELAY_DEMO_MS,
-  GATE_MORPH_MS,
-  GATE_MORPH_REDUCED_MS,
-  resolveGateHintDelay,
-  resolveGateMorphDuration,
-  isSessionValid,
-} from "./loader-gate-constants.js";
-
 /**
  * @param {{
  *   scene: HTMLElement;

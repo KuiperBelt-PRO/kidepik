@@ -27,7 +27,7 @@ export function renderAuthCallback() {
     if (session) {
       navigate("/home");
     } else {
-      navigate("/auth");
+      navigate("/loader");
     }
   })();
 

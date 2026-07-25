@@ -29,28 +29,6 @@ const SCENE_CLASS_MIGRATE = [
 /** @type {WorldSessionState | null} */
 let session = null;
 
-/** @type {HTMLElement | null} */
-let stashedLogoWrap = null;
-
-/**
- * Conserva el logo cargado al volver de legal → auth.
- * @param {HTMLElement} logoWrap
- */
-export function stashWorldLogo(logoWrap) {
-  if (!(logoWrap instanceof HTMLElement)) return;
-  if (logoWrap.parentElement) logoWrap.remove();
-  stashedLogoWrap = logoWrap;
-}
-
-/**
- * @returns {HTMLElement | null}
- */
-export function consumeWorldLogo() {
-  const logo = stashedLogoWrap;
-  stashedLogoWrap = null;
-  return logo;
-}
-
 /**
  * @returns {WorldSessionState | null}
  */
@@ -63,13 +41,6 @@ export function getWorldSession() {
  */
 export function getWorldLayers() {
   return session?.layers ?? null;
-}
-
-/**
- * @returns {boolean}
- */
-export function isWorldSessionActive() {
-  return session != null;
 }
 
 /**
@@ -155,15 +126,6 @@ export function detachWorldLayers() {
 }
 
 /**
- * @param {HTMLElement} scene
- */
-export function handoffWorldLayers(scene) {
-  if (!session?.layers) return;
-  syncWorldSessionFromDom(scene);
-  detachWorldLayers();
-}
-
-/**
  * Destruye por completo la sesión y todos los efectos montados.
  */
 export function destroyWorldSession() {
@@ -179,7 +141,6 @@ export function destroyWorldSession() {
   session.fantasySceneTeardown?.destroy();
   session.layers.remove();
   session = null;
-  stashedLogoWrap = null;
 }
 
 /**

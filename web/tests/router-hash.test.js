@@ -13,7 +13,7 @@ describe("router / hashRoutePath", () => {
     assert.equal(hashRoutePath("#/"), "loader");
   });
 
-  it("mockup con params en hash", () => {
-    assert.equal(hashRoutePath("#/mockup/home?preview=1"), "mockup/home");
+  it("legal con params en hash", () => {
+    assert.equal(hashRoutePath("#/legal/terminos?preview=1"), "legal/terminos");
   });
 });

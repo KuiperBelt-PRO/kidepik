@@ -8,7 +8,6 @@ import { signInWithGoogle } from "../lib/supabase.js";
 export const AUTH_COPY = {
   subtitle: "Cuenta de padre, madre o tutor",
   google: "Continuar con Google",
-  legal: "Al continuar, aceptas los Términos y la Política de privacidad.",
   errorGeneric: "No hemos podido iniciar sesión. Inténtalo de nuevo.",
   errorOffline: "Necesitas conexión para continuar con Google.",
 };

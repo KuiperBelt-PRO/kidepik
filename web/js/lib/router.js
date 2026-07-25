@@ -4,7 +4,7 @@
 const routes = new Map();
 
 /**
- * @param {string} pattern e.g. /mockup/:id
+ * @param {string} pattern e.g. legal/:slug
  * @param {RouteHandler} handler
  */
 export function registerRoute(pattern, handler) {

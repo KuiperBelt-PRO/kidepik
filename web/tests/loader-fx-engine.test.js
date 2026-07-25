@@ -14,7 +14,6 @@ import {
   resetSceneParticleBudget,
   totalParticleBudget,
 } from "../js/components/loader-fx-engine.js";
-import { reflectionOpacityPulse } from "../js/components/loader-fx-fantasy-palette.js";
 import "../js/components/loader-fx-crystals.js";
 import { generateCrystals } from "../js/components/loader-fantasy-crystals.js";
 
@@ -80,14 +79,5 @@ describe("loader-fx-anchors", () => {
     ]);
     assert.ok(foot);
     assert.equal(foot?.y, 80);
-  });
-});
-
-describe("loader-fx-fantasy-palette", () => {
-  it("reflectionOpacityPulse oscila en rango", () => {
-    const v = reflectionOpacityPulse(0);
-    assert.ok(v >= 0.18 && v <= 0.52);
-    const peak = reflectionOpacityPulse(0.25 / 0.38);
-    assert.ok(peak >= 0.48 && peak <= 0.54);
   });
 });

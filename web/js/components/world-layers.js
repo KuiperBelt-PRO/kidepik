@@ -4,9 +4,8 @@
  */
 
 import { assetUrl } from "../lib/assets.manifest.js";
-import { parseDevFaction } from "./loader-fantasy-castle-factions.js";
 import { mountFantasyTerrainLayer, measureFantasyTerrainHeightPx } from "./loader-fantasy-terrain.js";
-import { mountFantasyBackdropLayer, parseBackdropKind } from "./loader-fantasy-backdrop.js";
+import { mountFantasyBackdropLayer } from "./loader-fantasy-backdrop.js";
 import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountFantasyCelestialLayer } from "./loader-fantasy-celestial.js";
 import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
@@ -14,52 +13,16 @@ import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=138";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
 import {
+  mountOptionalImage,
+  parseWorldLayerQuery,
+  probeImage,
+} from "./loader-world-utils.js";
+import {
   getWorldSession,
   registerWorldSession,
   worldLayersHaveFantasyMounted,
   worldLayersHaveSpaceMounted,
 } from "../lib/world-session.js?v=156";
-
-/**
- * @param {string} src
- * @returns {Promise<boolean>}
- */
-function probeImage(src) {
-  return new Promise((resolve) => {
-    const probe = new Image();
-    probe.onload = () => resolve(true);
-    probe.onerror = () => resolve(false);
-    probe.src = src;
-  });
-}
-
-/**
- * @param {HTMLElement} layer
- * @param {string} slotId
- * @param {{ fit?: "cover" | "contain"; onLoad?: () => void; onError?: () => void }} [options]
- * @returns {Promise<boolean>}
- */
-async function mountOptionalImage(layer, slotId, options = {}) {
-  const { fit = "cover", onLoad, onError } = options;
-  const src = assetUrl(slotId);
-  if (!src) return false;
-
-  const img = document.createElement("img");
-  img.className = "loader-layer__img";
-  img.alt = "";
-  img.decoding = "async";
-  img.style.objectFit = fit;
-
-  const loaded = await new Promise((resolve) => {
-    img.addEventListener("load", () => { onLoad?.(); resolve(true); }, { once: true });
-    img.addEventListener("error", () => { onError?.(); resolve(false); }, { once: true });
-    img.src = src;
-  });
-
-  if (!loaded) return false;
-  layer.appendChild(img);
-  return true;
-}
 
 /**
  * @returns {{
@@ -92,46 +55,6 @@ export function createWorldLayersDom() {
 }
 
 /**
- * @param {URLSearchParams} [query]
- * @returns {object}
- */
-export function parseWorldLayerQuery(query = new URLSearchParams()) {
-  const meteorDemo = query.get("meteorDemo") === "1";
-  const cloudDemo = query.get("cloudDemo") === "1";
-  const celestialDemo = query.get("celestialDemo") === "1";
-  const backdropKind = parseBackdropKind(query.get("backdropKind"));
-  const fantasyDev = query.get("fantasyDev") || undefined;
-  const fantasyFaction = parseDevFaction(query.get("fantasyFaction"));
-  const fantasySeedRaw = query.get("fantasySeed");
-  const fantasySeed = fantasySeedRaw != null && fantasySeedRaw !== ""
-    ? Number.parseInt(fantasySeedRaw, 10)
-    : undefined;
-  const fantasyFormationRaw = query.get("fantasyFormation");
-  const fantasyFormation = fantasyFormationRaw === "cliff" || fantasyFormationRaw === "rocks"
-    ? fantasyFormationRaw
-    : undefined;
-  const fxIntensityRaw = query.get("fxIntensity");
-  const fxIntensityParsed = fxIntensityRaw != null && fxIntensityRaw !== ""
-    ? Number.parseFloat(fxIntensityRaw)
-    : NaN;
-  const fxIntensity = Number.isFinite(fxIntensityParsed) ? fxIntensityParsed : 1;
-  const fxEnabled = query.get("fxDev") !== "0";
-
-  return {
-    meteorDemo,
-    cloudDemo,
-    celestialDemo,
-    backdropKind,
-    fantasyDev,
-    fantasyFaction,
-    fantasySeed: Number.isFinite(fantasySeed) ? fantasySeed : undefined,
-    fantasyFormation,
-    fxIntensity,
-    fxEnabled,
-  };
-}
-
-/**
  * @param {{
  *   layers: HTMLElement;
  *   scene: HTMLElement;
@@ -140,7 +63,7 @@ export function parseWorldLayerQuery(query = new URLSearchParams()) {
  *   query?: URLSearchParams;
  *   revealed?: boolean;
  * }} options
- * @returns {{ destroy: () => void; reveal: () => void; syncMask: () => void }}
+ * @returns {{ destroy: () => void; reveal: () => void; syncMask: () => void; getSessionState: () => object }}
  */
 export function mountWorldLayers({
   layers,
@@ -151,16 +74,6 @@ export function mountWorldLayers({
   revealed = false,
 }) {
   const opts = parseWorldLayerQuery(query);
-  const { bg, accentFantasy, accentSpace } = (() => {
-    const bgEl = layers.querySelector(".loader-layer--bg");
-    const fantasyEl = layers.querySelector(".loader-layer--fantasy");
-    const spaceEl = layers.querySelector(".loader-layer--space");
-    return {
-      bg: bgEl instanceof HTMLElement ? bgEl : null,
-      accentFantasy: fantasyEl instanceof HTMLElement ? fantasyEl : null,
-      accentSpace: spaceEl instanceof HTMLElement ? spaceEl : null,
-    };
-  })();
 
   /** @type {{ destroy: () => void } | null} */
   let spaceOrbitTeardown = null;
@@ -254,7 +167,6 @@ export function mountWorldLayers({
       fxEnabled: opts.fxEnabled,
       fxIntensity: opts.fxIntensity,
     });
-    if (accentFantasy) void mountOptionalImage(accentFantasy, "loader.accent.fantasy");
     syncMask();
     syncWorldSessionState();
   }
@@ -265,7 +177,6 @@ export function mountWorldLayers({
     const spaceLayout = scene.classList.contains("scene-legal") ? "legal" : "loader";
     spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion, layout: spaceLayout });
     meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: opts.meteorDemo, layout: spaceLayout });
-    if (accentSpace) void mountOptionalImage(accentSpace, "loader.accent.space");
     syncMask();
     syncWorldSessionState();
   }
@@ -278,7 +189,8 @@ export function mountWorldLayers({
 
   if (revealed) reveal();
 
-  if (bg) {
+  const bg = layers.querySelector(".loader-layer--bg");
+  if (bg instanceof HTMLElement) {
     void (async () => {
       const bgOk = await mountOptionalImage(bg, "loader.bg.plain", {
         fit: "cover",

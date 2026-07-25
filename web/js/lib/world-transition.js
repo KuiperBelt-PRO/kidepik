@@ -317,49 +317,6 @@ export async function morphLogoWithBands(scene, logoEl, from, toCompressed, dura
 }
 
 /**
- * @param {HTMLElement} el
- * @param {RectSnapshot | null | undefined} from
- * @param {number} durationMs
- * @returns {Promise<void>}
- */
-export function flipFromRect(el, from, durationMs) {
-  if (!from || durationMs <= 0 || typeof el.animate !== "function") {
-    return Promise.resolve();
-  }
-
-  const last = el.getBoundingClientRect();
-  const dx = from.left - last.left;
-  const dy = from.top - last.top;
-  const sx = from.width / Math.max(last.width, 1);
-  const sy = from.height / Math.max(last.height, 1);
-
-  if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5 && Math.abs(sx - 1) < 0.01 && Math.abs(sy - 1) < 0.01) {
-    return Promise.resolve();
-  }
-
-  el.style.transformOrigin = "top left";
-  const anim = el.animate(
-    [
-      { transform: `translate(${dx}px, ${dy}px) scale(${sx}, ${sy})` },
-      { transform: "translate(0px, 0px) scale(1, 1)" },
-    ],
-    { duration: durationMs, easing: EASE, fill: "forwards" },
-  );
-
-  return anim.finished
-    .then(() => {
-      if (typeof anim.commitStyles === "function") anim.commitStyles();
-      anim.cancel();
-      el.style.transform = "";
-      el.style.transformOrigin = "";
-    })
-    .catch(() => {
-      el.style.transform = "";
-      el.style.transformOrigin = "";
-    });
-}
-
-/**
  * @param {HTMLElement} scene
  * @param {boolean} toCompressed
  * @param {number} durationMs

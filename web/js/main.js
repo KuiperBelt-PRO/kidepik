@@ -1,7 +1,6 @@
 import { registerRoute, startRouter } from "./lib/router.js";
 import { initTheme } from "./lib/theme.js";
 import { renderLoader } from "./scenes/loader.js?v=159";
-import { renderAuth } from "./scenes/auth.js";
 import { renderAuthCallback } from "./scenes/auth-callback.js";
 import { renderHome } from "./scenes/home.js";
 import { renderLegal } from "./scenes/legal.js?v=159";
@@ -26,7 +25,8 @@ function boot() {
   initTheme();
 
   registerRoute("loader", () => renderLoader());
-  registerRoute("auth", () => renderAuth());
+  // Deep-link / fallback OAuth: auth embebido vive en el loader (no escena standalone).
+  registerRoute("auth", () => renderLoader());
   registerRoute("auth/callback", () => renderAuthCallback());
   registerRoute("home", () => renderHome());
   registerRoute("legal/terminos", () => renderLegal({ slug: "terminos" }));
