@@ -385,6 +385,110 @@
   opacity: 0.85;
 }
 
+/* Skeleton de carga (estilo LinkedIn: barras + brillo deslizante). */
+.legal-body__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  padding-top: 0.15rem;
+}
+
+.legal-skeleton__block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.legal-skeleton__line {
+  --legal-skeleton-shimmer-delay: 0s;
+  position: relative;
+  height: 0.82em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.legal-skeleton__line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 35%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(255, 255, 255, 0.08) 65%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: legal-skeleton-shimmer 1.35s ease-in-out infinite;
+  animation-delay: var(--legal-skeleton-shimmer-delay);
+}
+
+.legal-skeleton__line--title {
+  width: 72%;
+  height: 1.05em;
+  margin: 0 auto 0.45rem;
+}
+
+.legal-skeleton__line--heading {
+  width: 46%;
+  height: 0.9em;
+  margin-bottom: 0.2rem;
+}
+
+.legal-skeleton__line--short {
+  width: 38%;
+}
+
+.legal-skeleton__line--full {
+  width: 100%;
+}
+
+.legal-skeleton__line--wide {
+  width: 92%;
+}
+
+.legal-skeleton__line--medium {
+  width: 78%;
+}
+
+.legal-skeleton__line--narrow {
+  width: 58%;
+}
+
+.legal-skeleton__block .legal-skeleton__line:nth-child(1) {
+  --legal-skeleton-shimmer-delay: 0s;
+}
+
+.legal-skeleton__block .legal-skeleton__line:nth-child(2) {
+  --legal-skeleton-shimmer-delay: 0.08s;
+}
+
+.legal-skeleton__block .legal-skeleton__line:nth-child(3) {
+  --legal-skeleton-shimmer-delay: 0.16s;
+}
+
+.legal-skeleton__block .legal-skeleton__line:nth-child(4) {
+  --legal-skeleton-shimmer-delay: 0.24s;
+}
+
+.legal-skeleton__block .legal-skeleton__line:nth-child(5) {
+  --legal-skeleton-shimmer-delay: 0.32s;
+}
+
+@keyframes legal-skeleton-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(120%);
+  }
+}
+
 .legal-body__error-actions {
   margin-top: 0.75rem;
   text-align: center;
@@ -467,6 +571,12 @@
   .scene-legal,
   .legal-fab--top {
     transition-duration: 0.12s !important;
+  }
+
+  .legal-skeleton__line::after {
+    animation: none;
+    transform: none;
+    opacity: 0.35;
   }
 }
 

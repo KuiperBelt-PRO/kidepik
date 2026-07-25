@@ -44,6 +44,33 @@ const SLUG_API = {
 const TRANSITION_MS = 720;
 const TRANSITION_MS_REDUCED = 120;
 
+/** HTML del skeleton de carga (barras + shimmer). */
+function renderLegalSkeletonHtml() {
+  const line = (widthClass, extra = "") =>
+    `<div class="legal-skeleton__line ${widthClass}${extra ? ` ${extra}` : ""}" aria-hidden="true"></div>`;
+
+  return `
+    <div class="legal-body__skeleton" role="status" aria-live="polite" aria-label="Cargando documento">
+      ${line("legal-skeleton__line--title")}
+      ${line("legal-skeleton__line--heading")}
+      <div class="legal-skeleton__block">
+        ${line("legal-skeleton__line--full")}
+        ${line("legal-skeleton__line--wide")}
+        ${line("legal-skeleton__line--medium")}
+        ${line("legal-skeleton__line--full")}
+        ${line("legal-skeleton__line--narrow")}
+      </div>
+      ${line("legal-skeleton__line--heading legal-skeleton__line--short")}
+      <div class="legal-skeleton__block">
+        ${line("legal-skeleton__line--wide")}
+        ${line("legal-skeleton__line--medium")}
+        ${line("legal-skeleton__line--full")}
+        ${line("legal-skeleton__line--narrow")}
+      </div>
+    </div>
+  `;
+}
+
 /**
  * @param {string} routeSlug
  * @returns {string | null}
@@ -204,8 +231,9 @@ export function renderLegal({ slug }) {
   scroll.tabIndex = 0;
 
   const article = document.createElement("article");
-  article.className = "legal-body";
-  article.innerHTML = '<p class="legal-body__loading">Cargando…</p>';
+  article.className = "legal-body is-loading";
+  article.setAttribute("aria-busy", "true");
+  article.innerHTML = renderLegalSkeletonHtml();
 
   scroll.appendChild(article);
   scrollPort.appendChild(scroll);
@@ -252,6 +280,8 @@ export function renderLegal({ slug }) {
   article.style.opacity = fromAuth ? "0" : "1";
 
   function showLoadError() {
+    article.classList.remove("is-loading");
+    article.removeAttribute("aria-busy");
     article.innerHTML = `
       <p class="legal-body__error">No hemos podido cargar este documento.</p>
       <p class="legal-body__error-actions">
@@ -265,13 +295,19 @@ export function renderLegal({ slug }) {
 
   async function loadDocument() {
     const seq = ++loadSeq;
-    article.innerHTML = '<p class="legal-body__loading">Cargando…</p>';
+    article.classList.add("is-loading");
+    article.setAttribute("aria-busy", "true");
+    article.innerHTML = renderLegalSkeletonHtml();
     const doc = await fetchLegalDoc(routeSlug, { signal: loadAbort.signal });
     if (destroyed || seq !== loadSeq) return;
     if (!doc) {
+      article.classList.remove("is-loading");
+      article.removeAttribute("aria-busy");
       showLoadError();
       return;
     }
+    article.classList.remove("is-loading");
+    article.removeAttribute("aria-busy");
     article.innerHTML = renderMarkdown(doc.body_markdown);
     scene.setAttribute("aria-label", doc.title);
     revealArticle();
