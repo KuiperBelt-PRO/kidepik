@@ -42,7 +42,7 @@ if (-not (Test-Path $envFile)) {
 
 & (Join-Path $Root "scripts\poc-write-config.ps1")
 
-Write-Host "==> Docker Compose (nginx + PHP)..." -ForegroundColor Yellow
+Write-Host "==> Docker Compose (nginx + PHP; migraciones PHP al arrancar contenedor)..." -ForegroundColor Yellow
 docker compose --env-file $envFile -f (Join-Path $Root "docker\compose.yaml") up -d --build
 
 Write-Host ""

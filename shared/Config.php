@@ -39,6 +39,7 @@ final class Config
             return filter_var($flag, FILTER_VALIDATE_BOOL);
         }
 
+        // Local: migraciones en arranque del contenedor PHP (entrypoint), no en cada request.
         return self::appEnv() !== 'local';
     }
 

@@ -22,6 +22,9 @@ final class MigrationRunner
     /** @var string|null Clave rápida (ficheros + historial) cuando no hay pendientes. */
     private static ?string $ensuredStateKey = null;
 
+    /** @var string|null Fingerprint de supabase/migrations/ tras último ensureApplied() OK. */
+    private static ?string $ensuredFilesystemFingerprint = null;
+
     public function __construct(
         private readonly ?PDO $pdo,
         private readonly string $migrationsDir,
@@ -56,8 +59,15 @@ final class MigrationRunner
             return;
         }
 
+        $fingerprint = $this->migrationsFingerprint();
+        if (self::$ensuredFilesystemFingerprint === $fingerprint) {
+            return;
+        }
+
         $stateKey = $this->migrationStateKey();
         if (self::$ensuredStateKey === $stateKey) {
+            self::$ensuredFilesystemFingerprint = $fingerprint;
+
             return;
         }
 
@@ -83,12 +93,14 @@ final class MigrationRunner
         }
 
         self::$ensuredStateKey = $this->migrationStateKey();
+        self::$ensuredFilesystemFingerprint = $this->migrationsFingerprint();
     }
 
     /** Solo tests: invalida la caché en memoria del worker PHP. */
     public static function resetEnsureCacheForTests(): void
     {
         self::$ensuredStateKey = null;
+        self::$ensuredFilesystemFingerprint = null;
     }
 
     private function migrationsFingerprint(): string

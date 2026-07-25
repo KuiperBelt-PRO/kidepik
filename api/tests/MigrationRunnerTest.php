@@ -68,7 +68,9 @@ final class MigrationRunnerTest extends TestCase
         file_put_contents($dir . "/{$version}_probe_table.sql", $sql);
 
         try {
+            MigrationRunner::resetEnsureCacheForTests();
             $runner = new MigrationRunner($pdo, $dir);
+            $runner->ensureApplied();
             $runner->ensureApplied();
             $runner->ensureApplied();
 
@@ -80,7 +82,13 @@ final class MigrationRunnerTest extends TestCase
             $exists = $pdo->query("select to_regclass('public.{$table}')")->fetchColumn();
             self::assertNotFalse($exists);
             self::assertNotNull($exists);
+
+            $ref = new \ReflectionClass(MigrationRunner::class);
+            $prop = $ref->getProperty('ensuredFilesystemFingerprint');
+            $prop->setAccessible(true);
+            self::assertNotNull($prop->getValue());
         } finally {
+            MigrationRunner::resetEnsureCacheForTests();
             $pdo->exec("drop table if exists public.{$table}");
             $pdo->exec(
                 "delete from supabase_migrations.schema_migrations where version = " . $pdo->quote($version),

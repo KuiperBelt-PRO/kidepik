@@ -88,9 +88,15 @@ Usar `pg_advisory_lock` / `pg_advisory_unlock` con una clave fija del proyecto d
 
 | Momento | Comportamiento |
 | --- | --- |
-| Cada request a la API | `ensureApplied()` si hay `DATABASE_URL` |
+| **Local — arranque contenedor PHP** | `api/bin/apply-migrations.php` en el entrypoint (`RUN_MIGRATIONS_ON_START` o `APP_ENV=local` por defecto) |
+| **Local — cada request** | **No** por defecto (`Config::runMigrationsOnRequest()` → `false` si `APP_ENV=local`) |
+| **Producción / staging — cada request** | `ensureApplied()` si hay `DATABASE_URL` y `RUN_MIGRATIONS_ON_REQUEST` no es `false` |
 | Sin `DATABASE_URL` | No-op (dev sin BD); status reporta `skipped` |
 | `GET /api/v1/migrations/status` | **No** aplica; solo lista applied / pending / invalid |
+
+### Caché rápida (sin penalizar requests)
+
+Tras un `ensureApplied()` correcto en el worker PHP-FPM, el runner guarda un **fingerprint** de `supabase/migrations/` (nombres + `mtime`). Si no cambia ningún `.sql`, las siguientes llamadas a `ensureApplied()` **no consultan Postgres** (return inmediato). Si cambia un fichero, se vuelve a comparar con el historial y solo entonces se aplican pendientes.
 
 ### Contrato — consulta de estado
 

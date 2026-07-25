@@ -24,3 +24,9 @@ RUN composer install --no-interaction --prefer-dist
 COPY api /var/www/api
 
 RUN composer dump-autoload --optimize
+
+COPY docker/php/entrypoint.sh /usr/local/bin/kidepik-php-entrypoint.sh
+RUN chmod +x /usr/local/bin/kidepik-php-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/kidepik-php-entrypoint.sh"]
+CMD ["php-fpm"]
