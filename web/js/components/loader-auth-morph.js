@@ -431,8 +431,9 @@ export function runLoaderAuthMorph({
  * Monta logo + eslogan recto sin animación morph (home post-login).
  * @param {HTMLElement} brand
  * @param {HTMLElement} logoWrap
+ * @param {{ showSlogan?: boolean }} [options]
  */
-export function mountStaticAuthBrand(brand, logoWrap) {
+export function mountStaticAuthBrand(brand, logoWrap, { showSlogan = true } = {}) {
   brand.className = "loader-auth-brand is-static";
 
   if (logoWrap.parentElement !== brand) {
@@ -442,14 +443,16 @@ export function mountStaticAuthBrand(brand, logoWrap) {
   const existingSlogan = brand.querySelector(".loader-auth-slogan");
   if (existingSlogan) existingSlogan.remove();
 
-  const sloganEl = document.createElement("div");
-  sloganEl.className = "loader-auth-slogan is-visible";
-  sloganEl.setAttribute("aria-hidden", "true");
+  if (showSlogan) {
+    const sloganEl = document.createElement("div");
+    sloganEl.className = "loader-auth-slogan is-visible";
+    sloganEl.setAttribute("aria-hidden", "true");
 
-  const sciLine = buildSloganLine(GATE_COPY.sloganLine1.replace(/\.$/, ""), "sci");
-  const fantasyLine = buildSloganLine(GATE_COPY.sloganLine2.replace(/\.$/, ""), "fantasy");
-  sloganEl.append(sciLine.line, fantasyLine.line);
-  brand.appendChild(sloganEl);
+    const sciLine = buildSloganLine(GATE_COPY.sloganLine1.replace(/\.$/, ""), "sci");
+    const fantasyLine = buildSloganLine(GATE_COPY.sloganLine2.replace(/\.$/, ""), "fantasy");
+    sloganEl.append(sciLine.line, fantasyLine.line);
+    brand.appendChild(sloganEl);
+  }
 
   logoWrap.classList.add("is-auth-positioned", "is-ready");
 }

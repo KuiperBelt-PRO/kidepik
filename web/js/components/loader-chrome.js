@@ -623,7 +623,7 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
           authFallback instanceof HTMLElement ? authFallback : logoFallback,
         );
       }
-      mountStaticAuthBrand(brand, logoWrap);
+      mountStaticAuthBrand(brand, logoWrap, { showSlogan: !welcomeHome });
       if (destroyed) return;
 
       if (welcomeHome) {
