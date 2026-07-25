@@ -38,10 +38,10 @@
   --legal-fab-size: 32px;
   --legal-scrollbar-size: 6px;
   /* Rampas de opacidad del texto (anclajes medidos en JS). */
-  --legal-fade-ramp-h: clamp(56px, 14dvh, 112px);
+  --legal-fade-ramp-h: clamp(72px, 18dvh, 128px);
   --legal-fade-bottom-overshoot: clamp(12px, 2.5dvh, 28px);
-  --legal-scroll-top: var(--legal-space-band);
-  --legal-text-pad-top: calc(var(--legal-logo-top) + var(--legal-logo-size) + 0.35rem - var(--legal-scroll-top));
+  --legal-scroll-top: var(--legal-logo-top);
+  --legal-text-pad-top: calc(var(--legal-logo-size) + 0.35rem);
   --legal-text-pad-bottom: 1.25rem;
 }
 

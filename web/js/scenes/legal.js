@@ -295,8 +295,8 @@ export function renderLegal({ slug }) {
     const scrollRect = scroll.getBoundingClientRect();
     const logoRect = logoWrap.getBoundingClientRect();
 
-    const topStart = logoRect.top - scrollRect.top;
-    /* El port ya invade un poco la banda fantasía; el borde inferior del scroll = fantasía + overshoot. */
+    /* Port alineado al logo: opacidad 0 en su borde superior (sin clip duro de la banda sci-fi). */
+    const topStart = Math.min(0, logoRect.top - scrollRect.top);
     const bottomEnd = scrollRect.height;
 
     scroll.style.setProperty("--legal-fade-mask-top-start", `${topStart}px`);
