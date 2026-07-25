@@ -1,8 +1,12 @@
 # Prompts IA — Pantalla Loader (KidepiK)
 
-> Spec: [SPEC_LOADER_SCREEN.md](SPEC_LOADER_SCREEN.md)  
+> Spec runtime: [SPEC_LOADER_SCREEN.md](SPEC_LOADER_SCREEN.md)  
 > Copia cada bloque tal cual en tu herramienta de generación de imágenes.  
 > **Sin texto** en ilustraciones salvo el logo (prompt 4).
+
+> **Estado jul 2026 (archivo vs runtime):** este documento es **banco de prompts / backlog de arte**.  
+> En el cliente **no** se usan `loader-bg-dual` ni `wordmark-ambigram-dark` (eliminados del manifest).  
+> Runtime: fondo plain + world procedural + `wordmark-ambigram-light.png`. Conservar prompts por si se vuelve a arte raster dual o tema oscuro.
 
 ---
 

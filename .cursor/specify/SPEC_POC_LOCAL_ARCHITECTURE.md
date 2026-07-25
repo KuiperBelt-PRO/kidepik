@@ -1,7 +1,9 @@
 # Spec: POC local — arquitectura FastAPI + Supabase + R2
 
-> ⚠️ **SUPERSEDIDA** (julio 2026) — No usar para trabajo nuevo.  
-> **Reemplazo:** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) + [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md) + [SPEC_PHP_BACKEND_ARCHITECTURE.md](SPEC_PHP_BACKEND_ARCHITECTURE.md)
+> ⚠️ **HISTÓRICA / SUPERSEDIDA** (julio 2026) — **No usar para trabajo nuevo.**  
+> Conservada solo como registro del POC FastAPI+MinIO (jun 2026).  
+> **Reemplazo vigente:** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) + [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md) + [SPEC_PHP_BACKEND_ARCHITECTURE.md](SPEC_PHP_BACKEND_ARCHITECTURE.md) + [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md).  
+> Stack actual: PHP en `:8082`, media en `web/media/`, **sin** MinIO ni FastAPI en el arranque canónico.
 
 > Estado histórico: **validada** (junio 2026) — cliente `web/` + tres capas en verde  
 > Relacionado: [SPEC_HOSTING_FREE_TIER_STACK.md](SPEC_HOSTING_FREE_TIER_STACK.md), [docs/kidepik.md](../../docs/kidepik.md) §10, [docs/POC_LOCAL.md](../../docs/POC_LOCAL.md)

@@ -5,7 +5,7 @@
 
 ## Contexto
 
-El loader actual (`web/js/components/loader-chrome.js`) termina la secuencia visual (fondo dual, anillo de progreso, textos circulares «DOS MUNDOS» / «UN VIAJE ÉPICO», logo central) pero **no enlaza con el producto**: no hay CTA de entrada ni comprobación de sesión.
+El loader actual (`web/js/components/loader-chrome.js`) termina la secuencia visual (fondo, capas duales procedurales, anillo de progreso, textos circulares «DOS MUNDOS» / «UN VIAJE ÉPICO», logo central) y **enlaza con el producto** vía esta puerta: CTA de entrada + comprobación de sesión.
 
 Esta spec define la **puerta de entrada** desde el loader hacia la app autenticada o hacia la pantalla de auth, con una transición continua sobre el mismo arte de fondo.
 
@@ -137,11 +137,11 @@ Secuencia simultánea (**800 ms**, `cubic-bezier(0.4, 0, 0.2, 1)`):
 
 | Ruta hash | Escena | Notas |
 | --- | --- | --- |
-| `#/loader` | Loader + puerta (default al abrir app) | Comportamiento de esta spec |
-| `#/auth` | Auth standalone (opcional) | Misma UI que `auth-idle`; fondo loader reutilizado; deep-link si sesión caduca en app |
+| `#/loader` | Loader + puerta (default al abrir app) | Comportamiento de esta spec; auth embebido en `auth-idle` |
+| `#/auth` | Alias de loader | `main.js` registra `#/auth` → `renderLoader()` (misma escena). Fallback OAuth usa `#/loader` |
 | `#/home` | Shell app (placeholder P0) | Tras sesión válida; spec futura `SPEC_APP_HOME.md` |
 
-**Decisión cerrada:** la transición loader→auth ocurre **in-place en `#/loader`** sin cambiar hash hasta que auth complete; entonces `navigate("/home")`. Si el usuario llega a `#/auth` directamente, montar auth con fondo loader estático (último frame o capas en hold).
+**Decisión cerrada:** la transición loader→auth ocurre **in-place en `#/loader`** sin cambiar hash hasta que auth complete; entonces `navigate("/home")`. Deep-link `#/auth` monta el mismo loader (no hay `scenes/auth.js`).
 
 ## Contratos técnicos
 
@@ -151,12 +151,12 @@ Secuencia simultánea (**800 ms**, `cubic-bezier(0.4, 0, 0.2, 1)`):
 | --- | --- |
 | `web/js/components/loader-gate.js` | Máquina de estados `loading`→`ready`→`exiting`; hint; listener tap |
 | `web/js/components/loader-auth-morph.js` | Animación anillo→logo+eslogan recto; handoff a auth UI |
-| `web/js/components/loader-chrome.js` | Integrar gate; exponer `pointer-events` en focal |
-| `web/js/scenes/auth.js` | Montaje UI auth (también embebible desde loader) |
+| `web/js/components/loader-chrome.js` | Integrar gate; resume desde legal; capas mundo |
+| `web/js/components/auth-panel.js` | CTA Google + enlaces legales (embebido en loader) |
 | `web/js/lib/supabase.js` | Cliente Supabase + `getSession`, `signInWithOAuth`, helpers |
-| `web/js/main.js` | Registrar rutas `auth`, `home` |
-| `web/css/scenes/loader.css` | Estados `.is-gate-ready`, `.is-gate-exiting`, `.is-auth-morph` |
-| `web/css/scenes/auth.css` | Estilos CTA Google |
+| `web/js/main.js` | Rutas `loader`, `auth`→loader, `auth/callback`, `home`, `legal/*` |
+| `web/css/scenes/loader.css` | Estados gate/auth morph + estilos `.auth-panel*` |
+| `web/css/scenes/auth.css` | Callback OAuth + placeholder home |
 
 ### API / backend
 
@@ -175,13 +175,13 @@ Secuencia simultánea (**800 ms**, `cubic-bezier(0.4, 0, 0.2, 1)`):
 
 ## Criterios de aceptación
 
-1. Viewport **390×844**: hint legible (≥ 16 px efectivos) y visible tras **5 s** post-progreso 100 %.
+1. Viewport **390×844**: hint legible (≥ 16 px efectivos) y visible **0,5 s** tras progreso 100 % (`GATE_HINT_DELAY_MS`).
 2. Tap en **cualquier punto** del disco central (no solo en la imagen del logo) dispara la transición.
 3. Con sesión mock/Supabase local válida → tras animación, navega a `#/home` (o placeholder acordado).
 4. Sin sesión → anillo desaparece, logo arriba, eslogan en **dos líneas rectas** con tipografías duales, CTA Google visible.
 5. Segundo tap durante transición no produce doble navegación ni errores consola.
 6. `prefers-reduced-motion`: flujo completable sin animaciones largas.
-7. Playwright: capturas `tmp/playwright-output/loader-gate-ready.png`, `loader-gate-auth-morph.png`.
+7. Playwright: capturas bajo `tmp/playwright-output/`.
 
 ## Fuera de alcance
 
@@ -196,7 +196,7 @@ La spec original preveía `navigate("/gallery")` al completar carga. **Esta spec
 
 ## Aprobación
 
-- [x] Usuario aprueba tiempos (**5 s** post-100 %, transición **800 ms**).
+- [x] Usuario aprueba tiempos (**0,5 s** post-100 % para el hint; transición morph **800 ms**).
 - [x] Usuario aprueba copy y reparto tipográfico: «Pulsa para comenzar» (sci-fi) + «tu viaje épico» (fantasía).
 - [x] Usuario aprueba **morph in-place** en `#/loader`.
 - [x] Usuario aprueba [SPEC_APP_AUTH.md](SPEC_APP_AUTH.md) (**Google solamente** en MVP).

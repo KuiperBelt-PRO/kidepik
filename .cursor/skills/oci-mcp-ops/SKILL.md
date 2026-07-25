@@ -19,10 +19,9 @@ Usar cuando el usuario pida aprovisionar, validar o operar infraestructura **Ora
 1. `oci_status` — debe devolver `ok: true`.
 2. `oci_network_ensure` — VCN `kidepik-vcn`.
 3. `oci_launch_arm_instance` / `oci_retry_launch_arm` — north star ARM.
-4. `oci_launch_micro_instance` / `oci_retry_launch_micro` — backend MVP FastAPI.
+4. `oci_launch_micro_instance` / `oci_retry_launch_micro` — compute Oracle Micro (alternativa futura; **no** implica FastAPI MVP).
 5. `oci_instance_get` — IP y estado.
-5. Documentar en `operations/OCI_ALWAYS_FREE_VALIDATION.md` § Resultado.
-
+6. Documentar en `operations/OCI_ALWAYS_FREE_VALIDATION.md` § Resultado.
 ## Reglas
 
 - **No** commitear `.secrets/`; plantillas en `.secrets.sample/` sí se versionan.

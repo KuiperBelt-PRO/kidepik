@@ -1,8 +1,8 @@
 # Spec: Sistema visual v3 — web premium (KidepiK)
 
-> Estado: **borrador para aprobación** (junio 2026)  
-> Relacionado: [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [docs/kidepik.md](../../docs/kidepik.md) §2
-
+> Estado: **dirección de arte vigente** (junio 2026); **galería/mockups de fase 1 aún no implementados** en `web/` (jul 2026).  
+> Relacionado: [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [docs/kidepik.md](../../docs/kidepik.md) §2  
+> **Runtime actual:** loader + gate/auth + legal + home placeholder. La «paridad galería» de abajo es **roadmap post-MVP**, no estado del código.
 ## Objetivo
 
 Definir un sistema visual **premium, tipo estudio de videojuegos / diseño editorial**, para cliente **web** (HTML + CSS + JavaScript), con dual theme **fantasía (verde + dorado)** y **space opera (azul + blanco)**, priorizando:
@@ -95,10 +95,11 @@ Cargar fuentes desde `web/assets/fonts/` (woff2 local; `<link>` o `@font-face` e
 | `ChoiceList` | 2–3 decisiones táctiles |
 | `ChallengeCard` | Reto + respuestas + pista |
 | `SessionHud` | Materia, zona, progreso |
-| `ThemeToggle` | Pill fantasy / space (dev y galería) |
+| `ThemeToggle` | Pill fantasy / space (dev; galería futura) |
 | `Wordmark` | Logo tipográfico |
+| `assets.manifest.js` | Slots bajo `web/js/lib/` (no TypeScript) |
 
-Cada componente con slot `// ART_SLOT: <id>` mapeado en `web/src/themes/assets.manifest.ts`.
+Cada componente con slot `// ART_SLOT: <id>` mapeado en el manifest de assets.
 
 ## Pipeline de assets
 
@@ -109,10 +110,10 @@ web/assets/themes/
   fantasy/
     screens/
       loader-bg.webp
-      gallery-bg.webp
+      gallery-bg.webp          # futuro
       world-picker-fantasy.webp
     ui/
-      panel-frame.webp          # o .svg nine-patch
+      panel-frame.webp
       button-primary.webp
     rive/
       loader.riv
@@ -135,12 +136,14 @@ web/assets/themes/
 - Usar **fotografías/ilustraciones stock coherentes** o frames IA aprobados — **no** gradientes SVG como destino final.
 - Marcar en UI dev badge `PLACEHOLDER` discreto.
 
-## Pantallas fase 1 (paridad galería)
+## Pantallas fase 1 (roadmap — no implementado en jul 2026)
 
-1. **Loader** — ilustración hero + Rive/Lottie anillo o personaje + frase rotatoria.
-2. **Galería** — lista de mockups sobre fondo pintado.
-3. **Mockups** — diálogo, elección, reto, mapa, HUD, recompensa, minijuego shell.
-4. **Selector de mundo** — dos tarjetas ilustradas full-bleed.
+> Conservar como especificación de producto futuro. **No** existe `#/gallery` ni `#/mockup/*` en el cliente actual.
+
+1. **Loader** — ilustración hero + Rive/Lottie anillo o personaje + frase rotatoria. *(parcial: loader procedural + ambigrama en runtime)*
+2. **Galería** — lista de mockups sobre fondo pintado. *(futuro)*
+3. **Mockups** — diálogo, elección, reto, mapa, HUD, recompensa, minijuego shell. *(futuro)*
+4. **Selector de mundo** — dos tarjetas ilustradas full-bleed. *(futuro)*
 
 ## Motion (criterios de calidad)
 
@@ -155,9 +158,9 @@ Respetar `prefers-reduced-motion: reduce` → estático o fade simple.
 
 ## Criterios de éxito visual
 
-1. Al menos **2 fondos ilustrados reales por tema** (loader + galería) antes de cerrar fase 1.
+1. Al menos **2 fondos ilustrados reales por tema** (loader + pantalla secundaria de producto) antes de cerrar la fase de arte; la «galería» del roadmap cuenta cuando se implemente.
 2. Un observador externo no describe la UI como “hecha con CSS de demo”.
-3. Toggle tema cambia **ilustración y tokens**, no solo colores de botones.
+3. Toggle tema (cuando exista en producto) cambia **ilustración y tokens**, no solo colores de botones.
 4. Texto de reto legible en viewport 390×844 sin zoom.
 5. Lighthouse Performance ≥ 85 en build prod (assets optimizados).
 

@@ -4,11 +4,10 @@
 > Spec MVP hosting: [../specify/SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md)  
 > MCP: [../specify/SPEC_OCI_MCP_SERVER.md](../specify/SPEC_OCI_MCP_SERVER.md)
 
-## Contexto (junio 2026)
+## Contexto (actualizado jul 2026)
 
-- **MVP producción:** Modern Free Tier Stack — Supabase (DB + Auth) + Cloudflare R2 + FastAPI. Compute backend: **GCP Cloud Run** *o* **Oracle AMD Micro** (pendiente elegir). Ver [docs/kidepik.md](../../docs/kidepik.md) §10.5.
-- **North star OCI:** monolito ARM 6 GB cuando haya stock (`OUT_OF_CAPACITY` en MAD).
-
+- **MVP producción activo:** DreamHost PHP + Supabase (DB + Auth) + media local (`web/media/`). Ver [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md). **No** R2 ni FastAPI en MVP.
+- **North star OCI:** monolito ARM 6 GB cuando haya stock (`OUT_OF_CAPACITY` en MAD). Oracle Micro = opción de compute futura, no backend FastAPI obligatorio.
 ## Prerrequisitos (usuario)
 
 - [x] Cuenta Oracle Cloud, home region **MAD** (`eu-madrid-1`)
@@ -79,26 +78,26 @@ Esperado: `aarch64`, ~6 Gi memoria.
 
 ---
 
-## MVP — Modern Free Tier Stack (activo)
+## MVP — DreamHost PHP + Supabase (activo jul 2026)
 
-Arquitectura fija: **Supabase** (Postgres + Auth) + **Cloudflare R2** (media) + **FastAPI**.
+Arquitectura fija del producto: **DreamHost PHP** + **Supabase** (Postgres + Auth) + **media local**. Ver [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
-### Compute backend (elegir uno)
+### Evolución / alternativas (no MVP)
 
 | Opción | Cuándo | Notas |
 | --- | --- | --- |
-| **GCP Cloud Run** | Preferido si no hay VM Oracle | `min-instances=0`, `max-instances=1-2`, región EU; alerta billing 0,01 € |
-| **Oracle AMD Micro** | Si hay stock en MAD | Solo FastAPI (~1 GB); misma VCN/red OCI ya creada |
+| **Cloudflare R2** | Escala media | `STORAGE_DRIVER=s3` — SPEC_MEDIA_STORAGE |
+| **GCP Cloud Run / Oracle Micro** | Si se retoma compute distinto de DreamHost | Histórico FastAPI; no extender `backend/` sin decisión nueva |
+| **Oracle ARM monolito** | Stock Always Free | North star § Resultado |
 
-**No usar:** Supabase Storage (egress 2 GB/mes). **No usar:** GCP e2-micro (1 GB, US only).
+**No usar en MVP:** Supabase Storage (egress), MinIO en Docker, FastAPI como API canónica.
 
-### Checklist servicios (pendiente)
+### Checklist servicios
 
-- [ ] Proyecto Supabase (EU): DB + Auth + `DATABASE_URL`
-- [ ] Bucket Cloudflare R2 + claves API
-- [ ] Proyecto GCP + Cloud Run *o* instancia Oracle Micro
-- [ ] `Dockerfile` FastAPI desplegable en ambos destinos
-- [ ] Regla egress: API devuelve URLs R2, no binarios
+- [ ] Proyecto Supabase (EU): DB + Auth
+- [ ] Dominio DreamHost + PHP deploy
+- [ ] Media en `web/media/` (local y prod)
+- [ ] (Futuro) Bucket R2 si se migra storage
 
 Detalle: [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
@@ -106,9 +105,9 @@ Detalle: [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STA
 
 Ver [GCP_CLOUD_RUN_MCP.md](GCP_CLOUD_RUN_MCP.md) — OAuth client Cursor, `roles/mcp.toolUser`, APIs y `gcp-cloudrun-kidepik` en `mcp.json`.
 
-### Oracle AMD Micro (backend FastAPI)
+### Oracle AMD Micro (compute opcional / futuro)
 
-Shape `VM.Standard.E2.1.Micro`, display name `kidepik-api-micro`. Reutiliza la VCN/subnet ya creada.
+Shape `VM.Standard.E2.1.Micro`, display name `kidepik-api-micro`. Reutiliza la VCN/subnet ya creada. **No** implica desplegar FastAPI como MVP (producto = PHP en DreamHost).
 
 **Un intento:**
 

@@ -1,6 +1,7 @@
 # Plan de ejecución: pivot web-first KidepiK
 
-> Pivot completado (jun 2026). Specs: [SPEC_WEB_FRONTEND_ARCHITECTURE.md](../specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md), [SPEC_APP_VISUAL_DESIGN_V3.md](../specify/SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_DEV_PREVIEW.md](../specify/SPEC_WEB_DEV_PREVIEW.md).
+> Pivot completado (jun 2026). Specs: [SPEC_WEB_FRONTEND_ARCHITECTURE.md](../specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md), [SPEC_APP_VISUAL_DESIGN_V3.md](../specify/SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_DEV_PREVIEW.md](../specify/SPEC_WEB_DEV_PREVIEW.md).  
+> **Nota jul 2026:** la «galería + mockups» de la Fase 3 fue **POC temporal** y se eliminó del runtime (ver [SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md](../specify/SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md)). Sigue como roadmap en SPEC_APP_VISUAL_DESIGN_V3.
 
 ## Fase 0 — Aprobación (usuario)
 
@@ -26,8 +27,8 @@
 
 ## Fase 3 — Pantallas P0
 
-- [x] Escena loader + capas ilustración (placeholder).
-- [x] Galería + catálogo mockups.
+- [x] Escena loader + capas (placeholder → procedural).
+- [x] Galería + catálogo mockups *(POC; **retirada** del cliente jul 2026 — roadmap visual v3)*.
 - [x] Toggle tema.
 - [ ] 2 fondos ilustrados por tema (assets reales).
 

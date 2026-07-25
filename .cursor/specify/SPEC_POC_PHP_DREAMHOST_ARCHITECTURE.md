@@ -154,12 +154,14 @@ Alias legacy: `POST /api/v1/storage/presign-upload` → mismo handler que `prepa
 
 ## Migración desde POC FastAPI
 
-| Componente actual | Acción |
+> Estado jul 2026: migración **hecha** en el repo (PHP + nginx, sin MinIO en compose). Tabla conservada como checklist histórico.
+
+| Componente (histórico) | Acción (resultado) |
 | --- | --- |
-| `backend/` FastAPI | Congelar |
-| `docker/compose.yaml` servicios `api` Python + `minio` | Sustituir por `php` + `nginx`; **eliminar MinIO** |
-| `presign-upload` (S3) | Renombrar semántica a `prepare-upload` agnóstico ([SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md)) |
-| `scripts/poc-web-dev.ps1` | Deprecar |
+| `backend/` FastAPI | Congelado / legacy — no extender |
+| `docker/compose.yaml` servicios `api` Python + `minio` | Sustituidos por `php` + `nginx`; **sin MinIO** |
+| `presign-upload` (S3) | Semántica `prepare-upload` agnóstica ([SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md)) |
+| `scripts/poc-web-dev.ps1` | Stub deprecado → `poc-up` |
 
 ## Riesgos y mitigaciones
 
@@ -171,6 +173,6 @@ Alias legacy: `POST /api/v1/storage/presign-upload` → mismo handler que `prepa
 
 ## Aprobación
 
-- [ ] Usuario aprueba pivot **PHP + DreamHost + Supabase** (sin FastAPI en POC).
-- [ ] Usuario aprueba desarrollo **solo vía Docker** con hot reload.
+- [x] Usuario aprueba pivot **PHP + DreamHost + Supabase** (sin FastAPI en POC).
+- [x] Usuario aprueba desarrollo **solo vía Docker** con hot reload.
 - [x] Usuario aprueba **media en filesystem local** (`web/media/`), sin Cloudflare en MVP.

@@ -1,7 +1,7 @@
 # KidepiK — Especificación de producto
 
 > Documento maestro de visión, pedagogía, diseño y stack técnico.  
-> Estado: borrador de producto · Última actualización: junio 2026
+> Estado: borrador de producto · Última actualización: julio 2026
 
 ---
 
@@ -25,13 +25,12 @@ El aprendizaje no se presenta como temario escolar, sino como **retos cortos** i
 | **Píldoras / minijuegos** | No incluidos | Minijuegos táctiles tras N lecciones |
 | **IA** | OpenRouter (modelos free) + fallback Gemini/Grok free | Modelos de pago según volumen |
 | **Perfil y progreso** | Tablas relacionales en PostgreSQL | Informes para padres, analíticas |
-| **Infra producción** | **Modern Free Tier Stack** (Supabase + R2 + FastAPI); backend en **GCP Cloud Run** *u* **Oracle AMD Micro** (TBD) | Monolito Oracle ARM 6 GB cuando haya stock |
+| **Infra producción** | **DreamHost PHP** + Supabase (DB + Auth) + media local (`web/media/`) | R2 / CDN a escala; monolito Oracle ARM 6 GB cuando haya stock |
 
 ### Contexto de negocio
 
-- **Coste operativo cero** en fase inicial: Supabase (DB + Auth), Cloudflare R2 (media), GCP Cloud Run u Oracle Micro (API), OpenRouter free, modelos `:free`. Oracle ARM sigue como north star.
-- Escalado **proporcional al volumen**: cuando haya usuarios de pago, ampliar recursos o activar modelos de pago sin saltos desproporcionados.
-- Monetización por **volumen de usuarios** con ticket bajo (freemium, créditos, suscripción familiar).
+- **Coste operativo bajo** en fase inicial: DreamHost (app+API+media), Supabase (DB + Auth), OpenRouter free. R2/CDN y Oracle ARM = evolución / north star.
+- Escalado **proporcional al volumen**: cuando haya usuarios de pago, ampliar recursos o activar modelos de pago sin saltos desproporcionados.- Monetización por **volumen de usuarios** con ticket bajo (freemium, créditos, suscripción familiar).
 - Desarrollo asistido por IA; el cuello de botella no es el tiempo de código sino la **definición de producto y validación con padres**.
 
 ---
@@ -184,9 +183,8 @@ La narrativa **no está pre-escrita** de forma rígida. Actúa como hilo conduct
 
 ### Flujo
 
-1. La API **FastAPI** recoge el **estado del jugador** desde PostgreSQL (perfil, niveles por materia, historial narrativo).
-2. El **motor de agentes** (LangGraph, véase §10.6) selecciona modelo vía OpenRouter y construye el prompt con contexto RAG del viaje.
-3. El LLM genera: introducción narrativa, contexto del siguiente reto, tono emocional.
+1. La API **PHP** recoge el **estado del jugador** desde PostgreSQL (perfil, niveles por materia, historial narrativo).
+2. El **motor de agentes** (LangGraph u orquestación futura, §10.6) selecciona modelo vía OpenRouter y construye el prompt con contexto RAG del viaje.3. El LLM genera: introducción narrativa, contexto del siguiente reto, tono emocional.
 4. Salida validada con **Pydantic**; texto adaptado al nivel lector; opcional **TTS** (*post-MVP*).
 5. Tras la sesión, el niño **elige** la siguiente ruta; la elección y el texto generado se **guardan** en `story_beats`.
 6. En la siguiente sesión, el motor **lee los beats anteriores** — no regenera desde cero puntos ya vividos.
@@ -292,8 +290,7 @@ api_usage                -- cuotas IA por usuario/modelo/día
 
 ### Políticas
 
-- La app móvil **nunca** accede a PostgreSQL directamente; solo vía **API FastAPI** con JWT validado.
-- Autorización en capa API: cada padre solo opera sobre sus `children` (equivalente funcional a RLS).
+- La app móvil **nunca** accede a PostgreSQL directamente; solo vía **API PHP** con JWT validado.- Autorización en capa API: cada padre solo opera sobre sus `children` (equivalente funcional a RLS).
 - Retención y borrado: política RGPD / menores (*pendiente legal*).
 
 ### Contrato API (vista agregada)
@@ -343,17 +340,17 @@ Una sola base de código **web** (`web/`) sirve navegador y, en fase posterior, 
 | Capa | Tecnología | Notas |
 | --- | --- | --- |
 | **App cliente** | **HTML + CSS + JS** en `web/`; **Capacitor** (fase posterior) | Android + iOS vía WebView nativo |
-| **Backend / API** | **FastAPI** (Python 3.11+) | Asíncrono; Pydantic; streaming de respuestas IA |
-| **Agentes y RAG** | **LangGraph** (+ LangChain según necesidad) | Flujos multi-agente: narrativa, validación pedagógica, formato |
-| **Base de datos** | **PostgreSQL + pgvector** | Relacional + vectorial en el mismo motor |
-| **Auth** | **Supabase Auth** (*recomendado MVP*) o JWT propio en FastAPI | Ver §10.8 |
-| **Storage de archivos** | Supabase Storage (*opcional*) o volumen en Oracle | Avatares e imágenes *post-MVP* |
+| **Backend / API** | **PHP 8.2+** (`api/` + `shared/`) | Mismo origen que `web/`; DreamHost en prod |
+| **Agentes y RAG** | **Fase posterior** (LangGraph u orquestación acordada) | Narrativa, validación pedagógica — no bloquea MVP hosting |
+| **Base de datos** | **PostgreSQL + pgvector** (Supabase) | Relacional + vectorial |
+| **Auth** | **Supabase Auth** | JWT validado en PHP — ver §10.8 |
+| **Storage de archivos** | **Filesystem `web/media/`** (MVP); R2 vía driver S3 (*evolución*) | [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md) |
 | **IA** | **OpenRouter** (modelos `:free`) | Gateway unificado; ver §10.6 |
-| **Proxy / TLS** | **Traefik** o **Nginx Proxy Manager** | Solo en producción (Oracle) |
-| **Contenedores** | **Docker + Docker Compose** | Local y producción con el mismo modelo |
+| **Proxy / TLS** | nginx (Docker/DreamHost); Traefik en north star OCI | Producción DreamHost o Oracle |
+| **Contenedores** | **Docker + Docker Compose** | Local (`poc-up`); prod DreamHost no requiere compose |
 | **TTS (opcional)** | API de voz del proveedor elegido | *Post-MVP* |
-| **CI/CD** | GitHub Actions | Tests, build imagen Docker; Capacitor build móvil (fase posterior) |
-| **Web comercial** | **Vercel + Next.js** (*opcional*) | Solo landing/marketing; no aloja backend ni app móvil |
+| **CI/CD** | GitHub Actions | Tests PHPUnit; Capacitor build móvil (fase posterior) |
+| **Web comercial** | **Vercel + Next.js** (*opcional*) | Solo landing/marketing |
 | **Pagos** | Stripe (*futuro*) | Sin coste fijo |
 
 ### 10.4 Entornos: local vs producción
@@ -368,20 +365,20 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 │                                                          │
 │  ┌──────────────┐    ┌─────────────────────────────┐   │
 │  │ web/ (app)   │    │  Docker Compose (local)      │   │
-│  │ navegador /  │───►│  • FastAPI (backend)         │   │
-│  │ Electron dev │    │  • MinIO (R2 sim)            │   │
+│  │ navegador /  │───►│  • nginx + PHP-FPM (api/)    │   │
+│  │ Electron dev │    │  • media: web/media/         │   │
 │  └──────────────┘    │  • Supabase CLI (54321)      │   │
 │                      └─────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
 ```
 
-- **Backend y storage** corren en Docker + Supabase CLI en el PC.
-- **Frontend:** `./scripts/poc-up.ps1` → app+API en `http://localhost:8082`; preview móvil PC con `./scripts/poc-web-preview.ps1` (Electron 390×844).
-- Sin PHP ni runtime nativo en el host Windows más allá de Node/Docker; ver reglas del workspace.
+- **Backend y media** en Docker (`:8082`); Supabase CLI para Auth/DB.
+- **Frontend:** `./scripts/poc-up.ps1` → app+API en `http://localhost:8082`; preview móvil con `./scripts/poc-web-preview.ps1` (Electron 390×844).
+- Sin PHP nativo en el host Windows; ver reglas del workspace. Spec: [.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md).
 
 #### Producción
 
-**MVP (activo):** Modern Free Tier Stack — diagrama en §10.5.1.
+**MVP (activo):** DreamHost PHP + Supabase + media local — diagrama en §10.5.1.
 
 **North star (Oracle ARM monolito):**
 
@@ -392,7 +389,7 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 │  ┌─────────────────────────────────────────────────┐   │
 │  │  Docker Compose                                  │   │
 │  │  • Traefik / NPM  (80, 443, Let's Encrypt)      │   │
-│  │  • FastAPI        (backend)                      │   │
+│  │  • PHP API / nginx (o runtime acordado)         │   │
 │  │  • PostgreSQL + pgvector (volumen persistente)  │   │
 │  └─────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
@@ -406,50 +403,48 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 
 **Ventaja del monolito:** API y Postgres en la **misma máquina** → latencia RAG ~1 ms. El stack Supabase + R2 + Cloud Run sacrifica esa latencia a cambio de disponibilidad inmediata sin stock ARM.
 
-### 10.5 Hosting — dos vías (junio 2026)
+### 10.5 Hosting — vías (julio 2026)
 
 | Vía | Estado | Descripción |
 | --- | --- | --- |
-| **A — Modern Free Tier Stack** | **MVP activo** | Supabase (DB + Auth) + Cloudflare R2 + FastAPI; compute en **GCP Cloud Run** *o* **Oracle AMD Micro** (pendiente elegir) |
-| **B — Monolito Oracle ARM** | North star / bloqueado por stock | FastAPI + Postgres/pgvector en una VM `VM.Standard.A1.Flex` 6 GB, Docker Compose (§10.4) |
+| **A — DreamHost PHP + Supabase + media local** | **MVP activo** | App+API PHP en DreamHost; Supabase DB+Auth; ficheros en `web/media/` — [SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md) |
+| **B — Object storage R2 (+ CDN)** | Evolución | Driver S3 cuando escala lo exija — [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md) |
+| **C — Monolito Oracle ARM** | North star / bloqueado por stock | Compute Always Free `VM.Standard.A1.Flex` 6 GB (§10.4); API puede ser PHP u otro runtime acordado |
 
-Spec detallada: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
+Spec MVP: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
-#### 10.5.1 Modern Free Tier Stack (arquitectura MVP)
+#### 10.5.1 DreamHost PHP (arquitectura MVP activa)
 
 ```
 ┌─────────────┐     JWT (Supabase)      ┌─────────────────────────────┐
-│  App web    │ ───────────────────────►│  FastAPI + LangGraph        │
-│  Capacitor  │     HTTPS               │  GCP Cloud Run  OR          │
-└──────┬──────┘                         │  Oracle AMD Micro (TBD)     │
-       │                                └───────┬──────────┬──────────┘
-       │ URLs de media (JSON)                  │          │
-       │ directo desde app                     │          │
-       ▼                                       ▼          ▼
-┌─────────────┐                         ┌──────────┐  ┌──────────┐
-│ Cloudflare  │                         │ Supabase │  │OpenRouter│
-│ R2          │                         │ Postgres │  │ (IA)     │
-│ avatares,   │                         │ + Auth   │  └──────────┘
-│ audios      │                         │ pgvector │
+│  App web    │ ───────────────────────►│  PHP API (mismo origen)     │
+│  Capacitor  │     HTTPS               │  DreamHost                  │
+└──────┬──────┘                         └───────┬─────────────────────┘
+       │ GET /media/...                         │
+       ▼                                        ▼
+┌─────────────┐                         ┌──────────┐
+│ Filesystem  │                         │ Supabase │
+│ web/media/  │                         │ Postgres │
+│ (MVP)       │                         │ + Auth   │
 └─────────────┘                         └──────────┘
 ```
 
-**Piezas fijas:**
+**Piezas fijas (MVP):**
 
-- **Supabase:** Postgres (pgvector) + Auth. La app obtiene JWT; FastAPI lo valida y accede a la BD con `DATABASE_URL` solo en servidor.
-- **Cloudflare R2:** buckets S3-compatible (`boto3`). La BD guarda URLs; **no** usar Supabase Storage (límite egress 2 GB/mes en free).
-- **FastAPI:** agentes, RAG, subida a R2 (URLs firmadas si hace falta), **nunca** proxy de imágenes al cliente (protege egress de Cloud Run).
+- **Supabase:** Postgres (pgvector) + Auth. La app obtiene JWT; PHP lo valida.
+- **Media:** filesystem bajo `web/media/` (local Docker / DreamHost). **No** R2 ni MinIO en MVP.
+- **PHP:** API en el mismo dominio que `web/`.
 
-**Backend (pendiente de elegir):**
+**Histórico (jun 2026):** POC FastAPI + MinIO — [SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md) (supersedida). Guía local actual: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md) + [SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md).
 
-| Opción | Pros | Contras |
-| --- | --- | --- |
-| **GCP Cloud Run** | 2 GB+ RAM por contenedor, EU, cero sysadmin, Always Free generoso | Cold start; vigilar egress GCP (1 GB/mes free) |
-| **Oracle AMD Micro** | EU Madrid, sin cold start, misma cuenta OCI | 1 GB RAM ajustado; más stock que ARM pero no garantizado |
+#### 10.5.1b Evolución documentada (R2 / Cloud Run / FastAPI)
 
-Mismo `Dockerfile` para ambos destinos.
+> Conservada como **roadmap / alternativas**, no como MVP. El diagrama antiguo (FastAPI + R2 + Cloud Run u Oracle Micro) queda como opción de escala o experimento; el código producto MVP es PHP.
 
-**POC local (jun 2026):** stack validado con Docker Compose (FastAPI + MinIO) + Supabase CLI + cliente `web/`. Guía: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md); spec: [.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
+**Piezas de esa vía (no activas en MVP):**
+
+- Cloudflare R2 vía `STORAGE_DRIVER=s3`.
+- Compute Cloud Run u Oracle Micro si se retoma un runtime distinto de DreamHost.
 
 #### 10.5.2 Neon vs Supabase
 
@@ -466,26 +461,30 @@ Metáfora: **Neon = solo el motor** (Postgres serverless); **Supabase = el coche
 
 **Decisión KidepiK:** **Supabase** (DB + Auth) para acelerar MVP. Neon como plan C si límites de Supabase free bloquean.
 
-#### 10.5.3 Cloudflare R2 (storage de media)
+#### 10.5.3 Cloudflare R2 (evolución de media — no MVP)
 
-- Rival de S3 con **egress gratuito** (crítico para app B2C con imágenes).
+> MVP usa `web/media/`. R2 cuando escala lo exija ([SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md)).
+
+- Rival de S3 con **egress gratuito** (crítico a escala B2C).
 - Free tier orientativo: 10 GB almacenamiento, 10M lecturas/mes, 1M escrituras/mes.
-- API **compatible S3** — `boto3` en FastAPI con endpoint R2.
+- API **compatible S3** — driver PHP o SDK cuando se active `STORAGE_DRIVER=s3`.
 
-**Supabase Storage free (por qué no):** 1 GB disco, **2 GB egress/mes** (~10k vistas de avatar a 200 KB). Bloqueo o upgrade Pro (~25 $/mes) al superar. R2 evita ese cuello de botella.
+**Supabase Storage free (por qué no):** 1 GB disco, **2 GB egress/mes**. Bloqueo o upgrade Pro al superar.
 
-#### 10.5.4 GCP Cloud Run — coste 0 y candados
+#### 10.5.4 GCP Cloud Run (alternativa histórica / no MVP)
 
-Preferido frente a **Compute Engine e2-micro** (1 GB RAM, free solo en US, insuficiente para LangGraph).
+> Conservado como opción de compute si se abandona DreamHost. **No** es el MVP jul 2026.
+
+Preferido históricamente frente a **Compute Engine e2-micro** (1 GB RAM, free solo en US).
 
 | Parámetro deploy | Valor | Motivo |
 | --- | --- | --- |
 | `min-instances` | `0` | Escala a cero |
 | `max-instances` | `1`–`2` | Evitar factura por picos / DDoS |
-| `concurrency` | `80` | FastAPI async; menos instancias |
+| `concurrency` | `80` | Menos instancias |
 | Región | EU | Latencia con Supabase EU |
 
-**Regla de egress:** FastAPI solo devuelve JSON con URL de R2; el móvil descarga la imagen **directo** de Cloudflare.
+**Regla de egress (si se usa object storage):** API solo JSON con URL; el cliente descarga media **directo**.
 
 **Alerta billing GCP:** presupuesto **0,01 €** con emails al 50 % / 90 % / 100 %.
 
@@ -495,8 +494,8 @@ Sigue siendo el diseño objetivo cuando haya stock en `eu-madrid-1`:
 
 | Perfil | OCPU | RAM | Uso |
 | --- | --- | --- | --- |
-| **Punto dulce** | 1 | **6 GB** | FastAPI + LangGraph + Postgres/pgvector |
-| AMD Micro | — | 1 GB | Solo API en stack híbrido (con Supabase + R2) |
+| **Punto dulce** | 1 | **6 GB** | API (PHP u otro acordado) + Postgres/pgvector (+ motor IA) |
+| AMD Micro | — | 1 GB | Solo API ligera en stack híbrido |
 
 - Stock ARM: `OUT_OF_CAPACITY` frecuente — `retry_provision_loop.py`.
 - Consideraciones: aarch64, security lists, backups propios.
@@ -522,7 +521,7 @@ Sigue siendo el diseño objetivo cuando haya stock en `eu-madrid-1`:
 #### Orquestación (LangGraph)
 
 ```
-Request narrativo (FastAPI)
+Request narrativo (API PHP)
        │
        ▼
 ┌─────────────────┐
@@ -561,15 +560,15 @@ Request narrativo (FastAPI)
 
 ```
 ┌─────────────┐     JWT (Supabase)      ┌──────────────────┐
-│  App web    │ ───────────────────────►│  FastAPI         │
+│  App web    │ ───────────────────────►│  PHP API         │
 │  Capacitor  │     HTTPS only          │  /api/v1/*       │
 └──────┬──────┘                         └────────┬─────────┘
        │                                         │
-       │ media URLs (directo)                    │ DATABASE_URL, R2 keys
+       │ GET /media/... (MVP)                    │ DATABASE_URL
        ▼                                         ▼
 ┌─────────────┐                         ┌──────────────────┐
-│ Cloudflare  │                         │  Supabase        │
-│ R2          │                         │  Postgres        │
+│ web/media/  │                         │  Supabase        │
+│ (o R2 fut.) │                         │  Postgres        │
 └─────────────┘                         └──────────────────┘
                                                  │
                                     OPENROUTER_API_KEY (solo servidor)
@@ -582,9 +581,9 @@ Request narrativo (FastAPI)
 | Secreto | Dónde vive | Quién lo usa |
 | --- | --- | --- |
 | Clave pública Supabase (anon) | App | App → Supabase Auth |
-| `DATABASE_URL` (Supabase) | Solo servidor / Cloud Run secrets | FastAPI → Postgres |
-| `SUPABASE_JWT_SECRET` o JWKS | Solo servidor | FastAPI valida JWT |
-| `R2_ACCESS_KEY` / `R2_SECRET` / bucket | Solo servidor | FastAPI → R2 (put, URLs firmadas) |
+| `DATABASE_URL` (Supabase) | Solo servidor | PHP → Postgres |
+| JWKS / validación JWT Supabase | Solo servidor | PHP valida JWT |
+| Credenciales R2 (*evolución*) | Solo servidor | Driver S3 cuando se active |
 | `OPENROUTER_API_KEY` | Solo servidor | Motor IA |
 | JWT del usuario | Memoria segura en app | Cada llamada a API |
 
@@ -595,27 +594,26 @@ Request narrativo (FastAPI)
 - Rate limiting por usuario (p. ej. 30 req/min) para proteger cuotas free de IA.
 - Sin secretos de IA ni credenciales de BD en el bundle de la app.
 
-### 10.8 Supabase y Cloudflare R2
+### 10.8 Supabase y media
 
 #### Supabase (DB + Auth — sí; Storage — no)
 
 | Pieza Supabase | ¿Usarla en KidepiK? |
 | --- | --- |
-| PostgreSQL hospedado (+ pgvector) | **Sí — BD principal en MVP** (Modern Free Tier Stack) |
-| Auth (email, Google, Apple) | **Sí** — JWT hacia FastAPI |
-| Storage | **No** — egress 2 GB/mes en free; usar **R2** |
-| Edge Functions | **No** — sustituidas por FastAPI |
-| API REST automática (PostgREST) | **No** — la app habla con FastAPI |
+| PostgreSQL hospedado (+ pgvector) | **Sí — BD principal en MVP** |
+| Auth (email, Google, Apple) | **Sí** — JWT hacia API PHP (MVP: Google) |
+| Storage | **No** — egress 2 GB/mes en free; MVP usa `web/media/`; R2 en evolución |
+| Edge Functions | **No** — lógica en PHP |
+| API REST automática (PostgREST) | **No** — la app habla con `/api/v1` PHP |
 
-Flujo: la app obtiene JWT de Supabase Auth → FastAPI valida JWT → lee/escribe en Postgres Supabase.
+Flujo: la app obtiene JWT de Supabase Auth → PHP valida JWT → lee/escribe en Postgres Supabase.
 
-En el **monolito Oracle ARM** (futuro), Postgres podría volver a ser local en Docker; Auth y R2 pueden mantenerse o migrarse según coste/latencia.
+En el **monolito Oracle ARM** (futuro), Postgres podría ser local en Docker; Auth puede mantenerse.
 
-#### Cloudflare R2 (media)
+#### Media (MVP local; R2 evolución)
 
-- Avatares, audios narrados, PDFs imprimibles.
-- FastAPI sube objetos y persiste **URL** en Postgres; la app descarga **directo** de R2 (no pasar por Cloud Run).
-- Integración vía `boto3` (API S3-compatible).
+- MVP: ficheros bajo `web/media/`; BD guarda URLs/rutas.
+- Evolución: driver S3 (R2) sin cambiar contrato de URLs en Postgres — [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md).
 
 Ver [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
@@ -670,16 +668,14 @@ La infraestructura Oracle se provisionará y operará con **agentes de Cursor** 
 
 | Fase | Usuarios | Infra | IA |
 | --- | --- | --- | --- |
-| **0 — MVP** | < 500 | Supabase + R2 + Cloud Run *u* Oracle Micro; local Docker para dev | Solo modelos `:free` vía OpenRouter |
-| **1 — Tracción** | 500–5k | Ampliar cuotas / Supabase Pro si hace falta; evaluar ARM Oracle | Mix free + modelos pago con techo |
+| **0 — MVP** | < 500 | DreamHost PHP + Supabase + media local; Docker `poc-up` en dev | Solo modelos `:free` vía OpenRouter |
+| **1 — Tracción** | 500–5k | Ampliar cuotas / Supabase Pro; valorar R2; evaluar ARM Oracle | Mix free + modelos pago con techo |
 | **2 — Escala** | > 5k | Monolito ARM o piezas gestionadas según cuello de botella | Router por tier (free vs premium) |
-
 ### 10.13 Principios de código
 
 - SOLID, KISS, YAGNI.
-- Separar: UI móvil · API FastAPI · motor IA (LangGraph) · persistencia (Postgres).
-- **Paridad local/producción:** mismo `docker-compose.yml` (o override por entorno).
-- Preparar módulos futuros: avatar 3D, píldoras, panel padres, ingesta RAG de corpus pedagógico.
+- Separar: UI web · API PHP · motor IA (fase posterior) · persistencia (Postgres).
+- **Paridad local/producción:** mismo contrato HTTP; local vía Docker PHP (`poc-up`), prod DreamHost.- Preparar módulos futuros: avatar 3D, píldoras, panel padres, ingesta RAG de corpus pedagógico.
 
 ---
 
@@ -736,9 +732,9 @@ Objetivo: **margen alto** por uso de APIs free al inicio y precio bajo × muchos
 
 Antes de implementar, cerrar en specs derivadas (`.cursor/specify/`) y operativa (`.cursor/operations/`):
 
-- [ ] `docker-compose.yml` local (api + postgres + pgvector) y override producción.
-- [ ] Migraciones SQL definitivas (tablas §9, índices, extensión pgvector).
-- [ ] Módulos FastAPI + esqueleto LangGraph (agentes narrador, validador, router).
+- [x] Stack Docker local PHP + Supabase (`poc-up`) — ver SPEC_POC_DOCKER_LOCAL_DEV.
+- [ ] Migraciones SQL definitivas producto (tablas §9, índices, extensión pgvector) — parcial vía PHP legal/bootstrap.
+- [ ] Motor IA / agentes (LangGraph u alternativa) acoplado a API PHP.
 - [ ] Enums de materias y niveles por edad (MVP: 2–3 materias).
 - [ ] System prompts: examen de acceso, beat narrativo, generación de reto.
 - [ ] Model router OpenRouter: orden de fallback y límites por usuario.
@@ -746,8 +742,8 @@ Antes de implementar, cerrar en specs derivadas (`.cursor/specify/`) y operativa
 - [ ] Flujo de pantallas MVP: registro → mundo → examen de acceso → mapa → lección → elección.
 - [ ] Terraform OCI (o scripts CLI) para VM ARM — **mantenidos por agentes Cursor**.
 - [ ] Playbook post-provisionado SSH (Docker, despliegue, backups Postgres).
-- [ ] Decisión Auth: Supabase Auth vs JWT propio.
-- [ ] Política de privacidad y consentimiento parental (COPPA / RGPD).
+- [x] Decisión Auth MVP: Supabase Auth + Google.
+- [ ] Política de privacidad y consentimiento parental (COPPA / RGPD) — textos legales en app parcialmente.
 - [ ] Comprobación final de marca **KidepiK** (OEPM, EUIPO, Play Store, App Store, dominio).
 - [ ] Landing marketing en Vercel (*opcional*).
 

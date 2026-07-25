@@ -1,146 +1,97 @@
 # Spec: Pantalla Loader (splash de arranque)
 
-> Estado: **aprobada e implementada** (junio 2026); salida a producto supersedida por [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md) (jul 2026).  
-> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [LOADER_SCREEN_AI_PROMPTS.md](LOADER_SCREEN_AI_PROMPTS.md), [docs/kidepik.md](../../docs/kidepik.md) §2  
-> Limpieza dead code / rutas: [SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md](SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md)
+> Estado: **implementada** (jun–jul 2026). Salida a producto: [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md).  
+> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [LOADER_SCREEN_AI_PROMPTS.md](LOADER_SCREEN_AI_PROMPTS.md), [SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md](SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md)
 
 ## Contexto
 
-La pantalla loader es el **primer contacto visual** con KidepiK: comunica la promesa de producto (aprendizaje gamificado, dos mundos) y termina en la **puerta de auth** (gate), no en una galería de mockups.
+La pantalla loader es el **primer contacto visual** con KidepiK: comunica la promesa de producto (aprendizaje gamificado, dos mundos) y termina en la **puerta de auth** (gate + morph), no en una galería de mockups.
 
-> **Histórico:** una versión temprana del POC usaba placeholder SVG + `navigate("/gallery")`. Esa galería **ya no existe** en `web/`; no reintroducir `#/gallery` ni `#/mockup/*`.
+> **Histórico:** el POC temprano usaba placeholder SVG + `navigate("/gallery")`. Esa galería **no existe** en `web/`; no reintroducir `#/gallery` ni `#/mockup/*`.
 
 ## Objetivo
 
-Pantalla de carga **premium, muy visual**, que muestre **simultáneamente** los dos universos (Fantasía y Space Opera), con logo, progreso, motion y eslogan — sin depender del tema ya elegido por el usuario.
+Pantalla de carga **premium, muy visual**, que muestre **simultáneamente** los dos universos (fantasía abajo / space arriba en bandas procedurales), con logo ambigrama, anillo de progreso y eslogan — sin depender del tema elegido por el usuario para el contenido dual.
 
-## Principios de diseño
+## Principios de diseño (vigentes)
 
-| Principio | Decisión |
+| Principio | Decisión actual |
 | --- | --- |
-| Dual mundo visible | Composición **diptico vertical** (mitad superior fantasía, mitad inferior space opera) con **frontera luminosa** central donde vive el logo |
-| No es selector | No hay botones de mundo aquí; solo **preview** de ambas ambientaciones |
-| Arte raster | Fondo hero ilustrado (`loader-bg-dual.webp`); sin SVG procedural como destino final |
-| Logo | Wordmark **ambigrama** `KidepiK` (asset raster o SVG); ver § Logo |
-| Progreso | Barra o anillo **bicolor** (verde/dorado ↔ azul/blanco) sincronizado con carga real + mínimo de tiempo |
-| Motion | CSS + Lottie opcional (partículas); Rive en fase 2 si hay asset |
-| Accesibilidad | `prefers-reduced-motion`: progreso estático, sin partículas |
-| Público | Niños 7–9 y padres; texto legible en 390×844 |
-
-## Composición (wire ASCII)
-
-```
-┌─────────────────────────────┐
-│  [Fantasy illustration]     │  ← bosque encantado, runas, dorado/verde
-│         ·  ✦  ·             │
-├ ─ ─ ─ ─ ✦ LOGO ✦ ─ ─ ─ ─ ─ ┤  ← franja central ~22% altura, logo + glow
-│  [Space illustration]       │  ← nebulosa, estrellas, azul/blanco
-│         ·  ★  ·             │
-├─────────────────────────────┤
-│  ████████░░░░  72%          │  ← barra progreso bicolor
-│  «Dos mundos. Un viaje      │  ← eslogan fijo (display)
-│     épico.»                  │
-│  Despertando las runas…      │  ← frase rotatoria (status)
-│  Toca para continuar         │  ← hint tras 1,5 s o 30% progreso
-└─────────────────────────────┘
-```
+| Dual mundo visible | Capas procedurales + clip de bandas: **space** (órbita, meteoritos) y **fantasía** (terreno, cielo, elementos). Fondo raster `loader.bg.plain` |
+| No es selector | Sin botones de mundo; preview de ambas ambientaciones |
+| Arte | Fondo plano + motor procedural (ver specs `SPEC_LOADER_FANTASY_*` / meteor / space). Un diptico raster único **no** es el runtime actual |
+| Logo | Wordmark ambigrama `loader.logo` (`wordmark-ambigram-light.png`) |
+| Progreso | Anillo SVG bicolor + textos circulares «DOS MUNDOS» / «UN VIAJE ÉPICO»; ~4,5 s (`DURATION_MS`) |
+| Accesibilidad | `prefers-reduced-motion`: progreso y revelado colapsados |
+| Público | Niños 7–9 y padres; viewport canónico 390×844 |
 
 ## Logo — ambigrama KidepiK
 
-Requisitos tipográficos (marca):
-
-- Palabra: **KidepiK** (K mayúscula, i minúscula, d, e, p, i, K).
-- **e central**: simetría rotacional 180° — se lee igual al derecho y al revés.
-- **i y K finales**: diseñadas como par ambigráfico para que, al **invertir la imagen 180°**, sigan leyendo como `i` + `K` finales (y el conjunto mantenga legibilidad de marca).
-- **d y p**: intercambio visual al rotar 180° (coherente con [docs/kidepik.md](../../docs/kidepik.md) §2).
-- Estilo: limpio, premium, sin mascotas ni personajes dentro del wordmark.
-- Variantes de entrega: `wordmark-ambigram-light.webp` (sobre oscuro), `wordmark-ambigram-dark.webp` (sobre claro), opcional SVG.
+- Palabra: **KidepiK**; e central con simetría 180° (ver [docs/kidepik.md](../../docs/kidepik.md) §2).
+- **Runtime:** solo variante light sobre fondo oscuro (`web/assets/shared/logo/wordmark-ambigram-light.png`).
+- Variante dark / WebP dual: prompts históricos en [LOADER_SCREEN_AI_PROMPTS.md](LOADER_SCREEN_AI_PROMPTS.md); **no** están en el manifest de runtime.
 
 ## Copy (español)
 
 | Elemento | Texto |
 | --- | --- |
-| **Eslogan principal** | «Dos mundos. Un viaje épico.» |
-| **Eslogan alternativo** (A/B futuro) | «Aprende jugando. Elige tu universo.» |
-| **Frases de estado** (rotación 2,5 s) | Ver tabla § Frases rotatorias |
-| **Hint skip** | «Toca para continuar» (visible tras delay o progreso > 25%) |
-
-### Frases rotatorias
-
-Mezcla **ambos mundos** en una misma secuencia (no dependen de `localStorage`):
-
-1. «Despertando reinos de luz verde…»
-2. «Calibrando rutas entre estrellas…»
-3. «Las runas y las nebulosas conspiran…»
-4. «Preparando tu aventura…»
-5. «Casi listo, explorador…»
+| **Eslogan** | «Dos mundos. Un viaje épico.» (en anillo → dos líneas en auth) |
+| **Hint gate** | Ver [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md) («Pulsa para comenzar» / «tu viaje épico») |
 
 ## Comportamiento
 
 | Requisito | Detalle |
 | --- | --- |
-| **Entrada** | Ruta `#/loader` (default al abrir app) |
-| **Progreso** | Simulado 0→100% en **3,5–4,5 s** con easing; opcional: avanzar más rápido si `GET /health` responde antes |
-| **Salida** | Tras 100 % + gate: morph a auth embebido (ver [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md)). **No** `navigate("/gallery")` (ruta eliminada). |
-| **Skip** | Tap en cualquier parte del contenido tras 1,5 s o progreso ≥ 25% |
-| **Tema `data-theme`** | Loader **no** cambia tema global; usa tokens neutros en chrome (barra, texto) sobre arte dual |
-| **Assets** | Manifest en `web/js/lib/assets.manifest.js` (nuevo) |
-| **Offline** | Fondo y logo en cache SW |
+| **Entrada** | `#/loader` (default) |
+| **Progreso** | 0→100 % en ~4,5 s; `gateDemo=1` acelera (~800 ms). Ver flags en `loader-world-utils.js` |
+| **Salida** | Gate → morph auth embebido o `#/home` si hay sesión ([SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md)) |
+| **Tema `data-theme`** | Se inicializa (`initTheme`); el loader dual no es un toggle de mundo |
+| **Assets** | `web/js/lib/assets.manifest.js` — slots activos: `loader.bg.plain`, `loader.logo` |
+| **Offline** | Precache SW de fondo + logo + CSS/JS núcleo |
 
-## Assets requeridos
+## Assets en runtime (manifest)
 
-| ID | Ruta objetivo | Dimensiones | Notas |
-| --- | --- | --- | --- |
-| `loader.bg.dual` | `web/assets/shared/screens/loader-bg-dual.webp` | 1080×1920 (9:16) | Diptico fantasía/space, **sin texto** |
-| `loader.logo` | `web/assets/shared/logo/wordmark-ambigram-light.webp` | ~800×280 px transparente | Sobre franja central oscura |
-| `loader.logo.alt` | `web/assets/shared/logo/wordmark-ambigram-dark.webp` | idem | Reserva |
-| `loader.particles.fantasy` | `web/assets/themes/fantasy/lottie/fireflies.json` | — | Opcional fase 1 |
-| `loader.particles.space` | `web/assets/themes/spaceOpera/lottie/stars-drift.json` | — | Opcional fase 1 |
-| `loader.accent.fantasy` | `web/assets/themes/fantasy/screens/loader-runes-glow.webp` | 1080×960 top half | Overlay multiply/screen opcional |
-| `loader.accent.space` | `web/assets/themes/spaceOpera/screens/loader-nebula-glow.webp` | 1080×960 bottom | Overlay opcional |
+| ID | Ruta | Notas |
+| --- | --- | --- |
+| `loader.bg.plain` | `web/assets/shared/screens/loader-bg-plain.png` | Fondo base |
+| `loader.logo` | `web/assets/shared/logo/wordmark-ambigram-light.png` | Ambigrama |
 
-Hasta tener arte final: gradiente + `PLACEHOLDER` badge discreto en dev (no en producción).
+Slots retirados del runtime (dead code jul 2026): `loader.bg.dual`, `loader.logo.alt`, `loader.particles.*`, `loader.ring`, accents webp inexistentes.
 
-## Implementación prevista (tras OK + assets)
+## Implementación (código)
 
-| Fichero | Cambio |
+| Fichero | Rol |
 | --- | --- |
-| `web/js/scenes/loader.js` | Reescritura: capas ilustración, logo `<img>`, barra progreso, frases, skip |
-| `web/js/components/loader-chrome.js` | Nuevo: montaje capas y animación progreso |
-| `web/js/lib/assets.manifest.js` | Nuevo: URLs por slot |
-| `web/css/components.css` | Estilos loader v2 (barra bicolor, franja central) |
-| `web/css/scenes/loader.css` | Opcional: estilos acotados a escena |
-| `web/sw.js` | Precache assets shared |
+| `web/js/scenes/loader.js` | Escena → `mountLoaderChrome` |
+| `web/js/components/loader-chrome.js` | Capas, anillo, revelado, gate, resume legal→auth |
+| `web/js/components/loader-world-utils.js` | Query params de depuración + helpers de montaje |
+| `web/css/scenes/loader.css` | Estilos escena + auth embebido |
+| Specs hijas | Fantasy engine, FX, meteoritos, etc. |
 
 ## Criterios de aceptación
 
-1. Viewport **390×844**: logo legible, eslogan ≥ 18px efectivos, barra visible.
-2. Usuario identifica **fantasía arriba y space abajo** sin leer texto.
-3. Progreso avanza de forma fluida; al completar → galería.
-4. Tap skip funciona tras condición definida.
-5. `prefers-reduced-motion`: sin animación de partículas ni pulso excesivo.
-6. Sin errores consola en flujo feliz.
-7. Playwright: captura en `tmp/playwright-output/loader-dual.png`.
+1. Viewport **390×844**: logo legible; anillo y hint visibles.
+2. Se perciben **ambos mundos** (bandas space / fantasía) sin leer texto.
+3. Progreso fluido; al completar → gate → auth o home (no galería).
+4. `prefers-reduced-motion` no rompe el flujo.
+5. Playwright: capturas bajo `tmp/playwright-output/`.
 
-### Capa orbital — naves procedurales (jun 2026)
+### Capa orbital — naves procedurales
 
-- Siluetas **modulares hard sci-fi** (`loader-ship-procedural.js`), inspiradas en concept art industrial (espina segmentada, pods, bloques asimétricos, greebles, antenas). **Sin fuselaje continuo tipo pepino.**
-- Archetypes → layouts: **fighter** (caza falcata / torre), **interceptor** (fragata de espina), **gunship** (bulk capital), **shuttle** (rig modular / torre). **14+ capas** SVG por nave.
-- Carriles **paralelos** a arcos orbitales; blanco puro `#fff`; sin propulsión/flama.
-- Tamaño ~38–44 px; tests en `web/tests/loader-ship-procedural.test.js`.
+- Siluetas hard sci-fi (`loader-ship-procedural.js`); tests en `web/tests/loader-ship-procedural.test.js`.
 
 ## Fuera de alcance
 
-- Selección de mundo (pantalla P1 separada).
-- Integración auth / bootstrap Supabase en loader (fase posterior).
-- Rive del anillo (fase 2 si hay diseño motion).
+- Selección de mundo (spec futura).
+- Rive del anillo (fase posterior si hay asset).
+- Galería de mockups (eliminada del cliente).
 
 ## Prompts IA
 
-Ver [LOADER_SCREEN_AI_PROMPTS.md](LOADER_SCREEN_AI_PROMPTS.md) — prompts listos para copiar y checklist de entrega.
+Ver [LOADER_SCREEN_AI_PROMPTS.md](LOADER_SCREEN_AI_PROMPTS.md) — archivo de prompts / checklist de arte; varios assets listados allí **no** están cableados en runtime.
 
 ## Aprobación
 
-- [x] Usuario aprueba composición diptico + copy.
-- [x] Prompts en fichero aparte para generación de assets.
-- [x] Implementación en `web/` (placeholder CSS hasta arte final).
+- [x] Composición dual + copy.
+- [x] Implementación en `web/` con motor procedural.
+- [x] Salida vía gate/auth ([SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md)).

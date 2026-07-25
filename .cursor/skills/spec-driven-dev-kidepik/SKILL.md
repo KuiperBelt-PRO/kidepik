@@ -32,9 +32,8 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 ## Cuándo usar (además de los criterios del hub)
 
-- Implementar o extender el **POC** (PHP + Docker nginx/php-fpm + Supabase + MinIO + cliente `web/`).
-- Añadir rutas API, auth JWT Supabase, storage S3-compatible, migraciones SQL o pantallas móvil con contrato en spec.
-- El usuario pide SDD/TDD y el cambio vive claramente en este repo.
+- Implementar o extender el **POC** (PHP + Docker nginx/php-fpm + Supabase + media `web/media/` + cliente `web/`).
+- Añadir rutas API, auth JWT Supabase, storage filesystem (o S3 futuro), migraciones SQL o pantallas móvil con contrato en spec.- El usuario pide SDD/TDD y el cambio vive claramente en este repo.
 
 ## Cuándo NO usar
 
@@ -90,8 +89,7 @@ docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/ph
 ```
 
 - Tests de integración HTTP contra `http://localhost:8082/api/v1/*` con stack levantado; mocks en unitarios.
-- Para integración con Postgres/MinIO: `./scripts/poc-up.ps1` obligatorio.
-
+- Para integración con Postgres / media local: `./scripts/poc-up.ps1` obligatorio.
 **Supabase:** validar migraciones con `supabase db reset` / stack local antes de dar por cerrada la fase.
 
 **Web:** `./scripts/poc-up.ps1` + MCP browser según [web-mobile-preview](../web-mobile-preview/SKILL.md) — **no** `poc-web-dev.ps1`.

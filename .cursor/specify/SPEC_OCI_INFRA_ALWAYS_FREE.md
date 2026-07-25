@@ -7,7 +7,7 @@
 
 Validar que la cuenta **eduserna** (home region **MAD** / `eu-madrid-1`) puede aprovisionar la VM **ARM** Always Free prevista como **north star** de hosting monolítico.
 
-El **MVP de producción** (junio 2026) sigue el [SPEC_HOSTING_FREE_TIER_STACK.md](SPEC_HOSTING_FREE_TIER_STACK.md): Supabase + R2 + FastAPI en Cloud Run u Oracle Micro. Esta spec OCI sigue siendo necesaria para el objetivo ARM y para Oracle Micro como compute alternativo.
+El **MVP de producción activo** (jul 2026) sigue el [SPEC_HOSTING_FREE_TIER_STACK.md](SPEC_HOSTING_FREE_TIER_STACK.md): **DreamHost PHP + Supabase + media local** (`web/media/`). R2 / FastAPI / Cloud Run **no** son el MVP actual (evolución o legado). Esta spec OCI sigue siendo necesaria para el **north star ARM** y para Oracle Micro como compute alternativo futuro.
 
 ## Alcance MVP de la validación
 

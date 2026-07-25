@@ -62,23 +62,23 @@ Nueva regla `.cursor/rules/web-mobile-preview.mdc`:
 
 | Flujo | Esperado |
 | --- | --- |
-| Loader | Wordmark + animación visible; tap salta |
-| Galería | Toggle tema cambia `data-theme` en `<html>` |
-| Mockup diálogo | Panel + texto legible |
-| Sin backend | Galería carga sin error en consola |
+| Loader | Wordmark + anillo; tras progreso, hint; tap → auth |
+| Auth embebido | CTA Google + enlaces legales |
+| Legal | `#/legal/terminos` o `#/legal/privacidad` carga markdown; FAB volver → loader/auth |
+| `#/auth` | Misma escena que loader (no standalone) |
 
 ## Integración con arranque POC
 
-1. `poc-up.ps1` — **obligatorio** (Supabase contenedores + Docker nginx/php/minio).
-2. ~~`poc-web-dev.ps1`~~ — **deprecado** (no usar `npx serve` en host).
-3. `poc-web-preview.ps1` — Electron, o agente Playwright contra `http://localhost:8082`.
+1. `poc-up.ps1` — **obligatorio** (Supabase contenedores + Docker nginx/php; media en `web/media/`).
+2. ~~`poc-web-dev.ps1`~~ — **deprecado** (stub → `poc-up`).
+3. `poc-web-preview.ps1` — Electron contra `:8082` (arranca `poc-up` si el puerto está libre); `-Static` usa `serve` solo sin API.
 
 ## Criterios de aceptación
 
 1. `pnpm install` en `tools/preview-electron/` + script raíz abre ventana 390×844.
 2. Agente documenta: MCP, URL, viewport, pasos.
-3. Captura PNG de galería en `tmp/playwright-output/`.
-4. Documentado en `docs/POC_LOCAL.md` (pendiente renombrar a `docs/POC_DOCKER.md`) y README.
+3. Captura PNG del flujo loader/auth/legal en `tmp/playwright-output/`.
+4. Documentado en `docs/POC_LOCAL.md` / overview y skill `web-mobile-preview`.
 
 ## Excluido
 

@@ -185,12 +185,14 @@ No bloquea la UI de auth; la UI navega a `#/home` con JWT en cliente hasta exist
 | Fichero | Cambio |
 | --- | --- |
 | `web/js/lib/supabase.js` | Cliente y helpers Google |
-| `web/js/scenes/auth.js` | Escena auth embebible desde loader |
-| `web/js/components/auth-panel.js` | CTA Google + legal |
+| `web/js/components/auth-panel.js` | CTA Google + legal (montado desde gate / chrome) |
+| `web/js/components/loader-gate.js` / `loader-auth-morph.js` | Entrada a auth embebido |
+| `web/js/scenes/auth-callback.js` | Callback OAuth → home o loader |
 | `web/js/scenes/home.js` | Placeholder post-login |
-| `web/js/main.js` | Rutas `auth/callback`, `home` |
-| `web/css/scenes/auth.css` | Estilos |
-| `web/package.json` | `@supabase/supabase-js` si no está |
+| `web/js/main.js` | Rutas `auth/callback`, `home`; `#/auth` → loader |
+| `web/css/scenes/loader.css` | Estilos `.auth-panel*` |
+| `web/css/scenes/auth.css` | Callback + home |
+| `web/package.json` | `@supabase/supabase-js` |
 | `supabase/config.toml` | Redirect URLs + Google provider |
 
 ## Aprobación

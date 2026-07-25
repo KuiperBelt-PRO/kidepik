@@ -16,15 +16,15 @@
   - MVP hosting: [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) — DreamHost + Supabase (actualizada jul 2026).
 - **POC local FastAPI (histórica, superseded):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
 - **Pivot frontend web-first (implementado jun 2026):** [specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md](specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md) — `web/` HTML/CSS/JS, puerto **8082**.
-- **Sistema visual v3 web premium:** [specify/SPEC_APP_VISUAL_DESIGN_V3.md](specify/SPEC_APP_VISUAL_DESIGN_V3.md)
-- **Pantalla Loader (splash dual mundo):** [specify/SPEC_LOADER_SCREEN.md](specify/SPEC_LOADER_SCREEN.md) — implementada jun 2026; prompts IA: [specify/LOADER_SCREEN_AI_PROMPTS.md](specify/LOADER_SCREEN_AI_PROMPTS.md)
-- **Loader → App / Auth (puerta de entrada):** [specify/SPEC_LOADER_APP_GATE.md](specify/SPEC_LOADER_APP_GATE.md) — **aprobada** jul 2026; hint 5 s post-100 %, morph in-place, tap disco central
-- **Limpieza dead code loader/auth/legal:** [specify/SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md](specify/SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md) — inventario + P0–P3; plan [tasks/LOADER_AUTH_LEGAL_DEAD_CODE_CLEANUP.md](tasks/LOADER_AUTH_LEGAL_DEAD_CODE_CLEANUP.md)
-- **Auth cuenta padre/tutor (Supabase):** [specify/SPEC_APP_AUTH.md](specify/SPEC_APP_AUTH.md) — **aprobada** jul 2026; Google solamente en MVP
+- **Sistema visual v3 web premium (dirección de arte; galería/mockups = futuro post-MVP):** [specify/SPEC_APP_VISUAL_DESIGN_V3.md](specify/SPEC_APP_VISUAL_DESIGN_V3.md)
+- **Pantalla Loader (splash + world procedural):** [specify/SPEC_LOADER_SCREEN.md](specify/SPEC_LOADER_SCREEN.md) — runtime jul 2026; prompts IA (archivo histórico de assets): [specify/LOADER_SCREEN_AI_PROMPTS.md](specify/LOADER_SCREEN_AI_PROMPTS.md)
+- **Loader → App / Auth (puerta de entrada):** [specify/SPEC_LOADER_APP_GATE.md](specify/SPEC_LOADER_APP_GATE.md) — **aprobada** jul 2026; hint **0,5 s** post-100 %, morph in-place; `#/auth` ≡ loader (sin escena auth standalone)
+- **Limpieza dead code loader/auth/legal (P0–P3 hecha jul 2026):** [specify/SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md](specify/SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md) — plan [tasks/LOADER_AUTH_LEGAL_DEAD_CODE_CLEANUP.md](tasks/LOADER_AUTH_LEGAL_DEAD_CODE_CLEANUP.md)
+- **Auth cuenta padre/tutor (Supabase):** [specify/SPEC_APP_AUTH.md](specify/SPEC_APP_AUTH.md) — **aprobada** jul 2026; Google solamente en MVP; panel embebido en loader
 - **Migraciones PHP + documentos legales:** [specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md) — **aprobada** jul 2026; auto-apply en bootstrap, historial compartido con Supabase, Términos/Privacidad versionados
 - **Loader — lluvia de meteoritos (franja superior):** [specify/SPEC_LOADER_METEOR_SHOWER.md](specify/SPEC_LOADER_METEOR_SHOWER.md) — implementada jun 2026
 - **Loader — terreno fantasía (base inferior):** [specify/SPEC_LOADER_FANTASY_TERRAIN.md](specify/SPEC_LOADER_FANTASY_TERRAIN.md) — implementada jun 2026
-- **Loader — motor de elementos de fantasía (propuesta jun 2026):** arquitectura del motor procedural (castillos, aldeas, torres, bosques, cristales, megalitos, portales) con construcción progresiva y erosión.
+- **Loader — motor de elementos de fantasía:** arquitectura del motor procedural (castillos, aldeas, torres, bosques, cristales, megalitos, portales) con construcción progresiva y erosión.
   - Motor: [specify/SPEC_LOADER_FANTASY_ENGINE.md](specify/SPEC_LOADER_FANTASY_ENGINE.md)
   - Castillos y palacios (primer builder): [specify/SPEC_LOADER_FANTASY_CASTLE.md](specify/SPEC_LOADER_FANTASY_CASTLE.md)
   - Acantilados y rocas en bordes: [specify/SPEC_LOADER_FANTASY_CLIFFS.md](specify/SPEC_LOADER_FANTASY_CLIFFS.md)

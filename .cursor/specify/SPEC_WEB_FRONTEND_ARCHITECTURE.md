@@ -2,7 +2,8 @@
 
 > Estado: **aprobada** (junio 2026)  
 > Cliente de producto: **HTML/CSS/JS** en `web/`.  
-> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_DEV_PREVIEW.md](SPEC_WEB_DEV_PREVIEW.md), [SPEC_CAPACITOR_MOBILE_SHELL.md](SPEC_CAPACITOR_MOBILE_SHELL.md), [SPEC_POC_LOCAL_ARCHITECTURE.md](SPEC_POC_LOCAL_ARCHITECTURE.md), [docs/kidepik.md](../../docs/kidepik.md)
+> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_DEV_PREVIEW.md](SPEC_WEB_DEV_PREVIEW.md), [SPEC_CAPACITOR_MOBILE_SHELL.md](SPEC_CAPACITOR_MOBILE_SHELL.md), [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [docs/kidepik.md](../../docs/kidepik.md)  
+> Histórico POC FastAPI: [SPEC_POC_LOCAL_ARCHITECTURE.md](SPEC_POC_LOCAL_ARCHITECTURE.md) (supersedida).
 
 ## Objetivo
 
@@ -10,7 +11,7 @@ Migrar el **cliente de producto** a una **aplicación web** en **HTML + CSS + Ja
 
 1. **Desarrollo y pruebas** en navegador y shell Electron (viewport móvil fijo).
 2. **Distribución móvil** vía **Capacitor** (Android/iOS) cuando corresponda — empaqueta los mismos ficheros estáticos.
-3. **Backend (jul 2026):** API **PHP** en el mismo origen que `web/`; Supabase + R2/MinIO como fuente de datos y media. Ver [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md).
+3. **Backend (jul 2026):** API **PHP** en el mismo origen que `web/`; Supabase Auth/DB + **media local** (`web/media/`). Ver [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) y [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md). R2/S3 = evolución futura, no MVP.
 
 ## ¿Hace falta Vite (u otro bundler)?
 
@@ -100,12 +101,12 @@ kidepik/
         fantasy/
         spaceOpera/
     sw.js                     # offline mínimo
-    package.json              # solo deps JS (supabase, @rive-app/canvas, lottie-web)
+    package.json              # scripts: test + preview:static (serve opcional)
   tools/
     preview-electron/
   api/                      # Backend PHP (mismo origen en prod)
   scripts/
-    poc-up.ps1              # Docker: web + PHP + MinIO
+    poc-up.ps1              # Docker: web + PHP (+ Supabase CLI)
     poc-web-preview.ps1
 ```
 
@@ -145,7 +146,7 @@ kidepik/
 2. Loader → auth → legal; `#/auth` ≡ loader.
 3. Electron preview 390×844 OK.
 4. Playwright agente con viewport móvil + capturas en `tmp/playwright-output/`.
-5. Tras primera carga online, galería visible offline (assets cacheados).
+5. Tras primera carga online, assets núcleo del loader/legal cacheables offline (SW).
 6. Sin errores en consola en flujo feliz.
 
 ## Riesgos y mitigaciones
