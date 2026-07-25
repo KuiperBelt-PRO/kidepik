@@ -1,0 +1,335 @@
+/* Shell post-login — FABs glass + drawer */
+
+:root {
+  --shell-fab-size: clamp(40px, 11.3vw, 44px);
+  --shell-fab-gap: clamp(8px, 2.5vw, 10px);
+  --shell-chrome-pad-top: max(12px, env(safe-area-inset-top));
+  --shell-chrome-pad-x: max(12px, env(safe-area-inset-left));
+  --shell-chrome-pad-right: max(12px, env(safe-area-inset-right));
+  --shell-chrome-band-h: calc(var(--shell-chrome-pad-top) + var(--shell-fab-size) + 12px);
+  --shell-z-chrome: 40;
+  --shell-z-scrim: 38;
+  --shell-z-drawer: 39;
+  --font-shell-sci: "Bruno Ace", "Orbitron", system-ui, sans-serif;
+  --font-shell-fantasy: "Uncial Antiqua", "Cinzel", Georgia, serif;
+  --shell-glass-bg: rgba(255, 255, 255, 0.14);
+  --shell-glass-border: rgba(255, 255, 255, 0.3);
+  --shell-drawer-bg: rgba(255, 255, 255, 0.12);
+  --shell-drawer-border: rgba(255, 255, 255, 0.28);
+  --shell-drawer-width: min(78%, 320px);
+  --shell-motion-drawer: 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  --shell-motion-accordion: 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  --shell-app-width: 100%;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  :root {
+    --shell-glass-bg: rgba(255, 255, 255, 0.24);
+    --shell-drawer-bg: rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* Posición/tamaño vía shell-frame.js (rect de #app) */
+.app-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--shell-app-width, 100%);
+  height: 100%;
+  pointer-events: none;
+  z-index: var(--shell-z-chrome);
+}
+
+/* Banda superior a ancho completo de la app — independiente del drawer */
+.app-shell__chrome {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  min-height: var(--shell-chrome-band-h);
+  padding:
+    var(--shell-chrome-pad-top)
+    var(--shell-chrome-pad-right)
+    12px
+    var(--shell-chrome-pad-x);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  pointer-events: none;
+  z-index: calc(var(--shell-z-chrome) + 1);
+}
+
+.app-shell__chrome-right {
+  display: flex;
+  align-items: center;
+  gap: var(--shell-fab-gap);
+  margin-left: auto;
+  pointer-events: none;
+}
+
+.shell-fab {
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: var(--shell-fab-size);
+  height: var(--shell-fab-size);
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--shell-glass-border);
+  background: var(--shell-glass-bg);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.shell-fab:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.shell-fab:active {
+  transform: scale(0.94);
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.shell-fab:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.shell-fab__icon {
+  display: grid;
+  place-items: center;
+  width: clamp(22px, 6vw, 24px);
+  height: clamp(22px, 6vw, 24px);
+  pointer-events: none;
+}
+
+.shell-ui-icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.shell-ui-icon__glyph {
+  pointer-events: none;
+}
+
+.app-shell__scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.32);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--shell-motion-drawer);
+  z-index: var(--shell-z-scrim);
+  cursor: pointer;
+}
+
+.app-shell[data-open="true"] .app-shell__scrim {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-shell__drawer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: var(--shell-drawer-width);
+  max-width: 100%;
+  box-sizing: border-box;
+  padding:
+    calc(var(--shell-chrome-band-h) + 8px)
+    16px
+    max(24px, env(safe-area-inset-bottom))
+    max(16px, env(safe-area-inset-left));
+  background: var(--shell-drawer-bg);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  border-right: 1px solid var(--shell-drawer-border);
+  box-shadow: 8px 0 24px rgba(0, 0, 0, 0.16);
+  transform: translate3d(-100%, 0, 0);
+  visibility: hidden;
+  pointer-events: none;
+  will-change: transform;
+  transition:
+    transform var(--shell-motion-drawer),
+    visibility 0s linear var(--shell-motion-drawer);
+  z-index: var(--shell-z-drawer);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-shell[data-open="true"] .app-shell__drawer {
+  transform: translate3d(0, 0, 0);
+  visibility: visible;
+  pointer-events: auto;
+  transition:
+    transform var(--shell-motion-drawer),
+    visibility 0s;
+}
+
+.app-shell__logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: clamp(16px, 5vw, 22px);
+}
+
+.app-shell__logo {
+  display: block;
+  width: min(60%, 180px);
+  height: auto;
+}
+
+.app-shell__logo-fallback {
+  margin: 0;
+  color: #fff;
+  font-family: var(--font-shell-fantasy);
+  font-size: clamp(1.2rem, 4.5vw, 1.4rem);
+  text-align: center;
+}
+
+.app-shell__menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-shell__menu-item {
+  margin: 0;
+}
+
+.app-shell__menu-row {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  text-decoration: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.app-shell__menu-row:hover,
+.app-shell__menu-row:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.app-shell__menu-row:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.app-shell__menu-row--sub {
+  min-height: 48px;
+  padding-left: 48px;
+}
+
+.app-shell__menu-icon {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.45));
+}
+
+.app-shell__menu-label {
+  flex: 1 1 auto;
+  color: #fff;
+  font-size: clamp(15px, 4.1vw, 16px);
+  line-height: 1.25;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+}
+
+.app-shell__menu-row--sub .app-shell__menu-label {
+  font-size: clamp(14px, 3.8vw, 15px);
+}
+
+.app-shell__menu-chevron {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  transform: rotate(0deg);
+  transition: transform var(--shell-motion-accordion);
+}
+
+.app-shell__menu-item.is-expanded .app-shell__menu-chevron {
+  transform: rotate(180deg);
+}
+
+.app-shell__submenu-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--shell-motion-accordion);
+}
+
+.app-shell__menu-item.is-expanded .app-shell__submenu-panel {
+  grid-template-rows: 1fr;
+}
+
+.app-shell__submenu {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.app-shell__toast {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  color: #fff;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 14px;
+  text-align: center;
+}
+
+[data-shell-theme="sci-fi"] .shell-drawer__label {
+  font-family: var(--font-shell-sci);
+  letter-spacing: 0.04em;
+}
+
+[data-shell-theme="fantasy"] .shell-drawer__label {
+  font-family: var(--font-shell-fantasy);
+}
+
+body.is-shell-drawer-open {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell__drawer,
+  .app-shell__scrim,
+  .shell-fab,
+  .app-shell__menu-chevron,
+  .app-shell__submenu-panel {
+    transition-duration: 0.08s !important;
+  }
+}

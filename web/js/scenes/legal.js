@@ -35,6 +35,8 @@ import {
 import {
   renderWorldArrowFabSvgInner,
 } from "../components/loader-world-arrows.js";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=169";
+import { getValidSession, signOut } from "../lib/supabase.js";
 
 const SLUG_API = {
   terminos: "terminos",
@@ -253,6 +255,22 @@ export function renderLegal({ slug }) {
   const loadAbort = new AbortController();
   /** @type {Promise<void>} */
   let enterPromise = Promise.resolve();
+
+  void (async () => {
+    const session = await getValidSession();
+    if (destroyed) return;
+    if (session) {
+      ensureAppShell({
+        async onSignOut() {
+          destroyAppShell();
+          await signOut();
+          navigate("/loader");
+        },
+      });
+    } else {
+      destroyAppShell();
+    }
+  })();
 
   if (fromAuth && transition.snapshot?.logo) {
     enterPromise = (async () => {

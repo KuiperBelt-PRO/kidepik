@@ -1,4 +1,5 @@
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=164";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=165";
+import { destroyAppShell } from "../components/app-shell.js?v=169";
 
 /**
  * @returns {Promise<boolean>}
@@ -19,6 +20,7 @@ async function pingHealth() {
  * @returns {{ destroy: () => void }}
  */
 export function renderLoader() {
+  destroyAppShell();
   const app = document.getElementById("app");
   if (!app) return { destroy() {} };
 

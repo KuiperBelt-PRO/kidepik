@@ -1,10 +1,9 @@
 /**
- * Home post-login: mismo mundo que el loader + mensaje de bienvenida + shell.
- * @module scenes/home
+ * Pantalla stub de cuenta padre/tutor.
+ * @module scenes/account
  */
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=169";
-import { resolveDisplayName } from "../components/home-welcome-panel.js";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=169";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
@@ -12,7 +11,7 @@ import { getValidSession, signOut } from "../lib/supabase.js";
 /**
  * @returns {{ destroy: () => void }}
  */
-export function renderHome() {
+export function renderAccount() {
   const app = document.getElementById("app");
   if (!app) return { destroy() {} };
 
@@ -35,12 +34,13 @@ export function renderHome() {
       return;
     }
 
-    const displayName = resolveDisplayName(session);
     ensureAppShell({ onSignOut: doSignOut });
 
     chromeHandle = mountLoaderChrome(app, {
       welcomeHome: {
-        displayName,
+        displayName: "cuenta",
+        lineSci: "Tu cuenta",
+        lineFantasy: "gestión del viaje (próximamente)",
       },
     });
   })();

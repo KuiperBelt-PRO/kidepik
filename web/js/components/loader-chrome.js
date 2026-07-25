@@ -207,7 +207,7 @@ function createLoaderRingTextSvg() {
 /**
  * Monta la escena loader (fondo dual + logo ambigrama + anillo de carga).
  * @param {HTMLElement} app
- * @param {{ pingHealth?: () => Promise<boolean>; welcomeHome?: { displayName: string; onSignOut: () => void | Promise<void> }; statusMessage?: string }} [options]
+ * @param {{ pingHealth?: () => Promise<boolean>; welcomeHome?: { displayName: string; lineSci?: string; lineFantasy?: string; onSignOut?: () => void | Promise<void> }; statusMessage?: string }} [options]
  * @returns {{ destroy: () => void }}
  */
 export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage } = {}) {
@@ -629,6 +629,8 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
       if (welcomeHome) {
         homeWelcomePanel = mountHomeWelcomePanel(authStack, {
           displayName: welcomeHome.displayName,
+          lineSci: welcomeHome.lineSci,
+          lineFantasy: welcomeHome.lineFantasy,
           onSignOut: welcomeHome.onSignOut,
         });
       } else if (statusMessage) {

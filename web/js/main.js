@@ -1,9 +1,11 @@
 import { registerRoute, startRouter } from "./lib/router.js";
 import { initTheme } from "./lib/theme.js";
-import { renderLoader } from "./scenes/loader.js?v=164";
-import { renderAuthCallback } from "./scenes/auth-callback.js?v=164";
-import { renderHome } from "./scenes/home.js?v=164";
-import { renderLegal } from "./scenes/legal.js?v=164";
+import { initShellUiTheme } from "./lib/shell-theme.js";
+import { renderLoader } from "./scenes/loader.js?v=169";
+import { renderAuthCallback } from "./scenes/auth-callback.js?v=169";
+import { renderHome } from "./scenes/home.js?v=169";
+import { renderAccount } from "./scenes/account.js?v=169";
+import { renderLegal } from "./scenes/legal.js?v=169";
 
 function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");
@@ -23,12 +25,14 @@ async function registerServiceWorker() {
 
 function boot() {
   initTheme();
+  initShellUiTheme();
 
   registerRoute("loader", () => renderLoader());
   // Deep-link / fallback OAuth: auth embebido vive en el loader (no escena standalone).
   registerRoute("auth", () => renderLoader());
   registerRoute("auth/callback", () => renderAuthCallback());
   registerRoute("home", () => renderHome());
+  registerRoute("account", () => renderAccount());
   registerRoute("legal/terminos", () => renderLegal({ slug: "terminos" }));
   registerRoute("legal/privacidad", () => renderLegal({ slug: "privacidad" }));
 

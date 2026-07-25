@@ -5,41 +5,54 @@
 
 /**
  * @param {HTMLElement} container
- * @param {{ displayName: string; onSignOut: () => void | Promise<void> }} options
+ * @param {{
+ *   displayName: string;
+ *   lineSci?: string;
+ *   lineFantasy?: string;
+ *   onSignOut?: () => void | Promise<void>;
+ * }} options
  * @returns {{ destroy: () => void }}
  */
-export function mountHomeWelcomePanel(container, { displayName, onSignOut }) {
+export function mountHomeWelcomePanel(container, { displayName, lineSci, lineFantasy, onSignOut }) {
   const welcome = document.createElement("div");
   welcome.className = "loader-home-welcome";
   welcome.setAttribute("aria-live", "polite");
 
-  const lineSci = document.createElement("p");
-  lineSci.className = "loader-home-welcome__sci";
-  lineSci.textContent = `Hola, ${displayName},`;
+  const sci = document.createElement("p");
+  sci.className = "loader-home-welcome__sci";
+  sci.textContent = lineSci ?? `Hola, ${displayName},`;
 
-  const lineFantasy = document.createElement("p");
-  lineFantasy.className = "loader-home-welcome__fantasy";
-  lineFantasy.textContent = "bienvenido a tu viaje épico";
+  const fantasy = document.createElement("p");
+  fantasy.className = "loader-home-welcome__fantasy";
+  fantasy.textContent = lineFantasy ?? "bienvenido a tu viaje épico";
 
-  welcome.append(lineSci, lineFantasy);
+  welcome.append(sci, fantasy);
+  container.append(welcome);
 
-  const signOutBtn = document.createElement("button");
-  signOutBtn.type = "button";
-  signOutBtn.className = "home-welcome-signout";
-  signOutBtn.textContent = "Cerrar sesión (temporal)";
+  /** @type {HTMLButtonElement | null} */
+  let signOutBtn = null;
+  /** @type {(() => void) | null} */
+  let onClick = null;
 
-  function onClick() {
-    void Promise.resolve(onSignOut());
+  if (typeof onSignOut === "function") {
+    signOutBtn = document.createElement("button");
+    signOutBtn.type = "button";
+    signOutBtn.className = "home-welcome-signout";
+    signOutBtn.textContent = "Cerrar sesión (temporal)";
+    onClick = () => {
+      void Promise.resolve(onSignOut());
+    };
+    signOutBtn.addEventListener("click", onClick);
+    container.append(signOutBtn);
   }
-
-  signOutBtn.addEventListener("click", onClick);
-  container.append(welcome, signOutBtn);
 
   return {
     destroy() {
-      signOutBtn.removeEventListener("click", onClick);
+      if (signOutBtn && onClick) {
+        signOutBtn.removeEventListener("click", onClick);
+        signOutBtn.remove();
+      }
       welcome.remove();
-      signOutBtn.remove();
     },
   };
 }

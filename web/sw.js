@@ -1,10 +1,11 @@
-const CACHE = "kidepik-web-v161";
+const CACHE = "kidepik-web-v169";
 const PRECACHE = [
   "/",
   "/index.html",
   "/css/tokens.css",
   "/css/layout.css",
   "/css/components.css",
+  "/css/components/app-shell.css",
   "/css/scenes/loader.css",
   "/css/scenes/auth.css",
   "/css/scenes/legal.css",
@@ -13,6 +14,8 @@ const PRECACHE = [
   "/js/config.sample.js",
   "/js/lib/router.js",
   "/js/lib/theme.js",
+  "/js/lib/shell-theme.js",
+  "/js/lib/shell-frame.js",
   "/js/lib/markdown.js",
   "/js/lib/world-session.js",
   "/js/lib/world-transition.js",
@@ -26,11 +29,15 @@ const PRECACHE = [
   "/js/components/loader-gate-constants.js",
   "/js/components/loader-auth-morph.js",
   "/js/components/auth-panel.js",
+  "/js/components/app-shell.js",
+  "/js/components/shell-ui-icons.js",
+  "/js/components/home-welcome-panel.js",
   "/js/scenes/loader.js",
   "/js/components/loader-world-arrows.js",
   "/js/scenes/legal.js",
   "/js/scenes/auth-callback.js",
   "/js/scenes/home.js",
+  "/js/scenes/account.js",
   "/assets/shared/screens/loader-bg-plain.png",
   "/assets/shared/logo/wordmark-ambigram-light.png",
 ];
