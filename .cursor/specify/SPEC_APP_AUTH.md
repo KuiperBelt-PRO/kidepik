@@ -94,9 +94,9 @@ sequenceDiagram
 
 Si el loader detecta sesión válida, **no muestra** esta pantalla; va directo a `#/home` (SPEC_LOADER_APP_GATE).
 
-### Flujo C — Cierre de sesión (futuro)
+### Flujo C — Cierre de sesión (dev)
 
-`signOut()` + `navigate("/loader")`. Fuera de implementación inmediata; dejar hook en `supabase.js`.
+`signOut()` + `navigate("/loader")` — implementado en home como **«Cerrar sesión (temporal)»**. Tras cerrar sesión, el siguiente login con Google dispara de nuevo OAuth y Google puede enviar un correo de notificación de datos compartidos; es **comportamiento esperado**. Detalle: [GOOGLE_OAUTH_LOCAL_SETUP.md](../operations/GOOGLE_OAUTH_LOCAL_SETUP.md) § Correos de Google y re-login.
 
 ## Post-auth routing (cerrado)
 
@@ -169,7 +169,7 @@ No bloquea la UI de auth; la UI navega a `#/home` con JWT en cliente hasta exist
 2. Google OAuth completa login en Supabase local con proyecto configurado.
 3. Tras login exitoso → `#/home` (placeholder) sin errores consola.
 4. Error OAuth u offline muestra mensaje en español sin romper layout.
-5. `signOut` (manual en dev) vuelve a mostrar auth al pasar por loader.
+5. `signOut` (manual en dev) vuelve a mostrar auth al pasar por loader; re-login con Google puede generar correo de notificación de Google (esperado).
 6. Playwright: captura `tmp/playwright-output/auth-google-cta.png`.
 
 ## Fuera de alcance (MVP)

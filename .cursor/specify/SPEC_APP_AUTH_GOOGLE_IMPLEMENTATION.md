@@ -400,7 +400,7 @@ Servidor: `./scripts/poc-up.ps1` → `http://localhost:8082`, viewport **390×84
 | 1 | Loader → tap → auth visible | CTA Google + legal; captura `tmp/playwright-output/auth-google-cta.png` |
 | 2 | Login Google (cuenta test) | Llega a `#/home` con email visible |
 | 3 | Reload en `#/home` | Sigue autenticado |
-| 4 | Cerrar sesión → loader | Auth visible de nuevo tras morph |
+| 4 | Cerrar sesión → loader | Auth visible de nuevo tras morph; nuevo login con Google puede disparar correo de notificación de Google (comportamiento esperado — ver [GOOGLE_OAUTH_LOCAL_SETUP.md](../operations/GOOGLE_OAUTH_LOCAL_SETUP.md) § Correos de Google y re-login) |
 | 5 | Offline + tap Google | Mensaje offline en panel |
 | 6 | `#/auth/callback` sin sesión | Redirige loader |
 

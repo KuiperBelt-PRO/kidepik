@@ -74,3 +74,47 @@ En el dashboard del proyecto Supabase (`Authentication → Providers → Google`
 | Provider disabled | Falta `supabase/.env` o no reiniciaste Supabase tras sync |
 | Login OK pero sin fila padre | Revisa `POST /api/v1/parents/bootstrap` y logs PHP |
 | App en 127.0.0.1 | Añade también `http://127.0.0.1:8082` en origins y redirect URLs de Supabase (`config.toml`) |
+| Correo de Google tras cada login | Ver § [Correos de Google y re-login](#correos-de-google-y-re-login) |
+
+## Correos de Google y re-login
+
+Google envía un correo del tipo **«Has compartido algunos datos de tu cuenta de Google con …»** cuando completas un flujo de **Iniciar sesión con Google** y la app recibe tu perfil básico (nombre, email, foto). Es una **notificación de privacidad de Google**, no un error de KidepiK ni de Supabase.
+
+### Comportamiento esperado en KidepiK
+
+| Situación | ¿Pasa por Google? | ¿Correo de Google? |
+| --- | --- | --- |
+| Recarga o nueva visita **con sesión Supabase válida** | No — el loader detecta sesión y va a `#/home` | No |
+| **Cerrar sesión (temporal)** en home → loader → **Continuar con Google** | Sí — OAuth completo | **Sí** (esperado) |
+| Primera vez que autorizas la app | Sí | Sí |
+
+El botón **«Cerrar sesión (temporal)»** (`web/js/scenes/home.js`) llama a `signOut()` y borra la sesión de Supabase en el navegador. El siguiente acceso **debe** volver a autenticarse con Google; no hay forma de evitar el correo en ese flujo sin dejar de usar Sign in with Google.
+
+> **Nota:** no implica que Google muestre la pantalla de consentimiento cada vez. A menudo solo aparece el selector de cuenta; aun así Google puede enviar el resumen de datos compartidos.
+
+### Qué hace el cliente (no fuerza re-consentimiento)
+
+- `web/js/lib/supabase.js`: `signInWithOAuth` **sin** `prompt: 'consent'`; sesión persistida (`persistSession: true`, PKCE).
+- `web/js/components/loader-gate.js`: si `getValidSession()` devuelve sesión, salta el CTA Google y navega a `#/home`.
+
+### Otras causas de re-login (y correo) en desarrollo
+
+| Causa | Efecto |
+| --- | --- |
+| `./scripts/poc-up.ps1` | Ejecuta `supabase db reset --local` y borra `auth.users` / refresh tokens → hay que volver a Google |
+| `localhost:8082` vs `127.0.0.1:8082` | Orígenes distintos → `localStorage` distinto → sesión no compartida |
+| Incógnito o borrar datos del sitio | Sesión perdida |
+| Playwright / contexto de navegador nuevo | Sin sesión previa |
+
+### Nombre «KidepiK Cursor MCP» en el correo
+
+El **OAuth client** de Google Cloud puede llamarse así si se creó para herramientas MCP (p. ej. `gcp-cloudrun-kidepik` en `.cursor/mcp.json`). El mismo Client ID alimenta Supabase Auth en local. Es cosmético en el correo; opcionalmente renombrar la app en [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent) o usar credenciales separadas para web vs MCP.
+
+### Modo Testing en Google Cloud
+
+Con el consent screen en **Testing** y scopes básicos (`openid`, `email`, `profile`), las autorizaciones **no** caducan a los 7 días (excepción documentada por Google para Sign in with Google). Publicar en **In production** reduce fricción en la UI de Google cuando vaya a prod; no elimina el correo tras un logout + login explícito.
+
+### Referencias
+
+- Spec producto: [SPEC_APP_AUTH.md](../specify/SPEC_APP_AUTH.md)
+- Spec implementación: [SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md](../specify/SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md) — matriz Playwright flujo 4 (cerrar sesión → loader)
