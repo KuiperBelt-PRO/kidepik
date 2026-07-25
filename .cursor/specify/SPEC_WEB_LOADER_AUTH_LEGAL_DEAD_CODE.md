@@ -1,6 +1,6 @@
 # Spec: Limpieza de código muerto — Loader / Auth / Legal
 
-**Estado:** P0+P1 implementados y verificados (jul 2026); P2–P3 pendientes  
+**Estado:** P0–P3 implementados (jul 2026)  
 **Ámbito:** `web/` (cliente), docs/specs obsoletas relacionadas.  
 **Fuera de alcance:** motor procedural fantasy/space en uso, API PHP, Docker, migraciones SQL, `backend/` FastAPI (legacy separado).
 
@@ -48,21 +48,21 @@ Reducir ruido para agentes de IA y mantenibilidad humana eliminando restos del P
 | `loader-fx-fantasy-palette.js` | Solo tests; runtime no lo importa → eliminar módulo + ajustar tests |
 | Duplicación chrome ↔ `world-layers` (query parse, mount optional image, montaje fantasy/space) | Extraer helpers compartidos; legal sigue usando `mountWorldLayers` |
 
-### P2 — Pulido (fase posterior, no en esta entrega)
+### P2 — Pulido — hecho
 
-| Ítem | Nota |
+| Ítem | Acción |
 | --- | --- |
-| Exports de `loader-world-arrows` solo usados en tests | Valorar API mínima pública |
-| Query params `gateDemo` / `fantasyDev` / … | Documentar o concentrar en un módulo |
-| Specs que aún citan `#/gallery` / `poc-web-dev` | Actualizar docs |
+| Exports de `loader-world-arrows` solo usados en tests | API pública: `renderWorldArrowFabSvgInner` + constantes; helpers internos |
+| Query params `gateDemo` / `fantasyDev` / … | Concentrados en `parseWorldLayerQuery` + `getLoaderQueryParams` (`loader-world-utils.js`) |
+| Specs que citaban `#/gallery` / `poc-web-dev` | Actualizadas (`SPEC_LOADER_SCREEN`, `SPEC_LOADER_APP_GATE`, skill/rule preview, `docs/kidepik.md`, …) |
 
-### P3 — Documentación / tooling
+### P3 — Documentación / tooling — hecho
 
-| Ítem | Nota |
+| Ítem | Acción |
 | --- | --- |
-| `scripts/poc-web-dev.ps1` stub | Ya deprecado |
-| `web/package.json` scripts `serve` | Stack canónico es Docker |
-| Comentario `mockup/:id` en `router.js` | Actualizar |
+| `scripts/poc-web-dev.ps1` stub | Documentado; `poc-web-preview` arranca `poc-up` |
+| `web/package.json` scripts `serve` | Solo `test` + `preview:static` (Docker canónico) |
+| Comentario `mockup/:id` en `router.js` | Ya corregido en P1 |
 
 ## Criterios de aceptación (P0+P1)
 

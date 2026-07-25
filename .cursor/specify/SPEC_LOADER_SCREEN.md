@@ -1,13 +1,14 @@
 # Spec: Pantalla Loader (splash de arranque)
 
-> Estado: **aprobada e implementada** (junio 2026)  
-> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [LOADER_SCREEN_AI_PROMPTS.md](LOADER_SCREEN_AI_PROMPTS.md), [docs/kidepik.md](../../docs/kidepik.md) §2
+> Estado: **aprobada e implementada** (junio 2026); salida a producto supersedida por [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md) (jul 2026).  
+> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [LOADER_SCREEN_AI_PROMPTS.md](LOADER_SCREEN_AI_PROMPTS.md), [docs/kidepik.md](../../docs/kidepik.md) §2  
+> Limpieza dead code / rutas: [SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md](SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md)
 
 ## Contexto
 
-El loader actual en `web/js/scenes/loader.js` es un **placeholder de galería POC**: anillo CSS, fondo procedural SVG y frases ligadas al tema guardado en `localStorage`. **No es guía de estilo** para el producto.
+La pantalla loader es el **primer contacto visual** con KidepiK: comunica la promesa de producto (aprendizaje gamificado, dos mundos) y termina en la **puerta de auth** (gate), no en una galería de mockups.
 
-La pantalla definitiva es el **primer contacto visual** con KidepiK: debe comunicar la promesa de producto (aprendizaje gamificado, dos mundos) y generar expectación antes de la galería / selector de mundo.
+> **Histórico:** una versión temprana del POC usaba placeholder SVG + `navigate("/gallery")`. Esa galería **ya no existe** en `web/`; no reintroducir `#/gallery` ni `#/mockup/*`.
 
 ## Objetivo
 
@@ -80,7 +81,7 @@ Mezcla **ambos mundos** en una misma secuencia (no dependen de `localStorage`):
 | --- | --- |
 | **Entrada** | Ruta `#/loader` (default al abrir app) |
 | **Progreso** | Simulado 0→100% en **3,5–4,5 s** con easing; opcional: avanzar más rápido si `GET /health` responde antes |
-| **Salida** | Al 100% o tap en zona segura → `navigate("/gallery")` |
+| **Salida** | Tras 100 % + gate: morph a auth embebido (ver [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md)). **No** `navigate("/gallery")` (ruta eliminada). |
 | **Skip** | Tap en cualquier parte del contenido tras 1,5 s o progreso ≥ 25% |
 | **Tema `data-theme`** | Loader **no** cambia tema global; usa tokens neutros en chrome (barra, texto) sobre arte dual |
 | **Assets** | Manifest en `web/js/lib/assets.manifest.js` (nuevo) |

@@ -4,9 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "serve . -p 8082",
-    "start": "serve . -p 8082",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "preview:static": "serve . -p 8082"
   },
   "devDependencies": {
     "serve": "^14.2.4"

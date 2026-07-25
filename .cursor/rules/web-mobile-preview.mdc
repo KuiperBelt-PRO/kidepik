@@ -19,7 +19,7 @@ globs:
 
 1. `browser_navigate` → `http://localhost:8082`
 2. Viewport móvil 390×844 (config del MCP o emulación)
-3. Flujo: loader (tap o espera) → galería → toggle tema → mockup
+3. Flujo: loader (tap) → auth → legal → volver; `#/auth` ≡ loader
 4. Capturas solo en `tmp/playwright-output/`
 
 ## Anti-patrones

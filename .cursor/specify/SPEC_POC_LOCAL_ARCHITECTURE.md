@@ -62,7 +62,7 @@ Validar en local que el **cliente web** puede hablar con las **tres capas** del 
 
 ## Cliente web
 
-- **Desarrollo:** `./scripts/poc-web-dev.ps1` → `http://localhost:8082`
+- **Desarrollo:** `./scripts/poc-up.ps1` → `http://localhost:8082` (canónico). ~~`poc-web-dev.ps1`~~ deprecado.
 - **Preview móvil PC:** `./scripts/poc-web-preview.ps1` (Electron 390×844)
 - Config: `web/js/config.js` (generado por script desde `config.sample.js` + `supabase status`)
 
@@ -83,6 +83,6 @@ kidepik/
   web/               # Cliente HTML/CSS/JS
   docker/            # compose.yaml (api + minio)
   supabase/          # config.toml + migrations
-  scripts/           # poc-up.ps1, poc-down.ps1, poc-web-dev.ps1, poc-web-preview.ps1
+  scripts/           # poc-up.ps1, poc-down.ps1, poc-web-preview.ps1 (poc-web-dev.ps1 = stub deprecado)
   .env.poc.sample    # plantilla env Docker (copiar a .env.poc)
 ```

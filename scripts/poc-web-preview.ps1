@@ -23,9 +23,9 @@ if (-not $NoServer) {
     } else {
         $listening = Get-NetTCPConnection -LocalPort 8082 -State Listen -ErrorAction SilentlyContinue
         if (-not $listening) {
-            Write-Host "Arrancando poc-web-dev.ps1 en segundo plano..." -ForegroundColor Yellow
-            Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$Root'; ./scripts/poc-web-dev.ps1" | Out-Null
-            Start-Sleep -Seconds 4
+            Write-Host "Puerto 8082 libre: arrancando poc-up.ps1 (Docker) en segundo plano..." -ForegroundColor Yellow
+            Start-Process powershell -ArgumentList "-NoExit", "-Command", "Set-Location '$Root'; ./scripts/poc-up.ps1" | Out-Null
+            Start-Sleep -Seconds 8
         }
         $env:KIDEPIK_PREVIEW_URL = "http://localhost:8082"
     }

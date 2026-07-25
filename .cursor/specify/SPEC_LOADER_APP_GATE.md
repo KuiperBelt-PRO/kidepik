@@ -192,7 +192,7 @@ Secuencia simultánea (**800 ms**, `cubic-bezier(0.4, 0, 0.2, 1)`):
 
 ## Relación con SPEC_LOADER_SCREEN
 
-La spec original prevé `navigate("/gallery")` al completar carga. **Esta spec sustituye esa salida** por el gate hacia app/auth. La galería POC puede quedar en `#/gallery` como ruta de desarrollo, no como destino por defecto del loader de producto.
+La spec original preveía `navigate("/gallery")` al completar carga. **Esta spec sustituye esa salida** por el gate hacia app/auth. La ruta `#/gallery` **no existe** en el cliente actual (eliminada en limpieza dead code jul 2026).
 
 ## Aprobación
 

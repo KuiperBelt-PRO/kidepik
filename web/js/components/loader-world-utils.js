@@ -8,6 +8,19 @@ import { parseBackdropKind } from "./loader-fantasy-backdrop.js";
 import { assetUrl } from "../lib/assets.manifest.js";
 
 /**
+ * Lee query params del loader desde `?…` o desde `#/loader?…` (ambos formatos).
+ * @returns {URLSearchParams}
+ */
+export function getLoaderQueryParams() {
+  const fromSearch = new URLSearchParams(window.location.search);
+  if ([...fromSearch.keys()].length > 0) return fromSearch;
+  const hash = window.location.hash || "";
+  const q = hash.indexOf("?");
+  if (q >= 0) return new URLSearchParams(hash.slice(q + 1));
+  return fromSearch;
+}
+
+/**
  * @param {string} src
  * @returns {Promise<boolean>}
  */
@@ -49,10 +62,25 @@ export async function mountOptionalImage(layer, slotId, options = {}) {
 }
 
 /**
- * Lee flags de depuración compartidos por loader-chrome y world-layers.
+ * Flags de depuración del loader / world layers.
+ *
+ * | Param | Efecto |
+ * | --- | --- |
+ * | `gateDemo=1` | Anillo de progreso acelerado (~800 ms) |
+ * | `meteorDemo=1` | Ráfaga de meteoritos inmediata |
+ * | `cloudDemo=1` / `celestialDemo=1` | Nubes / cielo en modo rápido |
+ * | `backdropKind=` | Tipo de horizonte (ver `parseBackdropKind`) |
+ * | `fantasyDev=` | Fuerza un kind de elemento fantasy |
+ * | `fantasyFaction=` | human \| elf \| dwarf |
+ * | `fantasySeed=` | Seed entera |
+ * | `fantasyFormation=` | cliff \| rocks |
+ * | `fxDev=0` | Desactiva FX anclados |
+ * | `fxIntensity=` | Escala 0–n de intensidad FX |
+ *
  * @param {URLSearchParams} [query]
  */
 export function parseWorldLayerQuery(query = new URLSearchParams()) {
+  const gateDemo = query.get("gateDemo") === "1";
   const meteorDemo = query.get("meteorDemo") === "1";
   const cloudDemo = query.get("cloudDemo") === "1";
   const celestialDemo = query.get("celestialDemo") === "1";
@@ -75,6 +103,7 @@ export function parseWorldLayerQuery(query = new URLSearchParams()) {
   const fxEnabled = query.get("fxDev") !== "0";
 
   return {
+    gateDemo,
     meteorDemo,
     cloudDemo,
     celestialDemo,

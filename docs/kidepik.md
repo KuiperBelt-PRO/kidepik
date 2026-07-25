@@ -376,7 +376,7 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 ```
 
 - **Backend y storage** corren en Docker + Supabase CLI en el PC.
-- **Frontend:** `./scripts/poc-web-dev.ps1` → `http://localhost:8082`; preview móvil PC con `./scripts/poc-web-preview.ps1` (Electron 390×844).
+- **Frontend:** `./scripts/poc-up.ps1` → app+API en `http://localhost:8082`; preview móvil PC con `./scripts/poc-web-preview.ps1` (Electron 390×844).
 - Sin PHP ni runtime nativo en el host Windows más allá de Node/Docker; ver reglas del workspace.
 
 #### Producción
@@ -699,21 +699,21 @@ La infraestructura Oracle se provisionará y operará con **agentes de Cursor** 
 
 | Entorno | Herramienta | Requisitos / notas |
 | --- | --- | --- |
-| **PC — desarrollo** | `./scripts/poc-web-dev.ps1` → `http://localhost:8082` | Node 20+, pnpm |
+| **PC — desarrollo** | `./scripts/poc-up.ps1` → `http://localhost:8082` | Docker Desktop; ver `SPEC_POC_DOCKER_LOCAL_DEV` |
 | **PC — viewport móvil** | `./scripts/poc-web-preview.ps1` (Electron 390×844) | Misma app web, marco fijo |
 | **Agentes / E2E** | MCP Playwright, viewport 390×844 | Capturas en `tmp/playwright-output/` |
 | **Móvil físico (fase Capacitor)** | Build Capacitor en dispositivo | Posterior al MVP web |
 
 ### Flujo de desarrollo día a día
 
-1. Levantar stack local: `./scripts/poc-up.ps1` (Supabase CLI + API + MinIO).
-2. En otra terminal: `./scripts/poc-web-dev.ps1` → cliente en `http://localhost:8082`.
-3. Validar UI en navegador o Electron preview; agentes con Playwright viewport móvil.
+1. Levantar stack local: `./scripts/poc-up.ps1` (Docker nginx+PHP + Supabase CLI).
+2. Abrir `http://localhost:8082` (loader → auth → legal). Opcional: `./scripts/poc-web-preview.ps1`.
+3. Validar UI en navegador o Electron; agentes con Playwright viewport móvil.
 4. Builds de tienda: **Capacitor** (fase posterior) empaquetando `web/`.
 
 ### Matriz de pruebas mínima (MVP)
 
-- **Web:** flujo loader → galería → POC arquitectura en `localhost:8082`.
+- **Web:** flujo loader → auth → legal en `localhost:8082` (`poc-up.ps1`).
 - **Backend:** tests `pytest` contra API local en Docker.
 - **Casos funcionales:** registro padre, alta de niño, elección de mundo, examen de acceso narrativo, una lección, elección narrativa, verificación de que el siguiente beat **no repite** el anterior, persistencia tras cerrar app.
 

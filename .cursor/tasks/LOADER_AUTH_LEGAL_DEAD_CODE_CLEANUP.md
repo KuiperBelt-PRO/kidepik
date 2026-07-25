@@ -28,16 +28,17 @@ Spec: [SPEC_WEB_LOADER_AUTH_LEGAL_DEAD_CODE.md](../specify/SPEC_WEB_LOADER_AUTH_
 3. Eliminado `loader-fx-fantasy-palette.js`; tests ajustados.
 4. Extraído `loader-world-utils.js` (probe/mount/parse query) usado por chrome y world-layers.
 
-### Fase 3 — P2 (posterior)
+### Fase 3 — P2 — hecha
 
-- API mínima de flechas legales.
-- Módulo único de query params de desarrollo.
-- Actualizar specs `SPEC_LOADER_SCREEN` / galería obsoleta.
+- API mínima de flechas legales (`renderWorldArrowFabSvgInner`).
+- Query params de desarrollo en `loader-world-utils.js` (incl. `gateDemo`).
+- Specs / skill / docs sin galería ni `poc-web-dev` como vía canónica.
 
-### Fase 4 — P3 (posterior)
+### Fase 4 — P3 — hecha
 
-- Docs tooling (`poc-web-dev`, `serve`).
-- Comentarios router mockup.
+- `package.json`: `test` + `preview:static` (sin `dev`/`start` confusos).
+- `poc-web-preview.ps1` → `poc-up.ps1` si :8082 libre.
+- Docs `kidepik.md`, skill y rule de preview alineados.
 
 ## Verificación
 

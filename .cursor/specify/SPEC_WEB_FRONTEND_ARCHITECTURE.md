@@ -91,9 +91,10 @@ kidepik/
         lottie.js
       scenes/
         loader.js
-        gallery.js
-        mockups/
-      components/             # Web Components o factories DOM
+        legal.js
+        home.js
+        auth-callback.js
+      components/             # factories DOM (loader-*, auth-panel, world-layers)
     assets/
       themes/
         fantasy/
@@ -133,15 +134,15 @@ kidepik/
 | Pantalla / módulo | Prioridad |
 | --- | --- |
 | Tema dual (`data-theme`) | P0 |
-| Loader | P0 |
-| Galería + mockups | P0 |
-| Selector de mundo | P1 |
-| POC arquitectura | P1 |
+| Loader + gate + auth embebido | P0 |
+| Legal (términos / privacidad) | P0 |
+| Selector de mundo / home | P1 |
+| ~~Galería + mockups~~ | Eliminado (POC) |
 
 ## Criterios de éxito (fase 1)
 
 1. `./scripts/poc-up.ps1` → app en `http://localhost:8082` (nginx Docker).
-2. Loader → galería → mockups; toggle fantasy / space opera.
+2. Loader → auth → legal; `#/auth` ≡ loader.
 3. Electron preview 390×844 OK.
 4. Playwright agente con viewport móvil + capturas en `tmp/playwright-output/`.
 5. Tras primera carga online, galería visible offline (assets cacheados).

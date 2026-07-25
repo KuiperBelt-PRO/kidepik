@@ -1,8 +1,8 @@
 /**
  * Generador procedural de flechas HUD (sci-fi) y heráldicas (fantasía).
  *
- * Sci-fi: doble chevron angular (navegación HUD).
- * Fantasía: flecha con aletas en la base (heráldica).
+ * API pública de producto: `renderWorldArrowFabSvgInner` (+ constantes de catálogo).
+ * El resto son helpers internos.
  *
  * @module loader-world-arrows
  */
@@ -51,7 +51,7 @@ function fmt(n) {
  * @param {{ x: number; y: number }[]} points
  * @param {boolean} [closed]
  */
-export function pointsToPath(points, closed = true) {
+function pointsToPath(points, closed = true) {
   if (points.length === 0) return "";
   let d = `M ${fmt(points[0].x)} ${fmt(points[0].y)}`;
   for (let i = 1; i < points.length; i += 1) {
@@ -67,7 +67,7 @@ export function pointsToPath(points, closed = true) {
  * @param {number} cy
  * @param {number} deg
  */
-export function rotatePoints(points, cx, cy, deg) {
+function rotatePoints(points, cx, cy, deg) {
   const rad = (deg * Math.PI) / 180;
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
@@ -86,13 +86,12 @@ export function rotatePoints(points, cx, cy, deg) {
  * @param {number} toSize
  * @param {number} [fromSize]
  */
-export function scalePoints(points, toSize, fromSize = BASE_SIZE) {
+function scalePoints(points, toSize, fromSize = BASE_SIZE) {
   const s = toSize / fromSize;
   return points.map(({ x, y }) => ({ x: x * s, y: y * s }));
 }
 
 /**
- * Chevron angular simple (bloque HUD).
  * @param {number} x0
  * @param {number} yTop
  * @param {number} yBot
@@ -115,7 +114,6 @@ function sciFiChevron(x0, yTop, yBot, xTip, xInner) {
 }
 
 /**
- * Sci-fi: doble chevron `>>` apuntando a la derecha.
  * @returns {{ x: number; y: number }[][]}
  */
 function buildSciFiGlyphRight() {
@@ -126,7 +124,6 @@ function buildSciFiGlyphRight() {
 }
 
 /**
- * Fantasía: flecha heráldica con aletas en la base.
  * @returns {{ x: number; y: number }[][]}
  */
 function buildFantasyGlyphRight() {
@@ -156,7 +153,7 @@ function baseGlyphGroups(theme) {
  * @param {number} [viewSize]
  * @returns {{ x: number; y: number }[][]}
  */
-export function buildWorldArrowGlyphGroups(theme, direction, viewSize = BASE_SIZE) {
+function buildWorldArrowGlyphGroups(theme, direction, viewSize = BASE_SIZE) {
   const deg = DIRECTION_DEG[direction];
   const groups = baseGlyphGroups(theme).map((pts) =>
     rotatePoints(pts, BASE_CENTER, BASE_CENTER, deg),
@@ -171,49 +168,12 @@ export function buildWorldArrowGlyphGroups(theme, direction, viewSize = BASE_SIZ
  * @param {number} [viewSize]
  * @returns {string[]}
  */
-export function generateWorldArrowGlyphPaths(theme, direction, viewSize = BASE_SIZE) {
+function generateWorldArrowGlyphPaths(theme, direction, viewSize = BASE_SIZE) {
   return buildWorldArrowGlyphGroups(theme, direction, viewSize).map((pts) => pointsToPath(pts));
 }
 
 /**
- * Silueta principal (primer path o unión lógica para tests).
- * @param {ArrowTheme} theme
- * @param {ArrowDirection} direction
- * @param {number} [viewSize]
- */
-export function generateWorldArrowGlyph(theme, direction, viewSize = BASE_SIZE) {
-  const paths = generateWorldArrowGlyphPaths(theme, direction, viewSize);
-  return paths[0] ?? "";
-}
-
-/**
- * @param {ArrowTheme} theme
- * @param {ArrowDirection} direction
- * @param {number} [viewSize]
- * @returns {{ glyphs: string[]; viewSize: number }}
- */
-export function generateWorldArrowFab(theme, direction, viewSize = 40) {
-  const glyphs = generateWorldArrowGlyphPaths(theme, direction, viewSize);
-  return { glyphs, viewSize };
-}
-
-/**
- * @param {number} [viewSize]
- */
-export function buildWorldArrowCatalog(viewSize = 40) {
-  /** @type {Record<string, { glyphs: string[] }>} */
-  const catalog = {};
-  for (const theme of ARROW_THEMES) {
-    for (const direction of ARROW_DIRECTIONS) {
-      const key = `${theme}/${direction}`;
-      catalog[key] = { glyphs: generateWorldArrowGlyphPaths(theme, direction, viewSize) };
-    }
-  }
-  return catalog;
-}
-
-/**
- * SVG interno del FAB: solo flecha(s) en positivo, sin placa.
+ * SVG interno del FAB legal: flecha(s) en positivo, sin placa.
  * @param {{
  *   theme: ArrowTheme;
  *   direction: ArrowDirection;
@@ -222,7 +182,7 @@ export function buildWorldArrowCatalog(viewSize = 40) {
  * }} opts
  */
 export function renderWorldArrowFabSvgInner(opts) {
-  const { glyphs } = generateWorldArrowFab(opts.theme, opts.direction, opts.viewSize ?? 40);
+  const glyphs = generateWorldArrowGlyphPaths(opts.theme, opts.direction, opts.viewSize ?? 40);
   const fill = opts.fill ?? "#fff";
   return glyphs
     .map((d) => `<path class="legal-fab__glyph" d="${d}" fill="${fill}"/>`)

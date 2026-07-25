@@ -11,6 +11,7 @@ import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.
 import { mountLoaderGate } from "./loader-gate.js?v=109";
 import { mountAuthPanel } from "./auth-panel.js?v=109";
 import {
+  getLoaderQueryParams,
   mountOptionalImage,
   parseWorldLayerQuery,
   probeImage,
@@ -73,19 +74,6 @@ const RING_TEXT_SCI_START_FRACTION = 0.5 - RING_TEXT_SCI_LENGTH / 2 / RING_TEXT_
 const RING_TEXT_REVEAL_LEAD_DEG = 6;
 const RING_REVEAL_START_DEG =
   180 + RING_TEXT_SCI_START_FRACTION * 180 - RING_TEXT_REVEAL_LEAD_DEG;
-
-/**
- * Lee query params del loader desde `?…` o desde `#/loader?…` (ambos formatos).
- * @returns {URLSearchParams}
- */
-function getLoaderQueryParams() {
-  const fromSearch = new URLSearchParams(window.location.search);
-  if ([...fromSearch.keys()].length > 0) return fromSearch;
-  const hash = window.location.hash || "";
-  const q = hash.indexOf("?");
-  if (q >= 0) return new URLSearchParams(hash.slice(q + 1));
-  return fromSearch;
-}
 
 /**
  * Anillo base de progreso (fijo, no gira).
@@ -331,6 +319,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const loaderQuery = getLoaderQueryParams();
   const worldOpts = parseWorldLayerQuery(loaderQuery);
   const {
+    gateDemo,
     meteorDemo,
     cloudDemo,
     celestialDemo,
@@ -342,7 +331,6 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     fxIntensity,
     fxEnabled,
   } = worldOpts;
-  const gateDemo = loaderQuery.get("gateDemo") === "1";
   const progressDurationMs = gateDemo ? DURATION_DEMO_MS : DURATION_MS;
 
   /** @type {{ destroy: () => void } | null} */
