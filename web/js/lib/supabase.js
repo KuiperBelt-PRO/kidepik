@@ -13,6 +13,7 @@ let client = null;
 let clientFactory = null;
 
 const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+const OAUTH_QUERY_KEYS = ["code", "state", "error", "error_description"];
 
 /**
  * Inyecta un factory (tests / mocks).
@@ -49,6 +50,48 @@ export async function getSupabaseClient() {
     },
   });
   return client;
+}
+
+/**
+ * @returns {URLSearchParams}
+ */
+function readOAuthParams() {
+  const params = new URLSearchParams(window.location.search);
+  const hash = window.location.hash || "";
+  const qIndex = hash.indexOf("?");
+  if (qIndex >= 0) {
+    const hashParams = new URLSearchParams(hash.slice(qIndex + 1));
+    for (const [key, value] of hashParams) {
+      if (!params.has(key)) {
+        params.set(key, value);
+      }
+    }
+  }
+  return params;
+}
+
+/**
+ * Elimina parámetros OAuth de la URL sin recargar.
+ */
+export function cleanOAuthParamsFromUrl() {
+  const url = new URL(window.location.href);
+  for (const key of OAUTH_QUERY_KEYS) {
+    url.searchParams.delete(key);
+  }
+
+  const hash = url.hash || "";
+  const qIndex = hash.indexOf("?");
+  if (qIndex >= 0) {
+    const path = hash.slice(0, qIndex);
+    const hashParams = new URLSearchParams(hash.slice(qIndex + 1));
+    for (const key of OAUTH_QUERY_KEYS) {
+      hashParams.delete(key);
+    }
+    const rest = hashParams.toString();
+    url.hash = rest ? `${path}?${rest}` : path;
+  }
+
+  window.history.replaceState({}, document.title, url.toString());
 }
 
 /**
@@ -119,13 +162,33 @@ export async function onAuthStateChange(callback) {
 }
 
 /**
- * Intercambia código OAuth de la URL si existe (PKCE).
+ * Intercambia código OAuth de la URL si existe (PKCE + hash router).
  * @returns {Promise<Session | null>}
  */
 export async function exchangeCodeFromUrl() {
   try {
     const supabase = await getSupabaseClient();
-    // detectSessionInUrl ya procesa en init; getSession refleja el resultado.
+    const params = readOAuthParams();
+    const oauthError = params.get("error");
+
+    if (oauthError) {
+      cleanOAuthParamsFromUrl();
+      return null;
+    }
+
+    const existing = await getValidSession();
+    if (existing) {
+      cleanOAuthParamsFromUrl();
+      return existing;
+    }
+
+    const code = params.get("code");
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      cleanOAuthParamsFromUrl();
+      if (error) return null;
+    }
+
     return getValidSession();
   } catch {
     return null;

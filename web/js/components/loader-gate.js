@@ -11,8 +11,8 @@ import {
   resolveGateHintDelay,
   resolveGateMorphDuration,
 } from "./loader-gate-constants.js";
-import { runLoaderAuthMorph } from "./loader-auth-morph.js?v=109";
-import { mountAuthPanel } from "./auth-panel.js?v=109";
+import { runLoaderAuthMorph } from "./loader-auth-morph.js?v=162";
+import { mountAuthPanel } from "./auth-panel.js?v=162";
 import { bindLegalLinkTransitions } from "../scenes/legal.js";
 
 /** @typedef {'loading' | 'ready' | 'exiting' | 'auth-morph' | 'auth-idle'} GateState */

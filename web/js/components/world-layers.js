@@ -22,7 +22,7 @@ import {
   registerWorldSession,
   worldLayersHaveFantasyMounted,
   worldLayersHaveSpaceMounted,
-} from "../lib/world-session.js?v=156";
+} from "../lib/world-session.js";
 
 /**
  * @returns {{
@@ -255,12 +255,26 @@ export async function mountWorldLogo(logoWrap, fallback) {
     return;
   }
 
-  logoImg.addEventListener("load", () => {
+  const reveal = () => {
     logoImg.hidden = false;
     fallback.hidden = true;
     logoWrap.classList.add("is-ready");
-  }, { once: true });
+  };
+
+  logoImg.addEventListener("load", reveal, { once: true });
+  logoImg.addEventListener(
+    "error",
+    () => {
+      logoImg.hidden = true;
+      fallback.hidden = false;
+      logoWrap.classList.add("is-ready");
+    },
+    { once: true },
+  );
   logoImg.src = logoSrc;
+  if (logoImg.complete && logoImg.naturalWidth > 0) {
+    reveal();
+  }
 }
 
 /**

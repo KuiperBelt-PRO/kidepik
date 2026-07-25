@@ -25,6 +25,10 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "==> Supabase local (Postgres + Auth + REST)..." -ForegroundColor Yellow
+& (Join-Path $Root "scripts\sync-google-oauth-env.ps1")
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "OAuth Google no configurado aún. Ejecuta: ./scripts/setup-google-oauth.ps1" -ForegroundColor Yellow
+}
 $null = Invoke-Supabase start
 
 Write-Host "==> Aplicando migraciones..." -ForegroundColor Yellow

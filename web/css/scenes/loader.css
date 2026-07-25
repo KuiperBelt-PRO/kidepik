@@ -51,10 +51,7 @@
   -webkit-mask-image: none;
 }
 
-/* Sin scanlines retro del tema space opera sobre el splash */
-[data-theme="spaceOpera"] body.is-loader-active.scanlines::after {
-  display: none;
-}
+/* Sin scanlines: legacy spaceOpera eliminado */
 
 .loader-layers {
   position: absolute;
@@ -1167,6 +1164,58 @@
 
 .scene-loader.is-auth-idle .loader-auth-stack .auth-panel {
   pointer-events: auto;
+}
+
+.scene-loader.is-home-welcome .loader-chrome {
+  pointer-events: none;
+}
+
+.scene-loader.is-home-welcome .loader-auth-stack,
+.scene-loader.is-home-welcome .home-welcome-signout {
+  pointer-events: auto;
+}
+
+.loader-home-welcome {
+  position: static;
+  width: min(100%, 300px);
+  margin: 0.65rem auto 0;
+  padding: 0 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  text-align: center;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.loader-home-welcome__sci,
+.loader-home-welcome__fantasy {
+  margin: 0;
+  max-width: 100%;
+  color: #fff;
+  text-align: center;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+  text-shadow:
+    0 0 12px rgba(0, 0, 0, 0.85),
+    0 2px 8px rgba(0, 0, 0, 0.7);
+}
+
+.loader-home-welcome__sci {
+  font-family: "Bruno Ace", "Orbitron", sans-serif;
+  font-size: clamp(0.78rem, 3.4vw, 0.95rem);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.loader-home-welcome__fantasy {
+  font-family: "Uncial Antiqua", "Cinzel", Georgia, serif;
+  font-size: clamp(0.88rem, 3.8vw, 1.05rem);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .auth-panel__subtitle {

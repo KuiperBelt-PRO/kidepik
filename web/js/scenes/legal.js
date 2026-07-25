@@ -25,13 +25,13 @@ import {
   isWorldRouteHash,
   registerWorldSession,
   syncWorldSessionFromDom,
-} from "../lib/world-session.js?v=156";
+} from "../lib/world-session.js";
 import {
   createWorldLayersDom,
   createWorldLogoDom,
   mountWorldLayers,
   mountWorldLogo,
-} from "../components/world-layers.js?v=138";
+} from "../components/world-layers.js";
 import {
   renderWorldArrowFabSvgInner,
 } from "../components/loader-world-arrows.js";

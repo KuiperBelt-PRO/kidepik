@@ -8,7 +8,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use Kidepik\Shared\Config;
 
-final class SupabaseAuthService
+class SupabaseAuthService
 {
     private Client $http;
 
@@ -17,7 +17,7 @@ final class SupabaseAuthService
         $this->http = $http ?? new Client(['timeout' => 5.0]);
     }
 
-    /** @return array{sub: string, role: string, email?: string|null} */
+    /** @return array{sub: string, role: string, email?: string|null, display_name?: string|null, avatar_url?: string|null} */
     public function validateBearer(?string $authorizationHeader): array
     {
         if ($authorizationHeader === null || !str_starts_with(strtolower($authorizationHeader), 'bearer ')) {
@@ -55,6 +55,42 @@ final class SupabaseAuthService
             'sub' => $userId,
             'role' => 'authenticated',
             'email' => isset($user['email']) ? (string) $user['email'] : null,
+            'display_name' => self::extractDisplayName($user),
+            'avatar_url' => self::extractAvatarUrl($user),
         ];
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function extractDisplayName(array $user): ?string
+    {
+        $meta = $user['user_metadata'] ?? null;
+        if (!is_array($meta)) {
+            return null;
+        }
+
+        foreach (['full_name', 'name'] as $key) {
+            if (isset($meta[$key]) && is_string($meta[$key]) && $meta[$key] !== '') {
+                return $meta[$key];
+            }
+        }
+
+        return null;
+    }
+
+    /** @param array<string, mixed> $user */
+    private static function extractAvatarUrl(array $user): ?string
+    {
+        $meta = $user['user_metadata'] ?? null;
+        if (!is_array($meta)) {
+            return null;
+        }
+
+        foreach (['avatar_url', 'picture'] as $key) {
+            if (isset($meta[$key]) && is_string($meta[$key]) && $meta[$key] !== '') {
+                return $meta[$key];
+            }
+        }
+
+        return null;
     }
 }

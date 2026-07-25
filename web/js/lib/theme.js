@@ -17,5 +17,6 @@ export function getThemeId() {
 export function initTheme() {
   const id = getThemeId();
   document.documentElement.dataset.theme = id;
-  document.body.classList.toggle("scanlines", id === "spaceOpera");
+  // Scanlines legacy eliminados: el fondo del producto es el mundo del loader.
+  document.body.classList.remove("scanlines");
 }

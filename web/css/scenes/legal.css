@@ -111,10 +111,6 @@
   --fantasy-terrain-h: var(--legal-terrain-h);
 }
 
-[data-theme="spaceOpera"] body.is-legal-active.scanlines::after {
-  display: none;
-}
-
 /* Paridad visual con loader (fondo, viñeta, acentos) */
 .scene-legal.is-reveal-bg .loader-bg-attenuate {
   opacity: 1;

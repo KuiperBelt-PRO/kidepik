@@ -8,8 +8,10 @@ import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=138";
 import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
-import { mountLoaderGate } from "./loader-gate.js?v=109";
-import { mountAuthPanel } from "./auth-panel.js?v=109";
+import { mountLoaderGate } from "./loader-gate.js?v=162";
+import { mountAuthPanel } from "./auth-panel.js?v=162";
+import { mountStaticAuthBrand } from "./loader-auth-morph.js?v=162";
+import { mountHomeWelcomePanel } from "./home-welcome-panel.js?v=162";
 import {
   getLoaderQueryParams,
   mountOptionalImage,
@@ -37,9 +39,9 @@ import {
   registerWorldSession,
   worldLayersHaveFantasyMounted,
   worldLayersHaveSpaceMounted,
-} from "../lib/world-session.js?v=156";
-import { mountWorldLogo } from "./world-layers.js?v=138";
-import { bindLegalLinkTransitions } from "../scenes/legal.js?v=142";
+} from "../lib/world-session.js";
+import { mountWorldLogo } from "./world-layers.js";
+import { bindLegalLinkTransitions } from "../scenes/legal.js?v=164";
 
 /**
  * @param {HTMLElement} logoWrap
@@ -50,6 +52,8 @@ function revealLoadedWorldLogo(logoWrap) {
   const fallback = logoWrap.querySelector(".loader-logo-fallback");
   if (!(logoImg instanceof HTMLImageElement)) return false;
   if (!logoImg.getAttribute("src")) return false;
+  // src presente pero imagen rota / aún no decodificada → no revelar como ok
+  if (!logoImg.complete || logoImg.naturalWidth <= 0) return false;
 
   logoImg.hidden = false;
   if (fallback instanceof HTMLElement) fallback.hidden = true;
@@ -203,10 +207,10 @@ function createLoaderRingTextSvg() {
 /**
  * Monta la escena loader (fondo dual + logo ambigrama + anillo de carga).
  * @param {HTMLElement} app
- * @param {{ pingHealth?: () => Promise<boolean> }} [options]
+ * @param {{ pingHealth?: () => Promise<boolean>; welcomeHome?: { displayName: string; onSignOut: () => void | Promise<void> }; statusMessage?: string }} [options]
  * @returns {{ destroy: () => void }}
  */
-export function mountLoaderChrome(app, { pingHealth } = {}) {
+export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage } = {}) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const pendingResume = peekWorldTransition();
   const resumingAuth = pendingResume.intent?.resumeAuth === true;
@@ -301,6 +305,7 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   const logoFallback = document.createElement("p");
   logoFallback.className = "loader-logo-fallback";
   logoFallback.textContent = "KidepiK";
+  logoFallback.hidden = true;
 
   logoWrap.append(logoImg, logoFallback);
   ringBase.appendChild(baseSvg);
@@ -453,6 +458,8 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
   let progressStarted = false;
   let logoRevealStageReached = false;
   let logoAssetReady = false;
+  /** @type {{ destroy: () => void } | null} */
+  let homeWelcomePanel = null;
 
   const gate = mountLoaderGate({
     scene,
@@ -481,49 +488,76 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     revealLogoIfReady();
   };
 
+  /**
+   * Carga el wordmark del chrome (siempre; las capas del mundo sí se reutilizan).
+   * @returns {Promise<void>}
+   */
+  async function ensureChromeLogoLoaded() {
+    if (revealLoadedWorldLogo(logoWrap)) {
+      markLogoAssetReady();
+      return;
+    }
+
+    const logoSrc = assetUrl("loader.logo");
+    if (!logoSrc) {
+      logoImg.hidden = true;
+      logoFallback.hidden = false;
+      markLogoAssetReady();
+      return;
+    }
+
+    const logoOk = await probeImage(logoSrc);
+    if (!logoOk) {
+      logoImg.hidden = true;
+      logoFallback.hidden = false;
+      markLogoAssetReady();
+      return;
+    }
+
+    const reveal = () => {
+      logoImg.hidden = false;
+      logoFallback.hidden = true;
+      markLogoAssetReady();
+    };
+
+    logoImg.addEventListener("load", reveal, { once: true });
+    logoImg.addEventListener(
+      "error",
+      () => {
+        logoImg.hidden = true;
+        logoFallback.hidden = false;
+        markLogoAssetReady();
+      },
+      { once: true },
+    );
+    logoImg.src = logoSrc;
+    // Caché: a veces no dispara `load`
+    if (logoImg.complete && logoImg.naturalWidth > 0) {
+      reveal();
+    }
+  }
+
   void (async () => {
     if (reusedWorldLayers) {
       if (!scene.classList.contains("is-bg-ready")) {
         const hasBgImg = bg.querySelector(".loader-layer__img");
         if (hasBgImg) scene.classList.add("is-bg-ready");
       }
-      markLogoAssetReady();
-      return;
-    }
-
-    const bgOk = await mountOptionalImage(bg, "loader.bg.plain", {
-      fit: "cover",
-      onLoad: () => scene.classList.add("is-bg-ready"),
-    });
-    if (!bgOk) markMissingBg();
-
-    const logoSrc = assetUrl("loader.logo");
-    if (logoSrc) {
-      const logoOk = await probeImage(logoSrc);
-      if (logoOk) {
-        logoImg.addEventListener(
-          "load",
-          () => {
-            logoImg.hidden = false;
-            logoFallback.hidden = true;
-            markLogoAssetReady();
-          },
-          { once: true },
-        );
-        logoImg.src = logoSrc;
-      } else {
-        logoImg.hidden = true;
-        markLogoAssetReady();
-      }
     } else {
-      logoImg.hidden = true;
-      markLogoAssetReady();
+      const bgOk = await mountOptionalImage(bg, "loader.bg.plain", {
+        fit: "cover",
+        onLoad: () => scene.classList.add("is-bg-ready"),
+      });
+      if (!bgOk) markMissingBg();
     }
+
+    await ensureChromeLogoLoaded();
   })();
 
   const revealSequence = startLoaderRevealSequence(scene, {
     reducedMotion,
     onStage(stage) {
+      if (welcomeHome || statusMessage) return;
       if (stage === "logo") {
         logoRevealStageReached = true;
         revealLogoIfReady();
@@ -539,6 +573,73 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
       }
     },
   });
+
+  if (welcomeHome || statusMessage) {
+    revealSequence.destroy();
+    gate.destroy();
+
+    scene.classList.add(
+      "is-reveal-bg",
+      "is-reveal-fantasy",
+      "is-reveal-space",
+      "is-reveal-logo",
+      "is-reveal-ring",
+      "is-auth-idle",
+    );
+    if (welcomeHome) scene.classList.add("is-home-welcome");
+    if (statusMessage) scene.classList.add("is-auth-status");
+    scene.classList.remove("is-gate-ready", "is-gate-exiting");
+    scene.removeAttribute("role");
+    scene.removeAttribute("aria-valuemin");
+    scene.removeAttribute("aria-valuemax");
+    scene.removeAttribute("aria-valuenow");
+    scene.setAttribute(
+      "aria-label",
+      welcomeHome
+        ? `Bienvenido a KidepiK, ${welcomeHome.displayName}`
+        : statusMessage,
+    );
+
+    mountFantasyWorldLayers();
+    mountSpaceWorldLayers();
+    logoRevealStageReached = true;
+    ringWrap.style.visibility = "hidden";
+    ringWrap.style.pointerEvents = "none";
+    ringSpin.classList.remove("is-orbiting");
+
+    const authStack = document.createElement("div");
+    authStack.className = "loader-auth-stack";
+    chrome.appendChild(authStack);
+
+    const brand = document.createElement("div");
+    brand.className = "loader-auth-brand is-static";
+    authStack.appendChild(brand);
+
+    void (async () => {
+      const authFallback = logoWrap.querySelector(".loader-logo-fallback");
+      if (!revealLoadedWorldLogo(logoWrap)) {
+        await mountWorldLogo(
+          logoWrap,
+          authFallback instanceof HTMLElement ? authFallback : logoFallback,
+        );
+      }
+      mountStaticAuthBrand(brand, logoWrap);
+      if (destroyed) return;
+
+      if (welcomeHome) {
+        homeWelcomePanel = mountHomeWelcomePanel(authStack, {
+          displayName: welcomeHome.displayName,
+          onSignOut: welcomeHome.onSignOut,
+        });
+      } else if (statusMessage) {
+        const statusEl = document.createElement("p");
+        statusEl.className = "loader-auth-status";
+        statusEl.textContent = statusMessage;
+        authStack.appendChild(statusEl);
+      }
+      markLogoAssetReady();
+    })();
+  }
 
   const resumeTransition = consumeWorldTransition();
   if (resumeTransition.intent?.resumeAuth) {
@@ -754,6 +855,8 @@ export function mountLoaderChrome(app, { pingHealth } = {}) {
     destroy() {
       destroyed = true;
       document.body.classList.remove("is-loader-active");
+      homeWelcomePanel?.destroy();
+      homeWelcomePanel = null;
       gate.destroy();
       revealSequence.destroy();
       if (rafId) cancelAnimationFrame(rafId);

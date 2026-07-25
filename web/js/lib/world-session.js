@@ -149,5 +149,5 @@ export function destroyWorldSession() {
  */
 export function isWorldRouteHash(hash = window.location.hash) {
   const path = (hash || "#/loader").replace(/^#\/?/, "").split("?")[0] || "loader";
-  return path === "loader" || path.startsWith("legal/");
+  return path === "loader" || path === "home" || path === "auth" || path === "auth/callback" || path.startsWith("legal/");
 }

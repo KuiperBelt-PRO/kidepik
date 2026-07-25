@@ -8,6 +8,7 @@ use Kidepik\Api\Controllers\ArchitectureController;
 use Kidepik\Api\Controllers\HealthController;
 use Kidepik\Api\Controllers\LegalController;
 use Kidepik\Api\Controllers\MigrationsController;
+use Kidepik\Api\Controllers\ParentsController;
 use Kidepik\Api\Controllers\StorageController;
 use Kidepik\Api\Http\JsonResponse;
 
@@ -33,6 +34,9 @@ final class Router
                     file_get_contents('php://input') ?: null,
                 ),
             $method === 'POST' && $path === '/api/v1/storage/upload' => (new StorageController())->upload(),
+            $method === 'POST' && $path === '/api/v1/parents/bootstrap' => (new ParentsController())->bootstrap(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+            ),
             default => JsonResponse::error('Not Found', 404),
         };
     }

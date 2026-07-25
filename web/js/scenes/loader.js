@@ -1,4 +1,4 @@
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=142";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=164";
 
 /**
  * @returns {Promise<boolean>}

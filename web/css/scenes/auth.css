@@ -1,64 +1,49 @@
-/* Auth callback + home placeholder (panel auth vive en loader.css) */
+/* Auth callback + home post-login (viven sobre el mundo del loader) */
 
-.scene-auth-callback {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  background: #03180a;
+.loader-auth-status {
+  margin: 0.65rem 0 0;
+  width: min(100%, 300px);
+  padding: 0 0.5rem;
   color: #fff;
   font-family: "Nunito", system-ui, sans-serif;
-}
-
-.scene-auth-callback__msg {
-  margin: 0;
-  opacity: 0.85;
-}
-
-.scene-home {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100dvh;
-  padding: 1.5rem;
-  background: linear-gradient(180deg, #03180a 0%, #051428 100%);
-}
-
-.scene-home__card {
-  width: min(100%, 340px);
-  padding: 1.5rem;
-  border-radius: 16px;
-  background: rgba(255, 248, 230, 0.92);
-  color: #0f3320;
+  font-size: 0.95rem;
+  font-weight: 600;
   text-align: center;
+  text-shadow:
+    0 0 12px rgba(0, 0, 0, 0.85),
+    0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
-.scene-home__title {
-  margin: 0 0 0.5rem;
-  font-family: "Cinzel", Georgia, serif;
-  font-size: 1.35rem;
+.scene-loader.is-auth-status .loader-chrome {
+  pointer-events: none;
 }
 
-.scene-home__email,
-.scene-home__note {
-  margin: 0 0 0.75rem;
+.scene-loader.is-auth-status .loader-auth-stack {
+  pointer-events: none;
+}
+
+.home-welcome-signout {
+  display: block;
+  min-height: 48px;
+  width: min(100%, 280px);
+  margin: 0.85rem auto 0;
+  padding: 0 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(3, 24, 10, 0.55);
+  color: #fff;
   font-family: "Nunito", system-ui, sans-serif;
   font-size: 0.9rem;
-}
-
-.scene-home__note {
-  opacity: 0.8;
-  font-size: 0.8rem;
-}
-
-.scene-home__signout {
-  min-height: 48px;
-  width: 100%;
-  border: none;
-  border-radius: 10px;
-  background: #0f3320;
-  color: #fff;
-  font-family: "Nunito", system-ui, sans-serif;
   font-weight: 600;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.home-welcome-signout:hover {
+  background: rgba(3, 24, 10, 0.75);
+}
+
+.home-welcome-signout:focus-visible {
+  outline: 2px solid rgba(255, 248, 230, 0.9);
+  outline-offset: 2px;
 }

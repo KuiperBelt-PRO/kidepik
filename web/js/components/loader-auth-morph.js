@@ -6,7 +6,7 @@
  * @module loader-auth-morph
  */
 
-import { GATE_COPY, GATE_MORPH_MS } from "./loader-gate-constants.js?v=109";
+import { GATE_COPY, GATE_MORPH_MS } from "./loader-gate-constants.js?v=162";
 
 const EASE = "cubic-bezier(0.4, 0, 0.2, 1)";
 
@@ -425,4 +425,31 @@ export function runLoaderAuthMorph({
       finished = true;
     },
   };
+}
+
+/**
+ * Monta logo + eslogan recto sin animación morph (home post-login).
+ * @param {HTMLElement} brand
+ * @param {HTMLElement} logoWrap
+ */
+export function mountStaticAuthBrand(brand, logoWrap) {
+  brand.className = "loader-auth-brand is-static";
+
+  if (logoWrap.parentElement !== brand) {
+    brand.insertBefore(logoWrap, brand.firstChild);
+  }
+
+  const existingSlogan = brand.querySelector(".loader-auth-slogan");
+  if (existingSlogan) existingSlogan.remove();
+
+  const sloganEl = document.createElement("div");
+  sloganEl.className = "loader-auth-slogan is-visible";
+  sloganEl.setAttribute("aria-hidden", "true");
+
+  const sciLine = buildSloganLine(GATE_COPY.sloganLine1.replace(/\.$/, ""), "sci");
+  const fantasyLine = buildSloganLine(GATE_COPY.sloganLine2.replace(/\.$/, ""), "fantasy");
+  sloganEl.append(sciLine.line, fantasyLine.line);
+  brand.appendChild(sloganEl);
+
+  logoWrap.classList.add("is-auth-positioned", "is-ready");
 }
