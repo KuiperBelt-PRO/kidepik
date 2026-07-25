@@ -3,7 +3,7 @@
  * @module world-transition
  */
 
-import { getWorldSession } from "./world-session.js?v=154";
+import { getWorldSession } from "./world-session.js?v=156";
 
 const EASE = "cubic-bezier(0.4, 0, 0.2, 1)";
 

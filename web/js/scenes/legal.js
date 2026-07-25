@@ -25,13 +25,16 @@ import {
   isWorldRouteHash,
   registerWorldSession,
   syncWorldSessionFromDom,
-} from "../lib/world-session.js?v=154";
+} from "../lib/world-session.js?v=156";
 import {
   createWorldLayersDom,
   createWorldLogoDom,
   mountWorldLayers,
   mountWorldLogo,
 } from "../components/world-layers.js?v=138";
+import {
+  renderWorldArrowFabSvgInner,
+} from "../components/loader-world-arrows.js";
 
 const SLUG_API = {
   terminos: "terminos",
@@ -60,36 +63,15 @@ function createFab(label, kind) {
   btn.className = `legal-fab legal-fab--${kind}`;
   btn.setAttribute("aria-label", label);
 
+  const theme = kind === "back" ? "sci-fi" : "fantasy";
+  const direction = kind === "back" ? "left" : "up";
+
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("class", "legal-fab__svg");
   svg.setAttribute("viewBox", "0 0 40 40");
   svg.setAttribute("aria-hidden", "true");
 
-  const uid = Math.random().toString(36).slice(2, 8);
-  const maskId = `legal-fab-mask-${kind}-${uid}`;
-
-  // Flechas HUD geométricas (Bruno Ace / Orbitron no traen glifos de flecha útiles).
-  const cut = kind === "back"
-    ? `
-      <path d="M26 11 L13 20 L26 29" fill="none" stroke="#000" stroke-width="3.4" stroke-linejoin="miter" stroke-linecap="square"/>
-      <path d="M15.5 20 H29" fill="none" stroke="#000" stroke-width="3.4" stroke-linecap="square"/>
-      <path d="M29 14.5 V25.5" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="square"/>
-    `
-    : `
-      <path d="M11 26 L20 13 L29 26" fill="none" stroke="#000" stroke-width="3.4" stroke-linejoin="miter" stroke-linecap="square"/>
-      <path d="M20 15.5 V29" fill="none" stroke="#000" stroke-width="3.4" stroke-linecap="square"/>
-      <path d="M14.5 29 H25.5" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="square"/>
-    `;
-
-  svg.innerHTML = `
-    <defs>
-      <mask id="${maskId}">
-        <rect width="40" height="40" fill="#fff"/>
-        ${cut}
-      </mask>
-    </defs>
-    <circle cx="20" cy="20" r="17.5" fill="#fff" mask="url(#${maskId})"/>
-  `;
+  svg.innerHTML = renderWorldArrowFabSvgInner({ theme, direction, viewSize: 40 });
 
   btn.appendChild(svg);
   return btn;

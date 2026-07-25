@@ -18,7 +18,7 @@ import {
   registerWorldSession,
   worldLayersHaveFantasyMounted,
   worldLayersHaveSpaceMounted,
-} from "../lib/world-session.js?v=154";
+} from "../lib/world-session.js?v=156";
 
 /**
  * @param {string} src
