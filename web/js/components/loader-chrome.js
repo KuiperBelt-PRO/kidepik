@@ -32,7 +32,7 @@ import {
   registerWorldSession,
   worldLayersHaveFantasyMounted,
   worldLayersHaveSpaceMounted,
-} from "../lib/world-session.js?v=152";
+} from "../lib/world-session.js?v=154";
 import { mountWorldLogo } from "./world-layers.js?v=138";
 import { bindLegalLinkTransitions } from "../scenes/legal.js?v=142";
 

@@ -1,4 +1,4 @@
-const CACHE = "kidepik-web-v152";
+const CACHE = "kidepik-web-v154";
 const PRECACHE = [
   "/",
   "/index.html",
@@ -58,6 +58,7 @@ self.addEventListener("fetch", (event) => {
   if (url.pathname.startsWith("/api/")) return;
 
   const isJs = url.pathname.startsWith("/js/");
+  const isCss = url.pathname.startsWith("/css/");
   const isHtml =
     url.pathname === "/" ||
     url.pathname.endsWith(".html") ||
@@ -65,7 +66,7 @@ self.addEventListener("fetch", (event) => {
   const isAssetImage =
     url.pathname.startsWith("/assets/") && url.pathname.match(/\.(png|webp|jpg|jpeg|svg)$/i);
 
-  if (isHtml || isJs || url.pathname.startsWith("/css/scenes/")) {
+  if (isHtml || isJs || isCss) {
     event.respondWith(
       fetch(request)
         .then((response) => {

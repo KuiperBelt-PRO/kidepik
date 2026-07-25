@@ -18,12 +18,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Evita flash de scrollbar en handoff loader ↔ legal (viewport fijo). */
+html:has(body.is-loader-active),
+html:has(body.is-legal-active),
+body.is-loader-active,
+body.is-legal-active {
+  overflow: hidden;
+  height: 100%;
+  overscroll-behavior: none;
+}
+
 #app {
   position: relative;
   min-height: 100dvh;
   max-width: 430px;
   margin: 0 auto;
   overflow-x: hidden;
+}
+
+/* Después del bloque #app para que overflow-y no quede en auto. */
+#app:has(.scene-loader),
+#app:has(.scene-legal) {
+  overflow: hidden;
+  max-width: none;
 }
 
 .scene {

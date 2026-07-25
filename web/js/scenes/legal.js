@@ -25,7 +25,7 @@ import {
   isWorldRouteHash,
   registerWorldSession,
   syncWorldSessionFromDom,
-} from "../lib/world-session.js?v=152";
+} from "../lib/world-session.js?v=154";
 import {
   createWorldLayersDom,
   createWorldLogoDom,
@@ -408,6 +408,9 @@ export function renderLegal({ slug }) {
     const finalRect = toHint ?? captureRect(logoWrap) ?? logoRect;
     if (finalRect) pinLogoAtRect(logoWrap, finalRect);
     document.body.appendChild(logoWrap);
+    /* Mantener overflow bloqueado antes de destruir la escena legal (evita flash de scrollbar). */
+    document.body.classList.add("is-loader-active");
+    document.body.classList.remove("is-legal-active");
     prepareWorldTransition(
       {
         logo: finalRect,
