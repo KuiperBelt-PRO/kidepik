@@ -32,6 +32,16 @@ final class Config
         return self::get('APP_ENV', 'local');
     }
 
+    public static function runMigrationsOnRequest(): bool
+    {
+        $flag = self::get('RUN_MIGRATIONS_ON_REQUEST', '');
+        if ($flag !== '') {
+            return filter_var($flag, FILTER_VALIDATE_BOOL);
+        }
+
+        return self::appEnv() !== 'local';
+    }
+
     public static function supabaseUrl(): string
     {
         return rtrim(self::get('SUPABASE_URL', 'http://host.docker.internal:54321'), '/');

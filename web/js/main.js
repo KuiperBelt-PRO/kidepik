@@ -1,10 +1,10 @@
 import { registerRoute, startRouter } from "./lib/router.js";
 import { initTheme } from "./lib/theme.js";
-import { renderLoader } from "./scenes/loader.js?v=146";
+import { renderLoader } from "./scenes/loader.js?v=147";
 import { renderAuth } from "./scenes/auth.js";
 import { renderAuthCallback } from "./scenes/auth-callback.js";
 import { renderHome } from "./scenes/home.js";
-import { renderLegal } from "./scenes/legal.js?v=146";
+import { renderLegal } from "./scenes/legal.js?v=147";
 
 function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");

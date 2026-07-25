@@ -9,6 +9,8 @@ use PDOException;
 
 final class PdoFactory
 {
+    private static ?PDO $shared = null;
+
     public static function fromDatabaseUrl(string $url): PDO
     {
         $parts = parse_url($url);
@@ -32,5 +34,21 @@ final class PdoFactory
             PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         ]);
+    }
+
+    public static function sharedFromDatabaseUrl(string $url): PDO
+    {
+        if (self::$shared instanceof PDO) {
+            return self::$shared;
+        }
+
+        self::$shared = self::fromDatabaseUrl($url);
+
+        return self::$shared;
+    }
+
+    public static function resetSharedForTests(): void
+    {
+        self::$shared = null;
     }
 }

@@ -19,7 +19,9 @@ if (is_readable($envFile)) {
 }
 
 try {
-    MigrationRunner::fromEnv($repoRoot)->ensureApplied();
+    if (Config::runMigrationsOnRequest()) {
+        MigrationRunner::fromEnv($repoRoot)->ensureApplied();
+    }
 } catch (MigrationException $e) {
     $payload = ['detail' => 'Migration failed'];
     if ($e->version !== null) {

@@ -19,7 +19,7 @@ final class DatabaseService
         }
 
         try {
-            return PdoFactory::fromDatabaseUrl($url);
+            return PdoFactory::sharedFromDatabaseUrl($url);
         } catch (PDOException) {
             return null;
         }

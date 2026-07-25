@@ -93,6 +93,7 @@ function createFab(label, kind) {
   return btn;
 }
 
+const LEGAL_FETCH_TIMEOUT_MS = 5_000;
 const LEGAL_FETCH_BASE_BACKOFF_MS = 400;
 const LEGAL_FETCH_MAX_BACKOFF_MS = 8_000;
 
@@ -128,7 +129,7 @@ async function fetchLegalDoc(routeSlug, options = {}) {
     if (signal?.aborted) return null;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
+    const timer = setTimeout(() => controller.abort(), LEGAL_FETCH_TIMEOUT_MS);
     const onParentAbort = () => controller.abort();
     signal?.addEventListener("abort", onParentAbort);
 
@@ -247,11 +248,16 @@ export function renderLegal({ slug }) {
     void mountWorldLogo(logoWrap, fallback);
   }
 
+  function revealArticle() {
+    if (destroyed) return;
+    article.style.transition = `opacity ${durationMs}ms ${WORLD_TRANSITION_EASE}`;
+    article.style.opacity = "1";
+  }
+
   void enterPromise.then(() => {
     if (destroyed) return;
     scene.classList.add("is-legal-entered");
-    article.style.transition = `opacity ${durationMs}ms ${WORLD_TRANSITION_EASE}`;
-    article.style.opacity = "1";
+    revealArticle();
     scheduleScrollFadeMask();
   });
 
@@ -280,6 +286,7 @@ export function renderLegal({ slug }) {
     }
     article.innerHTML = renderMarkdown(doc.body_markdown);
     scene.setAttribute("aria-label", doc.title);
+    revealArticle();
     scheduleScrollFadeMask();
   }
 

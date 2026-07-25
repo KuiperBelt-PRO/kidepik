@@ -19,6 +19,9 @@ final class MigrationRunner
 
     private const FILE_PATTERN = '/^(\d{14})_([a-z0-9_]+)\.sql$/';
 
+    /** @var string|null Clave rápida (ficheros + historial) cuando no hay pendientes. */
+    private static ?string $ensuredStateKey = null;
+
     public function __construct(
         private readonly ?PDO $pdo,
         private readonly string $migrationsDir,
@@ -33,7 +36,7 @@ final class MigrationRunner
         $pdo = null;
         if ($url !== null) {
             try {
-                $pdo = PdoFactory::fromDatabaseUrl($url);
+                $pdo = PdoFactory::sharedFromDatabaseUrl($url);
             } catch (PDOException) {
                 $pdo = null;
             }
@@ -50,6 +53,11 @@ final class MigrationRunner
     public function ensureApplied(): void
     {
         if ($this->pdo === null) {
+            return;
+        }
+
+        $stateKey = $this->migrationStateKey();
+        if (self::$ensuredStateKey === $stateKey) {
             return;
         }
 
@@ -72,6 +80,51 @@ final class MigrationRunner
             } catch (Throwable) {
                 // ignore unlock errors
             }
+        }
+
+        self::$ensuredStateKey = $this->migrationStateKey();
+    }
+
+    /** Solo tests: invalida la caché en memoria del worker PHP. */
+    public static function resetEnsureCacheForTests(): void
+    {
+        self::$ensuredStateKey = null;
+    }
+
+    private function migrationsFingerprint(): string
+    {
+        if (!is_dir($this->migrationsDir)) {
+            return '';
+        }
+
+        $files = glob($this->migrationsDir . DIRECTORY_SEPARATOR . '*.sql') ?: [];
+        $parts = [];
+        foreach ($files as $path) {
+            $mtime = @filemtime($path);
+            $parts[] = basename($path) . ':' . ($mtime !== false ? (string) $mtime : '0');
+        }
+        sort($parts);
+
+        return hash('sha256', implode("\n", $parts));
+    }
+
+    private function migrationStateKey(): string
+    {
+        assert($this->pdo instanceof PDO);
+
+        $fingerprint = $this->migrationsFingerprint();
+        try {
+            $stmt = $this->pdo->query(
+                'SELECT count(*)::text, coalesce(max(version), \'\')
+                 FROM supabase_migrations.schema_migrations',
+            );
+            $row = $stmt !== false ? $stmt->fetch(PDO::FETCH_NUM) : false;
+            $count = is_array($row) ? (string) ($row[0] ?? '0') : '0';
+            $maxVersion = is_array($row) ? (string) ($row[1] ?? '') : '';
+
+            return $fingerprint . ':' . $count . ':' . $maxVersion;
+        } catch (Throwable) {
+            return $fingerprint . ':error';
         }
     }
 
