@@ -110,11 +110,57 @@ export function attachWorldLayersTo(scene) {
 }
 
 /**
+ * @param {ParentNode} layers
+ * @returns {boolean}
+ */
+export function worldLayersHaveFantasyMounted(layers) {
+  return Boolean(layers.querySelector(".loader-layer--fantasy-scene"));
+}
+
+/**
+ * @param {ParentNode} layers
+ * @returns {boolean}
+ */
+export function worldLayersHaveSpaceMounted(layers) {
+  return Boolean(
+    layers.querySelector(".loader-layer--space-orbit")
+      || layers.querySelector(".loader-layer--meteor-shower"),
+  );
+}
+
+/**
+ * Conserva flags y referencias de teardown si el DOM ya tiene capas montadas.
+ * @param {HTMLElement} ownerScene
+ */
+export function syncWorldSessionFromDom(ownerScene) {
+  if (!session?.layers) return;
+
+  const hasFantasy = worldLayersHaveFantasyMounted(session.layers);
+  const hasSpace = worldLayersHaveSpaceMounted(session.layers);
+
+  registerWorldSession({
+    ...session,
+    ownerScene,
+    fantasyLayersMounted: session.fantasyLayersMounted || hasFantasy,
+    spaceLayersMounted: session.spaceLayersMounted || hasSpace,
+  });
+}
+
+/**
  * Desacopla las capas del DOM conservando la sesión (handoff entre rutas).
  */
 export function detachWorldLayers() {
   if (!session?.layers) return;
   session.layers.remove();
+}
+
+/**
+ * @param {HTMLElement} scene
+ */
+export function handoffWorldLayers(scene) {
+  if (!session?.layers) return;
+  syncWorldSessionFromDom(scene);
+  detachWorldLayers();
 }
 
 /**

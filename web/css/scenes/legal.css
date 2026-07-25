@@ -43,6 +43,7 @@
   --legal-scroll-top: var(--legal-logo-top);
   --legal-text-pad-top: calc(var(--legal-logo-size) + 0.35rem);
   --legal-text-pad-bottom: 1.25rem;
+  --legal-text-pad-x: clamp(1.5rem, 8.5vw, 2rem);
 }
 
 @property --legal-space-band {
@@ -275,9 +276,9 @@
   overflow-x: hidden;
   padding:
     var(--legal-text-pad-top)
-    max(0.85rem, env(safe-area-inset-right))
+    max(var(--legal-text-pad-x), env(safe-area-inset-right))
     var(--legal-text-pad-bottom)
-    max(0.85rem, env(safe-area-inset-left));
+    max(var(--legal-text-pad-x), env(safe-area-inset-left));
   pointer-events: auto;
   scrollbar-width: thin;
   scrollbar-color: #fff rgba(255, 255, 255, 0.12);
@@ -460,6 +461,10 @@
 }
 
 @media (min-width: 431px) {
+  .scene-legal {
+    --legal-text-pad-x: max(0.85rem, 1rem);
+  }
+
   body:has(.scene-legal) {
     background: #000;
   }

@@ -23,7 +23,9 @@ import {
   detachWorldLayers,
   getWorldLayers,
   isWorldRouteHash,
-} from "../lib/world-session.js";
+  registerWorldSession,
+  syncWorldSessionFromDom,
+} from "../lib/world-session.js?v=152";
 import {
   createWorldLayersDom,
   createWorldLogoDom,
@@ -179,7 +181,7 @@ export function renderLegal({ slug }) {
   setWorldBandLayout(scene, fromAuth ? false : true);
 
   const reusedLayers = attachWorldLayersTo(scene);
-  /** @type {{ destroy: () => void }} */
+  /** @type {{ destroy: () => void; getSessionState?: () => object }} */
   let world = { destroy() {} };
 
   if (!reusedLayers) {
@@ -191,6 +193,10 @@ export function renderLegal({ slug }) {
       revealed: true,
     });
     scene.insertBefore(layers, scene.firstChild);
+    const sessionState = world.getSessionState?.();
+    if (sessionState) {
+      registerWorldSession({ ...sessionState, ownerScene: scene });
+    }
   }
 
   const chrome = document.createElement("div");
@@ -438,6 +444,7 @@ export function renderLegal({ slug }) {
       topFab.removeEventListener("click", onTop);
 
       if (isWorldRouteHash()) {
+        syncWorldSessionFromDom(scene);
         detachWorldLayers();
         return;
       }

@@ -13,6 +13,12 @@ import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
 import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=138";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
+import {
+  getWorldSession,
+  registerWorldSession,
+  worldLayersHaveFantasyMounted,
+  worldLayersHaveSpaceMounted,
+} from "../lib/world-session.js?v=152";
 
 /**
  * @param {string} src
@@ -181,8 +187,55 @@ export function mountWorldLayers({
     if (focal) syncLoaderLogoMask(scene, focal);
   };
 
+  const syncWorldSessionState = () => {
+    if (worldLayersHaveFantasyMounted(layers)) fantasyLayersMounted = true;
+    if (worldLayersHaveSpaceMounted(layers)) spaceLayersMounted = true;
+    if (!fantasyLayersMounted || !spaceLayersMounted) return;
+    registerWorldSession({
+      layers,
+      ownerScene: scene,
+      teardownLogoMaskSync,
+      spaceOrbitTeardown,
+      meteorTeardown,
+      fantasyBackdropTeardown,
+      fantasyTerrainTeardown,
+      fantasyCloudsTeardown,
+      fantasyCelestialTeardown,
+      fantasySceneTeardown,
+      fantasyLayersMounted,
+      spaceLayersMounted,
+    });
+  };
+
+  function adoptFantasyFromSession() {
+    if (!worldLayersHaveFantasyMounted(layers)) return false;
+    const existing = getWorldSession();
+    if (existing) {
+      fantasyBackdropTeardown = existing.fantasyBackdropTeardown;
+      fantasyTerrainTeardown = existing.fantasyTerrainTeardown;
+      fantasyCloudsTeardown = existing.fantasyCloudsTeardown;
+      fantasyCelestialTeardown = existing.fantasyCelestialTeardown;
+      fantasySceneTeardown = existing.fantasySceneTeardown;
+    }
+    fantasyLayersMounted = true;
+    syncWorldSessionState();
+    return true;
+  }
+
+  function adoptSpaceFromSession() {
+    if (!worldLayersHaveSpaceMounted(layers)) return false;
+    const existing = getWorldSession();
+    if (existing) {
+      spaceOrbitTeardown = existing.spaceOrbitTeardown;
+      meteorTeardown = existing.meteorTeardown;
+    }
+    spaceLayersMounted = true;
+    syncWorldSessionState();
+    return true;
+  }
+
   function mountFantasyWorldLayers() {
-    if (fantasyLayersMounted) return;
+    if (fantasyLayersMounted || adoptFantasyFromSession()) return;
     fantasyLayersMounted = true;
     fantasyBackdropTeardown = mountFantasyBackdropLayer(layers, { kind: opts.backdropKind });
     fantasyTerrainTeardown = mountFantasyTerrainLayer(layers);
@@ -203,16 +256,18 @@ export function mountWorldLayers({
     });
     if (accentFantasy) void mountOptionalImage(accentFantasy, "loader.accent.fantasy");
     syncMask();
+    syncWorldSessionState();
   }
 
   function mountSpaceWorldLayers() {
-    if (spaceLayersMounted) return;
+    if (spaceLayersMounted || adoptSpaceFromSession()) return;
     spaceLayersMounted = true;
     const spaceLayout = scene.classList.contains("scene-legal") ? "legal" : "loader";
     spaceOrbitTeardown = mountSpaceOrbitLayer(layers, { reducedMotion, layout: spaceLayout });
     meteorTeardown = mountMeteorShowerLayer(layers, { reducedMotion, demoBurst: opts.meteorDemo, layout: spaceLayout });
     if (accentSpace) void mountOptionalImage(accentSpace, "loader.accent.space");
     syncMask();
+    syncWorldSessionState();
   }
 
   function reveal() {
@@ -236,6 +291,20 @@ export function mountWorldLayers({
   return {
     reveal,
     syncMask,
+    getSessionState: () => ({
+      layers,
+      ownerScene: scene,
+      teardownLogoMaskSync,
+      spaceOrbitTeardown,
+      meteorTeardown,
+      fantasyBackdropTeardown,
+      fantasyTerrainTeardown,
+      fantasyCloudsTeardown,
+      fantasyCelestialTeardown,
+      fantasySceneTeardown,
+      fantasyLayersMounted,
+      spaceLayersMounted,
+    }),
     destroy() {
       teardownLogoMaskSync();
       spaceOrbitTeardown?.destroy();
