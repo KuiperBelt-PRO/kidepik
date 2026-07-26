@@ -3,13 +3,13 @@
  * @module scenes/account
  */
 
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=182";
-import { mountSectionFrame } from "../components/section-frame.js?v=182";
-import { mountAccountPanel } from "../components/account-panel.js?v=182";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=182";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=183";
+import { mountSectionFrame } from "../components/section-frame.js?v=183";
+import { mountAccountPanel } from "../components/account-panel.js?v=183";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=183";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
-import { applySectionEnter } from "../lib/shell-section-transition.js?v=182";
+import { applySectionEnter } from "../lib/shell-section-transition.js?v=183";
 
 /**
  * @returns {{ destroy: () => void }}

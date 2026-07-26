@@ -11,7 +11,7 @@ import {
   navigateFromLegal,
   prepareLegalNavigation,
 } from "../lib/legal-navigation.js";
-import { navigateShellRoute } from "../lib/shell-navigation.js?v=182";
+import { navigateShellRoute } from "../lib/shell-navigation.js?v=183";
 import {
   getShellUiTheme,
   initShellUiTheme,

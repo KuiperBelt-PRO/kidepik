@@ -5,7 +5,7 @@ import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountFantasyCelestialLayer } from "./loader-fantasy-celestial.js";
 import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
-import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=182";
+import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=183";
 import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
 import { mountLoaderGate } from "./loader-gate.js?v=162";
@@ -44,7 +44,7 @@ import {
 } from "../lib/world-session.js";
 import { scheduleShellFrameSync } from "../lib/shell-frame.js";
 import { mountWorldLogo } from "./world-layers.js";
-import { bindLegalLinkTransitions } from "../scenes/legal.js?v=182";
+import { bindLegalLinkTransitions } from "../scenes/legal.js?v=183";
 import { shouldResumeShellTransition } from "../lib/legal-navigation.js";
 
 /**

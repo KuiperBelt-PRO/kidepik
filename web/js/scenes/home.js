@@ -3,13 +3,13 @@
  * @module scenes/home
  */
 
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=182";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=183";
 import { resolveDisplayName } from "../components/home-welcome-panel.js";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=182";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=183";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
-import { fetchParentMe } from "../lib/parent-account.js?v=182";
-import { resolveAccountDisplayName } from "../lib/account-display-name.js?v=182";
+import { fetchParentMe } from "../lib/parent-account.js?v=183";
+import { resolveAccountDisplayName } from "../lib/account-display-name.js?v=183";
 
 /**
  * @returns {{ destroy: (options?: { worldHandoff?: boolean }) => void }}

@@ -42,6 +42,7 @@ import {
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=175";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { resolveLegalBackNavigation, shouldAnimateLegalEntry, prepareLegalNavigation, registerLegalExitHandler, prepareAuthenticatedLegalExit } from "../lib/legal-navigation.js";
+import { normalizeShellPath, shouldCompressWorldBands } from "../lib/world-band-layout.js";
 import { initShellUiTheme } from "../lib/shell-theme.js";
 import { scheduleShellFrameSync } from "../lib/shell-frame.js";
 
@@ -296,10 +297,32 @@ export function renderLegal({ slug }) {
     article.style.opacity = "0";
 
     const logoRect = captureRect(logoWrap);
-    const welcomeLines = shellWelcomeLinesForPath(targetPath);
-    const toHint = logoRect ? measureShellBrandLogoTarget(logoRect, welcomeLines) : null;
+    const targetRoute = normalizeShellPath(targetPath);
+    const targetCompressed = shouldCompressWorldBands(targetRoute);
 
     if (logoRect) pinLogoAtRect(logoWrap, logoRect);
+
+    // Compacto → compacto (p. ej. privacidad → cuenta): no tocar bandas.
+    // Solo se expanden al volver a home.
+    if (targetCompressed) {
+      setWorldBandLayout(scene, true);
+      if (logoRect) {
+        document.body.appendChild(logoWrap);
+      }
+      syncWorldSessionFromDom(scene);
+      document.body.classList.remove("is-legal-active");
+      prepareAuthenticatedLegalExit(targetPath, {
+        logo: logoRect,
+        logoEl: logoWrap,
+        bandsAlreadyExpanded: false,
+        fromBandsCompressed: true,
+      });
+      navigate(targetPath);
+      return;
+    }
+
+    const welcomeLines = shellWelcomeLinesForPath(targetPath);
+    const toHint = logoRect ? measureShellBrandLogoTarget(logoRect, welcomeLines) : null;
 
     setOrbitLayoutPaused(scene, true);
     try {
@@ -326,6 +349,8 @@ export function renderLegal({ slug }) {
     prepareAuthenticatedLegalExit(targetPath, {
       logo: finalRect,
       logoEl: logoWrap,
+      bandsAlreadyExpanded: true,
+      fromBandsCompressed: false,
     });
     navigate(targetPath);
   }

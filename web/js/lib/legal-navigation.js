@@ -96,20 +96,39 @@ export function prepareLegalNavigation(from = "shell") {
 }
 
 /**
- * Marca handoff post-expansión de bandas + logo (legal autenticado → shell).
+ * Marca handoff legal autenticado → shell (home u otra sección).
  * @param {string} path
- * @param {{ logo?: { left: number; top: number; width: number; height: number } | null; logoEl?: HTMLElement | null }} [extras]
+ * @param {{
+ *   logo?: { left: number; top: number; width: number; height: number } | null;
+ *   logoEl?: HTMLElement | null;
+ *   bandsAlreadyExpanded?: boolean;
+ *   fromBandsCompressed?: boolean;
+ * }} [extras]
  */
 export function prepareAuthenticatedLegalExit(path, extras = {}) {
   const route = path.replace(/^#\/?/, "").replace(/^\//, "").split("/")[0] || "home";
+  const targetCompressed = shouldCompressWorldBands(route);
+  const bandsAlreadyExpanded = extras.bandsAlreadyExpanded === true && !targetCompressed;
+  const fromBandsCompressed =
+    typeof extras.fromBandsCompressed === "boolean"
+      ? extras.fromBandsCompressed
+      : targetCompressed || !bandsAlreadyExpanded;
+
   prepareWorldTransition(
     {
       from: "legal",
-      bandsAlreadyExpanded: true,
+      bandsAlreadyExpanded,
+      fromBandsCompressed,
       logo: extras.logo ?? null,
       logoEl: extras.logoEl ?? null,
     },
-    { to: route, from: "legal", resumeShell: true },
+    {
+      to: route,
+      from: "legal",
+      // Solo home (expandido) reanuda con bandas ya abiertas; compact→compact no toca bandas.
+      resumeShell: bandsAlreadyExpanded,
+      bandTransition: false,
+    },
   );
 }
 
