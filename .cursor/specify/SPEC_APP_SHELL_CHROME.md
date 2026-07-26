@@ -43,7 +43,7 @@ Esta spec es el contrato para implementación SDD/TDD. **No se implementa códig
 | Pantalla de gestión de cuenta padre | El botón cuenta abre placeholder o stub navegable |
 | Perfiles de niño y su tema propio | Solo se reserva el modelo de datos / API de tema |
 | HUD de sesión de juego | Distinto del chrome de gestión |
-| Sustituir FABs legales actuales | Legal pre-login sigue con flechas procedurales sin placa glass (salvo decisión posterior) |
+| Sustituir FABs legales actuales | Legal **pre-login** sigue con flechas procedurales; con sesión ver [SPEC_LEGAL_AUTHENTICATED_SESSION.md](SPEC_LEGAL_AUTHENTICATED_SESSION.md) |
 | Onboarding alta de niño / selector de mundo de juego | Fuera de shell |
 
 ---

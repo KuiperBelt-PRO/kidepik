@@ -44,6 +44,12 @@ body.is-legal-active {
   max-width: none;
 }
 
+/* Shell montado: ancho completo aunque el router vacíe #app entre rutas */
+body.is-shell-active #app {
+  width: 100%;
+  max-width: none;
+}
+
 .scene {
   position: relative;
   min-height: 100dvh;

@@ -349,6 +349,27 @@
   margin: 1rem 0 0.45rem;
 }
 
+/* Sesión autenticada: shell activo, sin FABs legales; logo/texto a la misma altura que anónimo */
+.scene-legal.is-legal-authenticated .legal-fab {
+  display: none;
+}
+
+html[data-shell-theme="sci-fi"] .scene-legal.is-legal-authenticated .legal-body h1,
+html[data-shell-theme="sci-fi"] .scene-legal.is-legal-authenticated .legal-body h2,
+html[data-shell-theme="sci-fi"] .scene-legal.is-legal-authenticated .legal-body h3,
+html[data-shell-theme="sci-fi"] .scene-legal.is-legal-authenticated .legal-logo-wrap .loader-logo-fallback {
+  font-family: "Bruno Ace", "Orbitron", system-ui, sans-serif;
+  letter-spacing: 0.04em;
+}
+
+html[data-shell-theme="fantasy"] .scene-legal.is-legal-authenticated .legal-body h1,
+html[data-shell-theme="fantasy"] .scene-legal.is-legal-authenticated .legal-body h2,
+html[data-shell-theme="fantasy"] .scene-legal.is-legal-authenticated .legal-body h3,
+html[data-shell-theme="fantasy"] .scene-legal.is-legal-authenticated .legal-logo-wrap .loader-logo-fallback {
+  font-family: "Uncial Antiqua", "Cinzel", Georgia, serif;
+  letter-spacing: 0.02em;
+}
+
 .legal-body p,
 .legal-body ul {
   margin: 0 0 0.85rem;

@@ -7,12 +7,17 @@
 import { assetUrl } from "../lib/assets.manifest.js";
 import { hashRoutePath, navigate } from "../lib/router.js";
 import {
+  legalTransitionSourceFromPath,
+  navigateFromLegal,
+  prepareLegalNavigation,
+} from "../lib/legal-navigation.js";
+import {
   getShellUiTheme,
   initShellUiTheme,
   toggleShellUiTheme,
 } from "../lib/shell-theme.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
-import { bindShellFrame, unbindShellFrame, syncShellFrameNow } from "../lib/shell-frame.js";
+import { bindShellFrame, unbindShellFrame, scheduleShellFrameSync } from "../lib/shell-frame.js";
 
 /** @typedef {import('./shell-ui-icons.js').UiIconId} UiIconId */
 /** @typedef {import('./shell-ui-icons.js').UiIconTheme} UiIconTheme */
@@ -281,6 +286,7 @@ export function mountAppShell(options) {
         link.addEventListener("click", (ev) => {
           ev.preventDefault();
           closeDrawer();
+          prepareLegalNavigation(legalTransitionSourceFromPath(hashRoutePath()));
           navigate(child.href);
         });
         childLi.appendChild(link);
@@ -323,7 +329,7 @@ export function mountAppShell(options) {
       row.addEventListener("click", () => {
         if (item.kind === "link" && item.href) {
           closeDrawer();
-          navigate(item.href);
+          void navigateFromLegal(item.href);
           return;
         }
         if (item.kind === "stub") {
@@ -344,6 +350,7 @@ export function mountAppShell(options) {
 
   drawer.append(logoWrap, list, stubToast);
   root.append(chrome, scrim, drawer);
+  document.body.classList.add("is-shell-active");
   document.body.appendChild(root);
   bindShellFrame(root);
 
@@ -360,7 +367,7 @@ export function mountAppShell(options) {
 
   function onAccountClick() {
     closeDrawer();
-    navigate("/account");
+    void navigateFromLegal("/account");
   }
 
   function onScrimClick() {
@@ -393,7 +400,7 @@ export function mountAppShell(options) {
       accountBtn.removeEventListener("click", onAccountClick);
       scrim.removeEventListener("click", onScrimClick);
       window.removeEventListener("keydown", onKeyDown);
-      document.body.classList.remove("is-shell-drawer-open");
+      document.body.classList.remove("is-shell-drawer-open", "is-shell-active");
       root.remove();
       if (shellHandle === handle) shellHandle = null;
     },
@@ -415,7 +422,7 @@ export function ensureAppShell(options) {
     return null;
   }
   if (shellHandle) {
-    syncShellFrameNow();
+    scheduleShellFrameSync();
     return shellHandle;
   }
   return mountAppShell(options);

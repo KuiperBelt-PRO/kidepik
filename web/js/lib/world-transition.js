@@ -34,7 +34,9 @@ const store = { snapshot: null, intent: null };
  * @typedef {{
  *   to?: string;
  *   slug?: string;
+ *   from?: string;
  *   resumeAuth?: boolean;
+ *   resumeShell?: boolean;
  * }} WorldIntent
  */
 
@@ -120,6 +122,101 @@ function measureLegalLogoTarget(scene, logoEl) {
  */
 function measureAuthLogoTarget(logoEl) {
   return captureRect(logoEl);
+}
+
+/**
+ * Mide el destino del logo en auth (loader) sin mutar bandas.
+ * @param {HTMLElement} scene
+ * @param {{ width: number; height: number }} fromLogo
+ * @returns {RectSnapshot}
+ */
+export function measureAuthBrandLogoTarget(scene, fromLogo) {
+  const authW = Math.min(188, Math.round(window.innerWidth * 0.48));
+  const authH = Math.max(1, fromLogo.height * (authW / Math.max(fromLogo.width, 1)));
+  const probeStack = document.createElement("div");
+  probeStack.className = "loader-auth-stack";
+  probeStack.setAttribute("aria-hidden", "true");
+  probeStack.style.opacity = "0";
+  probeStack.style.pointerEvents = "none";
+  const probeBrand = document.createElement("div");
+  probeBrand.className = "loader-auth-brand is-static";
+  const probe = document.createElement("div");
+  probe.className = "loader-logo-wrap is-auth-positioned is-ready";
+  probe.style.width = `${authW}px`;
+  probe.style.height = `${authH}px`;
+  probeBrand.appendChild(probe);
+  const spacer = document.createElement("div");
+  spacer.style.width = "1px";
+  spacer.style.height = "7.5rem";
+  probeStack.append(probeBrand, spacer);
+  scene.appendChild(probeStack);
+  void scene.offsetWidth;
+  const rect = captureRect(probe);
+  probeStack.remove();
+  if (rect) return rect;
+  return {
+    left: (window.innerWidth - authW) / 2,
+    top: Math.max(0, window.innerHeight * 0.5 - authH * 0.5 - 60),
+    width: authW,
+    height: authH,
+  };
+}
+
+/**
+ * Mide el destino del logo en home/account (shell post-login) sin mutar bandas.
+ * @param {{ width: number; height: number }} fromLogo
+ * @param {{ lineSci?: string; lineFantasy?: string }} [welcomeLines]
+ * @returns {RectSnapshot}
+ */
+export function measureShellBrandLogoTarget(fromLogo, welcomeLines = {}) {
+  const authW = Math.min(188, Math.round(window.innerWidth * 0.48));
+  const authH = Math.max(1, fromLogo.height * (authW / Math.max(fromLogo.width, 1)));
+
+  const probeScene = document.createElement("div");
+  probeScene.className = "scene scene-loader scene-world is-auth-idle is-home-welcome";
+  probeScene.setAttribute("aria-hidden", "true");
+  probeScene.style.cssText =
+    "position:fixed;inset:0;width:100vw;height:100vh;opacity:0;pointer-events:none;z-index:-1;overflow:hidden;";
+
+  const probeChrome = document.createElement("div");
+  probeChrome.className = "loader-chrome";
+
+  const probeStack = document.createElement("div");
+  probeStack.className = "loader-auth-stack";
+
+  const probeBrand = document.createElement("div");
+  probeBrand.className = "loader-auth-brand is-static";
+
+  const probeLogo = document.createElement("div");
+  probeLogo.className = "loader-logo-wrap is-auth-positioned is-ready";
+  probeLogo.style.width = `${authW}px`;
+  probeLogo.style.height = `${authH}px`;
+  probeBrand.appendChild(probeLogo);
+
+  const welcome = document.createElement("div");
+  welcome.className = "loader-home-welcome";
+  const sci = document.createElement("p");
+  sci.className = "loader-home-welcome__sci";
+  sci.textContent = welcomeLines.lineSci ?? "Hola, explorador,";
+  const fantasy = document.createElement("p");
+  fantasy.className = "loader-home-welcome__fantasy";
+  fantasy.textContent = welcomeLines.lineFantasy ?? "bienvenido a tu viaje épico";
+  welcome.append(sci, fantasy);
+
+  probeStack.append(probeBrand, welcome);
+  probeChrome.appendChild(probeStack);
+  probeScene.appendChild(probeChrome);
+  document.body.appendChild(probeScene);
+  void probeScene.offsetWidth;
+  const rect = captureRect(probeLogo);
+  probeScene.remove();
+  if (rect) return rect;
+  return {
+    left: (window.innerWidth - authW) / 2,
+    top: Math.max(0, window.innerHeight * 0.5 - authH * 0.5 - 40),
+    width: authW,
+    height: authH,
+  };
 }
 
 /**

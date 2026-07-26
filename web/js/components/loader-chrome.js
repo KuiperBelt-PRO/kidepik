@@ -40,8 +40,10 @@ import {
   worldLayersHaveFantasyMounted,
   worldLayersHaveSpaceMounted,
 } from "../lib/world-session.js";
+import { scheduleShellFrameSync } from "../lib/shell-frame.js";
 import { mountWorldLogo } from "./world-layers.js";
-import { bindLegalLinkTransitions } from "../scenes/legal.js?v=164";
+import { bindLegalLinkTransitions } from "../scenes/legal.js?v=175";
+import { shouldResumeShellTransition } from "../lib/legal-navigation.js";
 
 /**
  * @param {HTMLElement} logoWrap
@@ -318,6 +320,7 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
   scene.insertBefore(layers, chrome);
   app.appendChild(scene);
   document.body.classList.add("is-loader-active");
+  scheduleShellFrameSync();
 
   const teardownLogoMaskSync = mountLoaderLogoMaskSync(scene, focal);
 
@@ -578,6 +581,12 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     revealSequence.destroy();
     gate.destroy();
 
+    const resumeShellTransition = welcomeHome ? consumeWorldTransition() : { snapshot: null, intent: null };
+    const resumeShell = welcomeHome && shouldResumeShellTransition(resumeShellTransition);
+    const fromLogo = resumeShellTransition.snapshot?.logo;
+    const reusedLogoEl = resumeShellTransition.snapshot?.logoEl;
+    const resumeMs = reducedMotion ? 120 : 720;
+
     scene.classList.add(
       "is-reveal-bg",
       "is-reveal-fantasy",
@@ -602,6 +611,10 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
 
     mountFantasyWorldLayers();
     mountSpaceWorldLayers();
+    if (resumeShell) {
+      setWorldBandLayout(scene, false);
+      setOrbitLayoutPaused(scene, true);
+    }
     logoRevealStageReached = true;
     ringWrap.style.visibility = "hidden";
     ringWrap.style.pointerEvents = "none";
@@ -615,25 +628,68 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     brand.className = "loader-auth-brand is-static";
     authStack.appendChild(brand);
 
+    /** @type {HTMLElement} */
+    let authLogo = logoWrap;
+    if (resumeShell && reusedLogoEl instanceof HTMLElement) {
+      logoWrap.remove();
+      authLogo = reusedLogoEl;
+      authLogo.classList.remove("legal-logo-wrap");
+      if (fromLogo) {
+        document.body.appendChild(authLogo);
+        pinLogoAtRect(authLogo, fromLogo);
+      }
+    }
+
+    if (welcomeHome) {
+      homeWelcomePanel = mountHomeWelcomePanel(authStack, {
+        displayName: welcomeHome.displayName,
+        lineSci: welcomeHome.lineSci,
+        lineFantasy: welcomeHome.lineFantasy,
+        onSignOut: welcomeHome.onSignOut,
+      });
+    }
+
     void (async () => {
-      const authFallback = logoWrap.querySelector(".loader-logo-fallback");
-      if (!revealLoadedWorldLogo(logoWrap)) {
+      const authFallback = authLogo.querySelector(".loader-logo-fallback");
+      if (!revealLoadedWorldLogo(authLogo)) {
         await mountWorldLogo(
-          logoWrap,
+          authLogo,
           authFallback instanceof HTMLElement ? authFallback : logoFallback,
         );
       }
-      mountStaticAuthBrand(brand, logoWrap, { showSlogan: !welcomeHome });
       if (destroyed) return;
 
-      if (welcomeHome) {
-        homeWelcomePanel = mountHomeWelcomePanel(authStack, {
-          displayName: welcomeHome.displayName,
-          lineSci: welcomeHome.lineSci,
-          lineFantasy: welcomeHome.lineFantasy,
-          onSignOut: welcomeHome.onSignOut,
-        });
-      } else if (statusMessage) {
+      if (resumeShell && fromLogo) {
+        void brand.offsetWidth;
+        const settleProbe = document.createElement("div");
+        settleProbe.className = "loader-logo-wrap is-auth-positioned is-ready world-logo-placeholder";
+        settleProbe.setAttribute("aria-hidden", "true");
+        settleProbe.style.visibility = "hidden";
+        const settleW = Math.min(188, Math.round(window.innerWidth * 0.48));
+        settleProbe.style.width = `${settleW}px`;
+        if (fromLogo.height > 0 && fromLogo.width > 0) {
+          settleProbe.style.aspectRatio = `${fromLogo.width} / ${fromLogo.height}`;
+        }
+        brand.appendChild(settleProbe);
+        void brand.offsetWidth;
+        const settleTo = captureRect(settleProbe);
+        settleProbe.remove();
+
+        if (settleTo) {
+          await morphLogoBetweenRects(authLogo, fromLogo, settleTo, Math.min(220, resumeMs), {
+            keepPinned: true,
+          });
+        }
+        mountStaticAuthBrand(brand, authLogo, { showSlogan: !welcomeHome });
+        clearLogoPinStyles(authLogo);
+        setOrbitLayoutPaused(scene, false);
+        getWorldSession()?.fantasySceneTeardown?.relayout?.();
+        getWorldSession()?.spaceOrbitTeardown?.relayout?.();
+      } else {
+        mountStaticAuthBrand(brand, authLogo, { showSlogan: !welcomeHome });
+      }
+
+      if (statusMessage) {
         const statusEl = document.createElement("p");
         statusEl.className = "loader-auth-status";
         statusEl.textContent = statusMessage;

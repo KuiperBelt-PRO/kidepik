@@ -1,5 +1,5 @@
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=165";
-import { destroyAppShell } from "../components/app-shell.js?v=169";
+import { destroyAppShell } from "../components/app-shell.js?v=175";
 
 /**
  * @returns {Promise<boolean>}

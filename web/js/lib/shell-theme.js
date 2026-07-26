@@ -7,6 +7,7 @@
 /** @typedef {'sci-fi' | 'fantasy'} ShellUiTheme */
 
 export const SHELL_UI_THEME_STORAGE_KEY = "kidepik.shell.uiTheme";
+export const SHELL_UI_THEME_CHANGE_EVENT = "kidepik:shell-ui-theme-change";
 export const DEFAULT_SHELL_UI_THEME = /** @type {ShellUiTheme} */ ("fantasy");
 
 /**
@@ -47,6 +48,19 @@ export function applyShellUiTheme(theme) {
 
 /**
  * @param {ShellUiTheme} theme
+ */
+function dispatchShellUiThemeChange(theme) {
+  try {
+    globalThis.dispatchEvent?.(
+      new CustomEvent(SHELL_UI_THEME_CHANGE_EVENT, { detail: { theme } }),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * @param {ShellUiTheme} theme
  * @returns {ShellUiTheme}
  */
 export function setShellUiTheme(theme) {
@@ -56,6 +70,7 @@ export function setShellUiTheme(theme) {
   } catch {
     /* ignore */
   }
+  dispatchShellUiThemeChange(next);
   return next;
 }
 
@@ -72,5 +87,19 @@ export function toggleShellUiTheme() {
  * @returns {ShellUiTheme}
  */
 export function initShellUiTheme() {
-  return applyShellUiTheme(getShellUiTheme());
+  const theme = applyShellUiTheme(getShellUiTheme());
+  return theme;
+}
+
+/**
+ * @param {(theme: ShellUiTheme) => void} listener
+ * @returns {() => void}
+ */
+export function subscribeShellUiTheme(listener) {
+  const handler = (/** @type {CustomEvent<{ theme: ShellUiTheme }>} */ event) => {
+    const theme = event.detail?.theme;
+    if (isShellUiTheme(theme)) listener(theme);
+  };
+  globalThis.addEventListener?.(SHELL_UI_THEME_CHANGE_EVENT, handler);
+  return () => globalThis.removeEventListener?.(SHELL_UI_THEME_CHANGE_EVENT, handler);
 }

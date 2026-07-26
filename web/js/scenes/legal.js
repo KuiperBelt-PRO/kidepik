@@ -10,6 +10,8 @@ import {
   animateWorldBands,
   captureRect,
   consumeWorldTransition,
+  measureAuthBrandLogoTarget,
+  measureShellBrandLogoTarget,
   morphLogoWithBands,
   pinLogoAtRect,
   prepareWorldTransition,
@@ -35,8 +37,11 @@ import {
 import {
   renderWorldArrowFabSvgInner,
 } from "../components/loader-world-arrows.js";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=169";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=175";
 import { getValidSession, signOut } from "../lib/supabase.js";
+import { resolveLegalBackNavigation, shouldAnimateLegalEntry, prepareLegalNavigation, registerLegalExitHandler, prepareAuthenticatedLegalExit } from "../lib/legal-navigation.js";
+import { initShellUiTheme } from "../lib/shell-theme.js";
+import { scheduleShellFrameSync } from "../lib/shell-frame.js";
 
 const SLUG_API = {
   terminos: "terminos",
@@ -183,13 +188,13 @@ export function renderLegal({ slug }) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const durationMs = reducedMotion ? TRANSITION_MS_REDUCED : TRANSITION_MS;
   const transition = consumeWorldTransition();
-  const fromAuth = transition.snapshot?.from === "auth" || transition.intent?.from === "auth";
+  const animateEntry = shouldAnimateLegalEntry(transition);
 
   const scene = document.createElement("div");
   scene.className = "scene scene-legal scene-world is-reveal-bg is-reveal-fantasy is-reveal-space";
   scene.dataset.legalSlug = routeSlug;
-  if (fromAuth) scene.classList.add("is-orbit-layout-paused");
-  setWorldBandLayout(scene, fromAuth ? false : true);
+  if (animateEntry) scene.classList.add("is-orbit-layout-paused");
+  setWorldBandLayout(scene, animateEntry ? false : true);
 
   const reusedLayers = attachWorldLayersTo(scene);
   /** @type {{ destroy: () => void; getSessionState?: () => object }} */
@@ -251,15 +256,93 @@ export function renderLegal({ slug }) {
 
   let destroyed = false;
   let backing = false;
+  let hasSession = false;
   let loadSeq = 0;
   const loadAbort = new AbortController();
   /** @type {Promise<void>} */
   let enterPromise = Promise.resolve();
 
+  /** @type {(() => void) | null} */
+  let unregisterLegalExit = null;
+
+  /**
+   * @param {string} targetPath
+   * @returns {{ lineSci: string; lineFantasy: string }}
+   */
+  function shellWelcomeLinesForPath(targetPath) {
+    const route = targetPath.replace(/^#\/?/, "").replace(/^\//, "").split("/")[0] || "home";
+    if (route === "account") {
+      return {
+        lineSci: "Tu cuenta",
+        lineFantasy: "gestión del viaje (próximamente)",
+      };
+    }
+    return {
+      lineSci: "Hola, explorador,",
+      lineFantasy: "bienvenido a tu viaje épico",
+    };
+  }
+
+  async function animateAuthenticatedExit(targetPath) {
+    await enterPromise.catch(() => {});
+
+    article.style.transition = `opacity ${Math.min(280, durationMs)}ms ${WORLD_TRANSITION_EASE}`;
+    article.style.opacity = "0";
+
+    const logoRect = captureRect(logoWrap);
+    const welcomeLines = shellWelcomeLinesForPath(targetPath);
+    const toHint = logoRect ? measureShellBrandLogoTarget(logoRect, welcomeLines) : null;
+
+    if (logoRect) pinLogoAtRect(logoWrap, logoRect);
+
+    setOrbitLayoutPaused(scene, true);
+    try {
+      if (logoRect && toHint) {
+        await morphLogoWithBands(scene, logoWrap, logoRect, false, durationMs, toHint, {
+          keepPinned: true,
+        });
+      } else {
+        await animateWorldBands(scene, false, durationMs);
+      }
+    } catch {
+      setWorldBandLayout(scene, false);
+      if (toHint) pinLogoAtRect(logoWrap, toHint);
+    }
+
+    if (destroyed) return;
+
+    const finalRect = toHint ?? captureRect(logoWrap) ?? logoRect;
+    if (finalRect) pinLogoAtRect(logoWrap, finalRect);
+    document.body.appendChild(logoWrap);
+
+    syncWorldSessionFromDom(scene);
+    document.body.classList.remove("is-legal-active");
+    prepareAuthenticatedLegalExit(targetPath, {
+      logo: finalRect,
+      logoEl: logoWrap,
+    });
+    navigate(targetPath);
+  }
+
+  unregisterLegalExit = registerLegalExitHandler(async (targetPath) => {
+    if (backing || destroyed) return;
+    backing = true;
+    if (!hasSession) {
+      navigate(targetPath);
+      return;
+    }
+    await animateAuthenticatedExit(targetPath);
+  });
+
   void (async () => {
     const session = await getValidSession();
     if (destroyed) return;
+    hasSession = Boolean(session);
     if (session) {
+      scene.classList.add("is-legal-authenticated");
+      backFab.hidden = true;
+      topFab.hidden = true;
+      initShellUiTheme();
       ensureAppShell({
         async onSignOut() {
           destroyAppShell();
@@ -267,19 +350,23 @@ export function renderLegal({ slug }) {
           navigate("/loader");
         },
       });
+      scheduleShellFrameSync();
     } else {
       destroyAppShell();
     }
   })();
 
-  if (fromAuth && transition.snapshot?.logo) {
+  if (animateEntry && transition.snapshot?.logo) {
     enterPromise = (async () => {
       await mountWorldLogo(logoWrap, fallback);
       await morphLogoWithBands(scene, logoWrap, transition.snapshot?.logo, true, durationMs);
     })();
-  } else {
+  } else if (!animateEntry) {
     setWorldBandLayout(scene, true);
     void mountWorldLogo(logoWrap, fallback);
+  } else {
+    void mountWorldLogo(logoWrap, fallback);
+    enterPromise = animateWorldBands(scene, true, durationMs);
   }
 
   function revealArticle() {
@@ -295,7 +382,7 @@ export function renderLegal({ slug }) {
     scheduleScrollFadeMask();
   });
 
-  article.style.opacity = fromAuth ? "0" : "1";
+  article.style.opacity = animateEntry ? "0" : "1";
 
   function showLoadError() {
     article.classList.remove("is-loading");
@@ -374,47 +461,15 @@ export function renderLegal({ slug }) {
     topFab.classList.toggle("is-visible", showTop);
   }
 
-  /**
-   * Destino aproximado del logo en auth (misma geometría que el brand estático).
-   * @param {{ width: number; height: number }} fromLogo
-   */
-  function measureAuthLogoTargetOnScene(fromLogo) {
-    const authW = Math.min(188, Math.round(window.innerWidth * 0.48));
-    const authH = Math.max(1, fromLogo.height * (authW / Math.max(fromLogo.width, 1)));
-    const probeStack = document.createElement("div");
-    probeStack.className = "loader-auth-stack";
-    probeStack.setAttribute("aria-hidden", "true");
-    probeStack.style.opacity = "0";
-    probeStack.style.pointerEvents = "none";
-    const probeBrand = document.createElement("div");
-    probeBrand.className = "loader-auth-brand is-static";
-    const probe = document.createElement("div");
-    probe.className = "loader-logo-wrap is-auth-positioned is-ready";
-    probe.style.width = `${authW}px`;
-    probe.style.height = `${authH}px`;
-    probeBrand.appendChild(probe);
-    // Espaciadores para imitar eslogan + CTA y subir el logo como en auth real
-    const spacer = document.createElement("div");
-    spacer.style.width = "1px";
-    spacer.style.height = "7.5rem";
-    probeStack.append(probeBrand, spacer);
-    scene.appendChild(probeStack);
-    void scene.offsetWidth;
-    const rect = captureRect(probe);
-    probeStack.remove();
-    if (rect) return rect;
-    // Fallback viewport si la sonda falla
-    return {
-      left: (window.innerWidth - authW) / 2,
-      top: Math.max(0, window.innerHeight * 0.5 - authH * 0.5 - 60),
-      width: authW,
-      height: authH,
-    };
-  }
-
   async function onBack() {
     if (backing || destroyed) return;
     backing = true;
+
+    const backTarget = resolveLegalBackNavigation(hasSession);
+    if (backTarget.mode === "authenticated-home") {
+      await animateAuthenticatedExit(backTarget.path);
+      return;
+    }
 
     await enterPromise.catch(() => {});
 
@@ -424,7 +479,7 @@ export function renderLegal({ slug }) {
     backFab.style.opacity = "0";
     topFab.style.opacity = "0";
 
-    const toHint = logoRect ? measureAuthLogoTargetOnScene(logoRect) : null;
+    const toHint = logoRect ? measureAuthBrandLogoTarget(scene, logoRect) : null;
 
     if (logoRect) pinLogoAtRect(logoWrap, logoRect);
 
@@ -458,7 +513,7 @@ export function renderLegal({ slug }) {
       },
       { to: "auth", resumeAuth: true },
     );
-    navigate("/loader");
+    navigate(backTarget.path);
   }
 
   function onTop() {
@@ -474,6 +529,8 @@ export function renderLegal({ slug }) {
       destroyed = true;
       loadSeq += 1;
       loadAbort.abort();
+      unregisterLegalExit?.();
+      unregisterLegalExit = null;
       document.body.classList.remove("is-legal-active");
       fadeMaskObserver.disconnect();
       window.removeEventListener("resize", scheduleScrollFadeMask);
@@ -504,17 +561,7 @@ export function bindLegalLinkTransitions(root) {
       event.preventDefault();
       const href = anchor.getAttribute("href") || "#/legal/terminos";
       const path = href.replace(/^#\/?/, "");
-      const logo = document.querySelector(".loader-auth-brand .loader-logo-wrap")
-        ?? document.querySelector(".scene-loader .loader-logo-wrap");
-      prepareWorldTransition(
-        {
-          logo: captureRect(logo),
-          from: "auth",
-          spaceBand: 0.48,
-          fantasyBand: 0.52,
-        },
-        { to: "legal", from: "auth" },
-      );
+      prepareLegalNavigation("auth");
       navigate(`/${path}`);
     });
   });
