@@ -5,7 +5,7 @@ import { mountFantasyScene } from "./loader-fantasy-scene.js";
 import { mountFantasyCelestialLayer } from "./loader-fantasy-celestial.js";
 import { mountFantasyCloudsLayer } from "./loader-fantasy-clouds.js";
 import { mountMeteorShowerLayer } from "./loader-meteor-shower.js";
-import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=138";
+import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=182";
 import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
 import { mountLoaderGate } from "./loader-gate.js?v=162";
@@ -19,6 +19,7 @@ import {
   probeImage,
 } from "./loader-world-utils.js";
 import {
+  animateWorldBands,
   captureRect,
   clearLogoPinStyles,
   consumeWorldTransition,
@@ -36,13 +37,14 @@ import {
   getWorldLayers,
   getWorldSession,
   isWorldRouteHash,
+  parkWorldLayersForHandoff,
   registerWorldSession,
   worldLayersHaveFantasyMounted,
   worldLayersHaveSpaceMounted,
 } from "../lib/world-session.js";
 import { scheduleShellFrameSync } from "../lib/shell-frame.js";
 import { mountWorldLogo } from "./world-layers.js";
-import { bindLegalLinkTransitions } from "../scenes/legal.js?v=175";
+import { bindLegalLinkTransitions } from "../scenes/legal.js?v=182";
 import { shouldResumeShellTransition } from "../lib/legal-navigation.js";
 
 /**
@@ -209,14 +211,25 @@ function createLoaderRingTextSvg() {
 /**
  * Monta la escena loader (fondo dual + logo ambigrama + anillo de carga).
  * @param {HTMLElement} app
- * @param {{ pingHealth?: () => Promise<boolean>; welcomeHome?: { displayName: string; lineSci?: string; lineFantasy?: string; onSignOut?: () => void | Promise<void> }; statusMessage?: string }} [options]
- * @returns {{ destroy: () => void }}
+ * @param {{
+ *   pingHealth?: () => Promise<boolean>;
+ *   welcomeHome?: { displayName: string; lineSci?: string; lineFantasy?: string; onSignOut?: () => void | Promise<void> };
+ *   statusMessage?: string;
+ *   compactSection?: boolean;
+ * }} [options]
+ * @returns {{ destroy: () => void; sectionHost?: HTMLElement }}
  */
-export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage } = {}) {
+export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage, compactSection } = {}) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const pendingResume = peekWorldTransition();
   const resumingAuth = pendingResume.intent?.resumeAuth === true;
   const bandsAlreadyExpanded = pendingResume.snapshot?.bandsAlreadyExpanded === true;
+  const pendingFromCompressed =
+    typeof pendingResume.snapshot?.fromBandsCompressed === "boolean"
+      ? pendingResume.snapshot.fromBandsCompressed
+      : null;
+  const pendingBandTransition = pendingResume.intent?.bandTransition === true
+    && typeof pendingResume.snapshot?.fromBandsCompressed === "boolean";
 
   const scene = document.createElement("div");
   scene.className = "scene scene-loader scene-world";
@@ -227,11 +240,27 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
   scene.setAttribute("aria-valuenow", "0");
   scene.setAttribute("aria-label", `Cargando KidepiK — ${LOADER_SLOGAN}`);
 
-  // Al volver de legal: si las bandas ya se expandieron allí, partir en loader;
-  // si no, partir comprimido para animar la expansión.
+  // Bandas ANTES de attach: si no, las capas parqueadas heredan el 48 % por defecto
+  // y la animación compress↔expand no arranca (48%→48% = sin transición).
   if (resumingAuth) {
     setWorldBandLayout(scene, !bandsAlreadyExpanded);
     setOrbitLayoutPaused(scene, true);
+  } else if (welcomeHome) {
+    const startCompressed = pendingFromCompressed === true;
+    setWorldBandLayout(scene, startCompressed);
+    if (startCompressed || pendingBandTransition) {
+      setOrbitLayoutPaused(scene, true);
+    }
+  } else if (compactSection) {
+    const startCompressed = pendingFromCompressed === true
+      ? true
+      : pendingFromCompressed === false
+        ? false
+        : true;
+    setWorldBandLayout(scene, startCompressed);
+    if (!startCompressed || pendingBandTransition) {
+      setOrbitLayoutPaused(scene, true);
+    }
   }
 
   const chrome = document.createElement("div");
@@ -577,14 +606,21 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     },
   });
 
-  if (welcomeHome || statusMessage) {
+  if (welcomeHome || statusMessage || compactSection) {
     revealSequence.destroy();
     gate.destroy();
 
-    const resumeShellTransition = welcomeHome ? consumeWorldTransition() : { snapshot: null, intent: null };
-    const resumeShell = welcomeHome && shouldResumeShellTransition(resumeShellTransition);
-    const fromLogo = resumeShellTransition.snapshot?.logo;
-    const reusedLogoEl = resumeShellTransition.snapshot?.logoEl;
+    const shellTransition = welcomeHome
+      ? consumeWorldTransition()
+      : compactSection
+        ? peekWorldTransition()
+        : { snapshot: null, intent: null };
+    const resumeShell = Boolean(welcomeHome) && shouldResumeShellTransition(shellTransition);
+    const bandTransition = shellTransition.intent?.bandTransition === true
+      && typeof shellTransition.snapshot?.fromBandsCompressed === "boolean";
+    const fromLogo = shellTransition.snapshot?.logo;
+    const reusedLogoEl = shellTransition.snapshot?.logoEl;
+    const fromPath = shellTransition.snapshot?.from;
     const resumeMs = reducedMotion ? 120 : 720;
 
     scene.classList.add(
@@ -596,6 +632,7 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
       "is-auth-idle",
     );
     if (welcomeHome) scene.classList.add("is-home-welcome");
+    if (compactSection) scene.classList.add("is-section-compact");
     if (statusMessage) scene.classList.add("is-auth-status");
     scene.classList.remove("is-gate-ready", "is-gate-exiting");
     scene.removeAttribute("role");
@@ -604,9 +641,11 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     scene.removeAttribute("aria-valuenow");
     scene.setAttribute(
       "aria-label",
-      welcomeHome
-        ? `Bienvenido a KidepiK, ${welcomeHome.displayName}`
-        : statusMessage,
+      compactSection
+        ? "Sección de gestión KidepiK"
+        : welcomeHome
+          ? `Bienvenido a KidepiK, ${welcomeHome.displayName}`
+          : statusMessage,
     );
 
     mountFantasyWorldLayers();
@@ -614,6 +653,32 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     if (resumeShell) {
       setWorldBandLayout(scene, false);
       setOrbitLayoutPaused(scene, true);
+    } else if (compactSection) {
+      const pending = shellTransition;
+      const fromCompressed = typeof pending.snapshot?.fromBandsCompressed === "boolean"
+        ? pending.snapshot.fromBandsCompressed
+        : false;
+      // Estado inicial ya fijado antes del attach; aquí solo forzar destino si no hay anim.
+      if (!pending.intent?.bandTransition) {
+        setWorldBandLayout(scene, true);
+        setOrbitLayoutPaused(scene, false);
+      } else if (fromCompressed !== true) {
+        // Home/expandido → sección: applySectionEnter anima; mantener origen.
+        setWorldBandLayout(scene, fromCompressed);
+      }
+    } else if (bandTransition) {
+      const fromCompressed = shellTransition.snapshot.fromBandsCompressed === true;
+      setWorldBandLayout(scene, fromCompressed);
+      setOrbitLayoutPaused(scene, true);
+      void scene.offsetWidth;
+      void animateWorldBands(scene, false, resumeMs).then(() => {
+        setOrbitLayoutPaused(scene, false);
+        getWorldSession()?.fantasySceneTeardown?.relayout?.();
+        getWorldSession()?.spaceOrbitTeardown?.relayout?.();
+      });
+    } else {
+      setWorldBandLayout(scene, Boolean(compactSection));
+      setOrbitLayoutPaused(scene, false);
     }
     logoRevealStageReached = true;
     ringWrap.style.visibility = "hidden";
@@ -624,13 +689,28 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     authStack.className = "loader-auth-stack";
     chrome.appendChild(authStack);
 
+    /** @type {HTMLElement | null} */
+    let sectionHost = null;
+    if (compactSection) {
+      sectionHost = document.createElement("div");
+      sectionHost.className = "section-host";
+      chrome.appendChild(sectionHost);
+      // @ts-expect-error stash for return
+      chrome._sectionHost = sectionHost;
+    }
+
     const brand = document.createElement("div");
     brand.className = "loader-auth-brand is-static";
-    authStack.appendChild(brand);
+    if (!compactSection) {
+      authStack.appendChild(brand);
+    }
 
     /** @type {HTMLElement} */
     let authLogo = logoWrap;
-    if (resumeShell && reusedLogoEl instanceof HTMLElement) {
+    if (
+      (resumeShell || fromPath === "account")
+      && reusedLogoEl instanceof HTMLElement
+    ) {
       logoWrap.remove();
       authLogo = reusedLogoEl;
       authLogo.classList.remove("legal-logo-wrap");
@@ -650,6 +730,10 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     }
 
     void (async () => {
+      if (compactSection) {
+        markLogoAssetReady();
+        return;
+      }
       const authFallback = authLogo.querySelector(".loader-logo-fallback");
       if (!revealLoadedWorldLogo(authLogo)) {
         await mountWorldLogo(
@@ -659,7 +743,7 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
       }
       if (destroyed) return;
 
-      if (resumeShell && fromLogo) {
+      if ((resumeShell || fromPath === "account") && fromLogo) {
         void brand.offsetWidth;
         const settleProbe = document.createElement("div");
         settleProbe.className = "loader-logo-wrap is-auth-positioned is-ready world-logo-placeholder";
@@ -682,9 +766,12 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
         }
         mountStaticAuthBrand(brand, authLogo, { showSlogan: !welcomeHome });
         clearLogoPinStyles(authLogo);
-        setOrbitLayoutPaused(scene, false);
-        getWorldSession()?.fantasySceneTeardown?.relayout?.();
-        getWorldSession()?.spaceOrbitTeardown?.relayout?.();
+        // Si hay animación de bandas en curso, el then() de animateWorldBands libera la órbita.
+        if (!bandTransition) {
+          setOrbitLayoutPaused(scene, false);
+          getWorldSession()?.fantasySceneTeardown?.relayout?.();
+          getWorldSession()?.spaceOrbitTeardown?.relayout?.();
+        }
       } else {
         mountStaticAuthBrand(brand, authLogo, { showSlogan: !welcomeHome });
       }
@@ -699,8 +786,9 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
     })();
   }
 
-  const resumeTransition = consumeWorldTransition();
-  if (resumeTransition.intent?.resumeAuth) {
+  if (!compactSection) {
+    const resumeTransition = consumeWorldTransition();
+    if (resumeTransition.intent?.resumeAuth) {
     const resumeMs = reducedMotion ? 120 : 720;
     revealSequence.destroy();
     gate.destroy();
@@ -851,6 +939,7 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
         if (!destroyed) authPanel.reveal();
       })();
     }
+    }
   }
 
   if (pingHealth) {
@@ -910,7 +999,12 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
   }
 
   return {
-    destroy() {
+    /** @type {HTMLElement | undefined} */
+    sectionHost: /** @type {HTMLElement | undefined} */ (
+      // @ts-expect-error optional stash
+      chrome._sectionHost
+    ),
+    destroy(options = {}) {
       destroyed = true;
       document.body.classList.remove("is-loader-active");
       homeWelcomePanel?.destroy();
@@ -922,7 +1016,11 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage 
       if (isWorldRouteHash()) {
         teardownLogoMaskSync();
         syncWorldSessionState();
-        detachWorldLayers();
+        if (options.worldHandoff) {
+          parkWorldLayersForHandoff();
+        } else {
+          detachWorldLayers();
+        }
         return;
       }
 

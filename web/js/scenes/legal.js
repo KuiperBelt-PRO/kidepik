@@ -12,6 +12,7 @@ import {
   consumeWorldTransition,
   measureAuthBrandLogoTarget,
   measureShellBrandLogoTarget,
+  morphLogoBetweenRects,
   morphLogoWithBands,
   pinLogoAtRect,
   prepareWorldTransition,
@@ -25,6 +26,7 @@ import {
   detachWorldLayers,
   getWorldLayers,
   isWorldRouteHash,
+  parkWorldLayersForHandoff,
   registerWorldSession,
   syncWorldSessionFromDom,
 } from "../lib/world-session.js";
@@ -189,12 +191,16 @@ export function renderLegal({ slug }) {
   const durationMs = reducedMotion ? TRANSITION_MS_REDUCED : TRANSITION_MS;
   const transition = consumeWorldTransition();
   const animateEntry = shouldAnimateLegalEntry(transition);
+  const fromCompressed = transition.snapshot?.fromBandsCompressed === true;
+  const bandNeedsAnim = animateEntry && !fromCompressed;
 
   const scene = document.createElement("div");
   scene.className = "scene scene-legal scene-world is-reveal-bg is-reveal-fantasy is-reveal-space";
   scene.dataset.legalSlug = routeSlug;
-  if (animateEntry) scene.classList.add("is-orbit-layout-paused");
-  setWorldBandLayout(scene, animateEntry ? false : true);
+  if (bandNeedsAnim) scene.classList.add("is-orbit-layout-paused");
+  // Compacto→compacto (p. ej. account→privacidad): partir ya comprimido, sin salto expand→compress.
+  // Solo expandido→comprimido parte en loader para poder animar.
+  setWorldBandLayout(scene, !bandNeedsAnim);
 
   const reusedLayers = attachWorldLayersTo(scene);
   /** @type {{ destroy: () => void; getSessionState?: () => object }} */
@@ -359,7 +365,21 @@ export function renderLegal({ slug }) {
   if (animateEntry && transition.snapshot?.logo) {
     enterPromise = (async () => {
       await mountWorldLogo(logoWrap, fallback);
-      await morphLogoWithBands(scene, logoWrap, transition.snapshot?.logo, true, durationMs);
+      if (fromCompressed) {
+        // Origen ya compacto: solo morph del logo, sin tocar bandas.
+        const fromLogo = transition.snapshot.logo;
+        const toLogo = captureRect(logoWrap);
+        if (fromLogo && toLogo) {
+          pinLogoAtRect(logoWrap, fromLogo);
+          await morphLogoBetweenRects(logoWrap, fromLogo, toLogo, durationMs, {
+            keepPinned: false,
+          });
+        }
+        setWorldBandLayout(scene, true);
+        setOrbitLayoutPaused(scene, false);
+      } else {
+        await morphLogoWithBands(scene, logoWrap, transition.snapshot?.logo, true, durationMs);
+      }
     })();
   } else if (!animateEntry) {
     setWorldBandLayout(scene, true);
@@ -525,7 +545,7 @@ export function renderLegal({ slug }) {
   topFab.addEventListener("click", onTop);
 
   return {
-    destroy() {
+    destroy(options = {}) {
       destroyed = true;
       loadSeq += 1;
       loadAbort.abort();
@@ -541,7 +561,11 @@ export function renderLegal({ slug }) {
 
       if (isWorldRouteHash()) {
         syncWorldSessionFromDom(scene);
-        detachWorldLayers();
+        if (options.worldHandoff) {
+          parkWorldLayersForHandoff();
+        } else {
+          detachWorldLayers();
+        }
         return;
       }
 

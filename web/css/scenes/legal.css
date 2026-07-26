@@ -33,6 +33,80 @@
     --legal-terrain-h 0.72s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Capas del mundo parqueadas en body durante handoff entre rutas shell.
+   Deben quedar ENCIMA del #app vacío (si no, solo se ve negro).
+   Y forzar opacity: las reglas .scene-loader.is-reveal-* viven en la escena
+   destruida; sin esto las capas se apagan → parpadeo al remontar home. */
+.loader-layers.world-layers--parked {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  --legal-space-band: 48%;
+  --legal-space-band-frac: 0.48;
+  --legal-fantasy-band: 52%;
+  --legal-fantasy-top: 48%;
+  --legal-fantasy-top-frac: 0.48;
+  --legal-terrain-h: clamp(36px, 7vh, 66px);
+}
+
+.loader-layers.world-layers--parked.is-parked-compressed {
+  --legal-space-band: 24%;
+  --legal-space-band-frac: 0.24;
+  --legal-fantasy-band: 24%;
+  --legal-fantasy-top: 76%;
+  --legal-fantasy-top-frac: 0.76;
+  --legal-terrain-h: clamp(20px, 3.6vh, 34px);
+}
+
+.loader-layers.world-layers--parked .loader-bg-attenuate,
+.loader-layers.world-layers--parked .loader-layer__img,
+.loader-layers.world-layers--parked .loader-layer--fantasy,
+.loader-layers.world-layers--parked .loader-layer--space,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-backdrop,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-terrain,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-clouds,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-celestial,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-scene,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--space-orbit,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--meteor-shower {
+  opacity: 1;
+}
+
+.loader-layers.world-layers--parked .loader-layer--space {
+  clip-path: inset(0 0 calc(100% - var(--legal-space-band)) 0);
+}
+
+.loader-layers.world-layers--parked .loader-layer--fantasy {
+  clip-path: inset(var(--legal-fantasy-top) 0 0 0);
+}
+
+.loader-layers.world-layers--parked .loader-layer.loader-layer--space-orbit,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--meteor-shower {
+  height: calc(var(--legal-space-band-frac) * 100%);
+  bottom: auto;
+}
+
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-backdrop,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-clouds,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-celestial,
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-scene {
+  inset: var(--legal-fantasy-top) 0 0 0;
+  height: auto;
+}
+
+.loader-layers.world-layers--parked .loader-layer.loader-layer--fantasy-terrain {
+  height: var(--legal-terrain-h) !important;
+}
+
+body.is-world-handoff #app {
+  background: transparent;
+}
+
+.scene.scene-loader.scene-world {
+  cursor: auto;
+}
+
 .scene-legal {
   --legal-logo-size: clamp(104px, 24vw, 140px);
   --legal-logo-top: calc(21dvh + clamp(0.25rem, 1.5vh, 1rem));
@@ -83,7 +157,10 @@
   initial-value: 36px;
 }
 
-.scene-world.is-world-band-legal {
+/* Especificidad ≥ .scene.scene-loader.scene-world (0,3,0); si no, home/account
+   mantienen 48%/52% aunque JS añada is-world-band-legal. */
+.scene.scene-legal.scene-world.is-world-band-legal,
+.scene.scene-loader.scene-world.is-world-band-legal {
   --legal-space-band: 24%;
   --legal-space-band-frac: 0.24;
   --legal-fantasy-band: 24%;
@@ -92,7 +169,8 @@
   --legal-terrain-h: clamp(20px, 3.6vh, 34px);
 }
 
-.scene-world.is-world-band-loader {
+.scene.scene-legal.scene-world.is-world-band-loader,
+.scene.scene-loader.scene-world.is-world-band-loader {
   --legal-space-band: 48%;
   --legal-space-band-frac: 0.48;
   --legal-fantasy-band: 52%;
@@ -160,11 +238,10 @@
 .scene-world .loader-layer.loader-layer--fantasy-clouds,
 .scene-world .loader-layer.loader-layer--fantasy-celestial,
 .scene-world .loader-layer.loader-layer--fantasy-scene {
-  top: var(--legal-fantasy-top);
-  bottom: 0;
+  /* Anula el `inset: 50%` hardcoded de loader.css — sin esto las bandas
+     de scene-loader (home/account) no comprimen al cambiar --legal-fantasy-top. */
+  inset: var(--legal-fantasy-top) 0 0 0;
   height: auto;
-  /* Sin transition:top — pelea con @property --legal-fantasy-top y deja el
-     footer congelado en legal; al handoff a auth salta de golpe. */
 }
 
 /* En legal comprimido, no dejar que castillos/riscos/bosques invadan el texto */

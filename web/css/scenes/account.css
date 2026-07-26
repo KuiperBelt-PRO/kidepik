@@ -1,0 +1,261 @@
+/* Sección cuenta padre/tutor */
+
+.account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  color: #fff;
+}
+
+.account-panel__subtitle {
+  margin: 0;
+  text-align: center;
+  font-size: clamp(0.95rem, 3.6vw, 1.05rem);
+  font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
+  letter-spacing: 0.02em;
+}
+
+html[data-shell-theme="sci-fi"] .account-panel__subtitle,
+html[data-shell-theme="sci-fi"] .account-panel__label,
+html[data-shell-theme="sci-fi"] .account-panel__danger-title {
+  font-family: var(--font-shell-sci, "Bruno Ace", "Orbitron", system-ui, sans-serif);
+}
+
+html[data-shell-theme="fantasy"] .account-panel__subtitle,
+html[data-shell-theme="fantasy"] .account-panel__label,
+html[data-shell-theme="fantasy"] .account-panel__danger-title {
+  font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
+}
+
+.account-panel__avatar {
+  width: 64px;
+  height: 64px;
+  margin: 0 auto;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.account-panel__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.account-panel__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.account-panel__label {
+  font-size: 0.85rem;
+  letter-spacing: 0.03em;
+}
+
+.account-panel__helper,
+.account-panel__value,
+.account-panel__status,
+.account-panel__error {
+  margin: 0;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.account-panel__helper {
+  opacity: 0.8;
+}
+
+.account-panel__value {
+  opacity: 0.95;
+}
+
+.account-panel__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.65rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 1rem;
+}
+
+.account-panel__input:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section-frame {
+    transition-duration: 80ms;
+  }
+}
+
+.account-panel__name-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.account-panel__name-row .account-panel__input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.account-panel__name-row .account-panel__btn {
+  flex: 0 1 auto;
+  min-width: 7.5rem;
+}
+
+.account-panel__btn {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0.65rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.account-panel__btn-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+}
+
+.account-panel__btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.account-panel__error {
+  color: #ffc9c4;
+}
+
+.account-panel__status {
+  color: #d7ffe4;
+}
+
+.account-panel__divider {
+  height: 1px;
+  margin: 0.35rem 0;
+  background: rgba(255, 255, 255, 0.12);
+  border: 0;
+}
+
+.account-panel__danger-title {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.account-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  pointer-events: auto;
+}
+
+.account-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.account-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 360px);
+  max-height: min(80dvh, 560px);
+  overflow: auto;
+  padding: 1.15rem 1.1rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+}
+
+.account-modal__title {
+  margin: 0 0 0.75rem;
+  font-size: 1.15rem;
+  font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
+}
+
+html[data-shell-theme="sci-fi"] .account-modal__title {
+  font-family: var(--font-shell-sci, "Bruno Ace", "Orbitron", system-ui, sans-serif);
+}
+
+.account-modal__body,
+.account-modal__undo {
+  margin: 0 0 0.75rem;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.account-modal__body ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.15rem;
+}
+
+.account-modal__undo {
+  font-weight: 700;
+}
+
+.account-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.account-panel--skeleton .account-panel__skel {
+  height: 14px;
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.08),
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.08)
+  );
+  background-size: 200% 100%;
+  animation: account-skel 1.2s ease-in-out infinite;
+}
+
+@keyframes account-skel {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-panel--skeleton .account-panel__skel {
+    animation: none;
+  }
+}

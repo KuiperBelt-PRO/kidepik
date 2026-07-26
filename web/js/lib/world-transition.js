@@ -27,6 +27,7 @@ const store = { snapshot: null, intent: null };
  *   spaceBand?: number;
  *   fantasyBand?: number;
  *   bandsAlreadyExpanded?: boolean;
+ *   fromBandsCompressed?: boolean;
  * }} WorldSnapshot
  */
 
@@ -37,6 +38,7 @@ const store = { snapshot: null, intent: null };
  *   from?: string;
  *   resumeAuth?: boolean;
  *   resumeShell?: boolean;
+ *   bandTransition?: boolean;
  * }} WorldIntent
  */
 
@@ -217,6 +219,26 @@ export function measureShellBrandLogoTarget(fromLogo, welcomeLines = {}) {
     width: authW,
     height: authH,
   };
+}
+
+/**
+ * Mide el destino del logo en la cabecera del marco de sección.
+ * @param {HTMLElement} logoMountEl — `.section-frame__logo-mount`
+ * @returns {RectSnapshot | null}
+ */
+export function measureSectionFrameLogoTarget(logoMountEl) {
+  if (!(logoMountEl instanceof HTMLElement)) return null;
+
+  const probe = document.createElement("div");
+  probe.className = "loader-logo-wrap section-frame__logo-probe";
+  probe.setAttribute("aria-hidden", "true");
+  probe.style.visibility = "hidden";
+  probe.style.width = "var(--section-frame-logo, 64px)";
+  logoMountEl.appendChild(probe);
+  void logoMountEl.offsetWidth;
+  const rect = captureRect(probe);
+  probe.remove();
+  return rect;
 }
 
 /**
@@ -420,22 +442,24 @@ export async function morphLogoWithBands(scene, logoEl, from, toCompressed, dura
  * @returns {Promise<void>}
  */
 export function animateWorldBands(scene, toCompressed, durationMs) {
-  const atTarget = scene.classList.contains(toCompressed ? "is-world-band-legal" : "is-world-band-loader");
-  if (!atTarget) {
+  if (durationMs <= 0) {
     setWorldBandLayout(scene, toCompressed);
+    return Promise.resolve();
   }
 
-  if (durationMs <= 0) return Promise.resolve();
+  const atTarget = scene.classList.contains(
+    toCompressed ? "is-world-band-legal" : "is-world-band-loader",
+  );
+  if (atTarget) {
+    setWorldBandLayout(scene, !toCompressed);
+    void scene.offsetWidth;
+  }
 
   const orbitRelayout = getWorldSession()?.spaceOrbitTeardown?.relayout;
   const fantasyRelayout = getWorldSession()?.fantasySceneTeardown?.relayout;
   let rafId = 0;
-  const tick = () => {
-    orbitRelayout?.();
-    fantasyRelayout?.();
-    rafId = requestAnimationFrame(tick);
-  };
-  rafId = requestAnimationFrame(tick);
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let timer;
 
   return new Promise((resolve) => {
     let done = false;
@@ -446,14 +470,25 @@ export function animateWorldBands(scene, toCompressed, durationMs) {
       orbitRelayout?.();
       fantasyRelayout?.();
       scene.removeEventListener("transitionend", onEnd);
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       resolve();
     };
     const onEnd = (event) => {
       if (event.target === scene) finish();
     };
-    scene.addEventListener("transitionend", onEnd);
-    const timer = setTimeout(finish, durationMs + 60);
+
+    requestAnimationFrame(() => {
+      setWorldBandLayout(scene, toCompressed);
+      void scene.offsetWidth;
+      scene.addEventListener("transitionend", onEnd);
+      const tick = () => {
+        orbitRelayout?.();
+        fantasyRelayout?.();
+        rafId = requestAnimationFrame(tick);
+      };
+      rafId = requestAnimationFrame(tick);
+      timer = setTimeout(finish, durationMs + 60);
+    });
   });
 }
 

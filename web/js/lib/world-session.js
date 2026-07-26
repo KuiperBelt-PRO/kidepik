@@ -26,6 +26,9 @@ const SCENE_CLASS_MIGRATE = [
   "is-placeholder-art",
 ];
 
+const PARKED_LAYERS_CLASS = "world-layers--parked";
+const PARKED_COMPRESSED_CLASS = "is-parked-compressed";
+
 /** @type {WorldSessionState | null} */
 let session = null;
 
@@ -61,7 +64,25 @@ function migrateSceneWorldState(fromScene, toScene) {
 }
 
 /**
- * Mueve las capas persistentes a otra escena sin destruir efectos montados.
+ * Parquea las capas en `body` durante handoff entre rutas mundo (evita flash negro).
+ * Conserva el estado de banda (expandido/comprimido) en la propia capa parqueada.
+ */
+export function parkWorldLayersForHandoff() {
+  if (!session?.layers) return;
+  const { layers } = session;
+  if (!layers.isConnected) return;
+
+  const owner = session.ownerScene;
+  const compressed = Boolean(owner?.classList.contains("is-world-band-legal"));
+
+  layers.remove();
+  layers.classList.add(PARKED_LAYERS_CLASS);
+  layers.classList.toggle(PARKED_COMPRESSED_CLASS, compressed);
+  document.body.classList.add("is-world-handoff");
+  document.body.appendChild(layers);
+}
+
+/**
  * @param {HTMLElement} scene
  * @returns {boolean}
  */
@@ -70,6 +91,9 @@ export function attachWorldLayersTo(scene) {
 
   const prev = session.ownerScene;
   if (prev && prev !== scene) migrateSceneWorldState(prev, scene);
+
+  session.layers.classList.remove(PARKED_LAYERS_CLASS, PARKED_COMPRESSED_CLASS);
+  document.body.classList.remove("is-world-handoff");
 
   if (!scene.contains(session.layers)) {
     scene.insertBefore(session.layers, scene.firstChild);
@@ -122,6 +146,8 @@ export function syncWorldSessionFromDom(ownerScene) {
  */
 export function detachWorldLayers() {
   if (!session?.layers) return;
+  session.layers.classList.remove(PARKED_LAYERS_CLASS, PARKED_COMPRESSED_CLASS);
+  document.body.classList.remove("is-world-handoff");
   session.layers.remove();
 }
 
@@ -139,6 +165,8 @@ export function destroyWorldSession() {
   session.fantasyCloudsTeardown?.destroy();
   session.fantasyCelestialTeardown?.destroy();
   session.fantasySceneTeardown?.destroy();
+  session.layers.classList.remove(PARKED_LAYERS_CLASS, PARKED_COMPRESSED_CLASS);
+  document.body.classList.remove("is-world-handoff");
   session.layers.remove();
   session = null;
 }

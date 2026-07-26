@@ -1,0 +1,171 @@
+/* Marco glass de sección autenticada */
+
+.section-frame {
+  --section-frame-pad-x: clamp(12px, 4vw, 20px);
+  --section-frame-fade-ramp: clamp(48px, 12dvh, 96px);
+  --section-frame-radius: 18px;
+  --section-frame-logo: clamp(56px, 14vw, 72px);
+  --section-frame-scrollbar: 6px;
+  position: absolute;
+  z-index: 4;
+  left: var(--section-frame-pad-x);
+  right: var(--section-frame-pad-x);
+  top: calc(var(--shell-chrome-band-h, 68px) + clamp(8px, 2vh, 16px));
+  bottom: calc(18% + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  pointer-events: auto;
+  border-radius: var(--section-frame-radius);
+  border: 1px solid var(--shell-drawer-border, rgba(255, 255, 255, 0.28));
+  background: var(--shell-drawer-bg, rgba(255, 255, 255, 0.12));
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  overflow: hidden;
+  color: #fff;
+  opacity: 1;
+  transition: opacity 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.section-frame.is-entering {
+  opacity: 0;
+}
+
+.section-frame.is-exiting {
+  opacity: 0;
+  transition-duration: 220ms;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .section-frame {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
+
+.section-frame__header {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 16px 16px 12px;
+}
+
+.section-frame__logo-mount {
+  width: var(--section-frame-logo);
+  min-height: calc(var(--section-frame-logo) * 0.42);
+  display: grid;
+  place-items: center;
+}
+
+.section-frame__logo-mount .loader-logo-wrap {
+  width: 100%;
+  position: static !important;
+  transform: none !important;
+  left: auto !important;
+  top: auto !important;
+}
+
+.section-frame__logo-mount .loader-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.section-frame__logo-wrap {
+  width: var(--section-frame-logo);
+  display: grid;
+  place-items: center;
+}
+
+.section-frame__logo {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.section-frame__logo-fallback {
+  margin: 0;
+  font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
+  font-size: clamp(1.1rem, 4vw, 1.35rem);
+  letter-spacing: 0.04em;
+  color: #fff;
+}
+
+html[data-shell-theme="sci-fi"] .section-frame__logo-fallback {
+  font-family: var(--font-shell-sci, "Bruno Ace", "Orbitron", system-ui, sans-serif);
+}
+
+.section-frame__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--section-frame-fade-ramp),
+    #000 calc(100% - var(--section-frame-fade-ramp)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--section-frame-fade-ramp),
+    #000 calc(100% - var(--section-frame-fade-ramp)),
+    transparent 100%
+  );
+  -webkit-mask-size: calc(100% - var(--section-frame-scrollbar)) 100%;
+  mask-size: calc(100% - var(--section-frame-scrollbar)) 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: left top;
+  mask-position: left top;
+}
+
+.section-frame__content {
+  padding:
+    calc(var(--section-frame-fade-ramp) * 0.35)
+    clamp(1rem, 4.5vw, 1.35rem)
+    calc(var(--section-frame-fade-ramp) * 0.85 + env(safe-area-inset-bottom, 0px));
+}
+
+.section-host {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.section-host .section-frame {
+  pointer-events: auto;
+}
+
+.scene-loader.is-section-compact .loader-focal,
+.scene-loader.is-section-compact .loader-auth-brand,
+.scene-loader.is-section-compact .loader-home-welcome,
+.scene-loader.is-section-compact .loader-auth-stack {
+  display: none !important;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.scene-loader.is-section-compact .loader-ring {
+  visibility: hidden;
+}
+
+/* En secciones compactas, no dejar que el scenery invade el marco */
+.scene.scene-loader.is-section-compact.is-world-band-legal .loader-layer.loader-layer--fantasy-scene {
+  overflow: hidden;
+}
+
+/* Refuerzo: anular inset:50% de loader.css en secciones compactas */
+.scene.scene-loader.scene-world.is-world-band-legal .loader-layer.loader-layer--fantasy-backdrop,
+.scene.scene-loader.scene-world.is-world-band-legal .loader-layer.loader-layer--fantasy-clouds,
+.scene.scene-loader.scene-world.is-world-band-legal .loader-layer.loader-layer--fantasy-celestial,
+.scene.scene-loader.scene-world.is-world-band-legal .loader-layer.loader-layer--fantasy-scene {
+  inset: var(--legal-fantasy-top) 0 0 0;
+  height: auto;
+}

@@ -304,7 +304,10 @@ function resolveSpaceLayout(layer) {
   // Durante la transición de bandas (paused) hay que escalar por altura actual
   // (modo "legal" en computeSpaceLayoutScale). Forzar "loader" dejaba scale=1
   // y el header sci-fi solo se recortaba, sin animación suave de tamaño.
+  // Igual con is-world-band-legal en scene-loader (account/secciones): la franja
+  // CSS ya está al 24 %, pero sin modo legal los planetas siguen a escala 1.
   if (scene.classList.contains("is-orbit-layout-paused")) return "legal";
+  if (scene.classList.contains("is-world-band-legal")) return "legal";
   return scene.classList.contains("scene-legal") ? "legal" : "loader";
 }
 

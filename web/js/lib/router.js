@@ -1,5 +1,7 @@
 /** @typedef {(params: Record<string, string>) => void | Promise<void>} RouteHandler */
 
+import { isWorldRouteHash } from "./world-session.js";
+
 /** @type {Map<string, RouteHandler>} */
 const routes = new Map();
 
@@ -51,13 +53,23 @@ export function navigate(path) {
   window.location.hash = path.startsWith("/") ? path : `/${path}`;
 }
 
-/** @type {(() => void) | null} */
+/** @typedef {{ worldHandoff?: boolean }} RouteTeardownOptions */
+
+/** @type {(() => void) | ((options?: RouteTeardownOptions) => void) | null} */
 let routeTeardown = null;
+
+/** @type {string} */
+let lastRoutePath = hashRoutePath();
 
 export function startRouter() {
   const run = () => {
+    const nextPath = hashRoutePath();
+    const fromPath = lastRoutePath;
+    const worldHandoff =
+      isWorldRouteHash(`#/${fromPath}`) && isWorldRouteHash(`#/${nextPath}`);
+
     if (routeTeardown) {
-      routeTeardown();
+      routeTeardown({ worldHandoff });
       routeTeardown = null;
     }
 
@@ -74,6 +86,8 @@ export function startRouter() {
     } else {
       navigate("/loader");
     }
+
+    lastRoutePath = nextPath;
   };
   window.addEventListener("hashchange", run);
   run();

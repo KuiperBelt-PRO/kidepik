@@ -4,7 +4,7 @@
  */
 
 /** @typedef {'sci-fi' | 'fantasy'} UiIconTheme */
-/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'} UiIconId */
+/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'} UiIconId */
 
 export const SHELL_UI_ICON_THEMES = Object.freeze(
   /** @type {UiIconTheme[]} */ (["sci-fi", "fantasy"]),
@@ -22,6 +22,8 @@ export const SHELL_UI_ICON_IDS = Object.freeze(
     "legal",
     "signout",
     "chevron",
+    "save",
+    "danger",
   ]),
 );
 
@@ -495,6 +497,96 @@ function buildGlyphGroups(theme, id) {
               { x: 78, y: 44 },
               { x: 50, y: 72 },
               { x: 22, y: 44 },
+            ],
+          ];
+
+    case "save":
+      return sci
+        ? [
+            [
+              { x: 24, y: 24 },
+              { x: 76, y: 24 },
+              { x: 76, y: 78 },
+              { x: 24, y: 78 },
+            ],
+            [
+              { x: 40, y: 16 },
+              { x: 60, y: 16 },
+              { x: 60, y: 26 },
+              { x: 40, y: 26 },
+            ],
+            [
+              { x: 32, y: 36 },
+              { x: 68, y: 36 },
+              { x: 68, y: 44 },
+              { x: 32, y: 44 },
+            ],
+            [
+              { x: 32, y: 50 },
+              { x: 68, y: 50 },
+              { x: 68, y: 58 },
+              { x: 32, y: 58 },
+            ],
+          ]
+        : [
+            [
+              { x: 26, y: 22 },
+              { x: 74, y: 18 },
+              { x: 78, y: 76 },
+              { x: 30, y: 80 },
+            ],
+            [
+              { x: 36, y: 36 },
+              { x: 66, y: 34 },
+              { x: 68, y: 44 },
+              { x: 38, y: 46 },
+            ],
+            [
+              { x: 38, y: 50 },
+              { x: 66, y: 48 },
+              { x: 68, y: 58 },
+              { x: 40, y: 60 },
+            ],
+          ];
+
+    case "danger":
+      return sci
+        ? [
+            [
+              { x: 50, y: 16 },
+              { x: 84, y: 78 },
+              { x: 16, y: 78 },
+            ],
+            [
+              { x: 47, y: 40 },
+              { x: 53, y: 40 },
+              { x: 53, y: 60 },
+              { x: 47, y: 60 },
+            ],
+            [
+              { x: 47, y: 66 },
+              { x: 53, y: 66 },
+              { x: 53, y: 72 },
+              { x: 47, y: 72 },
+            ],
+          ]
+        : [
+            [
+              { x: 50, y: 14 },
+              { x: 82, y: 74 },
+              { x: 18, y: 74 },
+            ],
+            [
+              { x: 46, y: 38 },
+              { x: 54, y: 38 },
+              { x: 54, y: 58 },
+              { x: 46, y: 58 },
+            ],
+            [
+              { x: 46, y: 64 },
+              { x: 54, y: 64 },
+              { x: 54, y: 72 },
+              { x: 46, y: 72 },
             ],
           ];
 

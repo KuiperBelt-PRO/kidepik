@@ -5,6 +5,7 @@
 
 import { captureRect, prepareWorldTransition } from "./world-transition.js";
 import { hashRoutePath, navigate } from "./router.js";
+import { shouldCompressWorldBands } from "./world-band-layout.js";
 
 /** @typedef {'authenticated-home' | 'auth-handoff'} LegalBackMode */
 
@@ -77,16 +78,20 @@ export async function navigateFromLegal(path) {
  * @param {LegalTransitionSource} [from]
  */
 export function prepareLegalNavigation(from = "shell") {
+  const fromPath = from === "shell" ? hashRoutePath() : from;
   const logo = document.querySelector(".loader-auth-brand .loader-logo-wrap")
+    ?? document.querySelector(".section-frame__logo-mount .loader-logo-wrap")
     ?? document.querySelector(".scene-loader .loader-logo-wrap");
   prepareWorldTransition(
     {
       logo: captureRect(logo),
-      from,
+      logoEl: logo instanceof HTMLElement ? logo : null,
+      from: fromPath,
+      fromBandsCompressed: shouldCompressWorldBands(fromPath),
       spaceBand: 0.48,
       fantasyBand: 0.52,
     },
-    { to: "legal", from },
+    { to: "legal", from: fromPath, bandTransition: !shouldCompressWorldBands(fromPath) },
   );
 }
 

@@ -37,6 +37,16 @@ final class Router
             $method === 'POST' && $path === '/api/v1/parents/bootstrap' => (new ParentsController())->bootstrap(
                 $_SERVER['HTTP_AUTHORIZATION'] ?? null,
             ),
+            $method === 'GET' && $path === '/api/v1/parents/me' => (new ParentsController())->me(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+            ),
+            $method === 'PATCH' && $path === '/api/v1/parents/me' => (new ParentsController())->updateMe(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                file_get_contents('php://input') ?: null,
+            ),
+            $method === 'DELETE' && $path === '/api/v1/parents/me' => (new ParentsController())->deleteMe(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+            ),
             default => JsonResponse::error('Not Found', 404),
         };
     }

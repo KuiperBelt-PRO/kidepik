@@ -54,6 +54,12 @@ export function mountHomeWelcomePanel(container, { displayName, lineSci, lineFan
       }
       welcome.remove();
     },
+    /**
+     * @param {string} name
+     */
+    updateDisplayName(name) {
+      sci.textContent = lineSci ?? `Hola, ${name},`;
+    },
   };
 }
 

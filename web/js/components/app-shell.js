@@ -11,6 +11,7 @@ import {
   navigateFromLegal,
   prepareLegalNavigation,
 } from "../lib/legal-navigation.js";
+import { navigateShellRoute } from "../lib/shell-navigation.js?v=182";
 import {
   getShellUiTheme,
   initShellUiTheme,
@@ -329,7 +330,11 @@ export function mountAppShell(options) {
       row.addEventListener("click", () => {
         if (item.kind === "link" && item.href) {
           closeDrawer();
-          void navigateFromLegal(item.href);
+          if (item.href.startsWith("/legal/")) {
+            void navigateFromLegal(item.href);
+          } else {
+            void navigateShellRoute(item.href);
+          }
           return;
         }
         if (item.kind === "stub") {
@@ -367,7 +372,7 @@ export function mountAppShell(options) {
 
   function onAccountClick() {
     closeDrawer();
-    void navigateFromLegal("/account");
+    void navigateShellRoute("/account");
   }
 
   function onScrimClick() {

@@ -3,7 +3,7 @@
  * @module scenes/auth-callback
  */
 
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=164";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=182";
 import { navigate } from "../lib/router.js";
 import { bootstrapParentIfNeeded } from "../lib/parent-account.js";
 import { exchangeCodeFromUrl, getValidSession } from "../lib/supabase.js";
