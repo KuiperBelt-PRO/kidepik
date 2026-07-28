@@ -21,8 +21,12 @@ export function shouldCompressWorldBands(path = "") {
   if (normalized === "" || normalized === "home") return false;
   if (normalized === "account") return true;
   if (normalized.startsWith("legal/")) return true;
-  // Futuras secciones de gestión autenticada
-  if (normalized === "crew" || normalized === "settings" || normalized === "family") {
+  if (
+    normalized === "crew" ||
+    normalized.startsWith("crew/") ||
+    normalized === "settings" ||
+    normalized === "family"
+  ) {
     return true;
   }
   return false;

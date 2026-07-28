@@ -1,11 +1,13 @@
 import { registerRoute, startRouter } from "./lib/router.js";
 import { initTheme } from "./lib/theme.js";
 import { initShellUiTheme } from "./lib/shell-theme.js";
-import { renderLoader } from "./scenes/loader.js?v=183";
-import { renderAuthCallback } from "./scenes/auth-callback.js?v=183";
-import { renderHome } from "./scenes/home.js?v=183";
-import { renderAccount } from "./scenes/account.js?v=183";
-import { renderLegal } from "./scenes/legal.js?v=183";
+import { renderLoader } from "./scenes/loader.js?v=184";
+import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
+import { renderHome } from "./scenes/home.js?v=184";
+import { renderAccount } from "./scenes/account.js?v=184";
+import { renderSettings } from "./scenes/settings.js?v=185";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=185";
+import { renderLegal } from "./scenes/legal.js?v=184";
 
 function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");
@@ -33,6 +35,10 @@ function boot() {
   registerRoute("auth/callback", () => renderAuthCallback());
   registerRoute("home", () => renderHome());
   registerRoute("account", () => renderAccount());
+  registerRoute("settings", () => renderSettings());
+  registerRoute("crew", () => renderCrew());
+  registerRoute("crew/new", () => renderCrewNew());
+  registerRoute("crew/:id", (params) => renderCrewDetail(params));
   registerRoute("legal/terminos", () => renderLegal({ slug: "terminos" }));
   registerRoute("legal/privacidad", () => renderLegal({ slug: "privacidad" }));
 

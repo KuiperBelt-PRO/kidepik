@@ -42,7 +42,7 @@ Definir el patrón reutilizable de **sección de gestión autenticada** para imp
 | Rediseño de Legal (marco glass) | Fuera; solo reutiliza bandas compactas ya existentes |
 | Home welcome | Sin marco glass; bandas **expandidas** |
 | HUD de juego infantil | Distinto del chrome de gestión |
-| Tripulación / Ajustes | Consumirán este patrón en specs futuras |
+| Tripulación / Ajustes | [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_SETTINGS_SECTION.md](SPEC_APP_SETTINGS_SECTION.md) (propuesta) |
 
 ---
 
@@ -81,7 +81,9 @@ Reutilizar el mecanismo actual de legal (`animateWorldBands` / `setWorldBandLayo
 | `#/account` | **Compacto** | **Sí** |
 | `#/legal/terminos` (sesión) | **Compacto** | No (layout legal) |
 | `#/legal/privacidad` (sesión) | **Compacto** | No (layout legal) |
-| Futuras (`#/crew`, `#/settings`, …) | **Compacto** | **Sí** (por defecto) |
+| `#/settings` | **Compacto** | **Sí** |
+| `#/crew`, `#/crew/new`, `#/crew/:id` | **Compacto** | **Sí** |
+| Otras gestión futuras | **Compacto** | **Sí** (por defecto) |
 | `#/loader`, `#/auth/*` | N/A (sin shell de gestión) | No |
 
 ### 1.3 Transiciones

@@ -4,7 +4,7 @@
  */
 
 /** @typedef {'sci-fi' | 'fantasy'} UiIconTheme */
-/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'} UiIconId */
+/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'} UiIconId */
 
 export const SHELL_UI_ICON_THEMES = Object.freeze(
   /** @type {UiIconTheme[]} */ (["sci-fi", "fantasy"]),
@@ -24,6 +24,8 @@ export const SHELL_UI_ICON_IDS = Object.freeze(
     "chevron",
     "save",
     "danger",
+    "add",
+    "close",
   ]),
 );
 
@@ -587,6 +589,76 @@ function buildGlyphGroups(theme, id) {
               { x: 54, y: 64 },
               { x: 54, y: 72 },
               { x: 46, y: 72 },
+            ],
+          ];
+
+    case "add":
+      return sci
+        ? [
+            [
+              { x: 44, y: 22 },
+              { x: 56, y: 22 },
+              { x: 56, y: 44 },
+              { x: 78, y: 44 },
+              { x: 78, y: 56 },
+              { x: 56, y: 56 },
+              { x: 56, y: 78 },
+              { x: 44, y: 78 },
+              { x: 44, y: 56 },
+              { x: 22, y: 56 },
+              { x: 22, y: 44 },
+              { x: 44, y: 44 },
+            ],
+          ]
+        : [
+            [
+              { x: 46, y: 20 },
+              { x: 54, y: 22 },
+              { x: 54, y: 44 },
+              { x: 76, y: 42 },
+              { x: 78, y: 50 },
+              { x: 56, y: 52 },
+              { x: 58, y: 78 },
+              { x: 48, y: 80 },
+              { x: 46, y: 54 },
+              { x: 22, y: 56 },
+              { x: 20, y: 46 },
+              { x: 44, y: 44 },
+            ],
+          ];
+
+    case "close":
+      return sci
+        ? [
+            [
+              { x: 28, y: 22 },
+              { x: 36, y: 22 },
+              { x: 50, y: 40 },
+              { x: 64, y: 22 },
+              { x: 72, y: 22 },
+              { x: 56, y: 50 },
+              { x: 72, y: 78 },
+              { x: 64, y: 78 },
+              { x: 50, y: 60 },
+              { x: 36, y: 78 },
+              { x: 28, y: 78 },
+              { x: 44, y: 50 },
+            ],
+          ]
+        : [
+            [
+              { x: 26, y: 24 },
+              { x: 36, y: 20 },
+              { x: 50, y: 38 },
+              { x: 64, y: 20 },
+              { x: 74, y: 24 },
+              { x: 58, y: 50 },
+              { x: 74, y: 76 },
+              { x: 64, y: 80 },
+              { x: 50, y: 62 },
+              { x: 36, y: 80 },
+              { x: 26, y: 76 },
+              { x: 42, y: 50 },
             ],
           ];
 

@@ -27,6 +27,13 @@
 - **Legal con sesión autenticada:** [specify/SPEC_LEGAL_AUTHENTICATED_SESSION.md](specify/SPEC_LEGAL_AUTHENTICATED_SESSION.md) — **aprobada** jul 2026; shell en Términos/Privacidad, vuelta a home sin cerrar sesión, tipografía según `uiTheme`
 - **Marco de sección autenticada (bandas + glass):** [specify/SPEC_APP_SECTION_FRAME.md](specify/SPEC_APP_SECTION_FRAME.md) — **aprobada** jul 2026; bandas compactas en todas las rutas de gestión salvo home; marco glass + logo + scroll con fade
 - **Sección Cuenta (padre/tutor):** [specify/SPEC_APP_ACCOUNT_SECTION.md](specify/SPEC_APP_ACCOUNT_SECTION.md) — **aprobada** jul 2026; datos Google, alias editable, eliminación con confirmación; depende del marco de sección
+- **Sección Ajustes (tutor):** [specify/SPEC_APP_SETTINGS_SECTION.md](specify/SPEC_APP_SETTINGS_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (tema, tipografía, defaults, resumen); `parent_accounts.settings` jsonb
+- **Sección Tripulación (perfiles infantiles):** [specify/SPEC_APP_CREW_SECTION.md](specify/SPEC_APP_CREW_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (plaza, lista, ficha, permisos); play/first-run pendiente
+- **Diálogo de aventura (IA):** [specify/SPEC_APP_ADVENTURE_DIALOGUE.md](specify/SPEC_APP_ADVENTURE_DIALOGUE.md) — **contrato** jul 2026; opciones + texto; tema visual por mundo; turns + effects tipados
+- **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** jul 2026; bienvenida → mundo → nombre → edad → examen
+- **Examen de conocimientos (placement):** [specify/SPEC_APP_PLACEMENT_EXAM.md](specify/SPEC_APP_PLACEMENT_EXAM.md) — **contrato** jul 2026; niveles por materia + general ponderado; `effective_age_band`
+- **Rangos de progresión (sci-fi / fantasía):** [specify/SPEC_APP_PROGRESSION_RANKS.md](specify/SPEC_APP_PROGRESSION_RANKS.md) — **marco** jul 2026; catálogo provisional 5 tiers; ampliación de lore después
+- **Sesión de aventura (post-examen):** [specify/SPEC_APP_ADVENTURE_SESSION.md](specify/SPEC_APP_ADVENTURE_SESSION.md) — **marco** jul 2026; handoff y reservas; detalle narrativo/gameplay aplazado a specs futuras
 - **Migraciones PHP + documentos legales:** [specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md) — **aprobada** jul 2026; auto-apply en bootstrap, historial compartido con Supabase, Términos/Privacidad versionados
 - **Loader — lluvia de meteoritos (franja superior):** [specify/SPEC_LOADER_METEOR_SHOWER.md](specify/SPEC_LOADER_METEOR_SHOWER.md) — implementada jun 2026
 - **Loader — terreno fantasía (base inferior):** [specify/SPEC_LOADER_FANTASY_TERRAIN.md](specify/SPEC_LOADER_FANTASY_TERRAIN.md) — implementada jun 2026

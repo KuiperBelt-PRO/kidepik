@@ -14,11 +14,10 @@ import {
   updateParentDisplayName,
 } from "../lib/parent-account.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
+import { GLASS_ICON_FILL, setGlassButton } from "./glass-controls.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 
 /** @typedef {import('./shell-ui-icons.js').UiIconId} UiIconId */
-
-const DANGER_ICON_FILL = "#FF6B63";
 
 const DELETE_COPY_HTML = `
 <p>Si continúas, se eliminará de forma permanente:</p>
@@ -26,7 +25,7 @@ const DELETE_COPY_HTML = `
   <li>Tu cuenta de padre, madre o tutor en KidepiK</li>
   <li>El enlace con tu cuenta de Google en esta app</li>
   <li>Tu nombre para mostrar y preferencias de la cuenta</li>
-  <li>Los perfiles de niños/as y su progreso, cuando existan en tu familia</li>
+  <li>Los exploradores de tu tripulación y su progreso</li>
 </ul>
 <p>No podrás recuperar estos datos. Tendrás que volver a registrarte con Google si quieres usar KidepiK otra vez.</p>
 `;
@@ -56,7 +55,7 @@ function iconSvg(id, opts = {}) {
 function setLabeledButton(btn, iconId, label, opts = {}) {
   btn.replaceChildren();
   btn.append(
-    iconSvg(iconId, { fill: opts.dangerIcon ? DANGER_ICON_FILL : "#fff" }),
+    iconSvg(iconId, { fill: opts.dangerIcon ? GLASS_ICON_FILL.danger : GLASS_ICON_FILL.default }),
     document.createTextNode(label),
   );
 }

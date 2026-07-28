@@ -41,6 +41,9 @@ export function isShellRoutePath(path = hashRoutePath()) {
   return (
     path === "home" ||
     path === "account" ||
+    path === "settings" ||
+    path === "crew" ||
+    path.startsWith("crew/") ||
     path.startsWith("legal/")
   );
 }
@@ -160,7 +163,7 @@ export function mountAppShell(options) {
   /** @type {{ id: string; label: string; icon: UiIconId; kind: 'link'|'stub'|'action'|'accordion'; href?: string; action?: string; children?: { id: string; label: string; href: string }[] }[]} */
   const items = [
     { id: "home", label: "Inicio", icon: "home", kind: "link", href: "/home" },
-    { id: "crew", label: "Tripulación", icon: "crew", kind: "stub" },
+    { id: "crew", label: "Tripulación", icon: "crew", kind: "link", href: "/crew" },
     {
       id: "legal",
       label: "Legal",
@@ -171,7 +174,7 @@ export function mountAppShell(options) {
         { id: "privacy", label: "Privacidad", href: "/legal/privacidad" },
       ],
     },
-    { id: "settings", label: "Ajustes", icon: "settings", kind: "stub" },
+    { id: "settings", label: "Ajustes", icon: "settings", kind: "link", href: "/settings" },
     { id: "account", label: "Cuenta", icon: "account", kind: "link", href: "/account" },
     { id: "signout", label: "Cerrar sesión", icon: "signout", kind: "action", action: "signout" },
   ];

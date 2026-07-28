@@ -1,0 +1,545 @@
+/* Controles glass — ver .cursor/DESIGN.md */
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.1);
+  --glass-bg-hover: rgba(255, 255, 255, 0.2);
+  --glass-bg-strong: rgba(255, 255, 255, 0.22);
+  --glass-bg-selected: rgba(255, 255, 255, 0.28);
+  --glass-border: rgba(255, 255, 255, 0.28);
+  --glass-border-strong: rgba(255, 255, 255, 0.55);
+  --glass-focus: rgba(255, 255, 255, 0.85);
+  --glass-text: #ffffff;
+  --glass-radius-field: 12px;
+  --glass-radius-pill: 999px;
+  --glass-touch: 48px;
+  /* Panel dropdown: tinte suave + blur (sin velo blanco). */
+  --glass-panel-tint: rgba(12, 28, 38, 0.28);
+  --glass-panel-fallback: rgba(40, 58, 68, 0.88);
+  --glass-panel-border: rgba(255, 255, 255, 0.5);
+}
+
+.glass-surface,
+.settings-panel,
+.crew-panel,
+.account-panel {
+  color-scheme: dark;
+  accent-color: #ffffff;
+}
+
+/* —— Fields —— */
+.glass-field,
+.crew-panel__input,
+.settings-panel__input,
+.account-panel__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--glass-touch);
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--glass-radius-field);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--glass-text);
+  font: inherit;
+  outline: none;
+  box-shadow: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.glass-field::placeholder,
+.crew-panel__input::placeholder,
+.account-panel__input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.glass-field:hover,
+.crew-panel__input:hover,
+.account-panel__input:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.glass-field:focus,
+.glass-field:focus-visible,
+.crew-panel__input:focus,
+.crew-panel__input:focus-visible,
+.account-panel__input:focus,
+.account-panel__input:focus-visible,
+.glass-slider__range:focus,
+.glass-slider__range:focus-visible {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+  border-color: var(--glass-border-strong);
+  box-shadow: none;
+}
+
+/* Ocultar spinners nativos */
+.glass-field[type="number"]::-webkit-outer-spin-button,
+.glass-field[type="number"]::-webkit-inner-spin-button,
+.crew-panel__input[type="number"]::-webkit-outer-spin-button,
+.crew-panel__input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.glass-field[type="number"],
+.crew-panel__input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Textarea — sin asa nativa (rompe el radio glass); scroll fino blanco */
+.glass-field:is(textarea),
+.crew-panel__input:is(textarea),
+.settings-panel__input:is(textarea),
+.account-panel__input:is(textarea) {
+  min-height: 96px;
+  resize: none;
+  line-height: 1.45;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.38) transparent;
+}
+
+.glass-field:is(textarea)::-webkit-scrollbar,
+.crew-panel__input:is(textarea)::-webkit-scrollbar,
+.settings-panel__input:is(textarea)::-webkit-scrollbar,
+.account-panel__input:is(textarea)::-webkit-scrollbar {
+  width: 6px;
+}
+
+.glass-field:is(textarea)::-webkit-scrollbar-thumb,
+.crew-panel__input:is(textarea)::-webkit-scrollbar-thumb,
+.settings-panel__input:is(textarea)::-webkit-scrollbar-thumb,
+.account-panel__input:is(textarea)::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+}
+
+.glass-field:is(textarea):focus,
+.glass-field:is(textarea):focus-visible,
+.crew-panel__input:is(textarea):focus,
+.crew-panel__input:is(textarea):focus-visible,
+.settings-panel__input:is(textarea):focus,
+.settings-panel__input:is(textarea):focus-visible,
+.account-panel__input:is(textarea):focus,
+.account-panel__input:is(textarea):focus-visible {
+  outline: none;
+  border-color: var(--glass-border-strong);
+  box-shadow: 0 0 0 2px var(--glass-focus);
+}
+
+/* Stepper edad */
+.glass-stepper {
+  display: grid;
+  grid-template-columns: var(--glass-touch) 1fr var(--glass-touch);
+  gap: 8px;
+  align-items: center;
+  margin-top: 0.35rem;
+}
+
+.glass-stepper__btn {
+  width: var(--glass-touch);
+  height: var(--glass-touch);
+  border-radius: var(--glass-radius-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--glass-text);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.glass-stepper__btn:hover {
+  background: var(--glass-bg-hover);
+}
+
+.glass-stepper__btn:focus-visible {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+}
+
+.glass-stepper__btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.glass-stepper__btn[data-dir="dec"] svg {
+  transform: rotate(90deg);
+}
+
+.glass-stepper__btn[data-dir="inc"] svg {
+  transform: rotate(-90deg);
+}
+
+.glass-stepper .glass-field {
+  margin-top: 0;
+  text-align: center;
+}
+
+/* —— Checkbox —— */
+.glass-check,
+.settings-panel__check,
+.crew-panel__check {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--glass-touch);
+  margin: 0.25rem 0;
+  font-size: calc(0.95rem * var(--font-scale-ui, 1));
+  cursor: pointer;
+  user-select: none;
+}
+
+.glass-check input[type="checkbox"],
+.settings-panel__check input[type="checkbox"],
+.crew-panel__check input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1.5px solid var(--glass-border-strong);
+  background: rgba(255, 255, 255, 0.08);
+  accent-color: #ffffff;
+  cursor: pointer;
+  position: relative;
+}
+
+.glass-check input[type="checkbox"]:hover,
+.settings-panel__check input[type="checkbox"]:hover,
+.crew-panel__check input[type="checkbox"]:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.glass-check input[type="checkbox"]:checked,
+.settings-panel__check input[type="checkbox"]:checked,
+.crew-panel__check input[type="checkbox"]:checked {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: #fff;
+}
+
+.glass-check input[type="checkbox"]:checked::after,
+.settings-panel__check input[type="checkbox"]:checked::after,
+.crew-panel__check input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 11px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.glass-check input[type="checkbox"]:focus-visible,
+.settings-panel__check input[type="checkbox"]:focus-visible,
+.crew-panel__check input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+}
+
+/* —— Chips (círculo / píldora) —— */
+.glass-chip,
+.settings-panel__chip,
+.crew-panel__chip {
+  min-height: var(--glass-touch);
+  min-width: var(--glass-touch);
+  padding: 0.5rem 0.85rem;
+  border-radius: var(--glass-radius-pill);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--glass-text);
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.glass-chip--round,
+.settings-panel__chip[data-cd-sessions]:not([data-cd-sessions="null"]) {
+  aspect-ratio: 1;
+  padding: 0;
+  width: var(--glass-touch);
+  min-width: var(--glass-touch);
+}
+
+.glass-chip[aria-pressed="true"],
+.settings-panel__chip[aria-pressed="true"],
+.crew-panel__chip[aria-pressed="true"] {
+  background: var(--glass-bg-selected);
+  border-color: var(--glass-border-strong);
+}
+
+.glass-chip:hover,
+.settings-panel__chip:hover,
+.crew-panel__chip:hover {
+  background: var(--glass-bg-hover);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.glass-chip[aria-pressed="true"]:hover,
+.settings-panel__chip[aria-pressed="true"]:hover,
+.crew-panel__chip[aria-pressed="true"]:hover {
+  background: var(--glass-bg-selected);
+  border-color: var(--glass-border-strong);
+}
+
+.glass-chip:focus-visible,
+.settings-panel__chip:focus-visible,
+.crew-panel__chip:focus-visible {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+}
+
+/* —— Buttons —— */
+.glass-btn,
+.settings-panel__btn,
+.crew-panel__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  min-height: var(--glass-touch);
+  width: 100%;
+  margin: 0.5rem 0;
+  padding: 0.6rem 1rem;
+  border-radius: var(--glass-radius-field);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--glass-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.glass-btn:hover:not(:disabled),
+.settings-panel__btn:hover:not(:disabled),
+.crew-panel__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+.glass-btn--primary:hover:not(:disabled),
+.settings-panel__btn--primary:hover:not(:disabled),
+.crew-panel__btn--primary:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.glass-btn--primary,
+.settings-panel__btn--primary,
+.crew-panel__btn--primary {
+  background: var(--glass-bg-strong);
+}
+
+.glass-btn__icon,
+.crew-panel__btn-icon,
+.settings-panel__btn-icon,
+.account-panel__btn-icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.glass-btn:focus-visible,
+.settings-panel__btn:focus-visible,
+.crew-panel__btn:focus-visible {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+}
+
+.glass-btn:disabled,
+.settings-panel__btn:disabled,
+.crew-panel__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Peligro = mismo chrome; el aviso es el icono */
+.crew-panel__btn--danger {
+  border-color: var(--glass-border);
+  color: var(--glass-text);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.crew-panel__btn--danger:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+}
+
+/* —— Slider duración —— */
+.glass-slider {
+  display: grid;
+  gap: 0.45rem;
+  margin: 0.5rem 0 0.85rem;
+}
+
+.glass-slider__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.glass-slider__value {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.95;
+  min-width: 4.5rem;
+  text-align: right;
+}
+
+.glass-slider__range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  outline: none;
+  accent-color: #ffffff;
+}
+
+.glass-slider__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.glass-slider__range::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.glass-slider__hints {
+  display: flex;
+  justify-content: space-between;
+  opacity: 0.55;
+  font-size: 0.78rem;
+}
+
+/* —— Custom select —— */
+.glass-select {
+  position: relative;
+  margin-top: 0.35rem;
+}
+
+.glass-select[data-open="true"] {
+  z-index: auto;
+}
+
+.glass-select__trigger {
+  width: 100%;
+  min-height: var(--glass-touch);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--glass-radius-field);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  color: var(--glass-text);
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.glass-select__trigger:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+.glass-select__trigger:focus-visible {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+  border-color: var(--glass-border-strong);
+}
+
+.glass-select__chevron {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.glass-select__list {
+  display: none;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: var(--glass-radius-field);
+  border: 1px solid var(--glass-panel-border);
+  color: var(--glass-text);
+  background: var(--glass-panel-tint);
+  -webkit-backdrop-filter: blur(28px) saturate(1.45);
+  backdrop-filter: blur(28px) saturate(1.45);
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  max-height: 220px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.38) transparent;
+}
+
+.glass-select__list.glass-select__list--open {
+  display: block;
+  position: fixed;
+  z-index: 220;
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-select__list {
+    background: var(--glass-panel-fallback);
+  }
+}
+
+.glass-select__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.glass-select__list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+}
+
+.glass-select__option {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0.45rem 0.7rem;
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  border: 1px solid transparent;
+  width: 100%;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+}
+
+.glass-select__option:hover,
+.glass-select__option:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+  outline: none;
+}
+
+.glass-select__option[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.26);
+  border-color: rgba(255, 255, 255, 0.4);
+}

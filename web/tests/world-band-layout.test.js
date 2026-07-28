@@ -30,4 +30,11 @@ describe("world-band-layout", () => {
   it("normalizeShellPath limpia hash", () => {
     assert.equal(normalizeShellPath("#/account?x=1"), "account");
   });
+
+  it("settings y crew comprimen (incl. subrutas)", () => {
+    assert.equal(shouldCompressWorldBands("settings"), true);
+    assert.equal(shouldCompressWorldBands("crew"), true);
+    assert.equal(shouldCompressWorldBands("crew/new"), true);
+    assert.equal(shouldCompressWorldBands("crew/abc"), true);
+  });
 });

@@ -43,7 +43,7 @@ Definir la sección **Cuenta** autenticada:
 | --- | --- |
 | Email/contraseña u otros OAuth | Fuera de MVP ([SPEC_APP_AUTH.md](SPEC_APP_AUTH.md)) |
 | Desvincular Google sin borrar cuenta | No en esta fase |
-| Perfiles de niño / tripulación | Specs futuras; el modal de borrado **sí** menciona pérdida futura |
+| Perfiles de niño / tripulación | Ver [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md); el modal de borrado de cuenta debe mencionar pérdida de tripulación y progreso |
 | Cambio de email | El email lo aporta Google; solo lectura |
 | Avatar upload propio | Solo mostrar avatar del proveedor si existe |
 | Cerrar sesión | Sigue en el drawer (`signOut`); no duplicar CTA primario en cuenta |

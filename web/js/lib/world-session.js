@@ -181,6 +181,9 @@ export function isWorldRouteHash(hash = window.location.hash) {
     path === "loader" ||
     path === "home" ||
     path === "account" ||
+    path === "settings" ||
+    path === "crew" ||
+    path.startsWith("crew/") ||
     path === "auth" ||
     path === "auth/callback" ||
     path.startsWith("legal/")

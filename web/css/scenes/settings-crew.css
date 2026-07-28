@@ -1,0 +1,255 @@
+/* Ajustes + Tripulación — paneles glass */
+
+.settings-panel,
+.crew-panel {
+  color: #fff;
+  font-family: Nunito, system-ui, sans-serif;
+}
+
+html[data-shell-theme="sci-fi"] .settings-panel__title,
+html[data-shell-theme="sci-fi"] .settings-panel__group-title,
+html[data-shell-theme="sci-fi"] .crew-panel__title,
+html[data-shell-theme="sci-fi"] .crew-panel__block-title {
+  font-family: "Bruno Ace", Orbitron, sans-serif;
+}
+
+html[data-shell-theme="fantasy"] .settings-panel__title,
+html[data-shell-theme="fantasy"] .settings-panel__group-title,
+html[data-shell-theme="fantasy"] .crew-panel__title,
+html[data-shell-theme="fantasy"] .crew-panel__block-title {
+  font-family: "Uncial Antiqua", Cinzel, serif;
+}
+
+.settings-panel__title,
+.crew-panel__title {
+  margin: 0 0 0.35rem;
+  font-size: calc(1.35rem * var(--font-scale-ui, 1));
+  text-align: center;
+}
+
+.settings-panel__subtitle,
+.crew-panel__subtitle {
+  margin: 0 0 1rem;
+  opacity: 0.85;
+  text-align: center;
+  font-size: calc(0.95rem * var(--font-scale-ui, 1));
+}
+
+.settings-panel__group,
+.crew-panel__block {
+  margin: 1.25rem 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.settings-panel__group-title,
+.crew-panel__block-title {
+  margin: 0 0 0.75rem;
+  font-size: calc(1.05rem * var(--font-scale-ui, 1));
+}
+
+.settings-panel__label,
+.crew-panel__label {
+  display: block;
+  margin: 0.75rem 0 0.35rem;
+  font-size: calc(0.9rem * var(--font-scale-ui, 1));
+}
+
+.settings-panel__helper,
+.crew-panel__helper,
+.crew-panel__muted,
+.crew-panel__body {
+  margin: 0.25rem 0 0.75rem;
+  opacity: 0.78;
+  font-size: calc(0.85rem * var(--font-scale-ui, 1));
+  line-height: 1.4;
+}
+
+.settings-panel__segment,
+.crew-panel__segment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 0.5rem;
+}
+
+.settings-panel__chip,
+.crew-panel__chip {
+  min-height: 48px;
+  padding: 0.5rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-panel__chip[aria-pressed="true"],
+.crew-panel__chip[aria-pressed="true"] {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.settings-panel__preview {
+  width: 72px;
+  height: 72px;
+  margin: 0.5rem 0 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  display: grid;
+  place-items: center;
+}
+
+.settings-panel__preview svg {
+  width: 40px;
+  height: 40px;
+}
+
+.settings-panel__check,
+.crew-panel__check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  margin: 0.25rem 0;
+  font-size: calc(0.95rem * var(--font-scale-ui, 1));
+}
+
+.settings-panel__btn,
+.crew-panel__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  width: 100%;
+  margin: 0.5rem 0;
+  padding: 0.6rem 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+.settings-panel__btn--primary,
+.crew-panel__btn--primary {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.crew-panel__btn--danger {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.settings-panel__btn:disabled,
+.crew-panel__btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.crew-panel__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 64px;
+  margin: 0.4rem 0;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.crew-panel__card-title {
+  font-weight: 700;
+  font-size: calc(1rem * var(--font-scale-ui, 1));
+}
+
+.crew-panel__card-meta {
+  opacity: 0.8;
+  font-size: calc(0.85rem * var(--font-scale-ui, 1));
+}
+
+.crew-panel__input {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin-top: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font: inherit;
+}
+
+.crew-panel__actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 1rem;
+}
+
+.crew-panel__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: none;
+  border: 0;
+  color: #fff;
+  opacity: 0.85;
+  font: inherit;
+  min-height: 44px;
+  padding: 0;
+  cursor: pointer;
+  margin-bottom: 0.5rem;
+}
+
+.crew-panel__link .glass-btn__icon {
+  width: 18px;
+  height: 18px;
+  transform: rotate(90deg);
+}
+
+.crew-panel__link:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.settings-panel__error,
+.crew-panel__error,
+.settings-panel__status,
+.crew-panel__status {
+  min-height: 1.25rem;
+  font-size: calc(0.85rem * var(--font-scale-ui, 1));
+}
+
+.settings-panel__skel,
+.crew-panel__skel {
+  height: 14px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0.75rem 0;
+}
+
+html[data-font-scale-ui="md"] {
+  --font-scale-ui: 1;
+}
+html[data-font-scale-ui="lg"] {
+  --font-scale-ui: 1.12;
+}
+html[data-font-scale-ui="xl"] {
+  --font-scale-ui: 1.24;
+}
+
+.crew-panel__block--danger {
+  margin-top: 2rem;
+}
