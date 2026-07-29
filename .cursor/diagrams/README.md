@@ -46,4 +46,6 @@ Mapa visual canónico de **KidepiK** para agentes de IA. No sustituye las specs:
 
 Al cambiar un **contrato HTTP**, **ruta hash**, **tabla** o **flujo de entrada**, actualizar el diagrama enlazado y, si aplica, [CURRENT_SPECS.md](../CURRENT_SPECS.md).
 
+Flujo completo (descubrimiento antes de proponer, cuándo crear vs ampliar, cierre por fase): [skills/spec-driven-dev-kidepik/SKILL.md](../skills/spec-driven-dev-kidepik/SKILL.md) § Inventario documental y § Mantenimiento vivo.
+
 Detalle visual de controles glass (tutor): [DESIGN.md](../DESIGN.md) — no duplicado aquí.
