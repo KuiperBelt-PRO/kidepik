@@ -14,12 +14,13 @@ import {
 } from "../lib/crew-api.js";
 import {
   bindGlassIconTheme,
+  fillGlassSkeleton,
   mountAgeStepper,
   mountDurationSlider,
   mountGlassSelect,
   normalizeSessionMinutes,
   setGlassButton,
-} from "./glass-controls.js?v=220";
+} from "./glass-controls.js?v=222";
 
 /**
  * @param {import('../lib/crew-api.js').CrewListItem} m
@@ -70,7 +71,7 @@ export function mountCrewListPanel(container, { session }) {
   async function load() {
     unsubIcons?.();
     unsubIcons = null;
-    root.innerHTML = `<p class="crew-panel__muted">Cargando…</p>`;
+    fillGlassSkeleton(root, { preset: "panel", ariaLabel: "Cargando tripulación" });
     const res = await fetchCrewList(session);
     if (destroyed) return;
     if (!res.ok) {
@@ -203,7 +204,7 @@ export function mountCrewDetailPanel(container, { session, childId }) {
 
   async function load() {
     resetCleanups();
-    root.innerHTML = `<p class="crew-panel__muted">Cargando…</p>`;
+    fillGlassSkeleton(root, { preset: "panel", ariaLabel: "Cargando tripulante" });
     const res = await fetchCrewMember(session, childId);
     if (destroyed) return;
     if (!res.ok) {

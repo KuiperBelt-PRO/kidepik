@@ -609,3 +609,115 @@
   background: rgba(255, 255, 255, 0.26);
   border-color: rgba(255, 255, 255, 0.4);
 }
+
+/* Skeleton de carga (barras + shimmer — mismo patrón que legal/privacidad). */
+.glass-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  width: 100%;
+  padding-top: 0.15rem;
+}
+
+.glass-skeleton__block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.glass-skeleton__line {
+  --glass-skeleton-shimmer-delay: 0s;
+  position: relative;
+  height: 0.82em;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.glass-skeleton__line::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 35%,
+    rgba(255, 255, 255, 0.32) 50%,
+    rgba(255, 255, 255, 0.08) 65%,
+    transparent 100%
+  );
+  transform: translateX(-120%);
+  animation: glass-skeleton-shimmer 1.35s ease-in-out infinite;
+  animation-delay: var(--glass-skeleton-shimmer-delay);
+}
+
+.glass-skeleton__line--title {
+  width: 72%;
+  height: 1.05em;
+  margin: 0 auto 0.45rem;
+}
+
+.glass-skeleton__line--heading {
+  width: 46%;
+  height: 0.9em;
+  margin-bottom: 0.2rem;
+}
+
+.glass-skeleton__line--short {
+  width: 38%;
+}
+
+.glass-skeleton__line--full {
+  width: 100%;
+}
+
+.glass-skeleton__line--wide {
+  width: 92%;
+}
+
+.glass-skeleton__line--medium {
+  width: 78%;
+}
+
+.glass-skeleton__line--narrow {
+  width: 58%;
+}
+
+.glass-skeleton__block .glass-skeleton__line:nth-child(1) {
+  --glass-skeleton-shimmer-delay: 0s;
+}
+
+.glass-skeleton__block .glass-skeleton__line:nth-child(2) {
+  --glass-skeleton-shimmer-delay: 0.08s;
+}
+
+.glass-skeleton__block .glass-skeleton__line:nth-child(3) {
+  --glass-skeleton-shimmer-delay: 0.16s;
+}
+
+.glass-skeleton__block .glass-skeleton__line:nth-child(4) {
+  --glass-skeleton-shimmer-delay: 0.24s;
+}
+
+.glass-skeleton__block .glass-skeleton__line:nth-child(5) {
+  --glass-skeleton-shimmer-delay: 0.32s;
+}
+
+@keyframes glass-skeleton-shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-skeleton__line::after {
+    animation: none;
+    transform: none;
+    opacity: 0.35;
+  }
+}

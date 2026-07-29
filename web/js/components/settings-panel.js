@@ -13,10 +13,11 @@ import { getShellUiTheme, subscribeShellUiTheme } from "../lib/shell-theme.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 import {
   bindGlassIconTheme,
+  fillGlassSkeleton,
   mountDurationSlider,
   normalizeSessionMinutes,
   setGlassButton,
-} from "./glass-controls.js?v=220";
+} from "./glass-controls.js?v=221";
 
 /**
  * @param {HTMLElement} root
@@ -35,8 +36,8 @@ function paintBtn(root, sel, iconId, label) {
  */
 export function mountSettingsPanel(container, { session }) {
   const root = document.createElement("div");
-  root.className = "settings-panel settings-panel--skeleton";
-  root.innerHTML = `<p class="settings-panel__skel"></p><p class="settings-panel__skel" style="width:80%"></p>`;
+  root.className = "settings-panel";
+  fillGlassSkeleton(root, { preset: "lines", ariaLabel: "Cargando ajustes" });
   container.appendChild(root);
 
   /** @type {ReturnType<typeof createSettingsDebouncer> | null} */
@@ -288,7 +289,7 @@ export function mountSettingsPanel(container, { session }) {
       paintBtn(root, "[data-retry]", "home", "Reintentar");
       unsubIcons = bindGlassIconTheme(root);
       root.querySelector("[data-retry]")?.addEventListener("click", () => {
-        root.className = "settings-panel settings-panel--skeleton";
+        fillGlassSkeleton(root, { preset: "lines", ariaLabel: "Cargando ajustes" });
         void fetchParentSettings(session).then((r) => {
           if (r.ok) {
             memberCount = r.member_count;

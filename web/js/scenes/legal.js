@@ -6,6 +6,7 @@
 import { config } from "../config.js";
 import { renderMarkdown } from "../lib/markdown.js";
 import { navigate } from "../lib/router.js";
+import { renderGlassSkeletonHtml } from "../components/glass-controls.js?v=221";
 import {
   animateWorldBands,
   captureRect,
@@ -56,29 +57,7 @@ const TRANSITION_MS_REDUCED = 120;
 
 /** HTML del skeleton de carga (barras + shimmer). */
 function renderLegalSkeletonHtml() {
-  const line = (widthClass, extra = "") =>
-    `<div class="legal-skeleton__line ${widthClass}${extra ? ` ${extra}` : ""}" aria-hidden="true"></div>`;
-
-  return `
-    <div class="legal-body__skeleton" role="status" aria-live="polite" aria-label="Cargando documento">
-      ${line("legal-skeleton__line--title")}
-      ${line("legal-skeleton__line--heading")}
-      <div class="legal-skeleton__block">
-        ${line("legal-skeleton__line--full")}
-        ${line("legal-skeleton__line--wide")}
-        ${line("legal-skeleton__line--medium")}
-        ${line("legal-skeleton__line--full")}
-        ${line("legal-skeleton__line--narrow")}
-      </div>
-      ${line("legal-skeleton__line--heading legal-skeleton__line--short")}
-      <div class="legal-skeleton__block">
-        ${line("legal-skeleton__line--wide")}
-        ${line("legal-skeleton__line--medium")}
-        ${line("legal-skeleton__line--full")}
-        ${line("legal-skeleton__line--narrow")}
-      </div>
-    </div>
-  `;
+  return renderGlassSkeletonHtml({ preset: "document", ariaLabel: "Cargando documento" });
 }
 
 /**

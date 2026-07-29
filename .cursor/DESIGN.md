@@ -28,7 +28,9 @@ Definidos en `web/css/components/glass-controls.css`:
 
 ```css
 --glass-bg: rgba(255, 255, 255, 0.10);
+--glass-bg-hover: rgba(255, 255, 255, 0.20);
 --glass-bg-strong: rgba(255, 255, 255, 0.22);
+--glass-bg-selected: rgba(255, 255, 255, 0.28);
 --glass-border: rgba(255, 255, 255, 0.28);
 --glass-border-strong: rgba(255, 255, 255, 0.55);
 --glass-focus: rgba(255, 255, 255, 0.85);
@@ -36,6 +38,11 @@ Definidos en `web/css/components/glass-controls.css`:
 --glass-radius-field: 12px;
 --glass-radius-pill: 999px;
 --glass-touch: 48px;
+/* Panel dropdown (popover top-layer) */
+--glass-panel-tint: rgba(255, 255, 255, 0.10);
+--glass-panel-fallback: rgba(255, 255, 255, 0.22);
+--glass-panel-border: rgba(255, 255, 255, 0.50);
+--glass-panel-blur: blur(40px) saturate(1.55);
 ```
 
 ---
@@ -55,10 +62,11 @@ Definidos en `web/css/components/glass-controls.css`:
 - Checked: fondo `rgba(255,255,255,0.35)`, checkmark blanco (SVG o `::after`), **sin** `accent-color` de sistema.
 - Hit area ≥ 48 px de alto en la fila label.
 
-### 3. Radio / segment chips (`glass-chip`)
+### 3. Radio / segment chips (`glass-chip` / `crew-panel__chip`)
 
 - Píldoras **redondas** (`border-radius: 999px`); si el contenido es un dígito corto, forzar **círculo** (`aspect-ratio: 1`, `min-width: 48px`).
-- Uso: tipografía Normal/Grande/Muy grande, sesiones/día, temas, etc.
+- En Tripulación/Ajustes la clase de producto es `crew-panel__chip` (estilos compartidos con `.glass-chip` en `glass-controls.css`).
+- Uso: tipografía Normal/Grande/Muy grande, sesiones/día, temas UI, etc.
 - **No** usar chips para duración máxima de sesión (ver slider).
 
 ### 4. Slider de duración (`glass-slider`)
@@ -70,10 +78,57 @@ Definidos en `web/css/components/glass-controls.css`:
 
 ### 5. Select / dropdown (`glass-select`)
 
+Implementación: `mountGlassSelect()` en `glass-controls.js`.
+
 - **No** depender del menú nativo del SO (fondo blanco + highlight azul).
-- Trigger glass + chevron procedural.
-- Lista: **Popover top-layer** + blur real (`--glass-panel-tint` suave, sin escarcha). Cierre al scroll/touchmove/wheel del marco (ignora interacción dentro del panel).
-- Cierre al elegir / Escape / click fuera / scroll del marco.
+- Trigger glass + chevron procedural (`createGlassIconSvg('chevron')`).
+- Opciones: texto **blanco**; hover/seleccionado con fill blanco semitransparente (`0.18` / `0.26`).
+
+#### Glass del panel (prioridad visual)
+
+| Capa | Valor |
+| --- | --- |
+| Tinte | `--glass-panel-tint` = mismo nivel que trigger (`rgba(255,255,255,0.10)`) |
+| Blur | `--glass-panel-blur` = `blur(40px) saturate(1.55)` |
+| Borde / sombra | `--glass-panel-border` · sombra exterior suave + `inset` blanco ~38 % |
+
+**No** usar tinte oscuro (`rgba(12,28,38,…)`) ni degradados blancos tipo “escarcha” encima del blur: leen como bloque opaco o velo blanco feo. El **blur** aporta el cristal; el tinte solo unifica con el trigger.
+
+#### Top-layer vs marco (`section-frame__scroll`)
+
+En Chromium, `backdrop-filter` **no funciona** dentro del scroll del marco (ancestros con `overflow` + `mask-image` del fade). Por eso el panel abierto usa, cuando el navegador lo permite:
+
+1. `popover="manual"` + clase `glass-select--top-layer`
+2. `position: fixed` + posición calculada al **abrir** y en **resize** (no en cada frame de scroll)
+3. `hidePopover()` al cerrar; `[hidden]` + `display: none !important` para que `:popover-open` no deje el panel visible
+
+**Fallback** sin `showPopover`: panel `position: absolute` bajo el trigger, mismo tinte, **sin** blur real.
+
+| Enfoque | Scroll con panel abierto | Glass (blur) | Fade del marco |
+| --- | --- | --- | --- |
+| `absolute` en el scroll | Sin lag (va pegado al trigger) | No real | Nativo del marco |
+| Popover top-layer + cierre al scroll | Fluido (no sync JS al scroll) | Real | El panel desaparece al scrollear el marco |
+
+**Decisión de producto:** priorizar glass real → popover + **cerrar al scroll** del marco (no seguir el trigger mientras scrolleas).
+
+#### Cierre del panel
+
+| Evento | Acción |
+| --- | --- |
+| `pointerup` en opción | Selecciona valor + cierra (ratón y táctil; no usar solo `click` con popover) |
+| `Escape` | Cierra |
+| Click fuera (`composedPath` sin root/panel) | Cierra |
+| `scroll` / `wheel` en `.section-frame__scroll` | Cierra si el evento **no** incluye el panel en `composedPath()` |
+| Toggle del trigger | Abre / cierra |
+
+Tras cerrar: **400 ms** sin reabrir el trigger (evita “ghost click” del popover en móvil).
+
+#### Anti-patrones técnicos (select)
+
+- Sincronizar `top/left` del panel en cada `scroll` (lag en touch).
+- `touchstart` en el marco para cerrar (compite con el tap en la opción).
+- `stopPropagation` en **captura** sobre el panel (bloquea el tap en opciones).
+- `selectOption` que aborta si `dataset.open` ya es `false` (deja valor sin aplicar o panel colgado).
 
 ### 6. Botón (`glass-btn`)
 
@@ -94,9 +149,23 @@ Definidos en `web/css/components/glass-controls.css`:
 
 - Track `0.15` blanco; fill `0.55` blanco (sin color de materia).
 
-### 10. Stepper ± (edad, cantidades)
+### 10. Stepper ± (`glass-stepper` + `mountAgeStepper`)
 
-- Dos botones circulares glass con chevron; valor en field central readonly o editable.
+- Dos botones circulares glass con chevron; field central `type="number"` (edad tripulante **5–14** en Cuenta/Tripulación).
+- Helper: `mountAgeStepper(host, { value, min, max, onChange })`.
+
+---
+
+## Uso en pantallas (julio 2026)
+
+| Pantalla | Controles glass |
+| --- | --- |
+| **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) |
+| **Ajustes** | `mountDurationSlider` · chips tema UI / texto · botones `save` / `close` |
+| **Cuenta** | Fields · checkboxes · botones (`signout`, etc.) |
+| **Demo** | `web/tmp/glass-controls-demo.html` — catálogo completo sobre loader real |
+
+Duración de sesión: **solo** slider (`normalizeSessionMinutes`, `formatDurationMinutes`), nunca chips.
 
 ---
 
@@ -135,6 +204,9 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 - Botón destructivo con **chrome** rojo/coral (el aviso es el **icono** coloreado + copy).
 - Botón solo texto sin icono en CTAs de gestión.
 - Chips para rangos largos (usar slider).
+- Panel select con tinte oscuro o degradado blanco “lechoso” encima del blur.
+- Panel select `position: fixed` + sync JS en cada scroll (lag).
+- Listeners de cierre en el marco que no filtran interacción dentro del panel (`composedPath`).
 
 ---
 
@@ -145,7 +217,40 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 | Tokens + CSS | `web/css/components/glass-controls.css` |
 | Helpers JS | `web/js/components/glass-controls.js` |
 | Iconos | `web/js/components/shell-ui-icons.js` |
-| Consumo | Cuenta, Ajustes, Tripulación (y futuras secciones glass) |
+| Consumo | `crew-panel.js`, `settings-panel.js`, `account-panel.js` |
 | Demo local | `http://localhost:8082/tmp/glass-controls-demo.html` (loader real + `poc-up.ps1`) |
+
+### Helpers JS exportados
+
+| Función | Uso |
+| --- | --- |
+| `mountGlassSelect` | Select custom con popover glass |
+| `mountDurationSlider` | Slider 5–120 min (step 5) |
+| `mountAgeStepper` | Stepper edad |
+| `setGlassButton` / `bindGlassIconTheme` | Botones icono + texto |
+| `createGlassIconSvg` | Iconos inline (chevron select, stepper) |
+| `normalizeSessionMinutes` / `formatDurationMinutes` | Duración sesión |
+| `renderGlassSkeletonHtml` / `fillGlassSkeleton` / `mountGlassSkeleton` | Placeholder de carga (barras + shimmer) |
+| `GLASS_ICON_FILL` | `#FFFFFF` · danger `#FF6B63` |
+
+### Skeleton de carga
+
+Barras redondeadas con brillo deslizante (mismo patrón que Privacidad/Términos). Clases: `.glass-skeleton`, `.glass-skeleton__line`, variantes `--title|--heading|--full|--wide|--medium|--narrow`.
+
+| Preset | Uso |
+| --- | --- |
+| `document` | Texto largo (legal, artículos) |
+| `panel` | Lista tripulación, ficha miembro |
+| `lines` | Bloques cortos (ajustes, estados breves) |
+
+Sustituir `<p>Cargando…</p>` por `fillGlassSkeleton(host, { preset, ariaLabel })`.
+
+### Cache bust
+
+Tras cambiar CSS/JS de controles, subir `?v=` en:
+
+- `web/index.html` → `glass-controls.css`, `main.js`
+- Cadena de imports: `main.js` → `scenes/crew.js` / `settings.js` → `crew-panel.js` / `settings-panel.js` → `glass-controls.js`
+- Demo: `glass-controls-demo.html` (css + import del módulo)
 
 Al añadir un control nuevo: documentarlo aquí **antes** o en el mismo PR, y reutilizar clases `glass-*`.

@@ -429,3 +429,101 @@ export function mountAgeStepper(host, opts) {
     },
   };
 }
+
+/** @typedef {'document' | 'panel' | 'lines'} GlassSkeletonPreset */
+
+/**
+ * @param {string} widthClass
+ * @param {string} [extra]
+ * @returns {string}
+ */
+function glassSkeletonLine(widthClass, extra = "") {
+  const extraClass = extra ? ` ${extra}` : "";
+  return `<div class="glass-skeleton__line ${widthClass}${extraClass}" aria-hidden="true"></div>`;
+}
+
+/**
+ * @param {string} label
+ * @returns {string}
+ */
+function escapeGlassSkeletonAriaLabel(label) {
+  return String(label).replace(/"/g, "&quot;");
+}
+
+/**
+ * HTML del skeleton de carga (barras + shimmer).
+ * @param {{ preset?: GlassSkeletonPreset; ariaLabel?: string }} [opts]
+ * @returns {string}
+ */
+export function renderGlassSkeletonHtml(opts = {}) {
+  const preset = opts.preset ?? "document";
+  const ariaLabel = escapeGlassSkeletonAriaLabel(opts.ariaLabel ?? "Cargando");
+
+  if (preset === "lines") {
+    return `
+    <div class="glass-skeleton glass-skeleton--lines" role="status" aria-live="polite" aria-label="${ariaLabel}">
+      ${glassSkeletonLine("glass-skeleton__line--full")}
+      ${glassSkeletonLine("glass-skeleton__line--wide")}
+    </div>`;
+  }
+
+  if (preset === "panel") {
+    return `
+    <div class="glass-skeleton glass-skeleton--panel" role="status" aria-live="polite" aria-label="${ariaLabel}">
+      ${glassSkeletonLine("glass-skeleton__line--title")}
+      ${glassSkeletonLine("glass-skeleton__line--heading")}
+      <div class="glass-skeleton__block">
+        ${glassSkeletonLine("glass-skeleton__line--wide")}
+        ${glassSkeletonLine("glass-skeleton__line--medium")}
+        ${glassSkeletonLine("glass-skeleton__line--narrow")}
+      </div>
+    </div>`;
+  }
+
+  return `
+    <div class="glass-skeleton" role="status" aria-live="polite" aria-label="${ariaLabel}">
+      ${glassSkeletonLine("glass-skeleton__line--title")}
+      ${glassSkeletonLine("glass-skeleton__line--heading")}
+      <div class="glass-skeleton__block">
+        ${glassSkeletonLine("glass-skeleton__line--full")}
+        ${glassSkeletonLine("glass-skeleton__line--wide")}
+        ${glassSkeletonLine("glass-skeleton__line--medium")}
+        ${glassSkeletonLine("glass-skeleton__line--full")}
+        ${glassSkeletonLine("glass-skeleton__line--narrow")}
+      </div>
+      ${glassSkeletonLine("glass-skeleton__line--heading glass-skeleton__line--short")}
+      <div class="glass-skeleton__block">
+        ${glassSkeletonLine("glass-skeleton__line--wide")}
+        ${glassSkeletonLine("glass-skeleton__line--medium")}
+        ${glassSkeletonLine("glass-skeleton__line--full")}
+        ${glassSkeletonLine("glass-skeleton__line--narrow")}
+      </div>
+    </div>`;
+}
+
+/**
+ * Sustituye el contenido del host con un skeleton.
+ * @param {HTMLElement} host
+ * @param {{ preset?: GlassSkeletonPreset; ariaLabel?: string }} [opts]
+ */
+export function fillGlassSkeleton(host, opts = {}) {
+  host.innerHTML = renderGlassSkeletonHtml(opts);
+}
+
+/**
+ * @param {HTMLElement} host
+ * @param {{ preset?: GlassSkeletonPreset; ariaLabel?: string }} [opts]
+ * @returns {{ el: Element | null; destroy: () => void }}
+ */
+export function mountGlassSkeleton(host, opts = {}) {
+  const wrap = document.createElement("div");
+  wrap.innerHTML = renderGlassSkeletonHtml(opts);
+  const skeleton = wrap.firstElementChild;
+  if (skeleton) host.appendChild(skeleton);
+  return {
+    el: skeleton,
+    destroy() {
+      skeleton?.remove();
+    },
+  };
+}
