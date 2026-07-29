@@ -16,7 +16,7 @@ import {
   mountDurationSlider,
   normalizeSessionMinutes,
   setGlassButton,
-} from "./glass-controls.js";
+} from "./glass-controls.js?v=220";
 
 /**
  * @param {HTMLElement} root

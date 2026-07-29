@@ -19,7 +19,7 @@ import {
   mountGlassSelect,
   normalizeSessionMinutes,
   setGlassButton,
-} from "./glass-controls.js";
+} from "./glass-controls.js?v=220";
 
 /**
  * @param {import('../lib/crew-api.js').CrewListItem} m

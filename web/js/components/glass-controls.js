@@ -184,9 +184,27 @@ export function mountGlassSelect(host, opts) {
   chevron.dataset.iconId = "chevron";
   trigger.append(labelSpan, chevron);
 
+  const panel = document.createElement("div");
+  panel.className = "glass-select__panel";
+  panel.setAttribute("hidden", "");
+
   const list = document.createElement("ul");
   list.className = "glass-select__list";
   list.setAttribute("role", "listbox");
+  panel.appendChild(list);
+
+  /** Popover top-layer: blur real; se cierra al scroll del marco (sin sync → sin lag). */
+  const PANEL_BLUR = "blur(40px) saturate(1.55)";
+  const useTopLayerGlass = typeof panel.showPopover === "function";
+
+  if (useTopLayerGlass) {
+    root.classList.add("glass-select--top-layer");
+    panel.setAttribute("popover", "manual");
+  }
+
+  /** @type {HTMLElement | null} */
+  let scrollParent = null;
+  let suppressToggleUntil = 0;
 
   function currentLabel() {
     return opts.options.find((o) => o.value === value)?.label ?? value;
@@ -196,47 +214,79 @@ export function mountGlassSelect(host, opts) {
     labelSpan.textContent = currentLabel();
   }
 
-  /** @type {HTMLElement | null} */
-  let scrollParent = null;
+  function syncPosition() {
+    if (!useTopLayerGlass) return;
+    const triggerRect = trigger.getBoundingClientRect();
+    panel.style.top = `${triggerRect.bottom + 6}px`;
+    panel.style.left = `${triggerRect.left}px`;
+    panel.style.width = `${triggerRect.width}px`;
+  }
 
-  function positionList() {
-    const rect = trigger.getBoundingClientRect();
-    const gap = 6;
-    list.style.left = `${rect.left}px`;
-    list.style.width = `${rect.width}px`;
-    list.style.top = `${rect.bottom + gap}px`;
-    const spaceBelow = window.innerHeight - rect.bottom - gap - 12;
-    list.style.maxHeight = `${Math.min(220, Math.max(96, spaceBelow))}px`;
+  function onScrollInteract(/** @type {Event} */ ev) {
+    if (root.dataset.open !== "true") return;
+    if (ev.composedPath().includes(panel)) return;
+    if (ev.type === "scroll" && ev.target !== scrollParent) return;
+    close();
+  }
+
+  function unbindScrollClose() {
+    if (!(scrollParent instanceof HTMLElement)) return;
+    scrollParent.removeEventListener("scroll", onScrollInteract);
+    scrollParent.removeEventListener("wheel", onScrollInteract);
+    scrollParent = null;
   }
 
   function close() {
     if (root.dataset.open !== "true") return;
     root.dataset.open = "false";
     trigger.setAttribute("aria-expanded", "false");
-    list.classList.remove("glass-select__list--open");
-    list.style.top = "";
-    list.style.left = "";
-    list.style.width = "";
-    list.style.maxHeight = "";
-    if (scrollParent) {
-      scrollParent.removeEventListener("scroll", positionList);
-      scrollParent = null;
+    suppressToggleUntil = performance.now() + 400;
+    unbindScrollClose();
+    window.removeEventListener("resize", syncPosition);
+    if (useTopLayerGlass) {
+      try {
+        panel.hidePopover();
+      } catch {
+        /* ignore */
+      }
+      panel.style.top = "";
+      panel.style.left = "";
+      panel.style.width = "";
     }
-    window.removeEventListener("resize", positionList);
-    root.appendChild(list);
+    panel.classList.remove("glass-select__panel--open");
+    panel.setAttribute("hidden", "");
+  }
+
+  function bindScrollClose() {
+    scrollParent = root.closest(".section-frame__scroll");
+    if (!(scrollParent instanceof HTMLElement)) return;
+    scrollParent.addEventListener("scroll", onScrollInteract, { passive: true });
+    scrollParent.addEventListener("wheel", onScrollInteract, { passive: true });
+  }
+
+  function selectOption(/** @type {string} */ nextValue) {
+    value = nextValue;
+    if (root.dataset.open === "true") close();
+    paintTrigger();
+    renderOptions();
+    opts.onChange(value);
   }
 
   function open() {
     root.dataset.open = "true";
     trigger.setAttribute("aria-expanded", "true");
-    list.classList.add("glass-select__list--open");
-    document.body.appendChild(list);
-    positionList();
-    scrollParent = root.closest(".section-frame__scroll");
-    if (scrollParent instanceof HTMLElement) {
-      scrollParent.addEventListener("scroll", positionList, { passive: true });
+    panel.removeAttribute("hidden");
+    panel.classList.add("glass-select__panel--open");
+    if (useTopLayerGlass) {
+      try {
+        panel.showPopover();
+      } catch {
+        /* ignore */
+      }
+      syncPosition();
+      window.addEventListener("resize", syncPosition, { passive: true });
+      bindScrollClose();
     }
-    window.addEventListener("resize", positionList, { passive: true });
   }
 
   function renderOptions() {
@@ -249,27 +299,32 @@ export function mountGlassSelect(host, opts) {
       btn.setAttribute("role", "option");
       btn.setAttribute("aria-selected", String(opt.value === value));
       btn.textContent = opt.label;
-      btn.addEventListener("click", () => {
-        value = opt.value;
-        paintTrigger();
-        renderOptions();
-        opts.onChange(value);
-        close();
+      btn.dataset.value = opt.value;
+      btn.addEventListener("pointerup", (ev) => {
+        if (ev.pointerType === "mouse" && ev.button !== 0) return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        selectOption(opt.value);
       });
       li.appendChild(btn);
       list.appendChild(li);
     }
   }
 
-  trigger.addEventListener("click", () => {
+  trigger.addEventListener("click", (ev) => {
+    if (performance.now() < suppressToggleUntil) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      return;
+    }
     if (root.dataset.open === "true") close();
     else open();
   });
 
   const onDoc = (/** @type {MouseEvent} */ ev) => {
-    const t = ev.target;
-    if (!(t instanceof Node)) return;
-    if (!root.contains(t) && !list.contains(t)) close();
+    const path = ev.composedPath();
+    if (path.includes(root) || path.includes(panel)) return;
+    close();
   };
   document.addEventListener("click", onDoc);
 
@@ -280,7 +335,7 @@ export function mountGlassSelect(host, opts) {
 
   paintTrigger();
   renderOptions();
-  root.append(trigger, list);
+  root.append(trigger, panel);
   host.appendChild(root);
 
   return {
@@ -294,8 +349,7 @@ export function mountGlassSelect(host, opts) {
       close();
       document.removeEventListener("click", onDoc);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", positionList);
-      list.remove();
+      window.removeEventListener("resize", syncPosition);
       root.remove();
     },
   };

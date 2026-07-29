@@ -72,8 +72,8 @@ Definidos en `web/css/components/glass-controls.css`:
 
 - **No** depender del menú nativo del SO (fondo blanco + highlight azul).
 - Trigger glass + chevron procedural.
-- Lista: al abrir se **portaliza** a `body`; panel con tinte suave + blur (~28px), texto blanco, sin velo ni sombra en opciones.
-- Cierre al elegir / Escape / click fuera.
+- Lista: **Popover top-layer** + blur real (`--glass-panel-tint` suave, sin escarcha). Cierre al scroll/touchmove/wheel del marco (ignora interacción dentro del panel).
+- Cierre al elegir / Escape / click fuera / scroll del marco.
 
 ### 6. Botón (`glass-btn`)
 
