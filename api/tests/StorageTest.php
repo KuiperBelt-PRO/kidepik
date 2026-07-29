@@ -18,14 +18,4 @@ final class StorageTest extends TestCase
 
         self::assertSame(401, $response->status);
     }
-
-    public function testPresignAliasRequiresAuth(): void
-    {
-        $response = (new Router())->dispatch(
-            'POST',
-            '/api/v1/storage/presign-upload',
-        );
-
-        self::assertSame(401, $response->status);
-    }
 }

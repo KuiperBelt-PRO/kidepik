@@ -11,7 +11,6 @@ Si la petición encaja en una fila, **lee** el `SKILL.md` indicado y aplícalo a
 | --- | --- |
 | SDD, TDD, tests o feature en **este repo** | `.cursor/skills/spec-driven-dev-kidepik/SKILL.md` |
 | Probar cliente web (loader/auth/legal), Playwright móvil 390×844, Electron preview | `.cursor/skills/web-mobile-preview/SKILL.md` |
-| Oracle Always Free, OCI CLI/MCP, VM ARM, validación hosting | `.cursor/skills/oci-mcp-ops/SKILL.md` |
 | Commit, push, stage selectivo | `Vibe-Coding/.cursor/skills/git-workflow/SKILL.md` |
 | Revisar PR, rama o parche | `Vibe-Coding/.cursor/skills/code-review/SKILL.md` |
 | Crear o editar reglas `.mdc` | `Vibe-Coding/.cursor/skills/create-rule/SKILL.md` |

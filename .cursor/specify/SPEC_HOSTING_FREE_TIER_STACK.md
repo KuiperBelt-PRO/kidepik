@@ -1,36 +1,20 @@
 # Spec: Arquitectura MVP hosting — DreamHost PHP + Supabase + media local
 
-> Estado: **aprobada para MVP** (actualizada julio 2026) · Relacionado: [docs/kidepik.md](../../docs/kidepik.md) §10.5–10.8  
-> **Pivot jul 2026:** compute → **DreamHost PHP**; media → **filesystem `web/media/`** (sin Cloudflare R2 en MVP).  
-> Storage detallado: [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md).
+> Estado: **aprobada** (julio 2026; sin R2/OCI/Cloud Run)  
+> Relacionado: [docs/kidepik.md](../../docs/kidepik.md) §10 · [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md)
 
 ## Decisión
 
-El **MVP en producción** usa:
+El **producto en producción** usa únicamente:
 
 | Capa | Servicio | Rol |
 | --- | --- | --- |
-| **Hosting app + API + media** | **DreamHost** (PHP 8.2+, espacio en disco del plan) | `web/`, `api/`, ficheros en `web/media/` |
-| **Base de datos** | **Supabase** (Postgres + pgvector) | Datos relacionales; **solo URLs** de media |
+| **Hosting app + API + media** | **DreamHost** (PHP 8.2+) | `web/`, `api/`, `web/media/` |
+| **Base de datos** | **Supabase** (Postgres) | Datos; **solo URLs** de media |
 | **Autenticación** | **Supabase Auth** | JWT hacia API PHP |
 | **IA** | **OpenRouter** vía PHP | Fase posterior |
 
-**No en MVP:** Cloudflare R2, MinIO, Supabase Storage, FastAPI, Cloud Run.
-
-**Migración futura:** object storage (R2) vía `STORAGE_DRIVER=s3` sin cambiar esquema de URLs en Postgres — [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md).
-
-## ¿Por qué media en DreamHost y no R2?
-
-| Criterio | Filesystem DreamHost | Cloudflare R2 (aplazado) |
-| --- | --- | --- |
-| Coste MVP | Incluido en plan (espacio amplio) | Cuenta y configuración extra |
-| Complejidad | nginx sirve `/media/` | SDK S3, presigned PUT, bucket |
-| Egress | Del mismo hosting | Ilimitado en R2 (ventaja a escala) |
-| Cuándo migrar | Tráfico alto, CDN, multi-región | Checklist en SPEC_MEDIA_STORAGE |
-
-## Neon vs Supabase
-
-**Decisión:** **Supabase** para DB + Auth.
+**No formar parte del plan:** Cloudflare R2, MinIO, Supabase Storage, FastAPI, GCP Cloud Run, Oracle OCI Always Free.
 
 ## Flujo de datos
 
@@ -40,15 +24,15 @@ App web / Capacitor ──JWT──► PHP API (DreamHost, mismo origen)
          ┌────────────┴────────────┐
          ▼                         ▼
     Supabase Postgres          OpenRouter (IA)
-    (URLs /media/...)               │
-         │                          │
+    (URLs /media/...)               
+         │                          
 Cliente ──GET /media/...──► nginx (fichero en disco)
 ```
 
 **Reglas:**
 
 - Postgres guarda `public_url` (p. ej. `/media/avatars/{user}/{uuid}.jpg`).
-- Lectura de ficheros: **directa** por nginx, sin PHP en el medio.
+- Lectura de ficheros: **directa** por nginx.
 - Escritura: API `prepare-upload` + `upload` (local).
 
 ## DreamHost — consideraciones
@@ -62,23 +46,15 @@ Cliente ──GET /media/...──► nginx (fichero en disco)
 
 ## Desarrollo local
 
-Docker nginx + php-fpm; `web/media/` bind-mount. Sin MinIO. [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md).
+Docker nginx + php-fpm; `web/media/` bind-mount. [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md). Arranque: `./scripts/poc-up.ps1` → `http://localhost:8082`.
 
-## Criterios de éxito MVP
+## Criterios de éxito
 
 1. JWT Supabase + API PHP operativa.
 2. Upload media → URL en Postgres → GET `/media/...` OK.
 3. HTTPS en DreamHost.
-4. Sin servicios cloud de storage adicionales en MVP.
+4. Sin object storage cloud ni compute OCI/Cloud Run.
 
-## Histórico
+## Descartado (no reabrir sin decisión explícita)
 
-- **Cloud Run / FastAPI / R2:** descartados para MVP jul 2026; R2 documentado como evolución en SPEC_MEDIA_STORAGE.
-- **OCI ARM:** north star infra, no MVP activo.
-
-## Pendiente
-
-- [ ] Dominio DreamHost KidepiK.
-- [ ] Proyecto Supabase cloud + secretos.
-- [ ] Script deploy DreamHost.
-- [ ] Implementar `LocalFilesystemDriver` + API storage.
+R2/S3, MinIO, FastAPI/`backend/`, OCI ARM, Cloud Run como hosting de API.

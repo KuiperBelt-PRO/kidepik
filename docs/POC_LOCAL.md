@@ -29,8 +29,6 @@ Preview móvil PC (Electron 390×844):
 ./scripts/poc-web-preview.ps1
 ```
 
-**No usar:** `poc-web-dev.ps1` (redirige a `poc-up`), `localhost:8080` (FastAPI legacy).
-
 ## Config del cliente
 
 `scripts/poc-up.ps1` genera `web/js/config.js` con rutas relativas (`apiUrl: "/api/v1"`).
@@ -51,12 +49,11 @@ docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/ph
 
 ```
 api/          # Backend PHP
-shared/       # StorageDriver, Config
+shared/       # StorageDriver local, Config
 web/          # Cliente + web/media/
 docker/       # compose.yaml (nginx + php)
 supabase/
-scripts/
-backend/      # LEGACY FastAPI — no usar
+scripts/      # poc-up, poc-down, poc-web-preview
 ```
 
 Archivos locales no versionados: `.env.poc`, `web/js/config.js`, `web/media/**` (salvo `.gitkeep`), `tmp/`.

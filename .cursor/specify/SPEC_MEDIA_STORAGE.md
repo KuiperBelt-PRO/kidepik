@@ -1,15 +1,13 @@
-# Spec: Almacenamiento de media — filesystem local (MVP) y migración futura a object storage
+# Spec: Almacenamiento de media — filesystem local
 
-> Estado: **aprobada** (julio 2026)  
+> Estado: **aprobada** (julio 2026; actualizada jul 2026 — sin R2/S3)  
 > Relacionado: [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](SPEC_PHP_BACKEND_ARCHITECTURE.md)
 
 ## Decisión
 
-**MVP y POC:** los ficheros de media viven en el **filesystem del servidor web** (DreamHost: espacio incluido en el plan; local Docker: carpeta montada bajo `web/media/`).
+Los ficheros de media viven en el **filesystem del servidor web** (DreamHost: espacio del plan; local Docker: `web/media/`).
 
-**No usar Cloudflare R2** (ni MinIO en Docker) en esta fase.
-
-**Migración futura:** el acceso a media se hace solo a través de una **interfaz `StorageDriver`** en PHP. Cambiar a R2/S3 será configurar `STORAGE_DRIVER=s3` y credenciales, sin tocar contratos JSON ni el esquema de URLs en Postgres.
+**No se usará** Cloudflare R2, MinIO, Supabase Storage ni driver S3. El único driver soportado es `local` (`STORAGE_DRIVER=local`).
 
 ## Usos
 
@@ -24,34 +22,31 @@
 ```
 web/
   media/                      # NO versionar ficheros subidos; sí .gitkeep por subcarpeta
-    avatars/                  # Imágenes de perfil / avatar (post-MVP visual)
-    audio/                    # Narraciones, efectos
-    pdf/                      # Documentos
-    illustrations/            # Arte de pantallas, assets pesados
-    poc/                      # Uploads de prueba POC arquitectura
+    avatars/
+    audio/
+    pdf/
+    illustrations/
+    poc/                      # Uploads de prueba POC
 ```
 
-**Convención de rutas públicas:** `/media/{categoria}/{user_id}/{uuid}.{ext}`  
-Ejemplo: `/media/avatars/550e8400-e29b-41d4-a716-446655440000/a1b2c3d4.jpg`
+**Convención de rutas públicas:** `/media/{categoria}/{user_id}/{uuid}.{ext}`
 
 - `{user_id}`: UUID Supabase del usuario autenticado (upload).
 - `{uuid}`: generado en servidor; nunca confiar en el nombre original del cliente.
-- Extensiones permitidas: lista blanca por categoría (p. ej. `jpg`, `png`, `webp`, `mp3`, `pdf`).
+- Extensiones permitidas: lista blanca por categoría.
 
 ## Flujo de datos
 
-### Lectura (siempre igual, local o R2 futuro)
+### Lectura
 
 ```
 Cliente  ──GET /media/avatars/...──►  nginx (DreamHost / Docker)
-                                         │
-                                         └── fichero en disco (MVP)
-                                         └── en futuro: redirect o CDN a R2
+                                         └── fichero en disco
 ```
 
-PHP **no** reenvía bytes en lectura salvo endpoint de upload.
+PHP **no** reenvía bytes en lectura.
 
-### Escritura (MVP — driver `local`)
+### Escritura (`STORAGE_DRIVER=local`)
 
 ```
 1. Cliente (JWT) ──POST /api/v1/storage/prepare-upload──► PHP
@@ -60,20 +55,14 @@ PHP **no** reenvía bytes en lectura salvo endpoint de upload.
 4. Cliente (o backend) persiste public_url en Postgres
 ```
 
-### Escritura (futuro — driver `s3` / R2)
-
-Mismo paso 1 y 4. En el paso 2–3, `upload_url` será presigned PUT hacia R2; `public_url` apuntará al bucket/CDN. **El cliente no cambia de contrato**, solo los valores del JSON.
-
-## Contrato API (agnóstico del driver)
+## Contrato API
 
 ### `POST /api/v1/storage/prepare-upload`
-
-Alias de transición: `POST /api/v1/storage/presign-upload` (misma respuesta; nombre legacy de la POC FastAPI).
 
 **Auth:** Bearer Supabase.
 
 **Body:** `{ "filename": "foto.jpg", "category": "avatars" }`  
-`category` debe ser una carpeta permitida (`avatars`, `audio`, `pdf`, `illustrations`, `poc`).
+`category`: `avatars` | `audio` | `pdf` | `illustrations` | `poc`.
 
 **Respuesta 200:**
 
@@ -92,83 +81,41 @@ Alias de transición: `POST /api/v1/storage/presign-upload` (misma respuesta; no
 }
 ```
 
-**Respuesta futura (driver `s3`):** misma forma; `upload.method` = `PUT`, `upload.url` = URL presigned, sin `fields`.
-
 ### `POST /api/v1/storage/upload`
 
-Solo driver `local`. Recibe multipart + `token` de un solo uso; valida JWT o token; escribe fichero; responde `{ "public_url": "..." }`.
+Multipart + `token` de un solo uso; escribe fichero; responde `{ "public_url": "..." }`.
 
 ## Interfaz PHP (`shared/Storage/`)
 
 ```
 StorageDriver (interface)
-├── LocalFilesystemDriver   ← MVP, STORAGE_DRIVER=local
-└── S3ObjectStorageDriver   ← futuro, STORAGE_DRIVER=s3 (R2, MinIO, AWS)
+└── LocalFilesystemDriver   ← STORAGE_DRIVER=local (único)
 ```
 
-| Método | Responsabilidad |
-| --- | --- |
-| `prepareUpload(userId, filename, category): UploadPlan` | Devuelve upload + public_url |
-| `completeUpload?(...)` | Solo local vía endpoint upload; S3 completa en PUT directo |
-| `publicUrl(objectKey): string` | URL pública estable para guardar en BD |
-| `delete?(objectKey): void` | Fase posterior |
-
-Factory: `StorageDriverFactory::fromEnv()` lee `STORAGE_DRIVER`, `MEDIA_ROOT`, `MEDIA_PUBLIC_BASE_URL`, y vars S3 si aplica.
+Factory: `StorageDriverFactory::create()` — rechaza cualquier driver distinto de `local`.
 
 ## Variables de entorno
 
-| Variable | MVP (`local`) | Futuro (`s3`) |
-| --- | --- | --- |
-| `STORAGE_DRIVER` | `local` | `s3` |
-| `MEDIA_ROOT` | `/var/www/html/media` (Docker) o ruta DreamHost | — |
-| `MEDIA_PUBLIC_BASE_URL` | `https://<dominio>/media` o vacío (rutas relativas) | URL base CDN/R2 |
-| `S3_ENDPOINT_URL` | — | endpoint R2 |
-| `S3_BUCKET` | — | nombre bucket |
-| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | — | credenciales |
+| Variable | Valor |
+| --- | --- |
+| `STORAGE_DRIVER` | `local` |
+| `MEDIA_ROOT` | `/var/www/html/media` (Docker) o ruta DreamHost |
+| `MEDIA_PUBLIC_BASE_URL` | `/media` o URL absoluta del dominio |
 
 ## Postgres — solo URLs
 
-```sql
--- Ejemplo futuro; POC puede usar solo JSON de prueba
--- avatar_url text  →  '/media/avatars/{user_id}/{uuid}.jpg'
-```
-
 Nunca `bytea` ni base64 de ficheros en tablas de producto.
 
-## Seguridad (MVP local)
+## Seguridad
 
-| Tema | Medida |
-| --- | --- |
-| Ejecución PHP en `/media/` | **Desactivada** — nginx sirve estáticos; sin `.php` en media |
-| Listado directorios | Denegado (`autoindex off`) |
-| Upload | Solo categorías en lista blanca; tamaño máximo en PHP/nginx |
-| Tokens de upload | Un solo uso, TTL corto, ligados a `user_id` |
-| Path traversal | Sanitizar; rutas siempre bajo `MEDIA_ROOT` |
+- Uploads autenticados; token one-time; lista blanca de extensiones; sin ejecución PHP bajo `media/`.
 
-## Docker local
+## Criterios de éxito
 
-- Carpeta `web/media/` bind-mount como el resto de `web/`.
-- **Sin servicio MinIO** en compose MVP.
-- `architecture/status` comprueba que `MEDIA_ROOT` existe y es escribible.
+1. `prepare-upload` + `upload` escriben bajo `web/media/`.
+2. `GET /media/...` sirve el fichero vía nginx.
+3. Sin dependencias S3/R2/MinIO en el repo.
 
-## Migración a Cloudflare R2 (checklist futuro)
+## Descartado (no reabrir sin decisión explícita)
 
-1. Crear bucket R2 y credenciales.
-2. Implementar `S3ObjectStorageDriver` (puede reutilizar `aws/aws-sdk-php`).
-3. Script one-off: copiar objetos `web/media/**` → R2 preservando keys lógicas.
-4. Actualizar filas Postgres: prefijo de URL si cambia el host público.
-5. Cambiar `STORAGE_DRIVER=s3` en producción.
-6. Opcional: dejar nginx `/media/` como redirect 302 a CDN.
-
-**Sin cambiar:** rutas API, forma del JSON `prepare-upload`, columnas URL en BD (solo valor del string).
-
-## Criterios de éxito (POC)
-
-1. Upload POC con JWT → fichero en `web/media/poc/` y `public_url` accesible vía GET en `:8082`.
-2. Postgres (o pantalla POC) muestra URL, no binario.
-3. `STORAGE_DRIVER=local` documentado; interfaz `StorageDriver` presente aunque `S3ObjectStorageDriver` esté stub.
-
-## Aprobación
-
-- [x] Usuario aprueba **filesystem DreamHost** para media (sin Cloudflare en MVP).
-- [x] Usuario aprueba diseño **migrable** vía `StorageDriver` + URLs en Postgres.
+Cloudflare R2, MinIO, alias `presign-upload`, `S3ObjectStorageDriver`, FastAPI storage.

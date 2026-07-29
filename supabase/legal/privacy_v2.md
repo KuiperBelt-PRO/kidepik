@@ -151,8 +151,8 @@ Podemos compartir datos con proveedores que nos prestan servicios, actuando como
 | Categoría | Ejemplos de proveedor | Finalidad |
 | --- | --- | --- |
 | **Base de datos y autenticación** | Supabase (PostgreSQL, Auth) | Almacenamiento, sesiones |
-| **Alojamiento y API** | Proveedor cloud (p. ej. GCP Cloud Run, Oracle Cloud u otro TBD) | Ejecución del backend |
-| **Almacenamiento de medios** | Cloudflare R2 u homólogo | Ficheros multimedia |
+| **Alojamiento y API** | DreamHost (PHP) u homólogo | Ejecución de la app y API |
+| **Almacenamiento de medios** | Disco del mismo hosting (`web/media/`) | Ficheros multimedia |
 | **Autenticación OAuth** | Google | Inicio de sesión |
 | **IA / LLM** | OpenRouter y modelos asociados | Narrativa y asistencia pedagógica |
 | **Correo y soporte** | Herramienta de ticketing o email transaccional | Atención al Tutor |

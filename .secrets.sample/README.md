@@ -2,40 +2,22 @@
 
 Los ficheros **reales** viven en `kidepik/.secrets/` (gitignored). Esta carpeta documenta la forma y permite recrear el entorno en otra máquina.
 
-## Bootstrap rápido
+## Bootstrap rápido (Google OAuth / GCP)
 
 ```powershell
 cd kidepik
-
-# 1. Copiar plantillas
-New-Item -ItemType Directory -Force -Path .secrets\ssh | Out-Null
-Copy-Item .secrets.sample\oci.env.sample .secrets\oci.env
-Copy-Item .secrets.sample\oci.config.sample .secrets\oci.config
-
-# 2. Rellenar OCIDs, fingerprint y rutas en .secrets\oci.env y .secrets\oci.config
-# 3. Colocar oracle_private.pem en .secrets\ (desde consola OCI → API Keys)
-# 4. Generar SSH (ver ssh/README.md)
-# 5. Opcional: script .cursor/mcp-oci/scripts/bootstrap_secrets.ps1
+New-Item -ItemType Directory -Force -Path .secrets | Out-Null
+# Copiar plantillas GCP según operations/GOOGLE_OAUTH_LOCAL_SETUP.md
+Copy-Item .secrets.sample\gcp-oauth.env.sample .secrets\gcp-oauth.env
+# Colocar gcp-oauth-client.json desde consola GCP (no versionar)
 ```
 
 ## Ficheros
 
 | Plantilla (aquí) | Destino (`.secrets/`) |
 | --- | --- |
-| `oci.env.sample` | `oci.env` |
-| `oci.config.sample` | `oci.config` |
-| `gcp.env.sample` | `gcp.env` |
-| `gcp-oauth-client.json` | Copiar JSON OAuth desde consola GCP (no versionar) |
-| `gcp-oauth.env` | Variables `GCP_OAUTH_CLIENT_ID` / `SECRET` (generar desde JSON) |
-| `ssh/README.md` | `ssh/kidepik_oci` + `kidepik_oci.pub` |
+| `gcp.env.sample` | `gcp.env` (si aplica) |
+| `gcp-oauth.env.sample` | `gcp-oauth.env` |
+| (manual) `gcp-oauth-client.json` | JSON OAuth desde consola GCP — **no** versionar |
 
-## ¿Y `~/.oci` o `~/.ssh`?
-
-No son obligatorios. El MCP y los scripts del repo leen **solo** `kidepik/.secrets/`. Si quieres usar `oci` CLI a mano fuera del repo, puedes crear un enlace simbólico opcional:
-
-```powershell
-# Opcional — comodidad para oci CLI global
-oci --config-file .secrets\oci.config iam region list
-```
-
-No hace falta copiar nada a `$HOME` salvo preferencia personal.
+**Fuera de alcance:** Oracle OCI, Cloudflare R2 y Cloud Run como hosting de producto. Stack canónico: DreamHost PHP + Supabase + `web/media/`.

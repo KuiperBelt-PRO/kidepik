@@ -2,7 +2,7 @@
 
 **Estado:** P0–P3 implementados (jul 2026)  
 **Ámbito:** `web/` (cliente), docs/specs obsoletas relacionadas.  
-**Fuera de alcance:** motor procedural fantasy/space en uso, API PHP, Docker, migraciones SQL, `backend/` FastAPI (legacy separado).
+**Fuera de alcance:** motor procedural fantasy/space en uso, API PHP, Docker, migraciones SQL.
 
 ## Objetivo
 
@@ -54,13 +54,13 @@ Reducir ruido para agentes de IA y mantenibilidad humana eliminando restos del P
 | --- | --- |
 | Exports de `loader-world-arrows` solo usados en tests | API pública: `renderWorldArrowFabSvgInner` + constantes; helpers internos |
 | Query params `gateDemo` / `fantasyDev` / … | Concentrados en `parseWorldLayerQuery` + `getLoaderQueryParams` (`loader-world-utils.js`) |
-| Specs que citaban `#/gallery` / `poc-web-dev` | Actualizadas (`SPEC_LOADER_SCREEN`, `SPEC_LOADER_APP_GATE`, skill/rule preview, `docs/kidepik.md`, …) |
+| Specs que citaban `#/gallery` | Actualizadas |
 
 ### P3 — Documentación / tooling — hecho
 
 | Ítem | Acción |
 | --- | --- |
-| `scripts/poc-web-dev.ps1` stub | Documentado; `poc-web-preview` arranca `poc-up` |
+| Arranque | `poc-up` + `poc-web-preview` |
 | `web/package.json` scripts `serve` | Solo `test` + `preview:static` (Docker canónico) |
 | Comentario `mockup/:id` en `router.js` | Ya corregido en P1 |
 

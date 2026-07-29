@@ -15,6 +15,6 @@ alwaysApply: true
 | Media | `http://localhost:8082/media/...` | `web/media/` en disco |
 | Supabase API | `http://localhost:54321` | `./scripts/poc-up.ps1` (contenedores CLI) |
 
-**No usar:** `poc-web-dev.ps1` (deprecado), `localhost:8080` (FastAPI legacy), MinIO `:9000` (descartado MVP).
+**Arranque:** `./scripts/poc-up.ps1` → `http://localhost:8082`.
 
 Para UI en `web/`, usar skill `.cursor/skills/web-mobile-preview/SKILL.md`. Viewport móvil **390×844**. Capturas en `tmp/playwright-output/`.

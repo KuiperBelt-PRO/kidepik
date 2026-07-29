@@ -1,43 +1,7 @@
 {
   "mcpServers": {
-    "oci-kidepik": {
-      "command": "C:\\Users\\eduse\\OneDrive\\Escritorio\\work\\dev\\kidepik\\.cursor\\.venv-mcp\\Scripts\\python.exe",
-      "args": [
-        "C:\\Users\\eduse\\OneDrive\\Escritorio\\work\\dev\\kidepik\\.cursor\\mcp-oci\\server.py"
-      ],
-      "env": {
-        "KIDEPIK_REPO": "C:\\Users\\eduse\\OneDrive\\Escritorio\\work\\dev\\kidepik"
-      }
-    },
     "supabase-kidepik": {
       "url": "https://mcp.supabase.com/mcp?project_ref=mohmbwlbozvnespnofuu&features=database,development,docs"
-    },
-    "cloudflare-kidepik": {
-      "command": "pnpm",
-      "args": [
-        "dlx",
-        "mcp-remote@latest",
-        "https://mcp.cloudflare.com/mcp"
-      ],
-      "env": {
-        "PNPM_UPDATE_NOTIFIER": "false"
-      }
-    },
-    "gcp-cloudrun-kidepik": {
-      "command": "pnpm",
-      "args": [
-        "dlx",
-        "mcp-remote@latest",
-        "https://run.googleapis.com/mcp",
-        "8787",
-        "--header",
-        "x-goog-user-project:kidepik"
-      ],
-      "envFile": "C:\\Users\\eduse\\OneDrive\\Escritorio\\work\\dev\\kidepik\\.secrets\\gcp-oauth.env",
-      "env": {
-        "PNPM_UPDATE_NOTIFIER": "false",
-        "GCP_PROJECT_ID": "kidepik"
-      }
     }
   }
 }

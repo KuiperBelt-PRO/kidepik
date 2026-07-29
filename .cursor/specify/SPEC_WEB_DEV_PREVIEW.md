@@ -70,8 +70,7 @@ Nueva regla `.cursor/rules/web-mobile-preview.mdc`:
 ## Integración con arranque POC
 
 1. `poc-up.ps1` — **obligatorio** (Supabase contenedores + Docker nginx/php; media en `web/media/`).
-2. ~~`poc-web-dev.ps1`~~ — **deprecado** (stub → `poc-up`).
-3. `poc-web-preview.ps1` — Electron contra `:8082` (arranca `poc-up` si el puerto está libre); `-Static` usa `serve` solo sin API.
+2. `poc-web-preview.ps1` — Electron contra `:8082` (arranca `poc-up` si el puerto está libre); `-Static` usa `serve` solo sin API.
 
 ## Criterios de aceptación
 

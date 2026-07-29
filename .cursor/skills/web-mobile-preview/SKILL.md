@@ -21,7 +21,7 @@ cd kidepik
 ./scripts/poc-web-preview.ps1     # Electron 390×844 (usa :8082 si ya está arriba)
 ```
 
-**No usar:** `poc-web-dev.ps1` (stub deprecado que solo redirige a `poc-up`).  
+**Arranque canónico:** `./scripts/poc-up.ps1`.  
 **Opcional estático (sin API):** `./scripts/poc-web-preview.ps1 -Static` (`pnpm exec serve` en `web/`).
 
 ## Playwright (agente)

@@ -6,42 +6,25 @@ Patrones Python genéricos (herramientas, scripts): `Vibe-Coding/.cursor/skills/
 
 ---
 
-## Backend de producto (PHP — vigente)
-
-Convención del POC / MVP:
+## Backend de producto (PHP)
 
 ```
 api/
   public/index.php
   src/                # dominio HTTP
   tests/              # PHPUnit
-shared/               # código compartido (Storage, DB, …)
+shared/               # Storage local, DB, Config
 docker/compose.yaml   # nginx + php-fpm
-web/media/            # media local MVP
+web/media/            # media filesystem
 ```
 
 Nuevos módulos: bajo `api/src/` + `shared/`; tests en `api/tests/`. Spec: [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md).
 
-**No extender** `backend/` (FastAPI legacy).
-
----
-
-## Backend FastAPI (histórico)
-
-```
-backend/
-  app/
-    main.py           # FastAPI — solo referencia
-    routes/
-  tests/
-  pyproject.toml
-```
-
-Conservado en el repo como legado del POC jun 2026. Spec supersedida: [SPEC_POC_LOCAL_ARCHITECTURE.md](../../specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
+**Descartado:** FastAPI, R2/S3, MinIO, OCI — ver [SPEC_POC_LOCAL_ARCHITECTURE.md](../../specify/SPEC_POC_LOCAL_ARCHITECTURE.md) (aviso).
 
 ---
 
 ## Spec como contrato
 
 - Contratos HTTP y storage: specs en `.cursor/specify/` + tests PHPUnit / Playwright.
-- Type hints Python solo en herramientas (`tools/`, MCP OCI), no en el camino crítico del producto web.
+- Orientación rápida: [.cursor/diagrams/](../../diagrams/README.md).

@@ -53,7 +53,7 @@ final class Router
             $method === 'GET' && $path === '/api/v1/architecture/config' => (new ArchitectureController())->config(),
             $method === 'GET' && $path === '/api/v1/architecture/status' => (new ArchitectureController())->status(),
             $method === 'GET' && $path === '/api/v1/migrations/status' => (new MigrationsController())->status(),
-            $method === 'POST' && in_array($path, ['/api/v1/storage/prepare-upload', '/api/v1/storage/presign-upload'], true)
+            $method === 'POST' && $path === '/api/v1/storage/prepare-upload'
                 => (new StorageController())->prepareUpload(
                     $_SERVER['HTTP_AUTHORIZATION'] ?? null,
                     file_get_contents('php://input') ?: null,

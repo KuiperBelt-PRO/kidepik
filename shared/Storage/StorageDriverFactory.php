@@ -18,8 +18,9 @@ final class StorageDriverFactory
                 Config::mediaPublicBaseUrl(),
                 new UploadTokenStore(Config::mediaRoot() . '/.tokens'),
             ),
-            's3' => new S3ObjectStorageDriver(),
-            default => throw new \RuntimeException('Unknown STORAGE_DRIVER: ' . $driver),
+            default => throw new \RuntimeException(
+                'Unsupported STORAGE_DRIVER: ' . $driver . ' (only "local" is supported)',
+            ),
         };
     }
 }

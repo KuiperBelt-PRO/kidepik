@@ -7,12 +7,14 @@ Guía operativa para agentes en `kidepik`.
 - Repositorio de producto **Kidepik** del ecosistema Kuiper Belt (org `KuiperBelt-PRO`).
 - No incluir secretos en git.
 - Mantener trazabilidad entre spec, tareas y cambios cuando el trabajo lo merezca.
+- **Stack canónico:** DreamHost PHP + Supabase + `web/media/` + cliente `web/` en `:8082` local. Sin FastAPI, R2, MinIO, OCI ni Cloud Run como producto.
 
 ## MCP: Context7 y Engram
 
 - **Context7** (`context7` en el hub `Vibe-Coding`): documentación **actual** de librerías, frameworks, CLI y APIs públicas cuando la respuesta dependa de la referencia oficial. No sustituye a leer el código de este repo.
 - **Engram** (si está activo en el IDE): memoria persistente por proyecto; conviene **buscar** antes de repetir diagnósticos largos y **guardar** decisiones reutilizables.
 - **GitHub:** MCP `github-rest` del hub (`Vibe-Coding/.cursor/mcp.json`) para operaciones de repos y ramas.
+- **Supabase:** MCP `supabase-kidepik` en `.cursor/mcp.json` de este repo.
 
 ## Documentación en `.cursor/`
 
@@ -26,9 +28,9 @@ Guía operativa para agentes en `kidepik`.
 | [COMPANY.md](COMPANY.md) | Alineación de marca con Kuiper Belt. |
 | [CURRENT_SPECS.md](CURRENT_SPECS.md) | Índice de specs vigentes y enlaces a `.cursor/specify/`. |
 | [plan/PROJECT_OVERVIEW.md](plan/PROJECT_OVERVIEW.md) | Contexto del repo, stack y URLs locales. |
+| [diagrams/README.md](diagrams/README.md) | Mapas Mermaid de orientación para agentes (stack, rutas, auth, mundo, tutor). |
 | [specify/README.md](specify/README.md) | Convención para nuevas especificaciones. |
 | [operations/README.md](operations/README.md) | Convención para flujos operativos reproducibles. |
-| [operations/OCI_ALWAYS_FREE_VALIDATION.md](operations/OCI_ALWAYS_FREE_VALIDATION.md) | Validación Oracle Always Free (VM ARM). |
-| [skills/oci-mcp-ops/SKILL.md](skills/oci-mcp-ops/SKILL.md) | MCP `oci-kidepik` y aprovisionamiento OCI. |
+| [operations/GOOGLE_OAUTH_LOCAL_SETUP.md](operations/GOOGLE_OAUTH_LOCAL_SETUP.md) | OAuth Google local (GCP client). |
 
 Convenciones del repo (`README.md`, dependencias, CI) viven fuera de `.cursor/`; este fichero centra la navegación **dentro** de `.cursor/`.

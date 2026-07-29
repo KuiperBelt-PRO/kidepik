@@ -25,11 +25,11 @@ El aprendizaje no se presenta como temario escolar, sino como **retos cortos** i
 | **Píldoras / minijuegos** | No incluidos | Minijuegos táctiles tras N lecciones |
 | **IA** | OpenRouter (modelos free) + fallback Gemini/Grok free | Modelos de pago según volumen |
 | **Perfil y progreso** | Tablas relacionales en PostgreSQL | Informes para padres, analíticas |
-| **Infra producción** | **DreamHost PHP** + Supabase (DB + Auth) + media local (`web/media/`) | R2 / CDN a escala; monolito Oracle ARM 6 GB cuando haya stock |
+| **Infra producción** | **DreamHost PHP** + Supabase (DB + Auth) + media local (`web/media/`) | Ampliar hosting DreamHost / cuotas Supabase según volumen |
 
 ### Contexto de negocio
 
-- **Coste operativo bajo** en fase inicial: DreamHost (app+API+media), Supabase (DB + Auth), OpenRouter free. R2/CDN y Oracle ARM = evolución / north star.
+- **Coste operativo bajo** en fase inicial: DreamHost (app+API+media), Supabase (DB + Auth), OpenRouter free.
 - Escalado **proporcional al volumen**: cuando haya usuarios de pago, ampliar recursos o activar modelos de pago sin saltos desproporcionados.- Monetización por **volumen de usuarios** con ticket bajo (freemium, créditos, suscripción familiar).
 - Desarrollo asistido por IA; el cuello de botella no es el tiempo de código sino la **definición de producto y validación con padres**.
 
@@ -344,9 +344,9 @@ Una sola base de código **web** (`web/`) sirve navegador y, en fase posterior, 
 | **Agentes y RAG** | **Fase posterior** (LangGraph u orquestación acordada) | Narrativa, validación pedagógica — no bloquea MVP hosting |
 | **Base de datos** | **PostgreSQL + pgvector** (Supabase) | Relacional + vectorial |
 | **Auth** | **Supabase Auth** | JWT validado en PHP — ver §10.8 |
-| **Storage de archivos** | **Filesystem `web/media/`** (MVP); R2 vía driver S3 (*evolución*) | [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md) |
+| **Storage de archivos** | **Filesystem `web/media/`** | [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md) |
 | **IA** | **OpenRouter** (modelos `:free`) | Gateway unificado; ver §10.6 |
-| **Proxy / TLS** | nginx (Docker/DreamHost); Traefik en north star OCI | Producción DreamHost o Oracle |
+| **Proxy / TLS** | nginx (Docker/DreamHost) | Producción DreamHost |
 | **Contenedores** | **Docker + Docker Compose** | Local (`poc-up`); prod DreamHost no requiere compose |
 | **TTS (opcional)** | API de voz del proveedor elegido | *Post-MVP* |
 | **CI/CD** | GitHub Actions | Tests PHPUnit; Capacitor build móvil (fase posterior) |
@@ -401,19 +401,17 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 └─────────────────┘
 ```
 
-**Ventaja del monolito:** API y Postgres en la **misma máquina** → latencia RAG ~1 ms. El stack Supabase + R2 + Cloud Run sacrifica esa latencia a cambio de disponibilidad inmediata sin stock ARM.
+**Ventaja del monolito (si algún día se unificara compute+DB):** latencia baja. **Producto actual:** PHP en DreamHost + Postgres en Supabase + media en disco.
 
-### 10.5 Hosting — vías (julio 2026)
+### 10.5 Hosting — vía canónica (julio 2026)
 
 | Vía | Estado | Descripción |
 | --- | --- | --- |
-| **A — DreamHost PHP + Supabase + media local** | **MVP activo** | App+API PHP en DreamHost; Supabase DB+Auth; ficheros en `web/media/` — [SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md) |
-| **B — Object storage R2 (+ CDN)** | Evolución | Driver S3 cuando escala lo exija — [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md) |
-| **C — Monolito Oracle ARM** | North star / bloqueado por stock | Compute Always Free `VM.Standard.A1.Flex` 6 GB (§10.4); API puede ser PHP u otro runtime acordado |
+| **DreamHost PHP + Supabase + media local** | **Única vía de producto** | App+API PHP en DreamHost; Supabase DB+Auth; ficheros en `web/media/` — [SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md) |
 
-Spec MVP: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
+**Descartado (no reabrir sin decisión explícita):** Cloudflare R2/S3, MinIO, FastAPI, GCP Cloud Run, Oracle OCI Always Free.
 
-#### 10.5.1 DreamHost PHP (arquitectura MVP activa)
+#### 10.5.1 DreamHost PHP (arquitectura activa)
 
 ```
 ┌─────────────┐     JWT (Supabase)      ┌─────────────────────────────┐
@@ -425,86 +423,41 @@ Spec MVP: [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/S
 ┌─────────────┐                         ┌──────────┐
 │ Filesystem  │                         │ Supabase │
 │ web/media/  │                         │ Postgres │
-│ (MVP)       │                         │ + Auth   │
+│             │                         │ + Auth   │
 └─────────────┘                         └──────────┘
 ```
 
-**Piezas fijas (MVP):**
+**Piezas fijas:**
 
 - **Supabase:** Postgres (pgvector) + Auth. La app obtiene JWT; PHP lo valida.
-- **Media:** filesystem bajo `web/media/` (local Docker / DreamHost). **No** R2 ni MinIO en MVP.
+- **Media:** filesystem bajo `web/media/` (local Docker / DreamHost).
 - **PHP:** API en el mismo dominio que `web/`.
 
-**Histórico (jun 2026):** POC FastAPI + MinIO — [SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md) (supersedida). Guía local actual: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md) + [SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md).
-
-#### 10.5.1b Evolución documentada (R2 / Cloud Run / FastAPI)
-
-> Conservada como **roadmap / alternativas**, no como MVP. El diagrama antiguo (FastAPI + R2 + Cloud Run u Oracle Micro) queda como opción de escala o experimento; el código producto MVP es PHP.
-
-**Piezas de esa vía (no activas en MVP):**
-
-- Cloudflare R2 vía `STORAGE_DRIVER=s3`.
-- Compute Cloud Run u Oracle Micro si se retoma un runtime distinto de DreamHost.
+Guía local: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md) + [SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md).  
+Aviso histórico FastAPI (no implementar): [SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
 
 #### 10.5.2 Neon vs Supabase
 
-Metáfora: **Neon = solo el motor** (Postgres serverless); **Supabase = el coche entero** (DB + Auth + Storage + APIs REST/GraphQL).
+Metáfora: **Neon = solo el motor** (Postgres serverless); **Supabase = el coche entero** (DB + Auth + APIs).
 
 | Característica | Neon | Supabase |
 | --- | --- | --- |
 | Producto | Postgres serverless | BaaS completo |
-| Escala a cero | Sí, rápido | Free: pausa ~7 días sin uso |
 | Auth | No | Sí (email, Google, Apple) |
-| Storage | No | Sí (no lo usamos — ver R2) |
-| Branching DB | Sí (clones instantáneos) | No nativo en free |
+| Storage producto | No usamos el de Supabase | Media en `web/media/` |
 | pgvector | Sí | Sí |
 
-**Decisión KidepiK:** **Supabase** (DB + Auth) para acelerar MVP. Neon como plan C si límites de Supabase free bloquean.
+**Decisión KidepiK:** **Supabase** (DB + Auth).
 
-#### 10.5.3 Cloudflare R2 (evolución de media — no MVP)
+#### 10.5.3 Media
 
-> MVP usa `web/media/`. R2 cuando escala lo exija ([SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md)).
+Solo filesystem `web/media/` — [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md). Sin object storage cloud.
 
-- Rival de S3 con **egress gratuito** (crítico a escala B2C).
-- Free tier orientativo: 10 GB almacenamiento, 10M lecturas/mes, 1M escrituras/mes.
-- API **compatible S3** — driver PHP o SDK cuando se active `STORAGE_DRIVER=s3`.
+#### 10.5.4 Compute descartado
 
-**Supabase Storage free (por qué no):** 1 GB disco, **2 GB egress/mes**. Bloqueo o upgrade Pro al superar.
+GCP Cloud Run, Oracle ARM/Micro y FastAPI **no** forman parte del plan de producto. Hosting = DreamHost PHP.
 
-#### 10.5.4 GCP Cloud Run (alternativa histórica / no MVP)
-
-> Conservado como opción de compute si se abandona DreamHost. **No** es el MVP jul 2026.
-
-Preferido históricamente frente a **Compute Engine e2-micro** (1 GB RAM, free solo en US).
-
-| Parámetro deploy | Valor | Motivo |
-| --- | --- | --- |
-| `min-instances` | `0` | Escala a cero |
-| `max-instances` | `1`–`2` | Evitar factura por picos / DDoS |
-| `concurrency` | `80` | Menos instancias |
-| Región | EU | Latencia con Supabase EU |
-
-**Regla de egress (si se usa object storage):** API solo JSON con URL; el cliente descarga media **directo**.
-
-**Alerta billing GCP:** presupuesto **0,01 €** con emails al 50 % / 90 % / 100 %.
-
-#### 10.5.5 Monolito Oracle ARM (north star)
-
-Sigue siendo el diseño objetivo cuando haya stock en `eu-madrid-1`:
-
-| Perfil | OCPU | RAM | Uso |
-| --- | --- | --- | --- |
-| **Punto dulce** | 1 | **6 GB** | API (PHP u otro acordado) + Postgres/pgvector (+ motor IA) |
-| AMD Micro | — | 1 GB | Solo API ligera en stack híbrido |
-
-- Stock ARM: `OUT_OF_CAPACITY` frecuente — `retry_provision_loop.py`.
-- Consideraciones: aarch64, security lists, backups propios.
-
-#### 10.5.6 Referencias operativas
-
-- Spec stack MVP: `.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md`
-- Reintento ARM: `.cursor/mcp-oci/scripts/retry_provision_loop.py`
-- Validación OCI: `.cursor/operations/OCI_ALWAYS_FREE_VALIDATION.md`
+Referencias: [SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md), [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md).
 
 ### 10.6 Motor de agentes, OpenRouter y RAG
 
@@ -564,11 +517,11 @@ Request narrativo (API PHP)
 │  Capacitor  │     HTTPS only          │  /api/v1/*       │
 └──────┬──────┘                         └────────┬─────────┘
        │                                         │
-       │ GET /media/... (MVP)                    │ DATABASE_URL
+       │ GET /media/...                          │ DATABASE_URL
        ▼                                         ▼
 ┌─────────────┐                         ┌──────────────────┐
 │ web/media/  │                         │  Supabase        │
-│ (o R2 fut.) │                         │  Postgres        │
+│ filesystem  │                         │  Postgres        │
 └─────────────┘                         └──────────────────┘
                                                  │
                                     OPENROUTER_API_KEY (solo servidor)
@@ -583,13 +536,12 @@ Request narrativo (API PHP)
 | Clave pública Supabase (anon) | App | App → Supabase Auth |
 | `DATABASE_URL` (Supabase) | Solo servidor | PHP → Postgres |
 | JWKS / validación JWT Supabase | Solo servidor | PHP valida JWT |
-| Credenciales R2 (*evolución*) | Solo servidor | Driver S3 cuando se active |
-| `OPENROUTER_API_KEY` | Solo servidor | Motor IA |
+| `OPENROUTER_API_KEY` | Solo servidor | PHP → OpenRouter |
 | JWT del usuario | Memoria segura en app | Cada llamada a API |
 
 **Reglas:**
 
-- TLS obligatorio (Traefik + Let's Encrypt en producción).
+- TLS en producción (DreamHost).
 - La API valida JWT en cada request; comprueba que `child_id` pertenece al padre autenticado.
 - Rate limiting por usuario (p. ej. 30 req/min) para proteger cuotas free de IA.
 - Sin secretos de IA ni credenciales de BD en el bundle de la app.
@@ -600,50 +552,29 @@ Request narrativo (API PHP)
 
 | Pieza Supabase | ¿Usarla en KidepiK? |
 | --- | --- |
-| PostgreSQL hospedado (+ pgvector) | **Sí — BD principal en MVP** |
+| PostgreSQL hospedado (+ pgvector) | **Sí — BD principal** |
 | Auth (email, Google, Apple) | **Sí** — JWT hacia API PHP (MVP: Google) |
-| Storage | **No** — egress 2 GB/mes en free; MVP usa `web/media/`; R2 en evolución |
+| Storage | **No** — media en `web/media/` |
 | Edge Functions | **No** — lógica en PHP |
 | API REST automática (PostgREST) | **No** — la app habla con `/api/v1` PHP |
 
 Flujo: la app obtiene JWT de Supabase Auth → PHP valida JWT → lee/escribe en Postgres Supabase.
 
-En el **monolito Oracle ARM** (futuro), Postgres podría ser local en Docker; Auth puede mantenerse.
+#### Media
 
-#### Media (MVP local; R2 evolución)
+Ficheros bajo `web/media/`; BD guarda URLs/rutas. [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md).
 
-- MVP: ficheros bajo `web/media/`; BD guarda URLs/rutas.
-- Evolución: driver S3 (R2) sin cambiar contrato de URLs en Postgres — [SPEC_MEDIA_STORAGE.md](../.cursor/specify/SPEC_MEDIA_STORAGE.md).
-
-Ver [.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
+Ver [SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md).
 
 ### 10.9 Papel de Vercel (opcional)
 
-**Vercel** despliega frontends web y funciones serverless ligeras (ecosistema Next.js). **No** compila apps móviles ni ejecuta contenedores Python largos.
+**Vercel** despliega frontends web y funciones serverless ligeras (ecosistema Next.js). **No** compila apps móviles ni ejecuta contenedores PHP.
 
 Uso previsto en KidepiK: **landing page** de marketing para padres (Next.js), si se necesita SEO. El núcleo del producto (app + API + BD) **no** va en Vercel.
 
-### 10.10 Provisión de infraestructura con agentes Cursor
+### 10.10 Operativa con agentes Cursor
 
-La infraestructura Oracle se provisionará y operará con **agentes de Cursor** apoyándose en herramientas estándar — **no** en un MCP oficial de Oracle para VMs (no existe a día de hoy para aprovisionamiento bruto).
-
-#### Vías previstas
-
-| Herramienta | Uso |
-| --- | --- |
-| **Terraform** (proveedor OCI oficial) | Infraestructura como código: VCN, subnet pública, security lists (22, 80, 443), instancia `VM.Standard.A1.Flex` (1 OCPU, 6 GB), Ubuntu ARM |
-| **OCI CLI** (`oci`) | Scripts bash alternativos para crear la VM si Terraform resulta pesado para el MVP |
-| **Ansible / scripts bash vía SSH** | Post-provisionado: Docker, Docker Compose, directorios, despliegue inicial |
-| **Docker Compose** (en repo) | Definición declarativa del stack: `api`, `db`, `proxy` — misma receta local y producción |
-
-#### Flujo esperado con Cursor
-
-1. El agente genera o actualiza ficheros `.tf` / scripts OCI CLI según especificación (región EU, puertos, tamaño ARM).
-2. El usuario (o CI) ejecuta `terraform apply` con credenciales OCI locales — **las claves nunca se commitean**.
-3. Tras obtener IP pública, el agente genera playbook/script SSH: instalar Docker, clonar repo, levantar `docker compose up -d`.
-4. Iteraciones posteriores: el agente modifica Compose, variables de entorno y documentación operativa en `.cursor/operations/`.
-
-> **Nota:** Oracle no ofrece MCP plug-and-play para crear VMs; la automatización pasa por Terraform/OCI CLI + SSH. Los agentes Cursor escriben y mantienen esos artefactos; la ejecución requiere credenciales del usuario en el entorno local.
+Los agentes trabajan sobre el stack canónico (Docker local `:8082`, specs en `.cursor/`, diagramas en `.cursor/diagrams/`). Deploy DreamHost vía SFTP/rsync documentado en operations cuando exista el flujo. **No** hay aprovisionamiento OCI ni Cloud Run en el plan de producto.
 
 ### 10.11 Alternativas evaluadas (resumen)
 
@@ -652,16 +583,16 @@ La infraestructura Oracle se provisionará y operará con **agentes de Cursor** 
 | **Flutter** | Descartado por ahora; reservado si avatar 3D exige más control gráfico |
 | **Nativo duplicado (Swift + Kotlin)** | Descartado |
 | **Supabase como backend completo** | Descartado; **DB + Auth sí**, Storage no |
-| **Supabase Storage** | Descartado (egress); **Cloudflare R2** para media |
+| **Supabase Storage** | Descartado (egress); media en `web/media/` |
 | **Neon** | Alternativa DB; Supabase elegido por Auth integrado |
 | **Vercel como backend** | Descartado |
 | **JSON monolítico como fuente de verdad** | Descartado |
 | **Llamada IA directa desde la app** | Descartado |
 | **Replit como producción** | Descartado |
 | **Render / Koyeb free como producción** | Descartado (RAM, sleep) |
-| **GCP Cloud Run** | **MVP activo** (candidato compute principal) |
-| **Oracle ARM monolito** | North star; bloqueado por stock |
-| **Oracle AMD Micro** | **MVP activo** (candidato compute alternativo) |
+| **GCP Cloud Run** | Descartado (no hosting de producto) |
+| **Oracle ARM / Micro** | Descartado (no hosting de producto) |
+| **Cloudflare R2 / MinIO / FastAPI** | Descartado |
 | **GCP e2-micro** | Descartado (1 GB, solo US) |
 
 ### 10.12 Coste cero → escalado proporcional
@@ -669,8 +600,8 @@ La infraestructura Oracle se provisionará y operará con **agentes de Cursor** 
 | Fase | Usuarios | Infra | IA |
 | --- | --- | --- | --- |
 | **0 — MVP** | < 500 | DreamHost PHP + Supabase + media local; Docker `poc-up` en dev | Solo modelos `:free` vía OpenRouter |
-| **1 — Tracción** | 500–5k | Ampliar cuotas / Supabase Pro; valorar R2; evaluar ARM Oracle | Mix free + modelos pago con techo |
-| **2 — Escala** | > 5k | Monolito ARM o piezas gestionadas según cuello de botella | Router por tier (free vs premium) |
+| **1 — Tracción** | 500–5k | Ampliar cuotas / Supabase Pro / plan DreamHost | Mix free + modelos pago con techo |
+| **2 — Escala** | > 5k | Escalar mismo stack (PHP + Supabase + disco) según cuello de botella | Router por tier (free vs premium) |
 ### 10.13 Principios de código
 
 - SOLID, KISS, YAGNI.
@@ -740,7 +671,8 @@ Antes de implementar, cerrar en specs derivadas (`.cursor/specify/`) y operativa
 - [ ] Model router OpenRouter: orden de fallback y límites por usuario.
 - [ ] Contrato OpenAPI `/api/v1` (profile, session, story).
 - [ ] Flujo de pantallas MVP: registro → mundo → examen de acceso → mapa → lección → elección.
-- [ ] Terraform OCI (o scripts CLI) para VM ARM — **mantenidos por agentes Cursor**.
+- [ ] Deploy DreamHost (web + api + shared + media).
+- [ ] Documentar flujo SFTP/rsync en `.cursor/operations/` cuando esté listo.
 - [ ] Playbook post-provisionado SSH (Docker, despliegue, backups Postgres).
 - [x] Decisión Auth MVP: Supabase Auth + Google.
 - [ ] Política de privacidad y consentimiento parental (COPPA / RGPD) — textos legales en app parcialmente.

@@ -94,15 +94,14 @@ Fichero `.env.poc` (plantilla `.env.poc.sample`):
 | `MEDIA_PUBLIC_BASE_URL` | `/media` o vacío (rutas relativas) | PHP + cliente |
 | `APP_ENV` | `local` | PHP |
 
-Variables `S3_*` **no** requeridas en MVP; reservadas para `STORAGE_DRIVER=s3` futuro.
+Solo `STORAGE_DRIVER=local`. Sin variables S3/R2.
 
-## Scripts (objetivo post-implementación)
+## Scripts
 
 | Script | Comportamiento |
 | --- | --- |
 | `poc-up.ps1` | `supabase start` + migraciones + `docker compose up -d` + `config.js` |
 | `poc-down.ps1` | `docker compose down`; opcional `supabase stop` |
-| ~~`poc-web-dev.ps1`~~ | **Deprecado** |
 | `poc-web-preview.ps1` | Electron contra `:8082` |
 
 ## Generación `web/js/config.js`

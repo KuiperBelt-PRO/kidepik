@@ -14,9 +14,9 @@ Stack **PHP + Docker** (`:8082`) + Supabase CLI. Cliente en **`web/`** (HTML/CSS
 - Guía: [docs/POC_LOCAL.md](docs/POC_LOCAL.md)
 - Spec: [.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md)
 - Arranque: `./scripts/poc-up.ps1` · Preview móvil PC: `./scripts/poc-web-preview.ps1`
-- Backend PHP: `api/` + `shared/` · Legacy FastAPI: `backend/` (no extender)
+- Backend PHP: `api/` + `shared/` · Media: `web/media/`
 
-## Sistema visual (galería de diseño)
+## Sistema visual
 
 Cliente **`web/`** (HTML + CSS + JavaScript). Specs:
 
@@ -26,4 +26,4 @@ Cliente **`web/`** (HTML + CSS + JavaScript). Specs:
 
 ## Agentes y SDD
 
-Documentación de agentes, reglas y specs en [`.cursor/AGENTS.md`](.cursor/AGENTS.md).
+Documentación de agentes, reglas, specs y diagramas en [`.cursor/AGENTS.md`](.cursor/AGENTS.md) y [`.cursor/diagrams/`](.cursor/diagrams/README.md).
