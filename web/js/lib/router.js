@@ -1,6 +1,7 @@
 /** @typedef {(params: Record<string, string>) => void | Promise<void>} RouteHandler */
 
 import { isWorldRouteHash } from "./world-session.js";
+import { onShellPathChange, setShellNavNavigate } from "./shell-nav-stack.js";
 
 /** @type {Map<string, RouteHandler>} */
 const routes = new Map();
@@ -18,8 +19,14 @@ export function registerRoute(pattern, handler) {
  * @param {string} [hash]
  * @returns {string}
  */
-export function hashRoutePath(hash = window.location.hash) {
-  let path = (hash || "#/loader").replace(/^#\/?/, "") || "loader";
+export function hashRoutePath(hash) {
+  const raw =
+    hash !== undefined
+      ? hash
+      : typeof window !== "undefined"
+        ? window.location.hash
+        : "#/loader";
+  let path = (raw || "#/loader").replace(/^#\/?/, "") || "loader";
   const q = path.indexOf("?");
   if (q >= 0) path = path.slice(0, q);
   return path || "loader";
@@ -53,13 +60,16 @@ export function navigate(path) {
   window.location.hash = path.startsWith("/") ? path : `/${path}`;
 }
 
+setShellNavNavigate(navigate);
+
 /** @typedef {{ worldHandoff?: boolean }} RouteTeardownOptions */
 
 /** @type {(() => void) | ((options?: RouteTeardownOptions) => void) | null} */
 let routeTeardown = null;
 
 /** @type {string} */
-let lastRoutePath = hashRoutePath();
+let lastRoutePath =
+  typeof window !== "undefined" ? hashRoutePath() : "loader";
 
 export function startRouter() {
   const run = () => {
@@ -88,6 +98,7 @@ export function startRouter() {
     }
 
     lastRoutePath = nextPath;
+    onShellPathChange(fromPath, nextPath);
   };
   window.addEventListener("hashchange", run);
   run();

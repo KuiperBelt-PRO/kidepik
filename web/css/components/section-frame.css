@@ -44,10 +44,62 @@
 }
 
 .section-frame__header {
+  position: relative;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  padding: 16px 16px 12px;
+  padding: 12px 16px 12px;
+  min-height: calc(var(--section-frame-logo) * 0.42 + 24px);
+}
+
+.section-frame__nav {
+  position: absolute;
+  left: clamp(8px, 2.5vw, 14px);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 6px;
+  z-index: 2;
+}
+
+.section-frame__nav-btn {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  transition: background 0.15s ease, opacity 0.15s ease, transform 0.12s ease;
+}
+
+.section-frame__nav-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.section-frame__nav-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.section-frame__nav-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.section-frame__nav-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.section-frame__nav-icon {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .section-frame__logo-mount {

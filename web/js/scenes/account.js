@@ -4,7 +4,7 @@
  */
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=183";
-import { mountSectionFrame } from "../components/section-frame.js?v=183";
+import { mountSectionFrame } from "../components/section-frame.js?v=186";
 import { mountAccountPanel } from "../components/account-panel.js?v=183";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=183";
 import { navigate } from "../lib/router.js";

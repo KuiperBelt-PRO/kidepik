@@ -154,6 +154,28 @@ Tras cerrar: **400 ms** sin reabrir el trigger (evita “ghost click” del popo
 - Dos botones circulares glass con chevron; field central `type="number"` (edad tripulante **5–14** en Cuenta/Tripulación).
 - Helper: `mountAgeStepper(host, { value, min, max, onChange })`.
 
+### 11. Skeleton de carga (`glass-skeleton`)
+
+Barras redondeadas con shimmer (Privacidad/Términos). Ver helpers `renderGlassSkeletonHtml`, `fillGlassSkeleton`, `mountGlassSkeleton`. Presets: `document` | `panel` | `lines`.
+
+### 12. Navegación del marco (`section-frame` + `shell-nav-stack`)
+
+Flechas **atrás / adelante** en la cabecera del marco glass (izquierda del logo). Pila acotada (`SHELL_NAV_STACK_MAX = 16`); no infinita.
+
+| Pieza | Path |
+| --- | --- |
+| Pila + API | `web/js/lib/shell-nav-stack.js` |
+| Botones en marco | `mountSectionFrame` → `section-frame__nav` |
+| Registro rutas hash | `router.js` → `onShellPathChange` |
+
+**Uso rutas hash (app):** `navigateShellRoute('/crew/…')` — la pila se actualiza en cada cambio de hash (incl. botón atrás del navegador si coincide con la pila).
+
+**Subvistas in-frame (sin hash):** `setShellNavDispatch(renderFn)` + `navigateShellSubview('demo/controls/form')` — demo y paneles con subniveles sin rutas nuevas.
+
+`mountSectionFrame(host, { navigation: false })` oculta las flechas si hace falta.
+
+Los botones «Volver» locales en paneles (`crew-panel__link`) pueden ir sustituyéndose por esta navegación global del marco.
+
 ---
 
 ## Uso en pantallas (julio 2026)
@@ -231,6 +253,8 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 | `createGlassIconSvg` | Iconos inline (chevron select, stepper) |
 | `normalizeSessionMinutes` / `formatDurationMinutes` | Duración sesión |
 | `renderGlassSkeletonHtml` / `fillGlassSkeleton` / `mountGlassSkeleton` | Placeholder de carga (barras + shimmer) |
+| `shellNavBack` / `shellNavForward` / `navigateShellSubview` | Navegación pila en marco |
+| `subscribeShellNav` / `getShellNavState` | Estado atrás/adelante |
 | `GLASS_ICON_FILL` | `#FFFFFF` · danger `#FF6B63` |
 
 ### Skeleton de carga
