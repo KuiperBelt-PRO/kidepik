@@ -49,6 +49,17 @@ let initialized = false;
 const listeners = [];
 
 /** @type {((path: string) => void | Promise<void>) | null} */
+let shellNavShellRoute = null;
+
+/**
+ * Enlaza navigateShellRoute para atrás/adelante con transiciones de banda.
+ * @param {(path: string) => void | Promise<void>} fn
+ */
+export function setShellNavShellRoute(fn) {
+  shellNavShellRoute = fn;
+}
+
+/** @type {((path: string) => void | Promise<void>) | null} */
 let shellNavDispatch = null;
 
 /**
@@ -56,12 +67,55 @@ let shellNavDispatch = null;
  */
 
 /**
+ * @param {string} fromPath
+ * @param {string} toPath
+ */
+function recordPathChange(fromPath, toPath) {
+  const from = normalizeShellPath(fromPath);
+  const to = normalizeShellPath(toPath);
+  if (from === to) return;
+
+  const backTop = backStack.length > 0 ? normalizeShellPath(backStack[backStack.length - 1]) : "";
+  const forwardTop =
+    forwardStack.length > 0 ? normalizeShellPath(forwardStack[forwardStack.length - 1]) : "";
+
+  if (backTop && backTop === to) {
+    backStack.pop();
+    forwardStack.push(from);
+    trimForward();
+    currentPath = to;
+    return;
+  }
+
+  if (forwardTop && forwardTop === to) {
+    forwardStack.pop();
+    backStack.push(from);
+    trimBack();
+    currentPath = to;
+    return;
+  }
+
+  const inferredParent = inferShellNavParent(from);
+  if (backStack.length === 0 && inferredParent && inferredParent === to) {
+    forwardStack.push(from);
+    trimForward();
+    currentPath = to;
+    return;
+  }
+
+  backStack.push(from);
+  trimBack();
+  forwardStack = [];
+  currentPath = to;
+}
+
+/**
  * @returns {ShellNavState}
  */
 export function getShellNavState() {
   return {
     current: currentPath,
-    canBack: backStack.length > 0,
+    canBack: canShellNavBack(),
     canForward: forwardStack.length > 0,
     backDepth: backStack.length,
     forwardDepth: forwardStack.length,
@@ -95,49 +149,40 @@ function trimForward() {
 }
 
 /**
- * @param {string} fromPath
- * @param {string} toPath
+ * @returns {string | null}
  */
-function recordPathChange(fromPath, toPath) {
-  const from = normalizeShellPath(fromPath);
-  const to = normalizeShellPath(toPath);
-  if (from === to) return;
-
-  const backTop = backStack.length > 0 ? normalizeShellPath(backStack[backStack.length - 1]) : "";
-  const forwardTop =
-    forwardStack.length > 0 ? normalizeShellPath(forwardStack[forwardStack.length - 1]) : "";
-
-  if (backTop && backTop === to) {
-    backStack.pop();
-    forwardStack.push(from);
-    trimForward();
-    currentPath = to;
-    return;
+export function inferShellNavParent(path) {
+  const n = normalizeShellPath(path);
+  if (!n || n === "home" || n === "loader") return null;
+  const [root, child] = n.split("/");
+  if (root === "crew") {
+    return child ? "crew" : "home";
   }
+  if (root === "settings" || root === "account") return "home";
+  return null;
+}
 
-  if (forwardTop && forwardTop === to) {
-    forwardStack.pop();
-    backStack.push(from);
+/**
+ * @param {string} path
+ */
+function seedBackStackForDeepLink(path) {
+  const parent = inferShellNavParent(path);
+  if (parent) {
+    backStack.push(parent);
     trimBack();
-    currentPath = to;
-    return;
   }
-
-  backStack.push(from);
-  trimBack();
-  forwardStack = [];
-  currentPath = to;
 }
 
 /**
  * Reinicia la pila (p. ej. demo o tests).
  * @param {string} [path]
+ * @param {{ fresh?: boolean }} [options]
  */
-export function resetShellNavStack(path = currentHashPath()) {
+export function resetShellNavStack(path = currentHashPath(), options = {}) {
   backStack = [];
   forwardStack = [];
   currentPath = normalizeShellPath(path);
-  initialized = true;
+  initialized = !options.fresh;
   notify();
 }
 
@@ -157,6 +202,7 @@ export function onShellPathChange(fromPath, toPath) {
   if (!initialized) {
     initialized = true;
     currentPath = normalizeShellPath(toPath);
+    seedBackStackForDeepLink(currentPath);
     notify();
     return;
   }
@@ -170,18 +216,23 @@ export function onShellPathChange(fromPath, toPath) {
  */
 async function applyShellNavTarget(path) {
   const normalized = normalizeShellPath(path);
+  const href = normalized.startsWith("/") ? normalized : `/${normalized}`;
   if (shellNavDispatch) {
     await shellNavDispatch(normalized);
     return;
   }
-  navigateHash(normalized.startsWith("/") ? normalized : `/${normalized}`);
+  if (shellNavShellRoute) {
+    await shellNavShellRoute(href);
+    return;
+  }
+  navigateHash(href);
 }
 
 /**
  * @returns {boolean}
  */
 export function canShellNavBack() {
-  return backStack.length > 0;
+  return backStack.length > 0 || inferShellNavParent(currentPath) != null;
 }
 
 /**
@@ -195,12 +246,12 @@ export function canShellNavForward() {
  * @returns {Promise<boolean>}
  */
 export async function shellNavBack() {
-  if (!canShellNavBack()) return false;
-
-  const target = backStack[backStack.length - 1];
+  const target =
+    backStack.length > 0 ? backStack[backStack.length - 1] : inferShellNavParent(currentPath);
+  if (!target) return false;
 
   if (shellNavDispatch) {
-    backStack.pop();
+    if (backStack.length > 0) backStack.pop();
     forwardStack.push(currentPath);
     trimForward();
     currentPath = normalizeShellPath(target);

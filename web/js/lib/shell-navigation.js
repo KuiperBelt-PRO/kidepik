@@ -12,6 +12,7 @@ import {
 import { prepareWorldTransition } from "./world-transition.js";
 import { captureShellNavigationSnapshot } from "./shell-section-transition.js";
 import { isLegalRoutePath, navigateFromLegal } from "./legal-navigation.js";
+import { setShellNavShellRoute } from "./shell-nav-stack.js";
 
 /**
  * @param {string} path
@@ -36,3 +37,5 @@ export async function navigateShellRoute(path) {
 
   navigate(normalized);
 }
+
+setShellNavShellRoute(navigateShellRoute);

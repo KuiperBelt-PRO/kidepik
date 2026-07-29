@@ -52,17 +52,11 @@
   min-height: calc(var(--section-frame-logo) * 0.42 + 24px);
 }
 
-.section-frame__nav {
+.section-frame__nav-btn {
   position: absolute;
-  left: clamp(8px, 2.5vw, 14px);
   top: 50%;
   transform: translateY(-50%);
-  display: flex;
-  gap: 6px;
   z-index: 2;
-}
-
-.section-frame__nav-btn {
   width: 40px;
   height: 40px;
   display: grid;
@@ -78,12 +72,20 @@
   transition: background 0.15s ease, opacity 0.15s ease, transform 0.12s ease;
 }
 
+.section-frame__nav-btn--back {
+  left: clamp(8px, 2.5vw, 14px);
+}
+
+.section-frame__nav-btn--forward {
+  right: clamp(8px, 2.5vw, 14px);
+}
+
 .section-frame__nav-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.18);
 }
 
 .section-frame__nav-btn:active:not(:disabled) {
-  transform: scale(0.96);
+  transform: translateY(-50%) scale(0.96);
 }
 
 .section-frame__nav-btn:disabled {

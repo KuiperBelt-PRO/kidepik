@@ -4,8 +4,8 @@
  */
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=185";
-import { mountSectionFrame } from "../components/section-frame.js?v=186";
-import { mountCrewListPanel, mountCrewNewPanel, mountCrewDetailPanel } from "../components/crew-panel.js?v=222";
+import { mountSectionFrame } from "../components/section-frame.js?v=188";
+import { mountCrewListPanel, mountCrewNewPanel, mountCrewDetailPanel } from "../components/crew-panel.js?v=223";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=185";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";

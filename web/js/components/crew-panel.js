@@ -225,7 +225,6 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     const p = member.permissions || {};
     const title = member.display_name || member.settings?.tutor_label || "Nuevo tripulante";
     root.innerHTML = `
-      <button type="button" class="crew-panel__link" data-back></button>
       <h1 class="crew-panel__title">${escapeHtml(title)}</h1>
       <p class="crew-panel__subtitle">${
         member.onboarding_step === "complete"
@@ -289,7 +288,6 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       </section>
     `;
 
-    paintBtn(root, "[data-back]", "chevron", "Tripulación");
     paintBtn(root, "[data-save-profile]", "save", "Guardar perfil");
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
     paintBtn(root, "[data-delete]", "danger", "Eliminar de la tripulación", { dangerIcon: true });
@@ -342,8 +340,6 @@ export function mountCrewDetailPanel(container, { session, childId }) {
           })
         : null;
     if (durationSlider) cleanups.push(() => durationSlider.destroy());
-
-    root.querySelector("[data-back]")?.addEventListener("click", () => navigateShellRoute("/crew"));
 
     root.querySelectorAll("[data-font]").forEach((btn) => {
       btn.addEventListener("click", () => {

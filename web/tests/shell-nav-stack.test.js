@@ -5,6 +5,7 @@ import {
   canShellNavBack,
   canShellNavForward,
   getShellNavState,
+  inferShellNavParent,
   onShellPathChange,
   resetShellNavStack,
   SHELL_NAV_STACK_MAX,
@@ -16,6 +17,7 @@ describe("shell-nav-stack", () => {
   beforeEach(async () => {
     const mod = await import("../js/lib/shell-nav-stack.js");
     mod.setShellNavDispatch(null);
+    mod.setShellNavShellRoute(null);
     resetShellNavStack("home");
   });
 
@@ -56,6 +58,20 @@ describe("shell-nav-stack", () => {
       from = to;
     }
     assert.equal(getShellNavState().backDepth, SHELL_NAV_STACK_MAX);
+  });
+
+  it("semilla padre en acceso directo", () => {
+    resetShellNavStack("loader", { fresh: true });
+    onShellPathChange("loader", "crew/abc-id");
+    assert.ok(canShellNavBack());
+    assert.equal(inferShellNavParent("crew/abc-id"), "crew");
+  });
+
+  it("inferShellNavParent para secciones shell", () => {
+    assert.equal(inferShellNavParent("crew"), "home");
+    assert.equal(inferShellNavParent("crew/new"), "crew");
+    assert.equal(inferShellNavParent("settings"), "home");
+    assert.equal(inferShellNavParent("home"), null);
   });
 
   it("dispatch local no usa hash", async () => {

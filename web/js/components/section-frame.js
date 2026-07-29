@@ -8,7 +8,7 @@ import {
   shellNavBack,
   shellNavForward,
   subscribeShellNav,
-} from "../lib/shell-nav-stack.js?v=186";
+} from "../lib/shell-nav-stack.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 
 const EXIT_MS = 220;
@@ -35,60 +35,75 @@ function createNavIconSvg(direction) {
 }
 
 /**
+ * @param {boolean | { back?: boolean; forward?: boolean }} [navigation]
+ * @returns {{ enabled: boolean; back: boolean; forward: boolean }}
+ */
+function resolveNavOptions(navigation) {
+  if (navigation === false) return { enabled: false, back: false, forward: false };
+  if (navigation === undefined || navigation === true) {
+    return { enabled: true, back: true, forward: true };
+  }
+  return {
+    enabled: true,
+    back: navigation.back !== false,
+    forward: navigation.forward !== false,
+  };
+}
+
+/**
  * @param {HTMLElement} header
+ * @param {{ back: boolean; forward: boolean }} navOptions
  * @returns {{ destroy: () => void }}
  */
-function mountSectionNav(header) {
-  const nav = document.createElement("div");
-  nav.className = "section-frame__nav";
-
+function mountSectionNav(header, navOptions) {
   const backBtn = document.createElement("button");
   backBtn.type = "button";
-  backBtn.className = "section-frame__nav-btn";
+  backBtn.className = "section-frame__nav-btn section-frame__nav-btn--back";
   backBtn.setAttribute("aria-label", "Atrás");
   backBtn.appendChild(createNavIconSvg("back"));
 
   const forwardBtn = document.createElement("button");
   forwardBtn.type = "button";
-  forwardBtn.className = "section-frame__nav-btn";
+  forwardBtn.className = "section-frame__nav-btn section-frame__nav-btn--forward";
   forwardBtn.setAttribute("aria-label", "Adelante");
   forwardBtn.appendChild(createNavIconSvg("forward"));
 
-  nav.append(backBtn, forwardBtn);
-  header.appendChild(nav);
+  if (navOptions.back) header.appendChild(backBtn);
+  if (navOptions.forward) header.appendChild(forwardBtn);
 
   function syncButtons(state) {
-    backBtn.disabled = !state.canBack;
-    forwardBtn.disabled = !state.canForward;
+    if (navOptions.back) backBtn.disabled = !state.canBack;
+    if (navOptions.forward) forwardBtn.disabled = !state.canForward;
   }
 
-  backBtn.addEventListener("click", () => void shellNavBack());
-  forwardBtn.addEventListener("click", () => void shellNavForward());
+  if (navOptions.back) backBtn.addEventListener("click", () => void shellNavBack());
+  if (navOptions.forward) forwardBtn.addEventListener("click", () => void shellNavForward());
 
   const unsubNav = subscribeShellNav(syncButtons);
   const unsubTheme = subscribeShellUiTheme(() => {
-    backBtn.replaceChildren(createNavIconSvg("back"));
-    forwardBtn.replaceChildren(createNavIconSvg("forward"));
+    if (navOptions.back) backBtn.replaceChildren(createNavIconSvg("back"));
+    if (navOptions.forward) forwardBtn.replaceChildren(createNavIconSvg("forward"));
   });
 
   return {
     destroy() {
       unsubNav();
       unsubTheme();
-      nav.remove();
+      backBtn.remove();
+      forwardBtn.remove();
     },
   };
 }
 
 /**
  * @param {HTMLElement} host
- * @param {{ ariaLabel?: string; navigation?: boolean }} [options]
+ * @param {{ ariaLabel?: string; navigation?: boolean | { back?: boolean; forward?: boolean } }} [options]
  * @returns {{ root: HTMLElement; contentEl: HTMLElement; logoMountEl: HTMLElement; destroy: () => Promise<void> }}
  */
 export function mountSectionFrame(host, options = {}) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const exitMs = reducedMotion ? 80 : EXIT_MS;
-  const showNav = options.navigation !== false;
+  const navOptions = resolveNavOptions(options.navigation);
 
   const root = document.createElement("div");
   root.className = "section-frame is-entering";
@@ -100,8 +115,8 @@ export function mountSectionFrame(host, options = {}) {
 
   /** @type {{ destroy: () => void } | null} */
   let navHandle = null;
-  if (showNav) {
-    navHandle = mountSectionNav(header);
+  if (navOptions.enabled) {
+    navHandle = mountSectionNav(header, navOptions);
   }
 
   const logoMount = document.createElement("div");

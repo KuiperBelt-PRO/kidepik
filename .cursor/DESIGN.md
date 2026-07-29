@@ -160,21 +160,36 @@ Barras redondeadas con shimmer (Privacidad/Términos). Ver helpers `renderGlassS
 
 ### 12. Navegación del marco (`section-frame` + `shell-nav-stack`)
 
-Flechas **atrás / adelante** en la cabecera del marco glass (izquierda del logo). Pila acotada (`SHELL_NAV_STACK_MAX = 16`); no infinita.
+Flecha **atrás** arriba a la **izquierda** del cajetín; **adelante** arriba a la **derecha** (logo centrado). Pila acotada (`SHELL_NAV_STACK_MAX = 16`).
 
 | Pieza | Path |
 | --- | --- |
 | Pila + API | `web/js/lib/shell-nav-stack.js` |
-| Botones en marco | `mountSectionFrame` → `section-frame__nav` |
-| Registro rutas hash | `router.js` → `onShellPathChange` |
+| Botones en marco | `mountSectionFrame` → `section-frame__nav-btn--back` / `--forward` |
+| Rutas hash + transiciones | `navigateShellRoute` (menú, enlaces entre secciones) |
+| Registro en pila | `router.js` → `onShellPathChange` |
 
-**Uso rutas hash (app):** `navigateShellRoute('/crew/…')` — la pila se actualiza en cada cambio de hash (incl. botón atrás del navegador si coincide con la pila).
+**Import singleton:** `shell-nav-stack.js` se importa **sin** `?v=` en módulos internos (router, `section-frame`, `shell-navigation`). Un `?v=` distinto duplica la pila y los botones no navegan.
 
-**Subvistas in-frame (sin hash):** `setShellNavDispatch(renderFn)` + `navigateShellSubview('demo/controls/form')` — demo y paneles con subniveles sin rutas nuevas.
+**Flujos que cubre la pila:**
 
-`mountSectionFrame(host, { navigation: false })` oculta las flechas si hace falta.
+- Menú shell → sección (p. ej. home → tripulación).
+- Enlace dentro de una sección → subruta (lista → ficha `crew/:id`).
+- Acceso directo / bookmark: se **semilla** el padre lógico (`crew/:id` → atrás a `crew`; `crew` / `settings` / `account` → `home`).
+- Atrás/adelante del marco usa `navigateShellRoute` (mismas transiciones de banda que el menú).
 
-Los botones «Volver» locales en paneles (`crew-panel__link`) pueden ir sustituyéndose por esta navegación global del marco.
+**Subvistas in-frame (sin hash):** `setShellNavDispatch(renderFn)` + `navigateShellSubview(…)` — ver demo.
+
+**Opciones de `mountSectionFrame`:**
+
+| `navigation` | Resultado |
+| --- | --- |
+| `true` o omitido | Atrás + adelante |
+| `false` | Sin flechas |
+| `{ forward: false }` | **Solo atrás** — usar cuando no hay historial «adelante» útil (p. ej. pantalla modal de un solo paso, wizard sin re-forward, o vista raíz que solo debe retroceder) |
+| `{ back: false }` | Solo adelante (raro; casi no usar) |
+
+Los botones «Volver» locales en paneles (`crew-panel__link`) se sustituyen por la flecha del marco; mantener botones locales solo en estados de error/reintento.
 
 ---
 
