@@ -151,15 +151,22 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   cursor: not-allowed;
 }
 
+.crew-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+  margin: 0.5rem 0 1rem;
+}
+
 .crew-panel__card {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  align-items: stretch;
+  gap: 8px;
   width: 100%;
-  min-height: 64px;
-  margin: 0.4rem 0;
-  padding: 0.85rem 1rem;
+  min-height: 120px;
+  margin: 0;
+  padding: 0.85rem 0.75rem;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.1);
@@ -171,7 +178,50 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
 
 .crew-panel__card-title {
   font-weight: 700;
-  font-size: calc(1rem * var(--font-scale-ui, 1));
+  font-size: calc(0.95rem * var(--font-scale-ui, 1));
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.crew-panel__card-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.crew-panel__card-fact {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.crew-panel__card-fact-icon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  opacity: 0.9;
+}
+
+.crew-panel__card-fact-icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.crew-panel__card-fact-text {
+  opacity: 0.82;
+  font-size: calc(0.78rem * var(--font-scale-ui, 1));
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
 }
 
 .crew-panel__card-meta {

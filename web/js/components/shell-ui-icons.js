@@ -4,7 +4,7 @@
  */
 
 /** @typedef {'sci-fi' | 'fantasy'} UiIconTheme */
-/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'} UiIconId */
+/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'|'note'|'age'|'pause'|'pending'} UiIconId */
 
 export const SHELL_UI_ICON_THEMES = Object.freeze(
   /** @type {UiIconTheme[]} */ (["sci-fi", "fantasy"]),
@@ -26,6 +26,10 @@ export const SHELL_UI_ICON_IDS = Object.freeze(
     "danger",
     "add",
     "close",
+    "note",
+    "age",
+    "pause",
+    "pending",
   ]),
 );
 
@@ -659,6 +663,176 @@ function buildGlyphGroups(theme, id) {
               { x: 36, y: 80 },
               { x: 26, y: 76 },
               { x: 42, y: 50 },
+            ],
+          ];
+
+    case "note":
+      return sci
+        ? [
+            [
+              { x: 28, y: 22 },
+              { x: 72, y: 22 },
+              { x: 72, y: 78 },
+              { x: 28, y: 78 },
+            ],
+            [
+              { x: 36, y: 36 },
+              { x: 64, y: 36 },
+              { x: 64, y: 42 },
+              { x: 36, y: 42 },
+            ],
+            [
+              { x: 36, y: 50 },
+              { x: 56, y: 50 },
+              { x: 56, y: 56 },
+              { x: 36, y: 56 },
+            ],
+          ]
+        : [
+            [
+              { x: 30, y: 20 },
+              { x: 70, y: 24 },
+              { x: 68, y: 80 },
+              { x: 28, y: 76 },
+            ],
+            [
+              { x: 38, y: 38 },
+              { x: 62, y: 40 },
+              { x: 62, y: 46 },
+              { x: 38, y: 44 },
+            ],
+            [
+              { x: 38, y: 52 },
+              { x: 54, y: 54 },
+              { x: 54, y: 60 },
+              { x: 38, y: 58 },
+            ],
+          ];
+
+    case "age":
+      return sci
+        ? [
+            [
+              { x: 50, y: 20 },
+              { x: 62, y: 24 },
+              { x: 64, y: 38 },
+              { x: 56, y: 48 },
+              { x: 44, y: 48 },
+              { x: 36, y: 38 },
+              { x: 38, y: 24 },
+            ],
+            [
+              { x: 30, y: 78 },
+              { x: 30, y: 58 },
+              { x: 70, y: 58 },
+              { x: 70, y: 78 },
+            ],
+            [
+              { x: 44, y: 64 },
+              { x: 56, y: 64 },
+              { x: 56, y: 72 },
+              { x: 44, y: 72 },
+            ],
+          ]
+        : [
+            [
+              { x: 50, y: 18 },
+              { x: 64, y: 24 },
+              { x: 66, y: 40 },
+              { x: 56, y: 50 },
+              { x: 44, y: 50 },
+              { x: 34, y: 40 },
+              { x: 36, y: 24 },
+            ],
+            [
+              { x: 28, y: 80 },
+              { x: 32, y: 56 },
+              { x: 68, y: 56 },
+              { x: 72, y: 80 },
+            ],
+            [
+              { x: 42, y: 62 },
+              { x: 58, y: 62 },
+              { x: 58, y: 74 },
+              { x: 42, y: 74 },
+            ],
+          ];
+
+    case "pause":
+      return sci
+        ? [
+            [
+              { x: 34, y: 26 },
+              { x: 44, y: 26 },
+              { x: 44, y: 74 },
+              { x: 34, y: 74 },
+            ],
+            [
+              { x: 56, y: 26 },
+              { x: 66, y: 26 },
+              { x: 66, y: 74 },
+              { x: 56, y: 74 },
+            ],
+          ]
+        : [
+            [
+              { x: 32, y: 24 },
+              { x: 44, y: 26 },
+              { x: 42, y: 76 },
+              { x: 30, y: 74 },
+            ],
+            [
+              { x: 56, y: 26 },
+              { x: 68, y: 24 },
+              { x: 70, y: 74 },
+              { x: 58, y: 76 },
+            ],
+          ];
+
+    case "pending":
+      return sci
+        ? [
+            [
+              { x: 50, y: 18 },
+              { x: 68, y: 28 },
+              { x: 68, y: 52 },
+              { x: 50, y: 62 },
+              { x: 32, y: 52 },
+              { x: 32, y: 28 },
+            ],
+            [
+              { x: 46, y: 34 },
+              { x: 54, y: 34 },
+              { x: 54, y: 50 },
+              { x: 46, y: 50 },
+            ],
+            [
+              { x: 48, y: 68 },
+              { x: 52, y: 68 },
+              { x: 52, y: 78 },
+              { x: 48, y: 78 },
+            ],
+          ]
+        : [
+            [
+              { x: 50, y: 16 },
+              { x: 70, y: 28 },
+              { x: 70, y: 54 },
+              { x: 50, y: 66 },
+              { x: 30, y: 54 },
+              { x: 30, y: 28 },
+            ],
+            [
+              { x: 44, y: 32 },
+              { x: 56, y: 32 },
+              { x: 56, y: 50 },
+              { x: 44, y: 50 },
+            ],
+            [
+              { x: 46, y: 70 },
+              { x: 54, y: 70 },
+              { x: 54, y: 80 },
+              { x: 46, y: 80 },
             ],
           ];
 

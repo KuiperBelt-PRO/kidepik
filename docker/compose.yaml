@@ -27,6 +27,7 @@ services:
       - ../api/src:/var/www/api/src
       - ../api/public:/var/www/api/public
       - ../api/tests:/var/www/api/tests
+      - ../api/phpunit.xml:/var/www/api/phpunit.xml:ro
       - ../api/bin:/var/www/api/bin:ro
       - ../shared:/var/www/shared
       - ../supabase/migrations:/var/www/supabase/migrations:ro

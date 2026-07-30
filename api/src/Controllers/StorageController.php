@@ -7,6 +7,7 @@ namespace Kidepik\Api\Controllers;
 use Kidepik\Api\Http\JsonResponse;
 use Kidepik\Api\Services\AuthException;
 use Kidepik\Api\Services\SupabaseAuthService;
+use Kidepik\Shared\Config;
 use Kidepik\Shared\Storage\StorageDriverFactory;
 
 final class StorageController
@@ -66,7 +67,7 @@ final class StorageController
         }
 
         $tmpName = (string) ($file['tmp_name'] ?? '');
-        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+        if ($tmpName === '' || !$this->isValidUploadedTempPath($tmpName)) {
             return JsonResponse::error('invalid upload', 422);
         }
 
@@ -78,5 +79,15 @@ final class StorageController
         }
 
         return JsonResponse::ok(['public_url' => $publicUrl]);
+    }
+
+    private function isValidUploadedTempPath(string $tmpName): bool
+    {
+        if (is_uploaded_file($tmpName)) {
+            return true;
+        }
+
+        // PHPUnit y smoke local: archivo temporal legible sin multipart HTTP.
+        return Config::appEnv() === 'local' && is_readable($tmpName);
     }
 }

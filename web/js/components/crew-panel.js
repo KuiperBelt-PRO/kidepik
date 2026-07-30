@@ -14,6 +14,7 @@ import {
 } from "../lib/crew-api.js";
 import {
   bindGlassIconTheme,
+  createGlassIconSvg,
   fillGlassSkeleton,
   mountAgeStepper,
   mountDurationSlider,
@@ -26,22 +27,80 @@ import {
  * @param {import('../lib/crew-api.js').CrewListItem} m
  */
 function memberTitle(m) {
-  return m.display_name || m.tutor_label || "Nuevo tripulante";
+  return m.display_name || "Nuevo tripulante";
 }
 
 /**
  * @param {import('../lib/crew-api.js').CrewListItem} m
  */
-function memberMeta(m) {
-  if (m.onboarding_step !== "complete") return "Pendiente de primera aventura";
-  const world =
-    m.world_theme === "sci-fi"
-      ? "Ciencia ficción"
-      : m.world_theme === "fantasy"
-        ? "Fantasía"
-        : "Sin mundo aún";
-  const age = m.age_years != null ? `${m.age_years} años` : "";
-  return [world, age].filter(Boolean).join(" · ");
+function memberTutorLabel(m) {
+  return m.tutor_label?.trim() || "";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
+ */
+function memberOnboardingLabel(m) {
+  if (m.status === "paused") return "En pausa";
+  if (m.onboarding_step !== "complete") {
+    if (m.placement_status === "in_progress" || m.onboarding_step === "placement") {
+      return "En examen de acceso";
+    }
+    return "Pendiente de primera aventura";
+  }
+  return "Listo";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
+ */
+function memberWorldLabel(m) {
+  if (m.world_theme === "sci-fi") return "Ciencia ficción";
+  if (m.world_theme === "fantasy") return "Fantasía";
+  return "Sin mundo aún";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
+ * @returns {import('./shell-ui-icons.js').UiIconId}
+ */
+function memberWorldIcon(m) {
+  if (m.world_theme === "sci-fi") return "theme-to-scifi";
+  if (m.world_theme === "fantasy") return "theme-to-fantasy";
+  return "pending";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
+ * @returns {import('./shell-ui-icons.js').UiIconId}
+ */
+function memberStatusIcon(m) {
+  if (m.status === "paused") return "pause";
+  if (m.onboarding_step !== "complete") return "pending";
+  return "crew";
+}
+
+/**
+ * @param {import('./shell-ui-icons.js').UiIconId} iconId
+ * @param {string} text
+ */
+function crewFactRow(iconId, text) {
+  return `<span class="crew-panel__card-fact">
+    <span class="crew-panel__card-fact-icon" data-icon="${iconId}" aria-hidden="true"></span>
+    <span class="crew-panel__card-fact-text">${escapeHtml(text)}</span>
+  </span>`;
+}
+
+/**
+ * @param {HTMLElement} card
+ */
+function paintCardIcons(card) {
+  card.querySelectorAll("[data-icon]").forEach((host) => {
+    if (!(host instanceof HTMLElement)) return;
+    const iconId = host.getAttribute("data-icon");
+    if (!iconId) return;
+    host.replaceChildren(createGlassIconSvg(/** @type {import('./shell-ui-icons.js').UiIconId} */ (iconId), { size: 16 }));
+  });
 }
 
 /**
@@ -88,7 +147,7 @@ export function mountCrewListPanel(container, { session }) {
     root.innerHTML = `
       <h1 class="crew-panel__title">Tripulación</h1>
       <p class="crew-panel__subtitle">Tripulantes a tu cargo</p>
-      <div class="crew-panel__list" data-list></div>
+      <div class="crew-panel__grid" data-list></div>
       <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-add ${atLimit ? "disabled" : ""}></button>
       ${atLimit ? `<p class="crew-panel__helper">Has alcanzado el máximo de ${res.member_limit} tripulantes.</p>` : ""}
     `;
@@ -103,10 +162,22 @@ export function mountCrewListPanel(container, { session }) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "crew-panel__card";
+        const tutorLabel = memberTutorLabel(m);
+        const facts = [
+          crewFactRow(memberStatusIcon(m), memberOnboardingLabel(m)),
+          crewFactRow(memberWorldIcon(m), memberWorldLabel(m)),
+        ];
+        if (m.age_years != null) {
+          facts.push(crewFactRow("age", `${m.age_years} años`));
+        }
+        if (tutorLabel) {
+          facts.push(crewFactRow("note", tutorLabel));
+        }
         btn.innerHTML = `
           <span class="crew-panel__card-title">${escapeHtml(memberTitle(m))}</span>
-          <span class="crew-panel__card-meta">${escapeHtml(memberMeta(m))}${m.status === "paused" ? " · En pausa" : ""}</span>
+          <span class="crew-panel__card-facts">${facts.join("")}</span>
         `;
+        paintCardIcons(btn);
         btn.addEventListener("click", () => navigateShellRoute(`/crew/${m.id}`));
         list.appendChild(btn);
       }
@@ -223,25 +294,29 @@ export function mountCrewDetailPanel(container, { session, childId }) {
   function paint(member) {
     resetCleanups();
     const p = member.permissions || {};
-    const title = member.display_name || member.settings?.tutor_label || "Nuevo tripulante";
+    const tutorLabel = member.settings?.tutor_label ?? member.tutor_label ?? "";
+    const title = member.display_name || "Nuevo tripulante";
+    const subtitleBase =
+      member.onboarding_step === "complete"
+        ? [
+            member.world_theme === "sci-fi"
+              ? "Ciencia ficción"
+              : member.world_theme === "fantasy"
+                ? "Fantasía"
+                : "Sin mundo",
+            member.age_years != null ? `${member.age_years} años` : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : memberOnboardingLabel(member);
+    const subtitle =
+      member.status === "paused" && member.onboarding_step === "complete"
+        ? `En pausa · ${subtitleBase}`
+        : subtitleBase;
     root.innerHTML = `
       <h1 class="crew-panel__title">${escapeHtml(title)}</h1>
-      <p class="crew-panel__subtitle">${
-        member.onboarding_step === "complete"
-          ? escapeHtml(
-              [
-                member.world_theme === "sci-fi"
-                  ? "Ciencia ficción"
-                  : member.world_theme === "fantasy"
-                    ? "Fantasía"
-                    : "Sin mundo",
-                member.age_years != null ? `${member.age_years} años` : null,
-              ]
-                .filter(Boolean)
-                .join(" · "),
-            )
-          : "Pendiente de primera aventura"
-      }</p>
+      <p class="crew-panel__subtitle">${escapeHtml(subtitle)}</p>
+      ${tutorLabel ? `<p class="crew-panel__muted">${escapeHtml(String(tutorLabel))}</p>` : ""}
       <p class="crew-panel__helper">Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.</p>
 
       <section class="crew-panel__block">
@@ -249,6 +324,10 @@ export function mountCrewDetailPanel(container, { session, childId }) {
         <label class="crew-panel__label">Nombre de tripulación
           <input class="crew-panel__input" data-profile="display_name" value="${escapeAttr(member.display_name || "")}" maxlength="24" />
         </label>
+        <label class="crew-panel__label">Descripción (solo para ti)
+          <input class="crew-panel__input" data-profile="tutor_label" value="${escapeAttr(String(tutorLabel))}" maxlength="40" placeholder="p. ej. El de Marta" />
+        </label>
+        <p class="crew-panel__helper">Esta nota solo la ves tú; ayuda a identificar al tripulante en el listado.</p>
         <label class="crew-panel__label">Edad
           <div data-age-host></div>
         </label>
@@ -352,6 +431,7 @@ export function mountCrewDetailPanel(container, { session, childId }) {
 
     root.querySelector("[data-save-profile]")?.addEventListener("click", async () => {
       const nameInput = root.querySelector('[data-profile="display_name"]');
+      const descInput = root.querySelector('[data-profile="tutor_label"]');
       /** @type {Record<string, unknown>} */
       const patch = {
         status: selectedStatus,
@@ -359,6 +439,9 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       };
       if (nameInput instanceof HTMLInputElement) {
         patch.display_name = nameInput.value.trim() || null;
+      }
+      if (descInput instanceof HTMLInputElement) {
+        patch.tutor_label = descInput.value.trim() || null;
       }
       const status = root.querySelector("[data-profile-status]");
       const res = await patchCrewMember(session, childId, patch);

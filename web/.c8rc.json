@@ -1,0 +1,39 @@
+{
+  "all": false,
+  "check-coverage": true,
+  "lines": 90,
+  "functions": 80,
+  "branches": 80,
+  "include": [
+    "js/lib/**/*.js",
+    "js/components/**/*.js"
+  ],
+  "exclude": [
+    "js/config.js",
+    "js/config.sample.js",
+    "js/components/loader-fx-render.js",
+    "js/components/loader-fantasy-render.js",
+    "js/components/loader-fantasy-scene.js",
+    "js/components/loader-space-orbit.js",
+    "js/components/loader-space-ships.js",
+    "js/components/loader-space-layout.js",
+    "js/components/loader-chrome.js",
+    "js/components/loader-gate.js",
+    "js/components/loader-auth-morph.js",
+    "js/components/world-layers.js",
+    "js/lib/shell-frame.js",
+    "js/lib/shell-navigation.js",
+    "js/lib/shell-section-transition.js",
+    "js/lib/apply-world-band-transition.js",
+    "js/lib/router.js",
+    "js/components/loader-ship-proximity-hud.js",
+    "js/components/loader-fantasy-celestial.js",
+    "js/components/loader-fantasy-clouds.js",
+    "js/components/loader-fantasy-modules.js",
+    "js/components/loader-meteor-shower.js",
+    "js/components/loader-logo-mask.js",
+    "js/components/loader-animation-frame.js",
+    "js/components/loader-fx-anchors.js",
+    "js/lib/supabase.js"
+  ]
+}

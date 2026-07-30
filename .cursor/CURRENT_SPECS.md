@@ -57,7 +57,7 @@
   - Arquitectura: [specify/SPEC_LOADER_FX_ENGINE.md](specify/SPEC_LOADER_FX_ENGINE.md)
   - Piloto cristales: [specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md](specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md)
   - Plan: [tasks/LOADER_FX_EXECUTION_PLAN.md](tasks/LOADER_FX_EXECUTION_PLAN.md)
-- **Preview dev móvil:** [specify/SPEC_WEB_DEV_PREVIEW.md](specify/SPEC_WEB_DEV_PREVIEW.md) — Electron 390×844 + Playwright.
+- **Tests CI:** [specify/SPEC_DEV_TEST_CI.md](specify/SPEC_DEV_TEST_CI.md) — PHPUnit + Node + Playwright E2E, cobertura ≥90% JS.
 - **Capacitor shell (fase posterior):** [specify/SPEC_CAPACITOR_MOBILE_SHELL.md](specify/SPEC_CAPACITOR_MOBILE_SHELL.md).
 - **Plan de ejecución pivot:** [tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md](tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md).
 

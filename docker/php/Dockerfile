@@ -5,7 +5,11 @@ RUN apt-get update && apt-get install -y \
     unzip \
     libpq-dev \
     libzip-dev \
+    $PHPIZE_DEPS \
     && docker-php-ext-install -j$(nproc) pdo_pgsql pgsql zip \
+    && pecl install pcov \
+    && docker-php-ext-enable pcov \
+    && apt-get purge -y --auto-remove $PHPIZE_DEPS \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

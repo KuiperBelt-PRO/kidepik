@@ -88,6 +88,14 @@ Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permis
 
 ### 1.2 Lista
 
+Grid responsive (`auto-fill`, min ~148px) con tarjetas que resumen:
+
+- Nombre de tripulación (o «Nuevo tripulante»)
+- Estado onboarding / pausa (icono)
+- Mundo (icono fantasía / sci-fi / pendiente)
+- Edad (si existe)
+- `tutor_label` — descripción solo tutor (icono nota)
+
 ```
 ┌─────────────────────────────────┐
 │  Tripulación                    │
@@ -122,7 +130,7 @@ CTA añadir deshabilitado si `member_count >= 4`.
 ### 1.3 Ficha
 
 1. Cabecera (nombre o placeholder, mundo, edad, badge onboarding).
-2. Perfil — editar cuando haya datos; helper «Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.»
+2. Perfil — editar cuando haya datos; helper «Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.»; incluye **descripción tutor** (`tutor_label`, editable, máx. 40 caracteres).
 3. Mundo — segmentado; disabled si null y onboarding incompleto (solo lectura «Lo elegirá en su primera aventura»); si `lock_world_theme` tras elegido, unlock explícito.
 4. Permisos y límites.
 5. Aprendizaje (Fase B overrides).

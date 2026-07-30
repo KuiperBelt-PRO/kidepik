@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Prepare env
+        run: |
+          cp .env.poc.sample .env.poc
+          cp web/js/config.sample.js web/js/config.js
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Apply migrations
+        run: supabase db reset --local --no-seed
+
+      - name: Build and start Docker stack
+        run: |
+          docker compose --env-file .env.poc -f docker/compose.yaml build php
+          docker compose --env-file .env.poc -f docker/compose.yaml up -d
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8082/api/v1/health; then exit 0; fi
+            sleep 3
+          done
+          exit 1
+
+      - name: PHPUnit with coverage
+        run: |
+          docker compose --env-file .env.poc -f docker/compose.yaml exec -T php \
+            vendor/bin/phpunit --coverage-text --colors=never
+
+      - name: Node unit tests with coverage
+        working-directory: web
+        run: |
+          npm ci
+          npm run test:coverage
+
+      - name: Playwright E2E
+        working-directory: web
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:8082
+          CI: "true"
+        run: |
+          npx playwright install chromium --with-deps
+          npm run test:e2e

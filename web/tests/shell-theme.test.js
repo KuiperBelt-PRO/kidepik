@@ -30,6 +30,15 @@ beforeEach(() => {
     documentElement: {
       dataset: {},
     },
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  };
+  globalThis.dispatchEvent = () => true;
+  globalThis.CustomEvent = class CustomEvent {
+    constructor(type, init = {}) {
+      this.type = type;
+      this.detail = init.detail;
+    }
   };
 });
 
@@ -55,5 +64,24 @@ describe("shell-theme", () => {
     applyShellUiTheme("fantasy");
     assert.equal(toggleShellUiTheme(), "sci-fi");
     assert.equal(toggleShellUiTheme(), "fantasy");
+  });
+
+  it("subscribeShellUiTheme recibe eventos", async () => {
+    const { subscribeShellUiTheme, SHELL_UI_THEME_CHANGE_EVENT } = await import("../js/lib/shell-theme.js");
+    let seen = null;
+    const listeners = [];
+    globalThis.addEventListener = (type, fn) => listeners.push({ type, fn });
+    globalThis.removeEventListener = (type, fn) => {
+      const i = listeners.findIndex((l) => l.type === type && l.fn === fn);
+      if (i >= 0) listeners.splice(i, 1);
+    };
+    globalThis.dispatchEvent = (event) => {
+      listeners.filter((l) => l.type === event.type).forEach((l) => l.fn(event));
+      return true;
+    };
+    const off = subscribeShellUiTheme((t) => { seen = t; });
+    globalThis.dispatchEvent(new CustomEvent(SHELL_UI_THEME_CHANGE_EVENT, { detail: { theme: "sci-fi" } }));
+    assert.equal(seen, "sci-fi");
+    off();
   });
 });
