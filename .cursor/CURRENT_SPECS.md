@@ -30,6 +30,7 @@
 - **Sección Cuenta (padre/tutor):** [specify/SPEC_APP_ACCOUNT_SECTION.md](specify/SPEC_APP_ACCOUNT_SECTION.md) — **aprobada** jul 2026; datos Google, alias editable, eliminación con confirmación; depende del marco de sección
 - **Sección Ajustes (tutor):** [specify/SPEC_APP_SETTINGS_SECTION.md](specify/SPEC_APP_SETTINGS_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (tema, tipografía, defaults, resumen); `parent_accounts.settings` jsonb
 - **Sección Tripulación (perfiles infantiles):** [specify/SPEC_APP_CREW_SECTION.md](specify/SPEC_APP_CREW_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (plaza, lista, ficha, permisos); play/first-run pendiente
+- **Fichas tripulación — cartas TCG:** [specify/SPEC_APP_CREW_MEMBER_CARDS.md](specify/SPEC_APP_CREW_MEMBER_CARDS.md) — **implementada** jul 2026; Fase A visual (lista + hero ficha)
 - **Diálogo de aventura (IA):** [specify/SPEC_APP_ADVENTURE_DIALOGUE.md](specify/SPEC_APP_ADVENTURE_DIALOGUE.md) — **contrato** jul 2026; opciones + texto; tema visual por mundo; turns + effects tipados
 - **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** jul 2026; bienvenida → mundo → nombre → edad → examen
 - **Examen de conocimientos (placement):** [specify/SPEC_APP_PLACEMENT_EXAM.md](specify/SPEC_APP_PLACEMENT_EXAM.md) — **contrato** jul 2026; niveles por materia + general ponderado; `effective_age_band`

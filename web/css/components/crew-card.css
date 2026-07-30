@@ -1,0 +1,259 @@
+/* Fichas de tripulación — cartas coleccionables (SPEC_APP_CREW_MEMBER_CARDS) */
+
+.crew-card {
+  --crew-card-bg: var(--glass-bg, rgba(255, 255, 255, 0.1));
+  --crew-card-bg-hover: var(--glass-bg-hover, rgba(255, 255, 255, 0.2));
+  --crew-card-border: var(--glass-border, rgba(255, 255, 255, 0.28));
+  --crew-card-radius: 14px;
+  --crew-card-inner-radius: 10px;
+  --crew-card-accent: var(--crew-card-border);
+  --crew-card-glow: transparent;
+
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 5 / 7;
+  min-height: 168px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font-family: Nunito, system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    filter 0.15s ease;
+}
+
+.crew-card--world-fantasy {
+  --crew-card-accent: rgba(61, 219, 126, 0.55);
+  --crew-card-glow: rgba(240, 193, 74, 0.25);
+}
+
+.crew-card--world-scifi {
+  --crew-card-accent: rgba(77, 163, 255, 0.55);
+  --crew-card-glow: rgba(255, 255, 255, 0.18);
+}
+
+.crew-card--world-neutral {
+  --crew-card-accent: var(--crew-card-border);
+  --crew-card-glow: transparent;
+}
+
+.crew-card__frame {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  height: 100%;
+  padding: 6px;
+  border-radius: var(--crew-card-radius);
+  border: 2px solid var(--crew-card-accent);
+  background: var(--crew-card-bg);
+  backdrop-filter: var(--glass-panel-blur, blur(40px) saturate(1.55));
+  -webkit-backdrop-filter: var(--glass-panel-blur, blur(40px) saturate(1.55));
+  box-shadow:
+    0 0 12px color-mix(in srgb, var(--crew-card-glow) 35%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+  overflow: hidden;
+}
+
+.crew-card--world-fantasy .crew-card__frame,
+.crew-card--world-scifi .crew-card__frame {
+  box-shadow:
+    0 0 14px color-mix(in srgb, var(--crew-card-glow) 45%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+.crew-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 0;
+}
+
+html[data-shell-theme="sci-fi"] .crew-card__title {
+  font-family: "Bruno Ace", Orbitron, sans-serif;
+}
+
+html[data-shell-theme="fantasy"] .crew-card__title {
+  font-family: "Uncial Antiqua", Cinzel, serif;
+}
+
+.crew-card__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.crew-card__status-gem {
+  flex: 0 0 auto;
+  max-width: 42px;
+  padding: 0.12rem 0.3rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  font-size: calc(0.58rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.crew-card__status-gem--ready {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.crew-card__status-gem--exam {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.crew-card__status-gem--paused {
+  background: rgba(255, 255, 255, 0.08);
+  opacity: 0.92;
+}
+
+.crew-card__status-gem--tutor {
+  background: rgba(255, 255, 255, 0.26);
+}
+
+.crew-card__art {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  border-radius: var(--crew-card-inner-radius);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: var(--glass-bg-strong, rgba(255, 255, 255, 0.22));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.crew-card__art::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.35), transparent 45%);
+  pointer-events: none;
+}
+
+.crew-card__art svg {
+  position: relative;
+  z-index: 1;
+  width: 40%;
+  height: auto;
+  opacity: 0.92;
+}
+
+.crew-card--hero .crew-card__art svg {
+  width: 44%;
+}
+
+.crew-card__type-line {
+  font-size: calc(0.64rem * var(--font-scale-ui, 1));
+  font-weight: 600;
+  line-height: 1.2;
+  opacity: 0.88;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.crew-card__text-box {
+  margin-top: auto;
+  padding: 0.28rem 0.35rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.12);
+  font-size: calc(0.6rem * var(--font-scale-ui, 1));
+  line-height: 1.25;
+  opacity: 0.82;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.crew-card__corner--rank {
+  display: none;
+}
+
+.crew-card:hover:not(:disabled) .crew-card__frame {
+  background: var(--crew-card-bg-hover);
+}
+
+.crew-card--world-fantasy:hover:not(:disabled) .crew-card__frame,
+.crew-card--world-scifi:hover:not(:disabled) .crew-card__frame {
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--crew-card-glow) 55%, transparent),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.28);
+}
+
+.crew-card:focus-visible {
+  outline: 2px solid var(--glass-focus, rgba(255, 255, 255, 0.85));
+  outline-offset: 3px;
+}
+
+.crew-card--paused {
+  opacity: 0.88;
+}
+
+.crew-card--tutor .crew-card__frame {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.crew-panel__hero-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0.35rem 0 1rem;
+}
+
+.crew-card--hero {
+  width: 72%;
+  max-width: 280px;
+  min-height: 200px;
+  cursor: default;
+  pointer-events: none;
+}
+
+.crew-card--hero .crew-card__title {
+  font-size: calc(0.82rem * var(--font-scale-ui, 1));
+}
+
+.crew-card--hero .crew-card__type-line {
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+}
+
+.crew-card--hero .crew-card__text-box {
+  font-size: calc(0.68rem * var(--font-scale-ui, 1));
+}
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .crew-card:hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+
+  .crew-card:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crew-card {
+    transition: none;
+  }
+}

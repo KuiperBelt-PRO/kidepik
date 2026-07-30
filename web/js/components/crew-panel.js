@@ -22,152 +22,26 @@ import {
   normalizeSessionMinutes,
   setGlassButton,
 } from "./glass-controls.js?v=223";
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- */
-function memberTitle(m) {
-  if (m.is_tutor_profile) return m.display_name || "Tú";
-  return m.display_name || "Nuevo tripulante";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- */
-function memberTutorLabel(m) {
-  return m.tutor_label?.trim() || "";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- */
-function memberOnboardingLabel(m) {
-  if (m.status === "paused") return "En pausa";
-  if (m.onboarding_step !== "complete") {
-    if (m.placement_status === "in_progress" || m.onboarding_step === "placement") {
-      return "En examen de acceso";
-    }
-    return "Pendiente de primera aventura";
-  }
-  return "Listo";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- */
-function memberWorldLabel(m) {
-  if (m.world_theme === "sci-fi") return "Ciencia ficción";
-  if (m.world_theme === "fantasy") return "Fantasía";
-  return "Sin mundo aún";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- * @returns {import('./shell-ui-icons.js').UiIconId}
- */
-function memberWorldIcon(m) {
-  if (m.world_theme === "sci-fi") return "theme-to-scifi";
-  if (m.world_theme === "fantasy") return "theme-to-fantasy";
-  return "pending";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- * @returns {'pending' | 'exam' | 'ready' | 'paused' | 'tutor'}
- */
-function memberCardTone(m) {
-  if (m.is_tutor_profile) return "tutor";
-  if (m.status === "paused") return "paused";
-  if (m.placement_status === "in_progress" || m.onboarding_step === "placement") return "exam";
-  if (m.onboarding_step === "complete") return "ready";
-  return "pending";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- */
-function memberBadgeLabel(m) {
-  if (m.is_tutor_profile) return "Tú";
-  const tone = memberCardTone(m);
-  if (tone === "paused") return "En pausa";
-  if (tone === "exam") return "En examen";
-  if (tone === "ready") return "Listo";
-  return "Pendiente";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- * @returns {import('./shell-ui-icons.js').UiIconId}
- */
-function memberAvatarIcon(m) {
-  if (m.is_tutor_profile) return "account";
-  if (m.status === "paused") return "pause";
-  if (m.world_theme === "sci-fi") return "theme-to-scifi";
-  if (m.world_theme === "fantasy") return "theme-to-fantasy";
-  if (m.onboarding_step === "complete") return "crew";
-  return "pending";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- */
-function memberAgeLabel(m) {
-  if (m.is_tutor_profile) return "Tu perfil";
-  if (m.age_years != null) return `${m.age_years} años`;
-  return "Edad pendiente";
-}
-
-/**
- * @param {import('../lib/crew-api.js').CrewListItem} m
- */
-function buildCrewCardHtml(m) {
-  const tone = memberCardTone(m);
-  const tutorLabel = memberTutorLabel(m);
-  const facts = [
-    crewFactRow(m.is_tutor_profile ? "account" : memberWorldIcon(m), m.is_tutor_profile ? "Perfil de tutor" : memberWorldLabel(m)),
-    crewFactRow("age", memberAgeLabel(m)),
-  ];
-  if (tutorLabel && !m.display_name) {
-    facts.push(crewFactRow("note", tutorLabel));
-  }
-  const desc =
-    tutorLabel && m.display_name
-      ? tutorLabel
-      : !tutorLabel && m.onboarding_step !== "complete"
-        ? "Completará su perfil en la primera aventura"
-        : "";
-
-  return `
-    <span class="crew-panel__card-head">
-      <span class="crew-panel__card-avatar" data-icon="${memberAvatarIcon(m)}" aria-hidden="true"></span>
-      <span class="crew-panel__card-badge crew-panel__card-badge--${tone}">${escapeHtml(memberBadgeLabel(m))}</span>
-    </span>
-    <span class="crew-panel__card-title">${escapeHtml(memberTitle(m))}</span>
-    ${desc ? `<span class="crew-panel__card-desc">${escapeHtml(desc)}</span>` : ""}
-    <span class="crew-panel__card-facts">${facts.join("")}</span>
-  `;
-}
-
-/**
- * @param {import('./shell-ui-icons.js').UiIconId} iconId
- * @param {string} text
- */
-function crewFactRow(iconId, text) {
-  return `<span class="crew-panel__card-fact">
-    <span class="crew-panel__card-fact-icon" data-icon="${iconId}" aria-hidden="true"></span>
-    <span class="crew-panel__card-fact-text">${escapeHtml(text)}</span>
-  </span>`;
-}
+import {
+  buildCrewMemberCardInner,
+  escapeHtml,
+  memberCardAriaLabel,
+  memberCardTone,
+  memberTitle,
+  memberWorldModifier,
+} from "../lib/crew-member-card.js";
 
 /**
  * @param {HTMLElement} card
+ * @param {{ hero?: boolean }} [opts]
  */
-function paintCardIcons(card) {
+function paintCrewCardIcons(card, opts = {}) {
+  const artSize = opts.hero ? 56 : 36;
   card.querySelectorAll("[data-icon]").forEach((host) => {
     if (!(host instanceof HTMLElement)) return;
     const iconId = host.getAttribute("data-icon");
     if (!iconId) return;
-    const size = host.classList.contains("crew-panel__card-avatar") ? 22 : 14;
+    const size = host.classList.contains("crew-card__art") ? artSize : 14;
     host.replaceChildren(
       createGlassIconSvg(/** @type {import('./shell-ui-icons.js').UiIconId} */ (iconId), { size }),
     );
@@ -240,10 +114,12 @@ export function mountCrewListPanel(container, { session }) {
     } else {
       for (const m of res.members) {
         const btn = document.createElement("button");
+        const tone = memberCardTone(m);
         btn.type = "button";
-        btn.className = `crew-panel__card crew-panel__card--${memberCardTone(m)}`;
-        btn.innerHTML = buildCrewCardHtml(m);
-        paintCardIcons(btn);
+        btn.className = `crew-card crew-card--${tone} ${memberWorldModifier(m)}`;
+        btn.setAttribute("aria-label", memberCardAriaLabel(m));
+        btn.innerHTML = buildCrewMemberCardInner(m);
+        paintCrewCardIcons(btn);
         btn.addEventListener("click", () => navigateShellRoute(`/crew/${m.id}`));
         list.appendChild(btn);
       }
@@ -362,29 +238,26 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     const p = member.permissions || {};
     const isTutor = Boolean(member.is_tutor_profile);
     const tutorLabel = member.settings?.tutor_label ?? member.tutor_label ?? "";
-    const title = isTutor ? member.display_name || "Tú" : member.display_name || "Nuevo tripulante";
-    const subtitleBase = isTutor
-      ? "Tu perfil en la tripulación"
-      : member.onboarding_step === "complete"
-        ? [
-            member.world_theme === "sci-fi"
-              ? "Ciencia ficción"
-              : member.world_theme === "fantasy"
-                ? "Fantasía"
-                : "Sin mundo",
-            member.age_years != null ? `${member.age_years} años` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")
-        : memberOnboardingLabel(member);
-    const subtitle =
-      !isTutor && member.status === "paused" && member.onboarding_step === "complete"
-        ? `En pausa · ${subtitleBase}`
-        : subtitleBase;
+    const listItem = {
+      id: member.id,
+      display_name: member.display_name,
+      age_years: member.age_years,
+      age_band: member.age_band,
+      world_theme: member.world_theme,
+      status: member.status,
+      onboarding_step: member.onboarding_step,
+      placement_status: member.placement_status,
+      tutor_label: tutorLabel,
+      is_tutor_profile: isTutor,
+    };
+    const heroTone = memberCardTone(listItem);
     root.innerHTML = `
-      <h1 class="crew-panel__title">${escapeHtml(title)}</h1>
-      <p class="crew-panel__subtitle">${escapeHtml(subtitle)}</p>
-      ${tutorLabel ? `<p class="crew-panel__muted">${escapeHtml(String(tutorLabel))}</p>` : ""}
+      <div class="crew-panel__hero-wrap">
+        <article
+          class="crew-card crew-card--hero crew-card--${heroTone} ${memberWorldModifier(listItem)}"
+          aria-label="${escapeAttr(memberCardAriaLabel(listItem))}"
+        >${buildCrewMemberCardInner(listItem)}</article>
+      </div>
       <p class="crew-panel__helper">${
         isTutor
           ? "Siempre formas parte de la tripulación. Puedes editar tu nombre y nota, pero no eliminarte."
@@ -456,6 +329,8 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     if (!isTutor) {
       paintBtn(root, "[data-delete]", "danger", "Eliminar de la tripulación", { dangerIcon: true });
     }
+    const hero = root.querySelector(".crew-card--hero");
+    if (hero instanceof HTMLElement) paintCrewCardIcons(hero, { hero: true });
     cleanups.push(bindGlassIconTheme(root));
 
     /** @type {number} */
@@ -564,7 +439,7 @@ export function mountCrewDetailPanel(container, { session, childId }) {
 
     root.querySelector("[data-delete]")?.addEventListener("click", async () => {
       if (isTutor) return;
-      const name = title;
+      const name = memberTitle(listItem);
       const ok = window.confirm(
         `¿Eliminar a ${name} de la tripulación?\n\nSe perderá su progreso y no se puede deshacer.`,
       );
@@ -582,15 +457,6 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       root.remove();
     },
   };
-}
-
-/** @param {string} s */
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
 }
 
 /** @param {string} s */

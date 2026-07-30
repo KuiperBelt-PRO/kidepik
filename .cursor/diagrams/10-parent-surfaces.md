@@ -25,7 +25,7 @@ flowchart TB
 | --- | --- | --- |
 | Cuenta | Implementada | `GET/PATCH/DELETE /parents/me` |
 | Ajustes | Fase A gestión | `GET/PATCH /parents/me/settings` |
-| Tripulación | Fase A gestión (plaza, lista, ficha, permisos) | `/crew`, `/crew/:id`, permissions |
+| Tripulación | Fase A gestión + **cartas TCG** ([SPEC_APP_CREW_MEMBER_CARDS.md](../specify/SPEC_APP_CREW_MEMBER_CARDS.md)) | `/crew`, `/crew/:id`, permissions |
 | Legal autenticado | Shell + vuelta a home sin logout | `GET /legal/:slug` |
 | Play desde crew | **Pendiente** (contrato en 11) | — |
 

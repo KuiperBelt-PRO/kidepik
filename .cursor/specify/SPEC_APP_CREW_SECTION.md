@@ -88,27 +88,36 @@ Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permis
 
 ### 1.2 Lista
 
-Grid responsive (**3 columnas máximo**) con tarjetas que resumen:
+Grid responsive (**3 columnas máximo**) con **fichas tipo carta coleccionable** (contrato visual: [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md)). Cada carta resume:
 
 - Nombre de tripulación (o «Nuevo tripulante»)
-- Badge de estado (pendiente / examen / listo / pausa) + avatar con icono de mundo
-- Contador «X de Y tripulantes»
-- Mundo, edad (o «Edad pendiente»), nota tutor si aplica
+- Caja de arte + marco según mundo del miembro
+- Badge / gemelo de estado (pendiente / examen / listo / pausa)
+- Línea de tipo: mundo, edad (o «Edad pendiente»)
+- Caja de texto: nota tutor u onboarding
+- Contador «X de Y tripulantes» (fuera del grid)
 
 ```
 ┌─────────────────────────────────┐
 │  Tripulación                    │
 │  Exploradores a tu cargo        │
 │                                 │
-│  ┌─ Plaza ───────────────────┐  │
-│  │ [?]  Nuevo explorador      │  │
-│  │ Pendiente de primera       │  │
-│  │ aventura                   │  │
-│  └────────────────────────────┘  │
-│  ┌─ Miembro ─────────────────┐  │
-│  │ [N]  Nora                  │  │
-│  │ Fantasía · 8 años · Listo  │  │
-│  └────────────────────────────┘  │
+│  ┌╌╌ Carta ═════════════════┐  │
+│  ║ NUEVO EXPLORADOR    [◆] ║  │
+│  ║ ┌────────────────────┐  ║  │
+│  ║ │      [arte ?]      │  ║  │
+│  ║ └────────────────────┘  ║  │
+│  ║ Sin mundo · Edad pend.  ║  │
+│  ║ Completará perfil…      ║  │
+│  └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘  │
+│  ┌╌╌ Carta ═════════════════┐  │
+│  ║ NORA               [◆] ║  │
+│  ║ ┌────────────────────┐  ║  │
+│  ║ │   [arte fantasía]  │  ║  │
+│  ║ └────────────────────┘  ║  │
+│  ║ Fantasía · 8 años       ║  │
+│  ║ Listo                   ║  │
+│  └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘  │
 │                                 │
 │  [ + Añadir explorador ]        │
 └─────────────────────────────────┘
@@ -128,7 +137,7 @@ CTA añadir deshabilitado si `member_count >= 10`.
 
 ### 1.3 Ficha
 
-1. Cabecera (nombre o placeholder, mundo, edad, badge onboarding).
+1. **Hero card** centrada (misma anatomía que lista, escala mayor) — [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md) §4.2.
 2. Perfil — editar cuando haya datos; helper «Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.»; incluye **descripción tutor** (`tutor_label`, editable, máx. 40 caracteres).
 3. Mundo — segmentado; disabled si null y onboarding incompleto (solo lectura «Lo elegirá en su primera aventura»); si `lock_world_theme` tras elegido, unlock explícito.
 4. Permisos y límites.
@@ -347,6 +356,7 @@ La ficha de Tripulación **refleja** esos datos al recargar; no duplica el diál
 | PLACEMENT_EXAM | Niveles + effective_age_band |
 | ADVENTURE_SESSION | Post-examen |
 | PROGRESSION_RANKS | Sensación de progreso por mundo |
+| CREW_MEMBER_CARDS | Presentación tipo carta TCG en lista y hero ficha |
 
 ## Aprobación
 
