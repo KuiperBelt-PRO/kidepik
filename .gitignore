@@ -41,6 +41,7 @@ tmp/playwright-output/
 .playwright-mcp/
 test-results/
 playwright-report/
+web/e2e/.auth/
 
 # Media subida (mantener .gitkeep)
 web/media/**/*

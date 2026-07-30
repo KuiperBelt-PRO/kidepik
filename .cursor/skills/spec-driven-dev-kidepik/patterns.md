@@ -56,5 +56,6 @@ Nuevos módulos: bajo `api/src/` + `shared/`; tests en `api/tests/`. Spec: [SPEC
 | Cuenta / crew / ajustes / legal | `SPEC_APP_*_SECTION`, `SPEC_LEGAL_*` | 10 |
 | Play / examen / diálogo | `SPEC_APP_PLAY_*`, `SPEC_APP_ADVENTURE_*` | 11 |
 | Media filesystem | `SPEC_MEDIA_*` | 12 |
-| Tests / validación UI | `SPEC_WEB_DEV_PREVIEW` | 13 |
+| Tests / validación UI | `SPEC_WEB_DEV_PREVIEW`, `SPEC_DEV_TEST_CI` | 13 |
+| Playwright auth local (agentes) | `SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT` | 13 |
 | ¿Qué abrir primero? | — | 14 |

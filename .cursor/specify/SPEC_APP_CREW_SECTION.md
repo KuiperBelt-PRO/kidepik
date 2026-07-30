@@ -12,7 +12,7 @@ Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permis
 ## Objetivo
 
 1. Rutas `#/crew`, `#/crew/new`, `#/crew/:id` con marco glass.
-2. CRUD de plazas (`children`) bajo el padre autenticado (máx. **4**).
+2. CRUD de plazas (`children`) bajo el padre autenticado (máx. **10**, provisional).
 3. Alta mínima: crear plaza vacía + permisos desde `crew_defaults`; perfil narrativo pendiente.
 4. Ficha: mostrar/editar datos cuando existan; permisos; estado de onboarding/placement.
 5. Mundo de juego (`world_theme`) **nullable** hasta que el niño lo elija en la aventura.
@@ -66,7 +66,7 @@ Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permis
 
 | # | Decisión |
 | --- | --- |
-| 1 | Máximo **4** miembros por cuenta |
+| 1 | Máximo **10** miembros por cuenta (provisional; antes 4) |
 | 2 | El **mundo lo elige el niño** la primera vez que entra a su aventura (no el tutor en el alta) |
 | 3 | Soft-delete |
 | 4 | Guardado explícito por bloque |
@@ -88,13 +88,12 @@ Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permis
 
 ### 1.2 Lista
 
-Grid responsive (`auto-fill`, min ~148px) con tarjetas que resumen:
+Grid responsive (**3 columnas máximo**) con tarjetas que resumen:
 
 - Nombre de tripulación (o «Nuevo tripulante»)
-- Estado onboarding / pausa (icono)
-- Mundo (icono fantasía / sci-fi / pendiente)
-- Edad (si existe)
-- `tutor_label` — descripción solo tutor (icono nota)
+- Badge de estado (pendiente / examen / listo / pausa) + avatar con icono de mundo
+- Contador «X de Y tripulantes»
+- Mundo, edad (o «Edad pendiente»), nota tutor si aplica
 
 ```
 ┌─────────────────────────────────┐
@@ -125,7 +124,7 @@ Grid responsive (`auto-fill`, min ~148px) con tarjetas que resumen:
 Nombre mostrado: `display_name` si existe; si no, «Nuevo explorador».  
 Mundo: label o «Sin mundo aún».
 
-CTA añadir deshabilitado si `member_count >= 4`.
+CTA añadir deshabilitado si `member_count >= 10`.
 
 ### 1.3 Ficha
 
@@ -155,7 +154,7 @@ No hay wizard de mundo/nombre/edad.
 
 **Copy de confirmación:**
 
-> Se creará una plaza en tu tripulación (máximo 4).  
+> Se creará una plaza en tu tripulación (máximo 10).  
 > El explorador elegirá su mundo (fantasía o ciencia ficción), su nombre y su edad la **primera vez** que entre en la aventura.  
 > Aquí solo configuras límites y permisos.
 
@@ -175,7 +174,7 @@ o opcional:
 
 ### 2.3 Efectos servidor
 
-1. Cupo ≤ 4.
+1. Cupo ≤ 10.
 2. Insert `children` con campos de perfil **null** / pasos pendientes.
 3. Insert `child_permissions` desde `crew_defaults`.
 4. `onboarding_step = 'pending_entry'`, `placement_status = 'not_started'`.
@@ -324,7 +323,7 @@ La ficha de Tripulación **refleja** esos datos al recargar; no duplica el diál
 
 ## 9. Criterios de aceptación (gestión)
 
-1. Alta crea plaza ≤ 4 sin mundo/nombre/edad obligatorios.
+1. Alta crea plaza ≤ 10 sin mundo/nombre/edad obligatorios.
 2. Lista muestra placeholder y badge pendiente.
 3. Ficha permite permisos aunque el perfil narrativo esté vacío.
 4. Tras simular/completar first-run (cuando exista), la ficha muestra mundo, nombre y edad.

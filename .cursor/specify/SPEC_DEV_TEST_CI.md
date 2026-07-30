@@ -13,11 +13,13 @@ Garantizar regresión en API PHP, lógica JS testable y flujos UI críticos mien
 | API PHP | PHPUnit 11 + PCOV | **≥ 90%** | `api/src/**` (métrica PCOV; `shared/Storage` tiene tests unitarios propios pero no entra en el filtro PCOV del contenedor) |
 | JS unit | Node `node:test` + c8 | **≥ 90%** | `web/js/lib/**`, `web/js/components/**` importados por tests; excluye runtime DOM pesado (ver `web/.c8rc.json`) |
 | E2E API + humo | `@playwright/test` (390×844) | contratos API + status | `web/e2e/smoke.spec.js` |
+| E2E autenticado | `@playwright/test` + storageState | UI post-login local | `web/e2e/authenticated-*.spec.js` + [SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md](SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md) |
 
 ## Comandos
 
 ```powershell
 ./scripts/poc-up.ps1
+./scripts/e2e-auth-setup.ps1   # opcional: precalienta web/e2e/.auth/tutor.json
 ./scripts/test-all.ps1
 ```
 

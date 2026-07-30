@@ -181,6 +181,39 @@ final class ProductIntegrationTest extends TestCase
         self::assertSame(200, $destroy->status);
     }
 
+    public function testCrewTutorProfileAutoCreatedAndCannotDelete(): void
+    {
+        $authUserId = $this->seedAuthUser('crew-tutor@test.local');
+        $email = 'crew-tutor@test.local';
+        $auth = $this->mockAuth($authUserId, $email);
+        $parents = new ParentAccountService($this->pdo);
+        $parents->bootstrap($authUserId, $email);
+        $crew = new CrewService($this->pdo, $parents);
+        $controller = new CrewController($auth, $crew, $parents);
+
+        $list = $controller->index('Bearer t');
+        self::assertSame(200, $list->status);
+        $listBody = json_decode($list->body, true, 512, JSON_THROW_ON_ERROR);
+        self::assertTrue($listBody['has_tutor_profile']);
+        self::assertSame(0, $listBody['member_count']);
+
+        $tutor = null;
+        foreach ($listBody['members'] as $member) {
+            if (!empty($member['is_tutor_profile'])) {
+                $tutor = $member;
+                break;
+            }
+        }
+        self::assertIsArray($tutor);
+
+        $destroy = $controller->destroy(
+            'Bearer t',
+            (string) $tutor['id'],
+            json_encode(['confirm' => true], JSON_THROW_ON_ERROR),
+        );
+        self::assertSame(422, $destroy->status);
+    }
+
     public function testCrewPatchAndPermissions(): void
     {
         $authUserId = $this->seedAuthUser('crew-patch@test.local');

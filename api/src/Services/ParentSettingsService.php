@@ -13,7 +13,7 @@ final class ParentSettingsService
 {
     public const SCHEMA_VERSION = 1;
 
-    public const MEMBER_LIMIT = 4;
+    public const MEMBER_LIMIT = 10;
 
     /**
      * @return array<string, mixed>

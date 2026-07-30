@@ -7,6 +7,7 @@ namespace Kidepik\Api\Controllers;
 use InvalidArgumentException;
 use Kidepik\Api\Http\JsonResponse;
 use Kidepik\Api\Services\AuthException;
+use Kidepik\Api\Services\CrewService;
 use Kidepik\Api\Services\ParentAccountService;
 use Kidepik\Api\Services\SupabaseAuthService;
 use RuntimeException;
@@ -46,6 +47,8 @@ final class ParentsController
         } catch (Throwable) {
             return JsonResponse::error('Internal error', 500);
         }
+
+        (new CrewService())->ensureTutorProfileForAuthUser($authUserId);
 
         return JsonResponse::ok($result);
     }

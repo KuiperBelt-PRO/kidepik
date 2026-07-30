@@ -61,12 +61,12 @@ describe("crew-api", () => {
   it("fetchCrewList", async () => {
     mock.method(globalThis, "fetch", async () => ({
       ok: true,
-      json: async () => ({ members: [], member_count: 0, member_limit: 4 }),
+      json: async () => ({ members: [], member_count: 0, member_limit: 10 }),
     }));
     const { fetchCrewList } = await import("../js/lib/crew-api.js");
     const res = await fetchCrewList(session);
     assert.equal(res.ok, true);
-    if (res.ok) assert.equal(res.member_limit, 4);
+    if (res.ok) assert.equal(res.member_limit, 10);
   });
 
   it("createCrewMember error", async () => {

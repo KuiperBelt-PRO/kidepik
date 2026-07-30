@@ -58,6 +58,7 @@
   - Piloto cristales: [specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md](specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md)
   - Plan: [tasks/LOADER_FX_EXECUTION_PLAN.md](tasks/LOADER_FX_EXECUTION_PLAN.md)
 - **Tests CI:** [specify/SPEC_DEV_TEST_CI.md](specify/SPEC_DEV_TEST_CI.md) — PHPUnit + Node + Playwright E2E, cobertura ≥90% JS.
+- **Auth local Playwright:** [specify/SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md](specify/SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md) — **implementada** jul 2026; sesión tutor sin Google OAuth (solo dev).
 - **Capacitor shell (fase posterior):** [specify/SPEC_CAPACITOR_MOBILE_SHELL.md](specify/SPEC_CAPACITOR_MOBILE_SHELL.md).
 - **Plan de ejecución pivot:** [tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md](tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md).
 

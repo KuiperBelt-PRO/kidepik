@@ -14,6 +14,7 @@
  * @property {string} onboarding_step
  * @property {string} placement_status
  * @property {string | null} tutor_label
+ * @property {boolean} [is_tutor_profile]
  */
 
 /**
@@ -32,7 +33,8 @@ export async function fetchCrewList(session) {
       ok: true,
       members: /** @type {CrewListItem[]} */ (data.members || []),
       member_count: Number(data.member_count ?? 0),
-      member_limit: Number(data.member_limit ?? 4),
+      member_limit: Number(data.member_limit ?? 10),
+      has_tutor_profile: Boolean(data.has_tutor_profile),
     };
   } catch (err) {
     console.warn("crew list error", err);

@@ -7,7 +7,7 @@ import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
 import { renderHome } from "./scenes/home.js?v=184";
 import { renderAccount } from "./scenes/account.js?v=184";
 import { renderSettings } from "./scenes/settings.js?v=221";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=223";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=226";
 import { renderLegal } from "./scenes/legal.js?v=184";
 
 function updateOfflineBanner() {

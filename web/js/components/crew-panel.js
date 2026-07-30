@@ -21,12 +21,13 @@ import {
   mountGlassSelect,
   normalizeSessionMinutes,
   setGlassButton,
-} from "./glass-controls.js?v=222";
+} from "./glass-controls.js?v=223";
 
 /**
  * @param {import('../lib/crew-api.js').CrewListItem} m
  */
 function memberTitle(m) {
+  if (m.is_tutor_profile) return m.display_name || "Tú";
   return m.display_name || "Nuevo tripulante";
 }
 
@@ -72,12 +73,79 @@ function memberWorldIcon(m) {
 
 /**
  * @param {import('../lib/crew-api.js').CrewListItem} m
+ * @returns {'pending' | 'exam' | 'ready' | 'paused' | 'tutor'}
+ */
+function memberCardTone(m) {
+  if (m.is_tutor_profile) return "tutor";
+  if (m.status === "paused") return "paused";
+  if (m.placement_status === "in_progress" || m.onboarding_step === "placement") return "exam";
+  if (m.onboarding_step === "complete") return "ready";
+  return "pending";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
+ */
+function memberBadgeLabel(m) {
+  if (m.is_tutor_profile) return "Tú";
+  const tone = memberCardTone(m);
+  if (tone === "paused") return "En pausa";
+  if (tone === "exam") return "En examen";
+  if (tone === "ready") return "Listo";
+  return "Pendiente";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
  * @returns {import('./shell-ui-icons.js').UiIconId}
  */
-function memberStatusIcon(m) {
+function memberAvatarIcon(m) {
+  if (m.is_tutor_profile) return "account";
   if (m.status === "paused") return "pause";
-  if (m.onboarding_step !== "complete") return "pending";
-  return "crew";
+  if (m.world_theme === "sci-fi") return "theme-to-scifi";
+  if (m.world_theme === "fantasy") return "theme-to-fantasy";
+  if (m.onboarding_step === "complete") return "crew";
+  return "pending";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
+ */
+function memberAgeLabel(m) {
+  if (m.is_tutor_profile) return "Tu perfil";
+  if (m.age_years != null) return `${m.age_years} años`;
+  return "Edad pendiente";
+}
+
+/**
+ * @param {import('../lib/crew-api.js').CrewListItem} m
+ */
+function buildCrewCardHtml(m) {
+  const tone = memberCardTone(m);
+  const tutorLabel = memberTutorLabel(m);
+  const facts = [
+    crewFactRow(m.is_tutor_profile ? "account" : memberWorldIcon(m), m.is_tutor_profile ? "Perfil de tutor" : memberWorldLabel(m)),
+    crewFactRow("age", memberAgeLabel(m)),
+  ];
+  if (tutorLabel && !m.display_name) {
+    facts.push(crewFactRow("note", tutorLabel));
+  }
+  const desc =
+    tutorLabel && m.display_name
+      ? tutorLabel
+      : !tutorLabel && m.onboarding_step !== "complete"
+        ? "Completará su perfil en la primera aventura"
+        : "";
+
+  return `
+    <span class="crew-panel__card-head">
+      <span class="crew-panel__card-avatar" data-icon="${memberAvatarIcon(m)}" aria-hidden="true"></span>
+      <span class="crew-panel__card-badge crew-panel__card-badge--${tone}">${escapeHtml(memberBadgeLabel(m))}</span>
+    </span>
+    <span class="crew-panel__card-title">${escapeHtml(memberTitle(m))}</span>
+    ${desc ? `<span class="crew-panel__card-desc">${escapeHtml(desc)}</span>` : ""}
+    <span class="crew-panel__card-facts">${facts.join("")}</span>
+  `;
 }
 
 /**
@@ -99,7 +167,10 @@ function paintCardIcons(card) {
     if (!(host instanceof HTMLElement)) return;
     const iconId = host.getAttribute("data-icon");
     if (!iconId) return;
-    host.replaceChildren(createGlassIconSvg(/** @type {import('./shell-ui-icons.js').UiIconId} */ (iconId), { size: 16 }));
+    const size = host.classList.contains("crew-panel__card-avatar") ? 22 : 14;
+    host.replaceChildren(
+      createGlassIconSvg(/** @type {import('./shell-ui-icons.js').UiIconId} */ (iconId), { size }),
+    );
   });
 }
 
@@ -144,9 +215,18 @@ export function mountCrewListPanel(container, { session }) {
     }
 
     const atLimit = res.member_count >= res.member_limit;
+    const countLabel =
+      res.members.length === 0
+        ? "Sin tripulantes aún"
+        : res.has_tutor_profile && res.member_count > 0
+          ? `${res.member_count} de ${res.member_limit} tripulantes (+ tú)`
+          : res.has_tutor_profile
+            ? "Solo tu perfil de tutor por ahora"
+            : `${res.member_count} de ${res.member_limit} tripulantes`;
     root.innerHTML = `
       <h1 class="crew-panel__title">Tripulación</h1>
       <p class="crew-panel__subtitle">Tripulantes a tu cargo</p>
+      <p class="crew-panel__count" aria-live="polite">${escapeHtml(countLabel)}</p>
       <div class="crew-panel__grid" data-list></div>
       <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-add ${atLimit ? "disabled" : ""}></button>
       ${atLimit ? `<p class="crew-panel__helper">Has alcanzado el máximo de ${res.member_limit} tripulantes.</p>` : ""}
@@ -161,22 +241,8 @@ export function mountCrewListPanel(container, { session }) {
       for (const m of res.members) {
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "crew-panel__card";
-        const tutorLabel = memberTutorLabel(m);
-        const facts = [
-          crewFactRow(memberStatusIcon(m), memberOnboardingLabel(m)),
-          crewFactRow(memberWorldIcon(m), memberWorldLabel(m)),
-        ];
-        if (m.age_years != null) {
-          facts.push(crewFactRow("age", `${m.age_years} años`));
-        }
-        if (tutorLabel) {
-          facts.push(crewFactRow("note", tutorLabel));
-        }
-        btn.innerHTML = `
-          <span class="crew-panel__card-title">${escapeHtml(memberTitle(m))}</span>
-          <span class="crew-panel__card-facts">${facts.join("")}</span>
-        `;
+        btn.className = `crew-panel__card crew-panel__card--${memberCardTone(m)}`;
+        btn.innerHTML = buildCrewCardHtml(m);
         paintCardIcons(btn);
         btn.addEventListener("click", () => navigateShellRoute(`/crew/${m.id}`));
         list.appendChild(btn);
@@ -294,10 +360,12 @@ export function mountCrewDetailPanel(container, { session, childId }) {
   function paint(member) {
     resetCleanups();
     const p = member.permissions || {};
+    const isTutor = Boolean(member.is_tutor_profile);
     const tutorLabel = member.settings?.tutor_label ?? member.tutor_label ?? "";
-    const title = member.display_name || "Nuevo tripulante";
-    const subtitleBase =
-      member.onboarding_step === "complete"
+    const title = isTutor ? member.display_name || "Tú" : member.display_name || "Nuevo tripulante";
+    const subtitleBase = isTutor
+      ? "Tu perfil en la tripulación"
+      : member.onboarding_step === "complete"
         ? [
             member.world_theme === "sci-fi"
               ? "Ciencia ficción"
@@ -310,30 +378,42 @@ export function mountCrewDetailPanel(container, { session, childId }) {
             .join(" · ")
         : memberOnboardingLabel(member);
     const subtitle =
-      member.status === "paused" && member.onboarding_step === "complete"
+      !isTutor && member.status === "paused" && member.onboarding_step === "complete"
         ? `En pausa · ${subtitleBase}`
         : subtitleBase;
     root.innerHTML = `
       <h1 class="crew-panel__title">${escapeHtml(title)}</h1>
       <p class="crew-panel__subtitle">${escapeHtml(subtitle)}</p>
       ${tutorLabel ? `<p class="crew-panel__muted">${escapeHtml(String(tutorLabel))}</p>` : ""}
-      <p class="crew-panel__helper">Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.</p>
+      <p class="crew-panel__helper">${
+        isTutor
+          ? "Siempre formas parte de la tripulación. Puedes editar tu nombre y nota, pero no eliminarte."
+          : "Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí."
+      }</p>
 
       <section class="crew-panel__block">
         <h2 class="crew-panel__block-title">Perfil</h2>
-        <label class="crew-panel__label">Nombre de tripulación
+        <label class="crew-panel__label">${isTutor ? "Tu nombre en la tripulación" : "Nombre de tripulación"}
           <input class="crew-panel__input" data-profile="display_name" value="${escapeAttr(member.display_name || "")}" maxlength="24" />
         </label>
         <label class="crew-panel__label">Descripción (solo para ti)
-          <input class="crew-panel__input" data-profile="tutor_label" value="${escapeAttr(String(tutorLabel))}" maxlength="40" placeholder="p. ej. El de Marta" />
+          <input class="crew-panel__input" data-profile="tutor_label" value="${escapeAttr(String(tutorLabel))}" maxlength="40" placeholder="${isTutor ? "p. ej. Tu perfil de tutor" : "p. ej. El de Marta"}" />
         </label>
-        <p class="crew-panel__helper">Esta nota solo la ves tú; ayuda a identificar al tripulante en el listado.</p>
-        <label class="crew-panel__label">Edad
+        <p class="crew-panel__helper">${
+          isTutor
+            ? "Esta nota solo la ves tú en el listado."
+            : "Esta nota solo la ves tú; ayuda a identificar al tripulante en el listado."
+        }</p>
+        ${
+          isTutor
+            ? ""
+            : `<label class="crew-panel__label">Edad
           <div data-age-host></div>
         </label>
         <label class="crew-panel__label">Estado
           <div data-status-host></div>
-        </label>
+        </label>`
+        }
         <p class="crew-panel__status" data-profile-status aria-live="polite"></p>
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-profile></button>
       </section>
@@ -361,15 +441,21 @@ export function mountCrewDetailPanel(container, { session, childId }) {
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-perm></button>
       </section>
 
-      <section class="crew-panel__block crew-panel__block--danger">
+      ${
+        isTutor
+          ? ""
+          : `<section class="crew-panel__block crew-panel__block--danger">
         <h2 class="crew-panel__block-title">Zona peligrosa</h2>
         <button type="button" class="crew-panel__btn crew-panel__btn--danger" data-delete></button>
-      </section>
+      </section>`
+      }
     `;
 
     paintBtn(root, "[data-save-profile]", "save", "Guardar perfil");
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
-    paintBtn(root, "[data-delete]", "danger", "Eliminar de la tripulación", { dangerIcon: true });
+    if (!isTutor) {
+      paintBtn(root, "[data-delete]", "danger", "Eliminar de la tripulación", { dangerIcon: true });
+    }
     cleanups.push(bindGlassIconTheme(root));
 
     /** @type {number} */
@@ -434,9 +520,11 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       const descInput = root.querySelector('[data-profile="tutor_label"]');
       /** @type {Record<string, unknown>} */
       const patch = {
-        status: selectedStatus,
         age_years: ageStepper?.getValue() ?? null,
       };
+      if (!isTutor) {
+        patch.status = selectedStatus;
+      }
       if (nameInput instanceof HTMLInputElement) {
         patch.display_name = nameInput.value.trim() || null;
       }
@@ -475,6 +563,7 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     });
 
     root.querySelector("[data-delete]")?.addEventListener("click", async () => {
+      if (isTutor) return;
       const name = title;
       const ok = window.confirm(
         `¿Eliminar a ${name} de la tripulación?\n\nSe perderá su progreso y no se puede deshacer.`,

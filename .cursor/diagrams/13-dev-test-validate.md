@@ -26,6 +26,7 @@ flowchart TB
 | Playwright E2E | `cd web && npm run test:e2e` |
 | Health | `GET http://localhost:8082/api/v1/health` |
 | UI agente | MCP `playwright` → `http://localhost:8082`, viewport 390×844 |
+| **Auth local Playwright** | `./scripts/e2e-auth-setup.ps1` → [SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md](../specify/SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md) |
 | Electron | `./scripts/poc-web-preview.ps1` |
 | Codegraph | Desde raíz kidepik: `codegraph index .` / `codegraph status .` |
 | Spec tests | [.cursor/specify/SPEC_DEV_TEST_CI.md](../specify/SPEC_DEV_TEST_CI.md) |

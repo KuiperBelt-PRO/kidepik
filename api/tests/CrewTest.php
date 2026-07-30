@@ -47,14 +47,14 @@ final class CrewTest extends TestCase
         $crew->method('listForAuthUser')->willReturn([
             'members' => [],
             'member_count' => 0,
-            'member_limit' => 4,
+            'member_limit' => 10,
         ]);
 
         $response = (new CrewController($auth, $crew, $parents))->index('Bearer t');
         self::assertSame(200, $response->status);
         $body = json_decode($response->body, true, 512, JSON_THROW_ON_ERROR);
         self::assertSame(0, $body['member_count']);
-        self::assertSame(4, $body['member_limit']);
+        self::assertSame(10, $body['member_limit']);
     }
 
     public function testCreateRejectsLimit(): void
