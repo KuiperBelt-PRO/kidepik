@@ -24,6 +24,7 @@ import {
   normalizeSessionMinutes,
   setGlassButton,
 } from "./glass-controls.js?v=224";
+import { showGlassConfirm } from "./glass-modal.js?v=2";
 import {
   buildCrewMemberCardInner,
   escapeHtml,
@@ -560,15 +561,26 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       if (res.ok) paint(res.member);
     });
 
-    root.querySelector("[data-delete]")?.addEventListener("click", async () => {
+    root.querySelector("[data-delete]")?.addEventListener("click", (ev) => {
       if (isTutor) return;
+      ev.preventDefault();
+      ev.stopPropagation();
       const name = memberTitle(listItem);
-      const ok = window.confirm(
-        `¿Eliminar a ${name} de la tripulación?\n\nSe perderá su progreso y no se puede deshacer.`,
-      );
-      if (!ok) return;
-      const res = await deleteCrewMember(session, childId);
-      if (res.ok) navigateShellRoute("/crew");
+      void showGlassConfirm({
+        title: `¿Eliminar a ${name} de la tripulación?`,
+        body: `<p>Se perderá su progreso, el diario del viaje y los datos del examen de nivelación.</p>`,
+        footer: "Esta acción no se puede deshacer.",
+        size: "md",
+        danger: true,
+        confirmLabel: "Eliminar de la tripulación",
+        onConfirm: async () => {
+          const res = await deleteCrewMember(session, childId);
+          if (!res.ok) {
+            throw new Error("No hemos podido eliminar el tripulante. Inténtalo de nuevo.");
+          }
+          navigateShellRoute("/crew");
+        },
+      });
     });
   }
 

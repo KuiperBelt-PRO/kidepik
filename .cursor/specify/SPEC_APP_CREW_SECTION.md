@@ -360,6 +360,7 @@ La ficha de Tripulación **refleja** esos datos al recargar; no duplica el diál
 3. Ficha permite permisos aunque el perfil narrativo esté vacío.
 4. Tras simular/completar first-run (cuando exista), la ficha muestra mundo, nombre y edad.
 5. Soft-delete; cupo; PIN hash; apply-defaults; Playwright lista/alta/permisos.
+6. Eliminar tripulante abre modal glass de confirmación con aviso de no-undo (no `window.confirm`).
 
 ---
 

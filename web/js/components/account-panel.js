@@ -15,6 +15,7 @@ import {
 } from "../lib/parent-account.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
 import { GLASS_ICON_FILL, setGlassButton } from "./glass-controls.js";
+import { closeGlassModal, showGlassConfirm } from "./glass-modal.js?v=2";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 
 /** @typedef {import('./shell-ui-icons.js').UiIconId} UiIconId */
@@ -79,8 +80,6 @@ export function mountAccountPanel(container, { session, onDeleted }) {
   `;
   container.appendChild(root);
 
-  /** @type {HTMLElement | null} */
-  let modalRoot = null;
   let cancelled = false;
 
   /**
@@ -230,101 +229,22 @@ export function mountAccountPanel(container, { session, onDeleted }) {
     });
 
     deleteBtn.addEventListener("click", () => {
-      openDeleteModal();
+      void showGlassConfirm({
+        title: "¿Eliminar tu cuenta?",
+        body: DELETE_COPY_HTML,
+        footer: "Esta acción no se puede deshacer.",
+        size: "lg",
+        danger: true,
+        confirmLabel: "Eliminar definitivamente",
+        onConfirm: async () => {
+          const result = await deleteParentAccount(session);
+          if (!result.ok) {
+            throw new Error("No hemos podido eliminar la cuenta. Inténtalo de nuevo.");
+          }
+          await onDeleted();
+        },
+      });
     });
-  }
-
-  function openDeleteModal() {
-    closeDeleteModal();
-    modalRoot = document.createElement("div");
-    modalRoot.className = "account-modal";
-
-    const scrim = document.createElement("div");
-    scrim.className = "account-modal__scrim";
-
-    const dialog = document.createElement("div");
-    dialog.className = "account-modal__dialog";
-    dialog.setAttribute("role", "dialog");
-    dialog.setAttribute("aria-modal", "true");
-    dialog.setAttribute("aria-labelledby", "account-delete-title");
-
-    const title = document.createElement("h2");
-    title.id = "account-delete-title";
-    title.className = "account-modal__title";
-    title.textContent = "¿Eliminar tu cuenta?";
-
-    const body = document.createElement("div");
-    body.className = "account-modal__body";
-    body.innerHTML = DELETE_COPY_HTML;
-
-    const undo = document.createElement("p");
-    undo.className = "account-modal__undo";
-    undo.textContent = "Esta acción no se puede deshacer.";
-
-    const err = document.createElement("p");
-    err.className = "account-panel__error";
-    err.hidden = true;
-
-    const actions = document.createElement("div");
-    actions.className = "account-modal__actions";
-
-    const cancelBtn = document.createElement("button");
-    cancelBtn.type = "button";
-    cancelBtn.className = "account-panel__btn";
-    cancelBtn.textContent = "Cancelar";
-
-    const confirmBtn = document.createElement("button");
-    confirmBtn.type = "button";
-    confirmBtn.className = "account-panel__btn";
-    setLabeledButton(confirmBtn, "danger", "Eliminar definitivamente", { dangerIcon: true });
-
-    actions.append(cancelBtn, confirmBtn);
-    dialog.append(title, body, undo, err, actions);
-    modalRoot.append(scrim, dialog);
-    document.body.appendChild(modalRoot);
-    cancelBtn.focus();
-
-    const onKey = (ev) => {
-      if (ev.key === "Escape") {
-        ev.preventDefault();
-        closeDeleteModal();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    modalRoot.dataset.keyHandler = "1";
-    // @ts-expect-error stash
-    modalRoot._onKey = onKey;
-
-    cancelBtn.addEventListener("click", () => closeDeleteModal());
-    scrim.addEventListener("click", () => closeDeleteModal());
-    confirmBtn.addEventListener("click", () => {
-      void (async () => {
-        err.hidden = true;
-        cancelBtn.disabled = true;
-        confirmBtn.disabled = true;
-        const result = await deleteParentAccount(session);
-        if (!result.ok) {
-          err.textContent = "No hemos podido eliminar la cuenta. Inténtalo de nuevo.";
-          err.hidden = false;
-          cancelBtn.disabled = false;
-          confirmBtn.disabled = false;
-          return;
-        }
-        closeDeleteModal();
-        await onDeleted();
-      })();
-    });
-  }
-
-  function closeDeleteModal() {
-    if (!modalRoot) return;
-    // @ts-expect-error stash
-    const onKey = modalRoot._onKey;
-    if (typeof onKey === "function") {
-      window.removeEventListener("keydown", onKey);
-    }
-    modalRoot.remove();
-    modalRoot = null;
   }
 
   function renderError() {
@@ -359,7 +279,7 @@ export function mountAccountPanel(container, { session, onDeleted }) {
   return {
     destroy() {
       cancelled = true;
-      closeDeleteModal();
+      closeGlassModal();
       root.remove();
     },
   };

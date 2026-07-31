@@ -212,7 +212,8 @@ Los botones «Volver» locales en paneles (`crew-panel__link`) se sustituyen por
 | **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) · **Diario del viaje** (timeline L1 + summary L2, tokens glass) |
 | **Aventura** `#/play/:childId` | Mismo **loader-chrome + section-frame** que Tripulación; log en burbujas glass; scroll del **marco** (`section-frame__scroll` + fade), sin scroll anidado en el log; pie fijo con compose. |
 | **Ajustes** | `mountDurationSlider` · chips tema UI / texto · botones `save` / `close` |
-| **Cuenta** | Fields · checkboxes · botones (`signout`, etc.) |
+| **Cuenta** | Fields · checkboxes · botones (`signout`, etc.) · modales glass (`showGlassConfirm`) |
+| **Modales** | `showGlassAlert` · `showGlassConfirm` — glass, scroll+fade, alturas `sm`/`md`/`lg`/`auto` |
 | **Demo** | `web/tmp/glass-controls-demo.html` — catálogo completo sobre loader real |
 
 Duración de sesión: **solo** slider (`normalizeSessionMinutes`, `formatDurationMinutes`), nunca chips.
@@ -286,8 +287,12 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 
 | Pieza | Path |
 | --- | --- |
-| Tokens + CSS | `web/css/components/glass-controls.css` |
+| Tokens + CSS controles | `web/css/components/glass-controls.css` |
+| Modales glass CSS | `web/css/components/glass-modal.css` |
+| Toasts CSS | `web/css/components/glass-toast.css` |
 | Helpers JS | `web/js/components/glass-controls.js` |
+| Modales JS | `web/js/components/glass-modal.js` |
+| Toasts JS | `web/js/components/glass-toast.js` |
 | Iconos | `web/js/components/shell-ui-icons.js` |
 | Consumo | `crew-panel.js`, `settings-panel.js`, `account-panel.js`, `scenes/play.js` |
 | Demo local | `http://localhost:8082/tmp/glass-controls-demo.html` (loader real + `poc-up.ps1`) |
@@ -306,6 +311,9 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 | `shellNavBack` / `shellNavForward` / `navigateShellSubview` | Navegación pila en marco |
 | `subscribeShellNav` / `getShellNavState` | Estado atrás/adelante |
 | `GLASS_ICON_FILL` | `#FFFFFF` · danger `#FF6B63` |
+| `showGlassAlert` / `showGlassConfirm` | Modales glass (alerta / confirmación) |
+| `syncGlassModalBodyScrollFade` | Fade en cuerpo modal solo con overflow |
+| `showGlassToast` | Notificaciones flotantes |
 
 ### Skeleton de carga
 

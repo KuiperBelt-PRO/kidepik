@@ -1,0 +1,147 @@
+/* Modales glass centrados (alerta / confirmación) */
+
+.glass-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  pointer-events: auto;
+}
+
+.glass-modal__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.glass-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  max-height: min(80dvh, 560px);
+  padding: 1.15rem 1.1rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  color: #fff;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.28);
+  animation: glass-modal-in 200ms ease;
+}
+
+.glass-modal__dialog--sm {
+  max-height: min(42dvh, 300px);
+}
+
+.glass-modal__dialog--md {
+  max-height: min(62dvh, 440px);
+}
+
+.glass-modal__dialog--lg {
+  max-height: min(80dvh, 560px);
+}
+
+.glass-modal__dialog--auto {
+  max-height: min(80dvh, 560px);
+}
+
+.glass-modal__title {
+  margin: 0 0 0.75rem;
+  flex-shrink: 0;
+  font-size: 1.15rem;
+  font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
+}
+
+html[data-shell-theme="sci-fi"] .glass-modal__title {
+  font-family: var(--font-shell-sci, "Bruno Ace", "Orbitron", system-ui, sans-serif);
+}
+
+.glass-modal__body {
+  margin: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+  max-height: min(36dvh, 280px);
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.glass-modal__dialog--sm .glass-modal__body {
+  max-height: min(18dvh, 120px);
+}
+
+.glass-modal__dialog--lg .glass-modal__body,
+.glass-modal__dialog--auto .glass-modal__body {
+  max-height: min(48dvh, 360px);
+}
+
+.glass-modal__body p {
+  margin: 0 0 0.65rem;
+}
+
+.glass-modal__body p:last-child {
+  margin-bottom: 0;
+}
+
+.glass-modal__body ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.15rem;
+}
+
+.glass-modal__footer {
+  margin: 0.75rem 0 0;
+  flex-shrink: 0;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.glass-modal__error {
+  margin: 0.5rem 0 0;
+  flex-shrink: 0;
+  font-size: 0.88rem;
+  color: #ff8a82;
+}
+
+.glass-modal__error[hidden] {
+  display: none;
+}
+
+.glass-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.85rem;
+  flex-shrink: 0;
+}
+
+@keyframes glass-modal-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-modal__dialog {
+    animation: none;
+  }
+}
