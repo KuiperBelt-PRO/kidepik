@@ -33,7 +33,8 @@ import {
   memberWorldModifier,
 } from "../lib/crew-member-card.js";
 
-/** Altura máxima ~4 líneas; scroll nativo sin fade. */
+/** Altura mínima ~2 líneas; máxima ~4 líneas; scroll nativo sin fade. */
+const CHARACTER_SUMMARY_MIN_HEIGHT_PX = 72;
 const CHARACTER_SUMMARY_MAX_HEIGHT_PX = 104;
 
 /**
@@ -42,7 +43,7 @@ const CHARACTER_SUMMARY_MAX_HEIGHT_PX = 104;
 function autoGrowCharacterSummary(el) {
   el.style.overflowY = "hidden";
   el.style.height = "0";
-  const sh = el.scrollHeight;
+  const sh = Math.max(CHARACTER_SUMMARY_MIN_HEIGHT_PX, el.scrollHeight);
   if (sh <= CHARACTER_SUMMARY_MAX_HEIGHT_PX) {
     el.style.height = `${sh}px`;
     el.style.overflowY = "hidden";
@@ -308,7 +309,7 @@ export function mountCrewDetailPanel(container, { session, childId }) {
           <textarea
             class="crew-panel__input crew-panel__input--character-summary"
             data-profile="character_summary"
-            rows="1"
+            rows="2"
             maxlength="600"
             spellcheck="false"
             autocorrect="off"

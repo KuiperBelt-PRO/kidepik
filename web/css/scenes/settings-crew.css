@@ -218,7 +218,7 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
 }
 
 .crew-panel__input.crew-panel__input--character-summary:is(textarea) {
-  min-height: 48px;
+  min-height: 72px;
   max-height: 6.5rem;
   margin-top: 0.35rem;
   resize: none;
