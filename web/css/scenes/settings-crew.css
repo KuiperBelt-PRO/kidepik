@@ -217,6 +217,14 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   font: inherit;
 }
 
+.crew-panel__input.crew-panel__input--character-summary:is(textarea) {
+  min-height: 48px;
+  max-height: 6.5rem;
+  margin-top: 0.35rem;
+  resize: none;
+  overflow-wrap: anywhere;
+}
+
 .crew-panel__actions {
   display: grid;
   gap: 8px;
@@ -287,7 +295,28 @@ html[data-font-scale-ui="xl"] {
   flex-direction: column;
   gap: 0.65rem;
   max-height: 18rem;
-  overflow-y: auto;
+}
+
+.section-frame[data-crew-world-theme="fantasy"] {
+  border-color: rgba(186, 220, 255, 0.32);
+  background: rgba(72, 42, 110, 0.22);
+}
+
+.section-frame[data-crew-world-theme="fantasy"] .crew-panel__title,
+.section-frame[data-crew-world-theme="fantasy"] .crew-panel__block-title,
+.section-frame[data-crew-world-theme="fantasy"] .crew-card__name {
+  font-family: "Uncial Antiqua", Cinzel, Georgia, serif;
+}
+
+.section-frame[data-crew-world-theme="sci-fi"] {
+  border-color: rgba(160, 220, 255, 0.34);
+  background: rgba(20, 48, 88, 0.24);
+}
+
+.section-frame[data-crew-world-theme="sci-fi"] .crew-panel__title,
+.section-frame[data-crew-world-theme="sci-fi"] .crew-panel__block-title,
+.section-frame[data-crew-world-theme="sci-fi"] .crew-card__name {
+  font-family: "Bruno Ace", Orbitron, system-ui, sans-serif;
 }
 
 .crew-panel__timeline-item {

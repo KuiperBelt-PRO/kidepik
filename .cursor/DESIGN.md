@@ -193,12 +193,24 @@ Los botones «Volver» locales en paneles (`crew-panel__link`) se sustituyen por
 
 ---
 
+## Scroll y fade (homogeneidad)
+
+| Superficie | Contenedor de scroll | Fade |
+| --- | --- | --- |
+| Tripulación, Ajustes, Cuenta | `.section-frame__scroll` | Máscara CSS del marco (`--section-frame-fade-ramp`) |
+| Aventura `#/play` | **Mismo** `.section-frame__scroll` (log sin `overflow` propio) | Igual que el marco |
+| Diario del viaje (ficha) | `.crew-panel__timeline.glass-scroll-fade` | Clase compartida `.glass-scroll-fade` en `glass-controls.css` |
+
+**Regla:** no anidar un segundo scroll con scrollbar distinta en play; el pie (`section-frame__footer`) queda fijo fuera del scroll.
+
+---
+
 ## Uso en pantallas (julio 2026)
 
 | Pantalla | Controles glass |
 | --- | --- |
 | **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) · **Diario del viaje** (timeline L1 + summary L2, tokens glass) |
-| **Aventura** `#/play/:childId` | Mismo **loader-chrome + section-frame** que Tripulación; log en burbujas glass; opciones = `crew-panel__chip`; input = `glass-field`; enviar = `glass-btn` icono+texto. **Sin** fondo plano ni chrome inventado. |
+| **Aventura** `#/play/:childId` | Mismo **loader-chrome + section-frame** que Tripulación; log en burbujas glass; scroll del **marco** (`section-frame__scroll` + fade), sin scroll anidado en el log; pie fijo con compose. |
 | **Ajustes** | `mountDurationSlider` · chips tema UI / texto · botones `save` / `close` |
 | **Cuenta** | Fields · checkboxes · botones (`signout`, etc.) |
 | **Demo** | `web/tmp/glass-controls-demo.html` — catálogo completo sobre loader real |

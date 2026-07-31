@@ -70,7 +70,7 @@ Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permis
 | 2 | El **mundo lo elige el niño** la primera vez que entra a su aventura (no el tutor en el alta) |
 | 3 | Soft-delete |
 | 4 | Guardado explícito por bloque |
-| 5 | Horarios y learning overrides: Fase B |
+| 5 | Materias por tripulante: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §3; horarios: Fase B |
 | 6 | Nombre de tripulación y edad: los aporta el niño en el primer acceso; el tutor puede corregir después en la ficha |
 
 ---
@@ -138,10 +138,10 @@ CTA añadir deshabilitado si `member_count >= 10`.
 ### 1.3 Ficha
 
 1. **Hero card** centrada (misma anatomía que lista, escala mayor) — [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md) §4.2.
-2. Perfil — editar cuando haya datos; helper «Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.»; incluye **descripción tutor** (`tutor_label`, editable, máx. 40 caracteres).
+2. Perfil — editar cuando haya datos; helper «Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.»; incluye **descripción tutor** (`tutor_label`, editable, máx. 40 caracteres) y **descripción del personaje** (`traits.character_summary`, textarea multilínea editable, máx. 600 caracteres; auto-grow hasta ~4 líneas y scroll nativo sin fade).
 3. Mundo — segmentado; disabled si null y onboarding incompleto (solo lectura «Lo elegirá en su primera aventura»); si `lock_world_theme` tras elegido, unlock explícito.
 4. Permisos y límites.
-5. Aprendizaje (Fase B overrides).
+5. **Materias de aprendizaje** — checklist por familia, `active_subjects` por tripulante ([SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §3).
 6. Viaje — `onboarding_step`, `placement_status`, niveles resumen (cuando existan).
 7. Zona peligrosa — pausar / eliminar.
 
@@ -260,7 +260,7 @@ Body vacío o `{ "tutor_label": "…" }`. Respuesta DTO completo con permisos.
 
 Como en la propuesta previa, con campos nullable y:
 
-- `PATCH` puede corregir `display_name`, `age_years`, `world_theme` (respetando lock).
+- `PATCH` puede corregir `display_name`, `age_years`, `world_theme` (respetando lock) y `character_summary` (solo exploradores; persiste en `child_traits.character_summary`).
 - Endpoints de **play/onboarding** (escribir mundo/nombre/edad desde el diálogo) viven en [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md) — autenticados con JWT del **tutor** (el dispositivo está en sesión adulta; el niño no tiene token propio).
 
 ### 4.4 apply-defaults
@@ -288,6 +288,29 @@ Guardado explícito: «Guardar permisos».
 
 ---
 
+## 5.1 Materias de aprendizaje (por tripulante)
+
+Contrato detallado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §3 — **aprobado** 31 jul 2026; **implementación bloqueada** hasta OK del titular.
+
+| Aspecto | Decisión |
+| --- | --- |
+| Ubicación | Bloque en ficha `#/crew/:id`, entre Permisos y Viaje |
+| Campo | `children.settings.learning.active_subjects` (string[]) |
+| UI | Checklist agrupada por familia (Fundamentales, Humanidades, Sociedad, Expresión, Vida práctica) |
+| Mínimo | ≥1 materia activa |
+| Edad | **No** bloquea materias; el tutor puede activar cualquier id del catálogo |
+| Dificultad en juego | Siempre según `age_band` del explorador, no según la materia |
+| Sugerencia | Al fijar edad en first-run, merge de materias base de banda + defaults del hogar |
+| Aviso | Si >10 materias activas: banner «examen largo, reanudable» |
+| Guardado | Botón «Guardar materias»; `PATCH` perfil |
+| Placement en curso | Cambios aplican al siguiente examen o retake confirmado |
+
+**Copy helper en ficha:**
+
+> Las materias activas se usan en el examen de acceso y en la aventura. El nivel de cada reto se adapta a la edad del explorador, no a la materia elegida.
+
+---
+
 ## 6. Sincronización con primer acceso
 
 Cuando el play complete pasos ([SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md)):
@@ -296,7 +319,7 @@ Cuando el play complete pasos ([SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_
 | --- | --- |
 | Elige mundo | `world_theme` set; `onboarding_step → choose_name` |
 | Nombre tripulación | `display_name` set; `→ choose_age` |
-| Edad | `age_years` + `age_band` inicial; `→ placement` |
+| Edad | `age_years` + `age_band` inicial; sugerencia `active_subjects` ([SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §2.1); `→ placement` |
 | Examen terminado | `placement_status=completed`; niveles; `effective_age_band`; `onboarding_step=complete` |
 
 La ficha de Tripulación **refleja** esos datos al recargar; no duplica el diálogo.

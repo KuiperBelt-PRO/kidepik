@@ -721,3 +721,34 @@
     opacity: 0.35;
   }
 }
+
+/* Scroll con fade superior/inferior (sub-áreas dentro del marco) */
+.glass-scroll-fade {
+  --glass-scroll-fade-ramp: clamp(28px, 7dvh, 48px);
+  --glass-scroll-scrollbar: 6px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--glass-scroll-fade-ramp),
+    #000 calc(100% - var(--glass-scroll-fade-ramp)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 var(--glass-scroll-fade-ramp),
+    #000 calc(100% - var(--glass-scroll-fade-ramp)),
+    transparent 100%
+  );
+  -webkit-mask-size: calc(100% - var(--glass-scroll-scrollbar)) 100%;
+  mask-size: calc(100% - var(--glass-scroll-scrollbar)) 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: left top;
+  mask-position: left top;
+}

@@ -100,6 +100,15 @@ complete
 | `sci-fi` | Ciencia ficción |
 | `fantasy` | Fantasía |
 
+Cada opción incluye `description` breve (1–2 líneas) evocando el mundo — nave/galaxia vs reinos/magia — alineado a [docs/kidepik.md](../../docs/kidepik.md) §5. La UI muestra las descripciones **bajo la burbuja de bienvenida** (`.play-world-hints`); en el pie solo aparecen chips con el nombre del mundo.
+
+Copy canónico (servidor):
+
+| option_id | description |
+| --- | --- |
+| `sci-fi` | Naves, planetas y galaxias: serás cadete explorador en una misión por las estrellas. |
+| `fantasy` | Magia, reinos y artefactos: tu camino pasa por bosques, montañas y castillos. |
+
 Copy de apoyo (agente): breve evocación de cada mundo (nave/galaxia vs reinos/magia), alineado a [docs/kidepik.md](../../docs/kidepik.md) §5.
 
 **Tras elegir:**
@@ -108,15 +117,21 @@ Copy de apoyo (agente): breve evocación de cada mundo (nave/galaxia vs reinos/m
 2. Cliente aplica tipografía + iconos del mundo ([SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md) §1.2).
 3. Turnos siguientes usan tono del mundo (cadete vs aprendiz).
 4. `onboarding_step = choose_name`.
-5. Si `lock_world_theme` (default), el niño no vuelve a este paso salvo reset tutor.
+5. Si `lock_world_theme` (default), el niño no vuelve a este paso salvo reset tutor; al elegir mundo se fuerza `lock_world_theme` en permisos.
 
 ### 3.3 Nombre de tripulación
 
 - Pregunta: cómo quiere que le llamen en la aventura.
-- `input_mode`: `options_or_text` o `text_only` (sugerencias opcionales generadas: 2–3 nombres temáticos según mundo).
-- Validación servidor: 1–24 caracteres; mismas reglas que Tripulación.
+- `input_mode`: `options_or_text` (sugerencias temáticas 2–3 según mundo si el texto libre no contiene un nombre claro).
+- **Extracción inteligente:** si el niño escribe un párrafo («Quiero que mi personaje se llame: Vatardar…»), el servidor usa `DisplayNameExtractor` (`shared/Text/DisplayNameExtractor.php`) para localizar el nombre; si no hay candidato válido, repregunta con chips sin error crudo `display_name invalid`.
+- Validación servidor: 1–24 caracteres; letras, números, espacios, apóstrofe y guión.
 - Persistir `display_name`.
 - Confirmación narrativa: «Encantado, {name}.»
+- Errores de validación en cliente: toast glass ([SPEC_APP_GLASS_TOAST.md](SPEC_APP_GLASS_TOAST.md)), no texto inline en el log.
+
+**Tras elegir mundo (§3.2):**
+
+6. `lock_world_theme = true` en permisos (default ya true); ficha Tripulación muestra mundo en solo lectura hasta que el tutor desbloquee el checkbox «Bloquear cambio de mundo».
 
 ### 3.4 Edad
 

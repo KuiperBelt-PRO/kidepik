@@ -13,6 +13,7 @@ import {
   patchCrewPermissions,
 } from "../lib/crew-api.js";
 import { fetchJourneyTimeline } from "../lib/play-api.js";
+import { applyCrewMemberWorldTheme } from "../lib/play-theme.js";
 import {
   bindGlassIconTheme,
   createGlassIconSvg,
@@ -22,7 +23,7 @@ import {
   mountGlassSelect,
   normalizeSessionMinutes,
   setGlassButton,
-} from "./glass-controls.js?v=223";
+} from "./glass-controls.js?v=224";
 import {
   buildCrewMemberCardInner,
   escapeHtml,
@@ -31,6 +32,25 @@ import {
   memberTitle,
   memberWorldModifier,
 } from "../lib/crew-member-card.js";
+
+/** Altura máxima ~4 líneas; scroll nativo sin fade. */
+const CHARACTER_SUMMARY_MAX_HEIGHT_PX = 104;
+
+/**
+ * @param {HTMLTextAreaElement} el
+ */
+function autoGrowCharacterSummary(el) {
+  el.style.overflowY = "hidden";
+  el.style.height = "0";
+  const sh = el.scrollHeight;
+  if (sh <= CHARACTER_SUMMARY_MAX_HEIGHT_PX) {
+    el.style.height = `${sh}px`;
+    el.style.overflowY = "hidden";
+  } else {
+    el.style.height = `${CHARACTER_SUMMARY_MAX_HEIGHT_PX}px`;
+    el.style.overflowY = "auto";
+  }
+}
 
 /**
  * @param {HTMLElement} card
@@ -239,6 +259,10 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     const p = member.permissions || {};
     const isTutor = Boolean(member.is_tutor_profile);
     const tutorLabel = member.settings?.tutor_label ?? member.tutor_label ?? "";
+    const characterSummary =
+      !isTutor && member.traits?.character_summary
+        ? String(member.traits.character_summary).trim()
+        : "";
     const listItem = {
       id: member.id,
       display_name: member.display_name,
@@ -278,6 +302,35 @@ export function mountCrewDetailPanel(container, { session, childId }) {
             ? "Esta nota solo la ves tú en el listado."
             : "Esta nota solo la ves tú; ayuda a identificar al tripulante en el listado."
         }</p>
+        ${
+          !isTutor
+            ? `<label class="crew-panel__label">Descripción del personaje
+          <textarea
+            class="crew-panel__input crew-panel__input--character-summary"
+            data-profile="character_summary"
+            rows="1"
+            maxlength="600"
+            spellcheck="false"
+            autocorrect="off"
+            autocapitalize="sentences"
+            placeholder="Tipo de personaje, aspecto, personalidad y logros…"
+            aria-label="Descripción del personaje"
+          >${escapeHtml(characterSummary)}</textarea>
+        </label>
+        <p class="crew-panel__helper">Evoluciona con la aventura; puedes corregirla aquí.</p>`
+            : ""
+        }
+        ${
+          isTutor
+            ? ""
+            : `<label class="crew-panel__label">Mundo de juego
+          <div class="crew-panel__segment" data-world-segment hidden>
+            <button type="button" class="crew-panel__chip" data-world="fantasy" aria-pressed="false">Fantasía</button>
+            <button type="button" class="crew-panel__chip" data-world="sci-fi" aria-pressed="false">Ciencia ficción</button>
+          </div>
+          <p class="crew-panel__helper" data-world-hint></p>
+        </label>`
+        }
         ${
           isTutor
             ? ""
@@ -325,7 +378,7 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       <section class="crew-panel__block" data-journey-block>
         <h2 class="crew-panel__block-title">Diario del viaje</h2>
         <p class="crew-panel__helper" data-journey-summary>Cargando resumen…</p>
-        <ol class="crew-panel__timeline" data-journey-timeline aria-label="Cronología del viaje"></ol>
+        <ol class="crew-panel__timeline glass-scroll-fade" data-journey-timeline aria-label="Cronología del viaje"></ol>
         <button type="button" class="crew-panel__btn" data-journey-more hidden>Ver más</button>
         <p class="crew-panel__status" data-journey-status aria-live="polite"></p>
       </section>
@@ -336,6 +389,10 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       }
     `;
 
+    if (!isTutor) {
+      applyCrewMemberWorldTheme(member.world_theme);
+      cleanups.push(() => applyCrewMemberWorldTheme(null));
+    }
     paintBtn(root, "[data-save-profile]", "save", "Guardar perfil");
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
     if (!isTutor) {
@@ -356,6 +413,41 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     let selectedFont = p.font_scale_play || "md";
     /** @type {string} */
     let selectedStatus = member.status === "paused" ? "paused" : "active";
+    /** @type {string | null} */
+    let selectedWorld = member.world_theme ?? null;
+    const worldLocked = Boolean(p.lock_world_theme && member.world_theme);
+    const worldHintEl = root.querySelector("[data-world-hint]");
+    const worldSegment = root.querySelector("[data-world-segment]");
+
+    if (worldHintEl instanceof HTMLElement) {
+      if (!member.world_theme) {
+        worldHintEl.textContent = "Lo elegirá en su primera aventura.";
+      } else if (worldLocked) {
+        worldHintEl.textContent =
+          "Mundo elegido en la aventura. Desbloquea «Bloquear cambio de mundo» en permisos para cambiarlo.";
+      } else {
+        worldHintEl.textContent = "Puedes corregir el mundo si aún no ha empezado la aventura.";
+      }
+    }
+
+    if (worldSegment instanceof HTMLElement && member.world_theme) {
+      worldSegment.hidden = false;
+      worldSegment.querySelectorAll("[data-world]").forEach((btn) => {
+        const id = btn.getAttribute("data-world");
+        const pressed = id === selectedWorld;
+        btn.setAttribute("aria-pressed", String(pressed));
+        if (worldLocked) {
+          btn.setAttribute("disabled", "true");
+        }
+        btn.addEventListener("click", () => {
+          if (worldLocked) return;
+          selectedWorld = id;
+          worldSegment.querySelectorAll("[data-world]").forEach((b) => {
+            b.setAttribute("aria-pressed", String(b.getAttribute("data-world") === selectedWorld));
+          });
+        });
+      });
+    }
 
     const ageHost = root.querySelector("[data-age-host]");
     const statusHost = root.querySelector("[data-status-host]");
@@ -407,9 +499,16 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       });
     });
 
+    const characterSummaryEl = root.querySelector('[data-profile="character_summary"]');
+    if (characterSummaryEl instanceof HTMLTextAreaElement) {
+      autoGrowCharacterSummary(characterSummaryEl);
+      characterSummaryEl.addEventListener("input", () => autoGrowCharacterSummary(characterSummaryEl));
+    }
+
     root.querySelector("[data-save-profile]")?.addEventListener("click", async () => {
       const nameInput = root.querySelector('[data-profile="display_name"]');
       const descInput = root.querySelector('[data-profile="tutor_label"]');
+      const summaryInput = root.querySelector('[data-profile="character_summary"]');
       /** @type {Record<string, unknown>} */
       const patch = {
         age_years: ageStepper?.getValue() ?? null,
@@ -422,6 +521,12 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       }
       if (descInput instanceof HTMLInputElement) {
         patch.tutor_label = descInput.value.trim() || null;
+      }
+      if (!isTutor && summaryInput instanceof HTMLTextAreaElement) {
+        patch.character_summary = summaryInput.value.trim() || null;
+      }
+      if (!isTutor && selectedWorld && !worldLocked) {
+        patch.world_theme = selectedWorld;
       }
       const status = root.querySelector("[data-profile-status]");
       const res = await patchCrewMember(session, childId, patch);
@@ -484,19 +589,40 @@ export function mountCrewDetailPanel(container, { session, childId }) {
 async function loadJourneyTimeline(root, session, childId) {
   const summaryEl = root.querySelector("[data-journey-summary]");
   const listEl = root.querySelector("[data-journey-timeline]");
-  const moreBtn = root.querySelector("[data-journey-more]");
   const statusEl = root.querySelector("[data-journey-status]");
   if (!(listEl instanceof HTMLOListElement)) return;
 
   /** @type {string | null} */
   let cursor = null;
+  let loading = false;
+  /** @type {string} */
+  let mentorLabel = "Mentor";
+  /** @type {string} */
+  let explorerLabel = "Explorador";
+
+  /**
+   * @param {string} kind
+   */
+  function eventKindLabel(kind) {
+    if (kind === "mentor_utterance") return mentorLabel;
+    if (kind === "explorer_reply") return explorerLabel;
+    if (kind === "decision") return "Decisión";
+    if (kind === "challenge") return "Reto";
+    if (kind === "quest") return "Misión";
+    return "Sistema";
+  }
 
   /**
    * @param {boolean} append
    */
   async function fetchPage(append) {
-    if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+    if (loading) return;
+    loading = true;
+    if (statusEl instanceof HTMLElement) {
+      statusEl.textContent = append ? "Cargando más…" : "";
+    }
     const res = await fetchJourneyTimeline(session, childId, { cursor: cursor ?? undefined, limit: 12 });
+    loading = false;
     if (!res.ok || !res.data) {
       if (summaryEl instanceof HTMLElement) {
         summaryEl.textContent = "Aún no hay diario del viaje, o no se ha podido cargar.";
@@ -505,6 +631,12 @@ async function loadJourneyTimeline(root, session, childId) {
       return;
     }
     const data = res.data;
+    if (typeof data.mentor_label === "string" && data.mentor_label.trim()) {
+      mentorLabel = data.mentor_label.trim();
+    }
+    if (typeof data.explorer_label === "string" && data.explorer_label.trim()) {
+      explorerLabel = data.explorer_label.trim();
+    }
     if (!append && summaryEl instanceof HTMLElement) {
       summaryEl.textContent = data.summary
         ? String(data.summary)
@@ -515,10 +647,10 @@ async function loadJourneyTimeline(root, session, childId) {
     for (const ev of events) {
       const li = document.createElement("li");
       li.className = "crew-panel__timeline-item";
-      const kind = escapeHtml(String(ev.kind || "system"));
+      const kind = String(ev.kind || "system");
       const summary = escapeHtml(String(ev.summary || ""));
       const at = escapeHtml(String(ev.at || "").replace("T", " ").slice(0, 16));
-      li.innerHTML = `<span class="crew-panel__timeline-kind">${kind}</span>
+      li.innerHTML = `<span class="crew-panel__timeline-kind">${escapeHtml(eventKindLabel(kind))}</span>
         <span class="crew-panel__timeline-text">${summary}</span>
         <time class="crew-panel__timeline-at" datetime="${escapeAttr(String(ev.at || ""))}">${at}</time>`;
       listEl.appendChild(li);
@@ -527,15 +659,23 @@ async function loadJourneyTimeline(root, session, childId) {
       summaryEl.textContent = "Este tripulante aún no tiene hitos de viaje.";
     }
     cursor = data.next_cursor ?? null;
+    const moreBtn = root.querySelector("[data-journey-more]");
     if (moreBtn instanceof HTMLButtonElement) {
       moreBtn.hidden = !cursor;
       paintBtn(root, "[data-journey-more]", "chevron", "Ver más");
     }
+    if (statusEl instanceof HTMLElement) statusEl.textContent = "";
   }
 
-  moreBtn?.addEventListener("click", () => {
-    void fetchPage(true);
+  root.addEventListener("click", (ev) => {
+    const target = ev.target;
+    if (!(target instanceof Element)) return;
+    if (target.closest("[data-journey-more]")) {
+      ev.preventDefault();
+      void fetchPage(true);
+    }
   });
+
   await fetchPage(false);
 }
 

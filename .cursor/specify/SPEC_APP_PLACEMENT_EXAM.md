@@ -1,7 +1,7 @@
 # Spec: Examen de conocimientos (placement) y niveles
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — **ampliación IA** propuesta (julio 2026, ver §8); fórmulas y banco refinables en Plan; **sin implementación** hasta motor play  
-> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §3, §6
+> Estado: **aprobada como contrato de producto** (julio 2026) — catálogo ampliado y placement adaptativo: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) + [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) (**aprobadas** 31 jul 2026, implementación bloqueada hasta OK); §8 ampliación IA; fórmulas refinables en Plan  
+> Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §3, §6
 
 ## Contexto
 
@@ -30,7 +30,7 @@ Al niño **no** se le muestra puntuación numérica; solo feedback narrativo. El
 | Principio | Decisión |
 | --- | --- |
 | Narrativo, no “examen escolar” | Envoltorio de historia |
-| Micro | 3–5 retos cortos (o 1–2 por materia activa), sesión acotada |
+| Micro por materia | **1 reto por materia activa** del tripulante (catálogo hasta 14); reanudable si el examen es largo — ver [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §4 |
 | Multi-modal | Opciones, texto, (futuro: otros tipos) |
 | Por materia + general | Ambos persistidos |
 | Edad cronológica ≠ techo | `effective_age_band` puede superar la banda por edad declarada |
@@ -38,17 +38,23 @@ Al niño **no** se le muestra puntuación numérica; solo feedback narrativo. El
 
 ---
 
-## 1. Materias (catálogo MVP)
+## 1. Materias (catálogo)
 
-| `subject_id` | Label tutor | Peso default \(w\) |
+> **Fuente de verdad ampliada (jul 2026):** [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) — **14 materias**, pesos, familias UI, materias base por `age_band`, activación por tripulante en ficha `#/crew/:id`.
+
+Resumen heredado MVP (5 originales, aún válidas como subconjunto):
+
+| `subject_id` | Label tutor | Peso default \(w\) * |
 | --- | --- | --- |
-| `math` | Matemáticas | 0.30 |
-| `language` | Lenguaje | 0.30 |
-| `logic` | Lógica | 0.20 |
-| `science` | Ciencias | 0.10 |
-| `culture` | Cultura general | 0.10 |
+| `math` | Matemáticas | 0.14 |
+| `language` | Lengua y gramática | 0.14 |
+| `logic` | Lógica | 0.09 |
+| `science` | Ciencias | 0.09 |
+| `culture` | Cultura general | 0.08 |
 
-Pesos normalizados \(\sum w = 1\). Si Ajustes desactiva materias (`learning.active_subjects`), se **renormalizan** los pesos de las activas.
+\* Pesos del catálogo completo en [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §1. Nuevas: `reading`, `geography`, `mythology`, `ethics`, `arts`, `communication`, `sports`, `politics`, `finance`.
+
+Pesos normalizados \(\sum w = 1\) sobre las materias **activas** del tripulante (`children.settings.learning.active_subjects`). El tutor puede activar materias extra sin límite de edad; la **dificultad** del reto sigue `age_band`, no el id de materia.
 
 Niveles discretos por materia (alineado a docs): `L1` … `L5` (equivalente M1–M5).
 

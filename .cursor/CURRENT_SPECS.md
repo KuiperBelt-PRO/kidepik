@@ -38,7 +38,10 @@
   - Placement: [SPEC_APP_PLACEMENT_EXAM](specify/SPEC_APP_PLACEMENT_EXAM.md) — banco + rewrite opcional
   - Adventure: [SPEC_APP_ADVENTURE_SESSION](specify/SPEC_APP_ADVENTURE_SESSION.md) — vertical slice zona/reto
   - Timeline tutor: `GET …/journey/timeline` + «Diario del viaje» en ficha crew
-- **Diálogo de aventura (IA):** [specify/SPEC_APP_ADVENTURE_DIALOGUE.md](specify/SPEC_APP_ADVENTURE_DIALOGUE.md) — **contrato** jul 2026; enlazado a orquestación/gateway
+- **Diálogo de aventura (IA):** [specify/SPEC_APP_ADVENTURE_DIALOGUE.md](specify/SPEC_APP_ADVENTURE_DIALOGUE.md) — **implementada** jul 2026; toast, burbujas con icono, compose chat, tema por mundo
+- **Catálogo de materias (14 áreas):** [specify/SPEC_APP_SUBJECT_CATALOG.md](specify/SPEC_APP_SUBJECT_CATALOG.md) — **aprobada** 31 jul 2026; `reading` separada de `language`; base por banda; activación por tripulante en ficha; **sin implementar** hasta OK
+- **Placement adaptativo + prosa mentor:** [specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) — **aprobada** 31 jul 2026; 1 reto/materia activa; dificultad/prosa por `age_band`; agente generador con validación PHP; **sin implementar** hasta OK
+- **Notificaciones glass:** [specify/SPEC_APP_GLASS_TOAST.md](specify/SPEC_APP_GLASS_TOAST.md) — **implementada** jul 2026; errores/warnings/success/info reutilizables
 - **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** + delta `choose_character`
 - **Rangos de progresión (sci-fi / fantasía):** [specify/SPEC_APP_PROGRESSION_RANKS.md](specify/SPEC_APP_PROGRESSION_RANKS.md) — **marco** jul 2026; catálogo provisional 5 tiers
 - **Migraciones PHP + documentos legales:** [specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md) — **aprobada** jul 2026; auto-apply en bootstrap, historial compartido con Supabase, Términos/Privacidad versionados

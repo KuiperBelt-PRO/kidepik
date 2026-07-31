@@ -47,9 +47,21 @@ Definir el **contrato de UI, estado, API y seguridad** del diálogo de aventura,
 │  │ [ A ]  [ B ]               │ │
 │  │ [ C ]  …                   │ │
 │  └────────────────────────────┘ │
-│  [ Escribe tu respuesta…   ➤ ]  │  ← si el turno admite texto
+│  [ Escribe tu respuesta…   ➤ ]  │  ← multilínea; botón enviar integrado a la derecha
 └─────────────────────────────────┘
 ```
+
+El bloque de respuesta (opciones + campo de texto) se ancla al **pie del marco glass** (`section-frame__footer`), no al scroll del historial. El historial hace scroll en la zona superior; el compose permanece visible.
+
+### 1.0 Control de respuesta (chat)
+
+| Aspecto | Decisión |
+| --- | --- |
+| Posición | Pie fijo del marco glass |
+| Campo | `textarea` multilínea (auto-grow hasta ~5 líneas) |
+| Enviar | Botón circular integrado dentro del campo, a la derecha |
+| Enter | Envía; Shift+Enter inserta salto de línea |
+| Opciones con `description` | Cartas de elección de mundo (título + texto breve) en grid 2 columnas |
 
 \* Salir: respeta `require_exit_pin` de Tripulación.
 
@@ -220,10 +232,21 @@ Orquestación detallada (roles, PlayerState, envelopes JSON): [SPEC_AI_PLAY_ORCH
 
 1. Un turno `options_or_text` muestra chips e input.
 2. Elegir opción o texto produce siguiente burbuja agente.
-3. Effect `set_world_theme` cambia tipografía/iconos al vuelo.
+3. Effect `set_world_theme` cambia tipografía/iconos al vuelo (`data-play-theme` en `.section-frame`).
 4. Reanudar sesión recupera historial sin regenerar desde cero.
 5. 429 muestra copy amable; no crashea UI.
 6. Tests: schema effects, ownership, validación reply vs input_mode.
+
+### 6.1 UI play (implementada jul 2026)
+
+| Elemento | Contrato |
+| --- | --- |
+| Burbujas mentor | Icono glass (`theme-to-fantasy` / `theme-to-scifi` / `account` neutro) + nombre del mentor |
+| Burbujas explorador | Icono `crew` desde paso `choose_character` (tras elegir personaje) |
+| Compose inferior | Textarea multilínea integrada en pie del marco; `spellcheck="false"`; crece hasta ~3 líneas y scroll interno |
+| Errores API | Toast glass reutilizable — [SPEC_APP_GLASS_TOAST.md](SPEC_APP_GLASS_TOAST.md) |
+| Mundo bloqueado | No cambio fantasía↔sci-fi en aventura; tripulación solo lectura si `lock_world_theme` |
+
 
 ## Aprobación
 

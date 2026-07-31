@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Kidepik\Api\Services;
 
+use Kidepik\Shared\Ai\MentorCatalog;
 use PDO;
 
 /**
@@ -25,6 +26,7 @@ final class JourneyTimelineService
     public function page(string $childId, ?string $cursor = null, int $limit = 30): array
     {
         $limit = max(1, min(100, $limit));
+        $labels = $this->labelsForChild($childId);
         $events = $this->collectEvents($childId);
         usort($events, static fn (array $a, array $b): int => strcmp($b['at'], $a['at']));
 
@@ -44,7 +46,38 @@ final class JourneyTimelineService
             'events' => $slice,
             'next_cursor' => $nextCursor,
             'summary' => (new JourneyMemoryService($this->pdo))->latestSummaryText($childId),
+            'explorer_label' => $labels['explorer'],
+            'mentor_label' => $labels['mentor'],
         ];
+    }
+
+    /**
+     * @return array{explorer:string,mentor:string}
+     */
+    private function labelsForChild(string $childId): array
+    {
+        $explorer = 'Explorador';
+        $mentor = 'Mentor';
+        try {
+            $stmt = $this->pdo->prepare(
+                'select display_name, world_theme, mentor_id from children where id = :id limit 1'
+            );
+            $stmt->execute(['id' => $childId]);
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if (is_array($row)) {
+                if (is_string($row['display_name'] ?? null) && trim($row['display_name']) !== '') {
+                    $explorer = trim($row['display_name']);
+                }
+                $mentorId = is_string($row['mentor_id'] ?? null) && $row['mentor_id'] !== ''
+                    ? (string) $row['mentor_id']
+                    : MentorCatalog::idForWorldTheme($row['world_theme'] ?? null);
+                $mentor = (string) (MentorCatalog::profile($mentorId)['display_name'] ?? $mentor);
+            }
+        } catch (\Throwable) {
+            /* tabla children opcional en tests sqlite */
+        }
+
+        return ['explorer' => $explorer, 'mentor' => $mentor];
     }
 
     /**
@@ -63,7 +96,6 @@ final class JourneyTimelineService
         foreach ($turns->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $role = (string) $row['role'];
             $kind = in_array($role, ['mentor', 'agent'], true) ? 'mentor_utterance' : 'explorer_reply';
-            $prefix = $kind === 'mentor_utterance' ? 'Mentor: ' : 'Explorador: ';
             $out[] = [
                 'id' => 'turn:' . $row['id'],
                 'member_id' => $childId,
@@ -71,7 +103,7 @@ final class JourneyTimelineService
                 'kind' => $kind,
                 'ref_table' => 'dialogue_turns',
                 'ref_id' => (string) $row['id'],
-                'summary' => $prefix . $this->oneLine((string) $row['text']),
+                'summary' => $this->oneLine((string) $row['text']),
             ];
         }
 

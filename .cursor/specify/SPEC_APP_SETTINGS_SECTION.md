@@ -258,14 +258,14 @@ Defaults pedagógicos del hogar. Overrides por niño en Tripulación cuando exis
 | Campo | Tipo | Valores | Default |
 | --- | --- | --- | --- |
 | `learning.adaptation_policy` | enum | `"balanced"` \| `"easier"` \| `"harder"` | `"balanced"` |
-| `learning.active_subjects` | string[] | ids de catálogo (`math`, `language`, `science`, `logic`, …) | todos los del MVP curricular |
+| `learning.active_subjects` | string[] | ids del catálogo ([SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §1; 14 materias) | materias base de `band_child` o todas si no hay edad de referencia |
 | `learning.show_levels_to_child` | bool | | `false` | Alineado con doc: sin puntuación numérica al niño |
 | `learning.pause_adaptation` | bool | | `false` | Congela `difficulty_modifier` por defecto |
 
 **UI:**
 
 - Adaptación: tres presets con helper pedagógico corto.
-- Materias: checklist; al menos **una** debe quedar activa (validación 422).
+- Materias: checklist por **familia** (Fundamentales, Humanidades, Sociedad, Expresión, Vida práctica); al menos **una** activa (422). Lista completa en [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md). Overrides finos por tripulante solo en Tripulación §5.1.
 - Toggles de visibilidad / pausa con helpers.
 
 Hasta existir motor de sesiones: **persistir** y exponer en API; sin efecto en juego aún.

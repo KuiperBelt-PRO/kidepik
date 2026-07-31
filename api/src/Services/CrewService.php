@@ -8,6 +8,7 @@ use InvalidArgumentException;
 use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Config;
 use Kidepik\Shared\Database\PdoFactory;
+use Kidepik\Shared\Text\CharacterSummaryBuilder;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -247,7 +248,13 @@ class CrewService
             throw new RuntimeException('Crew member not found');
         }
 
-        return $this->mapDetail($row);
+        $detail = $this->mapDetail($row);
+        $traits = $this->fetchTraits($pdo, $childId);
+        if ($traits !== null) {
+            $detail['traits'] = $traits;
+        }
+
+        return $detail;
     }
 
     /**
@@ -314,15 +321,35 @@ class CrewService
             $params['settings'] = json_encode($settings, JSON_THROW_ON_ERROR);
         }
 
-        if ($fields === []) {
+        $traitsUpdated = false;
+        if (array_key_exists('character_summary', $payload)) {
+            if (!empty($detail['is_tutor_profile'])) {
+                throw new InvalidArgumentException('Cannot set character_summary on tutor profile');
+            }
+            $this->upsertCharacterSummary(
+                $pdo,
+                $childId,
+                $this->normalizeCharacterSummary($payload['character_summary']),
+            );
+            $traitsUpdated = true;
+        }
+
+        if ($fields === [] && !$traitsUpdated) {
             throw new InvalidArgumentException('No updatable fields');
         }
 
-        $fields[] = 'updated_at = now()';
-        $sql = 'update public.children set ' . implode(', ', $fields)
-            . ' where id = :id and status <> \'deleted\'';
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute($params);
+        if ($fields !== []) {
+            $fields[] = 'updated_at = now()';
+            $sql = 'update public.children set ' . implode(', ', $fields)
+                . ' where id = :id and status <> \'deleted\'';
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+        } elseif ($traitsUpdated) {
+            $stmt = $pdo->prepare(
+                "update public.children set updated_at = now() where id = :id and status <> 'deleted'",
+            );
+            $stmt->execute(['id' => $childId]);
+        }
 
         return $this->getForAuthUser($authUserId, $childId);
     }
@@ -505,10 +532,129 @@ class CrewService
                 'font_scale_play' => (string) ($row['font_scale_play'] ?? 'md'),
                 'learning_overrides' => $learning,
             ],
-            'traits' => [],
+            'traits' => null,
             'created_at' => isset($row['created_at']) ? (string) $row['created_at'] : null,
             'updated_at' => isset($row['updated_at']) ? (string) $row['updated_at'] : null,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fetchTraits(PDO $pdo, string $childId): ?array
+    {
+        $stmt = $pdo->prepare(
+            'select species, palette, features, vibe, achievements, character_summary, updated_at
+             from public.child_traits
+             where child_id = :id
+             limit 1',
+        );
+        $stmt->execute(['id' => $childId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!is_array($row)) {
+            return null;
+        }
+
+        $featuresRaw = $this->decodeJson($row['features'] ?? null);
+        $achievementsRaw = $this->decodeJson($row['achievements'] ?? null);
+        /** @var list<string> $featuresList */
+        $featuresList = is_array($featuresRaw)
+            ? array_values(array_filter($featuresRaw, static fn ($v) => is_string($v) && trim($v) !== ''))
+            : [];
+        /** @var list<string> $achievements */
+        $achievements = is_array($achievementsRaw)
+            ? array_values(array_filter($achievementsRaw, static fn ($v) => is_string($v) && trim($v) !== ''))
+            : [];
+
+        $species = (string) ($row['species'] ?? '');
+        $palette = (string) ($row['palette'] ?? '');
+        $vibe = $this->nullableString($row['vibe'] ?? null);
+        $summary = $this->nullableString($row['character_summary'] ?? null);
+        if ($summary === null && $species !== '') {
+            $summary = CharacterSummaryBuilder::build($species, $palette, $featuresList, $vibe, null);
+        }
+
+        return [
+            'species' => $species,
+            'palette' => $palette,
+            'features' => $featuresList,
+            'vibe' => $vibe,
+            'achievements' => $achievements,
+            'character_summary' => $summary,
+            'updated_at' => isset($row['updated_at']) ? (string) $row['updated_at'] : null,
+        ];
+    }
+
+    private function normalizeCharacterSummary(mixed $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        if (!is_string($value)) {
+            throw new InvalidArgumentException('character_summary invalid');
+        }
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return null;
+        }
+        $stripped = trim(strip_tags($trimmed));
+        if ($stripped === '') {
+            return null;
+        }
+        if (mb_strlen($stripped) > 600) {
+            throw new InvalidArgumentException('character_summary too long');
+        }
+
+        return $stripped;
+    }
+
+    private function upsertCharacterSummary(PDO $pdo, string $childId, ?string $summary): void
+    {
+        $check = $pdo->prepare(
+            'select species, palette from public.child_traits where child_id = :id',
+        );
+        $check->execute(['id' => $childId]);
+        $row = $check->fetch(PDO::FETCH_ASSOC);
+
+        if (is_array($row)) {
+            $stmt = $pdo->prepare(
+                'update public.child_traits
+                 set character_summary = :summary, updated_at = now()
+                 where child_id = :id',
+            );
+            $stmt->execute(['id' => $childId, 'summary' => $summary]);
+
+            if ($summary === null && $this->isPlaceholderTraitsRow(
+                (string) ($row['species'] ?? ''),
+                (string) ($row['palette'] ?? ''),
+            )) {
+                $delete = $pdo->prepare('delete from public.child_traits where child_id = :id');
+                $delete->execute(['id' => $childId]);
+            }
+
+            return;
+        }
+
+        if ($summary === null) {
+            return;
+        }
+
+        $stmt = $pdo->prepare(
+            'insert into public.child_traits
+             (child_id, species, palette, features, vibe, achievements, character_summary, updated_at)
+             values (:id, :species, :palette, \'[]\'::jsonb, null, \'[]\'::jsonb, :summary, now())',
+        );
+        $stmt->execute([
+            'id' => $childId,
+            'species' => 'Por definir',
+            'palette' => 'Por definir',
+            'summary' => $summary,
+        ]);
+    }
+
+    private function isPlaceholderTraitsRow(string $species, string $palette): bool
+    {
+        return trim($species) === 'Por definir' && trim($palette) === 'Por definir';
     }
 
     private function normalizeTutorLabel(mixed $value): ?string

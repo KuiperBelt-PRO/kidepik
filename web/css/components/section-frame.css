@@ -186,6 +186,10 @@ html[data-shell-theme="sci-fi"] .section-frame__logo-fallback {
     calc(var(--section-frame-fade-ramp) * 0.85 + env(safe-area-inset-bottom, 0px));
 }
 
+.section-frame__footer {
+  flex: 0 0 auto;
+}
+
 .section-host {
   position: absolute;
   inset: 0;

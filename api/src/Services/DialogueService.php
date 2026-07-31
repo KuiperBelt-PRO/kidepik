@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Kidepik\Api\Services;
 
 use InvalidArgumentException;
+use Kidepik\Shared\Text\CharacterSummaryBuilder;
+use Kidepik\Shared\Text\DisplayNameExtractor;
+use Kidepik\Shared\Text\SpeciesExtractor;
 use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Ai\AiGateway;
 use Kidepik\Shared\Ai\MentorCatalog;
@@ -90,6 +93,7 @@ final class DialogueService
             'flow_id' => (string) $session['flow_id'],
             'onboarding_step' => (string) ($child['onboarding_step'] ?? 'pending_entry'),
             'world_theme' => $child['world_theme'] ?? null,
+            'display_name' => $child['display_name'] ?? null,
             'mentor' => MentorCatalog::profile(
                 (string) ($session['mentor_id'] ?? MentorCatalog::idForWorldTheme($child['world_theme'] ?? null))
             ),
@@ -125,9 +129,16 @@ final class DialogueService
             throw new InvalidArgumentException('reply invalid');
         }
 
+        $lastMentorForLabel = $this->lastMentorTurn($pdo, $sessionId);
         $explorerText = $replyKind === 'option'
-            ? (string) ($reply['option_id'] ?? '')
+            ? $this->resolveOptionLabel(
+                (string) ($reply['option_id'] ?? ''),
+                is_array($lastMentorForLabel['options'] ?? null) ? $lastMentorForLabel['options'] : [],
+            )
             : trim((string) ($reply['text'] ?? ''));
+        if ($replyKind === 'option' && $explorerText === '') {
+            $explorerText = (string) ($reply['option_id'] ?? '');
+        }
         if ($replyKind !== 'continue' && $explorerText === '') {
             throw new InvalidArgumentException('reply empty');
         }
@@ -261,6 +272,7 @@ final class DialogueService
             'flow_complete' => ($fresh['onboarding_step'] ?? '') === 'complete'
                 && ($fresh['placement_status'] ?? '') === 'completed',
             'onboarding_step' => $fresh['onboarding_step'] ?? $step,
+            'display_name' => $fresh['display_name'] ?? null,
             'mentor' => MentorCatalog::profile(
                 MentorCatalog::idForWorldTheme($fresh['world_theme'] ?? null)
             ),
@@ -303,6 +315,9 @@ final class DialogueService
                     'world_theme' => $option,
                     'unlock_world' => true,
                 ]);
+                $crew->updatePermissionsForAuthUser($authUserId, $childId, [
+                    'lock_world_theme' => true,
+                ]);
                 $pdo->prepare('update children set mentor_id = :m, onboarding_step = :step, updated_at = now() where id = :id')
                     ->execute(['m' => $mentorId, 'step' => 'choose_name', 'id' => $childId]);
                 $pdo->prepare('update dialogue_sessions set mentor_id = :m, updated_at = now() where id = :id')
@@ -343,10 +358,7 @@ final class DialogueService
                 'role' => 'mentor',
                 'text' => 'Elige cómo será tu mundo.',
                 'input_mode' => 'options_only',
-                'options' => [
-                    ['id' => 'sci-fi', 'label' => 'Ciencia ficción'],
-                    ['id' => 'fantasy', 'label' => 'Fantasía'],
-                ],
+                'options' => $this->worldThemeOptions(),
                 'explorer_reply' => null,
                 'meta' => ['phase' => 'choose_world'],
                 'model_used' => null,
@@ -356,10 +368,43 @@ final class DialogueService
         }
 
         if ($step === 'choose_name') {
-            $name = trim((string) ($reply['text'] ?? $reply['option_id'] ?? ''));
-            if ($name === '' || mb_strlen($name) > 24) {
-                throw new InvalidArgumentException('display_name invalid');
+            $raw = trim((string) ($reply['text'] ?? $reply['option_id'] ?? ''));
+            $name = null;
+            $optionId = (string) ($reply['option_id'] ?? '');
+            if ($optionId !== '' && $optionId !== 'custom') {
+                foreach ($this->nameSuggestionOptions($child) as $opt) {
+                    if ($opt['id'] === $optionId) {
+                        $name = $opt['label'];
+                        break;
+                    }
+                }
             }
+            if ($name === null) {
+                $name = DisplayNameExtractor::pickBest($raw);
+            }
+            if ($name === null && DisplayNameExtractor::isValidName($raw)) {
+                $name = trim($raw);
+            }
+
+            if ($name === null) {
+                $suggestions = $this->nameSuggestionOptions($child);
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => $flowId,
+                    'sequence' => $nextSeq,
+                    'role' => 'mentor',
+                    'text' => 'No he encontrado un nombre claro en tu mensaje. Elige uno de estos o escribe solo tu nombre (sin la historia completa).',
+                    'input_mode' => 'options_or_text',
+                    'options' => $suggestions,
+                    'explorer_reply' => null,
+                    'meta' => ['phase' => 'choose_name', 'clarification' => true],
+                    'model_used' => null,
+                ]);
+
+                return [$effects, $agentTurns, $step];
+            }
+
             $crew->updateProfileForAuthUser($authUserId, $childId, ['display_name' => $name]);
             $this->setOnboarding($pdo, $childId, 'choose_age');
             $effects[] = ['type' => 'set_display_name', 'value' => $name];
@@ -461,25 +506,68 @@ final class DialogueService
         string $mentorId,
     ): array {
         $effects = [];
-        $species = trim((string) ($reply['text'] ?? ''));
-        if ($species === '') {
+        $raw = trim((string) ($reply['text'] ?? ''));
+        $species = null;
+        if ($raw !== '') {
+            $species = SpeciesExtractor::pickBest($raw);
+            if ($species === null && SpeciesExtractor::isValidSpecies($raw)) {
+                $species = trim($raw);
+            }
+        }
+        if ($species === null) {
             $opt = (string) ($reply['option_id'] ?? '');
             $species = match ($opt) {
                 'spot' => 'explorador spot',
                 'orbit' => 'criatura orbital',
                 'spark' => 'chispa de niebla',
                 'drake' => 'dragón pequeño',
-                default => $opt !== 'custom' ? $opt : '',
+                default => $opt !== 'custom' ? $opt : null,
             };
         }
-        if ($species === '' || mb_strlen($species) > 40) {
-            throw new InvalidArgumentException('species invalid');
+
+        if ($species === null || !SpeciesExtractor::isValidSpecies($species)) {
+            $child = $this->crew()->getForAuthUser($authUserId, $childId);
+            $theme = (string) ($child['world_theme'] ?? 'fantasy');
+            $suggestions = $theme === 'sci-fi'
+                ? [
+                    ['id' => 'spot', 'label' => 'Explorador spot'],
+                    ['id' => 'orbit', 'label' => 'Criatura orbital'],
+                    ['id' => 'custom', 'label' => 'Escribir la mía'],
+                ]
+                : [
+                    ['id' => 'spark', 'label' => 'Chispa de niebla'],
+                    ['id' => 'drake', 'label' => 'Dragón pequeño'],
+                    ['id' => 'custom', 'label' => 'Escribir la mía'],
+                ];
+
+            $agentTurns = [$this->insertTurn($pdo, [
+                'session_id' => $sessionId,
+                'child_id' => $childId,
+                'flow_id' => $flowId,
+                'sequence' => $nextSeq,
+                'role' => 'mentor',
+                'text' => 'No he entendido bien tu forma. Elige una opción o escribe en pocas palabras qué criatura eres (máx. 40 caracteres).',
+                'input_mode' => 'options_or_text',
+                'options' => $suggestions,
+                'explorer_reply' => null,
+                'meta' => ['phase' => 'choose_character_species', 'clarification' => true],
+                'model_used' => null,
+            ])];
+
+            return [$effects, $agentTurns, 'choose_character'];
         }
 
         // MVP: completar traits en un paso (species + defaults de paleta/rasgos)
         $palette = str_contains(mb_strtolower($species), 'neón') ? 'verde neón' : 'violeta y plata';
         $features = ['ojos curiosos', 'silueta no humana'];
-        $this->upsertTraits($pdo, $childId, $species, $palette, $features, null);
+        $characterSummary = CharacterSummaryBuilder::build(
+            $species,
+            $palette,
+            $features,
+            null,
+            $raw !== '' ? $raw : null,
+        );
+        $this->upsertTraits($pdo, $childId, $species, $palette, $features, null, $characterSummary);
         $this->setOnboarding($pdo, $childId, 'placement');
 
         $effects[] = [
@@ -538,15 +626,17 @@ final class DialogueService
         string $palette,
         array $features,
         ?string $vibe,
+        ?string $characterSummary = null,
     ): void {
         $stmt = $pdo->prepare(
-            'insert into child_traits (child_id, species, palette, features, vibe, achievements, updated_at)
-             values (:id, :species, :palette, :features::jsonb, :vibe, \'[]\'::jsonb, now())
+            'insert into child_traits (child_id, species, palette, features, vibe, achievements, character_summary, updated_at)
+             values (:id, :species, :palette, :features::jsonb, :vibe, \'[]\'::jsonb, :character_summary, now())
              on conflict (child_id) do update set
                species = excluded.species,
                palette = excluded.palette,
                features = excluded.features,
                vibe = excluded.vibe,
+               character_summary = coalesce(excluded.character_summary, child_traits.character_summary),
                updated_at = now()'
         );
         $stmt->execute([
@@ -555,6 +645,7 @@ final class DialogueService
             'palette' => $palette,
             'features' => json_encode(array_values($features), JSON_UNESCAPED_UNICODE),
             'vibe' => $vibe,
+            'character_summary' => $characterSummary,
         ]);
     }
 
@@ -641,10 +732,7 @@ final class DialogueService
             'role' => 'mentor',
             'text' => 'Bienvenido al umbral del viaje. Primero elige el mundo que habitarás.',
             'input_mode' => 'options_only',
-            'options' => [
-                ['id' => 'sci-fi', 'label' => 'Ciencia ficción'],
-                ['id' => 'fantasy', 'label' => 'Fantasía'],
-            ],
+            'options' => $this->worldThemeOptions(),
             'explorer_reply' => null,
             'meta' => ['phase' => 'choose_world', 'mentor_id' => $mentorId],
             'model_used' => null,
@@ -652,6 +740,64 @@ final class DialogueService
         if ($step === 'pending_entry') {
             $this->setOnboarding($pdo, $childId, 'choose_world');
         }
+    }
+
+    /** @return list<array{id:string,label:string}> */
+    private function nameSuggestionOptions(array $child): array
+    {
+        $theme = (string) ($child['world_theme'] ?? 'fantasy');
+        $pool = $theme === 'sci-fi'
+            ? ['Nova', 'Orion', 'Lyra', 'Pulsar', 'Cometa']
+            : ['Luna', 'Bruno', 'Nerea', 'Leo', 'Alba'];
+
+        $options = [];
+        foreach ($pool as $label) {
+            $options[] = ['id' => mb_strtolower($label, 'UTF-8'), 'label' => $label];
+        }
+        $options[] = ['id' => 'custom', 'label' => 'Escribir otro nombre'];
+
+        return $options;
+    }
+
+    /**
+     * @param list<array{id:string,label:string}> $options
+     */
+    private function resolveOptionLabel(string $optionId, array $options): string
+    {
+        if ($optionId === '') {
+            return '';
+        }
+
+        foreach ($options as $opt) {
+            if (($opt['id'] ?? '') === $optionId) {
+                return (string) ($opt['label'] ?? $optionId);
+            }
+        }
+
+        foreach ($this->worldThemeOptions() as $opt) {
+            if (($opt['id'] ?? '') === $optionId) {
+                return (string) ($opt['label'] ?? $optionId);
+            }
+        }
+
+        return $optionId;
+    }
+
+    /** @return list<array{id:string,label:string,description:string}> */
+    private function worldThemeOptions(): array
+    {
+        return [
+            [
+                'id' => 'sci-fi',
+                'label' => 'Ciencia ficción',
+                'description' => 'Naves, planetas y galaxias: serás cadete explorador en una misión por las estrellas.',
+            ],
+            [
+                'id' => 'fantasy',
+                'label' => 'Fantasía',
+                'description' => 'Magia, reinos y artefactos: tu camino pasa por bosques, montañas y castillos.',
+            ],
+        ];
     }
 
     /** @return list<array{id:string,label:string}> */

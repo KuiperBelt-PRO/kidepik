@@ -90,6 +90,40 @@ final class CrewServiceValidationIntegrationTest extends TestCase
         self::assertNull($updated['settings']['tutor_label'] ?? null);
     }
 
+    public function testProfileCharacterSummaryUpsertAndClear(): void
+    {
+        $ctx = $this->seedParent();
+        $crew = new CrewService($this->pdo, $ctx['parents']);
+        $authUserId = $ctx['auth_user_id'];
+        $childId = $this->createMember($crew, $authUserId);
+
+        $summary = "Explorador spot de tono verde neón.\nRasgos: ojos redondos.";
+        $updated = $crew->updateProfileForAuthUser($authUserId, $childId, [
+            'character_summary' => $summary,
+        ]);
+
+        self::assertIsArray($updated['traits']);
+        self::assertSame($summary, $updated['traits']['character_summary'] ?? null);
+
+        $cleared = $crew->updateProfileForAuthUser($authUserId, $childId, [
+            'character_summary' => '   ',
+        ]);
+        self::assertNull($cleared['traits']['character_summary'] ?? null);
+    }
+
+    public function testProfileCharacterSummaryTooLong(): void
+    {
+        $ctx = $this->seedParent();
+        $crew = new CrewService($this->pdo, $ctx['parents']);
+        $authUserId = $ctx['auth_user_id'];
+        $childId = $this->createMember($crew, $authUserId);
+
+        $this->expectException(InvalidArgumentException::class);
+        $crew->updateProfileForAuthUser($authUserId, $childId, [
+            'character_summary' => str_repeat('a', 601),
+        ]);
+    }
+
     private function createMember(CrewService $crew, string $authUserId, array $payload = []): string
     {
         $created = $crew->createForAuthUser($authUserId, $payload);

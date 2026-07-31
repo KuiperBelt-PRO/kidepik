@@ -1,6 +1,6 @@
 # 11 — Pipeline de aventura infantil (contrato)
 
-**Specs:** [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](../specify/SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_AGE_BANDS.md](../specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](../specify/SPEC_APP_MENTOR.md), [SPEC_APP_JOURNEY_MEMORY.md](../specify/SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_PLACEMENT_EXAM.md](../specify/SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](../specify/SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_SESSION.md](../specify/SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_PROGRESSION_RANKS.md](../specify/SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](../specify/SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_OPENROUTER_GATEWAY.md](../specify/SPEC_AI_OPENROUTER_GATEWAY.md), [SPEC_AI_PLAY_ORCHESTRATION.md](../specify/SPEC_AI_PLAY_ORCHESTRATION.md)
+**Specs:** [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](../specify/SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_AGE_BANDS.md](../specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_SUBJECT_CATALOG.md](../specify/SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](../specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_MENTOR.md](../specify/SPEC_APP_MENTOR.md), [SPEC_APP_JOURNEY_MEMORY.md](../specify/SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_PLACEMENT_EXAM.md](../specify/SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](../specify/SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_SESSION.md](../specify/SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_PROGRESSION_RANKS.md](../specify/SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](../specify/SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_OPENROUTER_GATEWAY.md](../specify/SPEC_AI_OPENROUTER_GATEWAY.md), [SPEC_AI_PLAY_ORCHESTRATION.md](../specify/SPEC_AI_PLAY_ORCHESTRATION.md)
 
 > **Estado:** contratos + **propuestas IA** (jul 2026) — **sin UI `#/play` en código**. Plan: [tasks/AI_ADVENTURE_SYSTEM_PLAN.md](../tasks/AI_ADVENTURE_SYSTEM_PLAN.md). Tripulantes: **cualquier edad** (5–99).
 
@@ -14,7 +14,7 @@ flowchart TB
   Name[nombre]
   Age[edad → age_band]
   Char[traits]
-  Exam[placement]
+  Exam["placement\n(active_subjects tutor)"]
   Zone[zona]
   Sess[adventure]
   Mem["Memoria L1 ledger\nL2 condensado\nL3 reciente"]
