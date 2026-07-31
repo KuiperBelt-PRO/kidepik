@@ -18,6 +18,9 @@ Copy-Item .secrets.sample\gcp-oauth.env.sample .secrets\gcp-oauth.env
 | --- | --- |
 | `gcp.env.sample` | `gcp.env` (si aplica) |
 | `gcp-oauth.env.sample` | `gcp-oauth.env` |
+| `openrouter.env.sample` | `openrouter.env` (IA local; clave distinta en prod) |
 | (manual) `gcp-oauth-client.json` | JSON OAuth desde consola GCP — **no** versionar |
+
+Para desarrollo local, las variables de OpenRouter también pueden inyectarse en `.env.poc` (gitignored) leyendo desde `.secrets/openrouter.env`. Ver [SPEC_AI_OPENROUTER_GATEWAY.md](../.cursor/specify/SPEC_AI_OPENROUTER_GATEWAY.md).
 
 **Fuera de alcance:** Oracle OCI, Cloudflare R2 y Cloud Run como hosting de producto. Stack canónico: DreamHost PHP + Supabase + `web/media/`.

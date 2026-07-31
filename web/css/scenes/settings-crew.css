@@ -278,3 +278,46 @@ html[data-font-scale-ui="xl"] {
 .crew-panel__block--danger {
   margin-top: 2rem;
 }
+
+.crew-panel__timeline {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.crew-panel__timeline-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--glass-radius-field, 12px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  color: var(--glass-text, #fff);
+}
+
+.crew-panel__timeline-kind {
+  grid-column: 1 / -1;
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+
+.crew-panel__timeline-text {
+  font-size: calc(0.88rem * var(--font-scale-ui, 1));
+  line-height: 1.35;
+}
+
+.crew-panel__timeline-at {
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+  opacity: 0.65;
+  white-space: nowrap;
+  align-self: end;
+}
+

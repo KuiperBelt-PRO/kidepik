@@ -90,6 +90,80 @@ final class Config
         return (int) self::get('UPLOAD_TOKEN_TTL', '900');
     }
 
+    public static function aiEnabled(): bool
+    {
+        $v = self::get('AI_ENABLED', 'true');
+
+        return filter_var($v, FILTER_VALIDATE_BOOL);
+    }
+
+    public static function aiMock(): bool
+    {
+        return filter_var(self::get('AI_MOCK', 'false'), FILTER_VALIDATE_BOOL);
+    }
+
+    public static function aiAllowPaid(): bool
+    {
+        return filter_var(self::get('AI_ALLOW_PAID', 'false'), FILTER_VALIDATE_BOOL);
+    }
+
+    public static function openRouterApiKey(): string
+    {
+        return self::get('OPENROUTER_API_KEY', '');
+    }
+
+    public static function openRouterBaseUrl(): string
+    {
+        return rtrim(self::get('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'), '/');
+    }
+
+    /** @return list<string> */
+    public static function aiModelPreference(): array
+    {
+        $raw = self::get('AI_MODEL_PREFERENCE', '');
+        if ($raw === '') {
+            $raw = self::get('OPENROUTER_MODELS', '');
+        }
+        if ($raw === '') {
+            $raw = 'google/gemma-3-27b-it:free,meta-llama/llama-3.3-70b-instruct:free,qwen/qwen3-30b-a3b:free';
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $s): bool => $s !== ''));
+    }
+
+    /** @return list<string> */
+    public static function aiModelDenylist(): array
+    {
+        $raw = self::get('AI_MODEL_DENYLIST', '');
+
+        return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $s): bool => $s !== ''));
+    }
+
+    public static function aiMaxModelAttempts(): int
+    {
+        return max(1, (int) self::get('AI_MAX_MODEL_ATTEMPTS', '8'));
+    }
+
+    public static function aiTimeoutSeconds(): int
+    {
+        return max(5, (int) self::get('AI_TIMEOUT_SECONDS', '30'));
+    }
+
+    public static function aiHttpReferer(): string
+    {
+        return self::get('AI_HTTP_REFERER', 'http://localhost:8082');
+    }
+
+    public static function aiAppTitle(): string
+    {
+        return self::get('AI_APP_TITLE', 'KidepiK');
+    }
+
+    public static function aiRateLimitPerChildDay(): int
+    {
+        return max(1, (int) self::get('AI_RATE_LIMIT_PER_CHILD_DAY', '80'));
+    }
+
     private static function get(string $key, string $default = ''): string
     {
         $value = getenv($key);

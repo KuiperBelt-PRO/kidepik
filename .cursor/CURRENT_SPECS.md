@@ -31,11 +31,16 @@
 - **Sección Ajustes (tutor):** [specify/SPEC_APP_SETTINGS_SECTION.md](specify/SPEC_APP_SETTINGS_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (tema, tipografía, defaults, resumen); `parent_accounts.settings` jsonb
 - **Sección Tripulación (perfiles infantiles):** [specify/SPEC_APP_CREW_SECTION.md](specify/SPEC_APP_CREW_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (plaza, lista, ficha, permisos); play/first-run pendiente
 - **Fichas tripulación — cartas TCG:** [specify/SPEC_APP_CREW_MEMBER_CARDS.md](specify/SPEC_APP_CREW_MEMBER_CARDS.md) — **implementada** jul 2026; Fase A visual (lista + hero ficha)
-- **Diálogo de aventura (IA):** [specify/SPEC_APP_ADVENTURE_DIALOGUE.md](specify/SPEC_APP_ADVENTURE_DIALOGUE.md) — **contrato** jul 2026; opciones + texto; tema visual por mundo; turns + effects tipados
-- **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** jul 2026; bienvenida → mundo → nombre → edad → examen
-- **Examen de conocimientos (placement):** [specify/SPEC_APP_PLACEMENT_EXAM.md](specify/SPEC_APP_PLACEMENT_EXAM.md) — **contrato** jul 2026; niveles por materia + general ponderado; `effective_age_band`
-- **Rangos de progresión (sci-fi / fantasía):** [specify/SPEC_APP_PROGRESSION_RANKS.md](specify/SPEC_APP_PROGRESSION_RANKS.md) — **marco** jul 2026; catálogo provisional 5 tiers; ampliación de lore después
-- **Sesión de aventura (post-examen):** [specify/SPEC_APP_ADVENTURE_SESSION.md](specify/SPEC_APP_ADVENTURE_SESSION.md) — **marco** jul 2026; handoff y reservas; detalle narrativo/gameplay aplazado a specs futuras
+- **Sistema IA play (aprobado jul 2026 — Fases A–E parciales):** plan [tasks/AI_ADVENTURE_SYSTEM_PLAN.md](tasks/AI_ADVENTURE_SYSTEM_PLAN.md); backlog [tasks/AI_ADVENTURE_BACKLOG.md](tasks/AI_ADVENTURE_BACKLOG.md)
+  - Gateway OpenRouter **solo free** + discovery/ranking: [specify/SPEC_AI_OPENROUTER_GATEWAY.md](specify/SPEC_AI_OPENROUTER_GATEWAY.md) — **Fase A** (`shared/Ai/`, discovery en `AiGateway`)
+  - Orquestación / mentor / age bands / memoria: [SPEC_AI_PLAY_ORCHESTRATION](specify/SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_MENTOR](specify/SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS](specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_JOURNEY_MEMORY](specify/SPEC_APP_JOURNEY_MEMORY.md) — **parcial** (context pack L2/L3 + summarizer + summary + timeline tutor)
+  - Diálogo API + UI `#/play/:childId`: **section-frame + mundo animado + glass** ([DESIGN.md](DESIGN.md))
+  - Placement: [SPEC_APP_PLACEMENT_EXAM](specify/SPEC_APP_PLACEMENT_EXAM.md) — banco + rewrite opcional
+  - Adventure: [SPEC_APP_ADVENTURE_SESSION](specify/SPEC_APP_ADVENTURE_SESSION.md) — vertical slice zona/reto
+  - Timeline tutor: `GET …/journey/timeline` + «Diario del viaje» en ficha crew
+- **Diálogo de aventura (IA):** [specify/SPEC_APP_ADVENTURE_DIALOGUE.md](specify/SPEC_APP_ADVENTURE_DIALOGUE.md) — **contrato** jul 2026; enlazado a orquestación/gateway
+- **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** + delta `choose_character`
+- **Rangos de progresión (sci-fi / fantasía):** [specify/SPEC_APP_PROGRESSION_RANKS.md](specify/SPEC_APP_PROGRESSION_RANKS.md) — **marco** jul 2026; catálogo provisional 5 tiers
 - **Migraciones PHP + documentos legales:** [specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md) — **aprobada** jul 2026; auto-apply en bootstrap, historial compartido con Supabase, Términos/Privacidad versionados
 - **Loader — lluvia de meteoritos (franja superior):** [specify/SPEC_LOADER_METEOR_SHOWER.md](specify/SPEC_LOADER_METEOR_SHOWER.md) — implementada jun 2026
 - **Loader — terreno fantasía (base inferior):** [specify/SPEC_LOADER_FANTASY_TERRAIN.md](specify/SPEC_LOADER_FANTASY_TERRAIN.md) — implementada jun 2026
@@ -69,7 +74,7 @@
 
 **Descartado (no reabrir sin decisión explícita):** Cloudflare R2, FastAPI/`backend/`, MinIO, Oracle OCI Always Free, GCP Cloud Run como hosting de API.
 
-**Secretos locales (no versionados):** `kidepik/.secrets/` — plantillas en `kidepik/.secrets.sample/` (GCP OAuth para Google Sign-In).
+**Secretos locales (no versionados):** `kidepik/.secrets/` — plantillas en `kidepik/.secrets.sample/` (GCP OAuth; **OpenRouter** `openrouter.env.sample`).
 
 ---
 

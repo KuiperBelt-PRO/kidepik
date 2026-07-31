@@ -1,11 +1,11 @@
 # Spec: Examen de conocimientos (placement) y niveles
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — fórmulas y banco de ítems refinables en Plan; **sin implementación** hasta motor play  
-> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §3, §6
+> Estado: **aprobada como contrato de producto** (julio 2026) — **ampliación IA** propuesta (julio 2026, ver §8); fórmulas y banco refinables en Plan; **sin implementación** hasta motor play  
+> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §3, §6
 
 ## Contexto
 
-Tras elegir mundo, nombre y edad, el explorador realiza un **examen de acceso narrativo**: retos cortos de varias materias, presentados como prueba de ingreso (academia espacial / escuela de magos, etc.). Responde con **opciones y/o texto** vía el sistema de diálogo.
+Tras elegir mundo, nombre, edad y **personaje**, el explorador realiza un **examen de acceso narrativo**: retos cortos de varias materias, presentados como prueba de ingreso (academia espacial / escuela de magos, etc.). Responde con **opciones y/o texto** vía el sistema de diálogo.
 
 Se guardan:
 
@@ -131,19 +131,17 @@ con \(G\) clamp a \([1,5]\) → `general_level` = `L{G}`.
 
 ### 3.4 Promoción de `effective_age_band`
 
+Usa el catálogo de [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md). Regla MVP:
+
 | Condición | Efecto |
 | --- | --- |
-| `age_band == age_7` y `general_level ∈ {L4, L5}` | `effective_age_band = age_9` |
-| `age_band == age_7` y ≥ 2 materias en L4+ | `effective_age_band = age_9` |
-| `age_band == age_9` | `effective_age_band` permanece `age_9` (techo MVP de banda) |
+| Rendimiento excelente (general L4–L5 o ≥2 materias L4+) | Subir **una** banda (techo `band_senior`) |
+| Rendimiento muy bajo sostenido (opcional post-MVP) | Bajar una banda (suelo `band_early`) |
 | En caso contrario | `effective_age_band = age_band` |
 
-Narrativa al niño: puede hablar de “escuadrón avanzado” / “círculo superior”; **nunca** “tienes nivel de 9 años”.
+Narrativa: círculos/rutas avanzadas; **nunca** «tienes nivel de N años».
 
-El tutor ve en ficha: edad declarada + banda efectiva + niveles.
-
-Sesiones futuras pueden seguir moviendo `effective_age_band` y niveles ([docs](../../docs/kidepik.md) Vygotsky); reglas de subida/bajada continua → spec de adaptación (futura). **Este documento fija el placement inicial.**
-
+*(La tabla legacy age_7→age_9 queda sustituida por este modelo de bandas.)*
 ---
 
 ## 4. Modelo de datos
@@ -242,13 +240,41 @@ Respetar `learning.show_levels_to_child === false` por defecto (Ajustes).
 
 ## 7. Criterios de aceptación
 
-1. Placement solo tras mundo+nombre+edad.
+1. Placement solo tras mundo+nombre+edad+**traits**.
 2. ≥1 respuesta por materia activa; scores persistidos.
 3. `general_level` = redondeo ponderado documentado.
 4. Promoción a `age_9` efectivo bajo reglas §3.4.
 5. Reanudación no duplica ítems.
 6. Retake tutor con confirm.
 7. Tests unitarios de fórmula y umbrales; PHPUnit ownership.
+8. Ítems: banco + rewrite; MCQ sin LLM scorer (§8).
+
+---
+
+## 8. Ampliación IA (propuesta)
+
+Complementa §§2–3 con el pipeline de [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md).
+
+### 8.1 Banco + rewrite (estrategia MVP)
+
+1. Catálogo versionado `shared/Ai/placement_bank/{age_band}/{subject_id}.json` con ítems seed (`item_key`, tipo, dificultad, `canonical_answer`, prompt neutro).
+2. Motor PHP elige 1 ítem por materia activa (3–5 total) según `age_band` y evita `item_key` ya usados en el exam abierto.
+3. `placement_item_writer` reescribe `prompt_text` + `narrative_wrapper` al mundo/traits **sin alterar** `canonical_answer`.
+4. Si el LLM falla: usar prompt neutro del banco (degradación elegante).
+
+### 8.2 Scoring
+
+| Tipo | Quién puntúa |
+| --- | --- |
+| `mcq` | PHP exact match |
+| `numeric` | PHP + tolerancia |
+| `short_text` | keywords PHP primero; si duda → `placement_text_scorer` (0 / 0.5 / 1) |
+
+El LLM **no** calcula `general_level` ni `effective_age_band`.
+
+### 8.3 Envoltorio narrativo
+
+Intro/cierre según [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md) § institución de ingreso. Tras cierre: `grant_rank` + handoff elección de primera zona (adventure).
 
 ## Aprobación
 
@@ -257,3 +283,5 @@ Respetar `learning.show_levels_to_child === false` por defecto (Ajustes).
 - [x] Banda efectiva puede superar edad declarada
 - [x] Sin nota numérica al niño
 - [x] Rangos/flavor de progreso detallados en SPEC_APP_PROGRESSION_RANKS (ampliable después)
+- [ ] Banco + rewrite LLM (§8)
+- [ ] Traits como prerrequisito

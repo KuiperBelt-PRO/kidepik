@@ -1,7 +1,7 @@
 # Spec: Primer acceso a la aventura (onboarding del explorador)
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — **sin implementación** hasta Plan de play  
-> Relacionado: [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [docs/kidepik.md](../../docs/kidepik.md) §5–6
+> Estado: **aprobada como contrato de producto** (julio 2026) — **delta propuesto** (personaje) pendiente de re-aprobación; **sin implementación** hasta Plan de play  
+> Relacionado: [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [docs/kidepik.md](../../docs/kidepik.md) §5–6
 
 ## Contexto
 
@@ -10,8 +10,9 @@ Tras crear una **plaza** en Tripulación, el perfil narrativo está vacío. La p
 1. Mundo: **Ciencia ficción** o **Fantasía**
 2. **Nombre de tripulación**
 3. **Edad**
-4. Luego el **examen de conocimientos** ([SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md))
-5. Tras el examen, comienza la aventura propiamente dicha ([SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md))
+4. **Personaje** (rasgos textuales con ayuda IA) — [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md)
+5. Luego el **examen de conocimientos** ([SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md))
+6. Tras el examen, comienza la aventura propiamente dicha ([SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md))
 
 En las entradas siguientes, si `onboarding_step === 'complete'`, se salta este flujo y se va a la sesión de aventura (o se reanuda placement si quedó a medias).
 
@@ -61,7 +62,9 @@ choose_world
 choose_name
     → (display_name) → choose_age
 choose_age
-    → (age_years + age_band) → placement
+    → (age_years + age_band) → choose_character
+choose_character
+    → (traits persistidos) → placement
 placement
     → (examen OK) → complete
 complete
@@ -74,6 +77,7 @@ complete
 | Mundo | `choose_world` | Elige CF o Fantasía (opciones claras) | `set_world_theme` + advance |
 | Nombre | `choose_name` | Nombre de tripulación | `set_display_name` + advance |
 | Edad | `choose_age` | Edad (opciones por rangos y/o texto numérico) | `set_age` + advance |
+| Personaje | `choose_character` | Co-crea especie/color/rasgos ([SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md)) | `set_traits` + advance |
 | Examen | `placement` | Delega en flow `placement` | ver exam spec |
 | Listo | `complete` | Cierre narrativo breve | handoff |
 
@@ -117,22 +121,25 @@ Copy de apoyo (agente): breve evocación de cada mundo (nave/galaxia vs reinos/m
 ### 3.4 Edad
 
 - Pregunta la edad.
-- Preferible: opciones numéricas razonables (p. ej. 6–12) **o** texto con parseo entero.
-- Persistir `age_years`.
-- Derivar `age_band` inicial:
-  - `age_years <= 8` → `age_7` (banda Piaget ~7)
-  - `age_years >= 9` → `age_9`
-  - Límite aceptado 5–14; fuera → repreguntar amable.
-- `effective_age_band` inicial = `age_band` (el examen puede **subirlo** después).
-- Advance → `placement`.
+- Preferible: opciones por **rangos de banda** + texto numérico libre.
+- Persistir `age_years` (5–99).
+- Derivar `age_band` según [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md) (no solo age_7/age_9).
+- `effective_age_band` inicial = `age_band` (placement/rendimiento pueden ajustarla ±1 banda).
+- Advance → `choose_character`.
 
-### 3.5 Handoff a examen
+### 3.5 Personaje (rasgos)
 
-- El agente enmarca el examen como prueba de ingreso (Academia Espacial / Escuela de Magos / variante según mundo).
+- Tras edad, el coach de personaje co-crea la ficha textual (especie, color, rasgos) ya en el tono del mundo.
+- Detalle completo: [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md).
+- Sin traits válidos **no** se avanza a placement.
+
+### 3.6 Handoff a examen
+
+- El agente enmarca el examen como prueba de ingreso (Academia Espacial / Escuela de Magos / variante según mundo y traits).
 - Abre o continúa `flow_id = "placement"` sin salir de la escena de diálogo.
 - No mostrar “vas a hacer un test”.
 
-### 3.6 Cierre first-run tras examen
+### 3.7 Cierre first-run tras examen
 
 - Mensaje narrativo de admisión (sin nota numérica).
 - `onboarding_step = complete`.
@@ -157,10 +164,13 @@ Los effects del diálogo bastan si el servicio de play aplica:
 ```ts
 set_world_theme: "fantasy" | "sci-fi"
 set_display_name: string
-set_age: { age_years: number; age_band: "age_7" | "age_9" }
+set_age: { age_years: number; age_band: AgeBand }  // SPEC_APP_AGE_BANDS
+set_traits: { species: string; palette: string; features: string[]; vibe?: string }
+set_mentor: { mentor_id: string }  // al fijar world_theme
 advance_onboarding: OnboardingStep
 ```
 
+Tras `set_world_theme`, el servidor asigna `mentor_id` canónico ([SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md)) y el host neutro cede la voz.
 Endpoint de conveniencia opcional (tests / tutor force):
 
 `POST /api/v1/play/{childId}/onboarding/reset` — solo tutor, confirmación; vuelve a `pending_entry` y limpia mundo/nombre/edad/placement **con warning** (spec destructiva; Fase B).
@@ -191,6 +201,9 @@ El tutor **puede corregir** nombre/edad/mundo (con unlock) sin rehacer el diálo
 ## Aprobación
 
 - [x] Mundo elegido por el niño en primera aventura
-- [x] Orden: bienvenida → mundo → nombre → edad → examen → aventura
-- [x] Persistencia en perfil del niño
+- [x] Orden original: bienvenida → mundo → nombre → edad → examen → aventura
+- [ ] **Delta:** insertar `choose_character` entre edad y examen ([SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md))
+- [ ] **Delta:** edades abiertas + bandas ([SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md))
+- [ ] **Delta:** voz mentor canónico post-mundo ([SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md))
+- [x] Persistencia en perfil del tripulante
 - [x] Adaptación tipografía/iconos/tono al mundo

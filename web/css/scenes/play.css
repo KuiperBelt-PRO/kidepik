@@ -1,0 +1,91 @@
+/* Play — diálogo en marco glass (mismo lenguaje que Tripulación / Ajustes) */
+
+.play-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  min-height: 100%;
+}
+
+.play-panel__mentor {
+  margin: 0;
+  text-align: center;
+}
+
+.play-panel__log {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  flex: 1 1 auto;
+  min-height: 10rem;
+  max-height: min(48vh, 22rem);
+  overflow-y: auto;
+  padding: 0.15rem 0.1rem 0.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.35) transparent;
+}
+
+.play-bubble {
+  max-width: 94%;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--glass-radius-field, 12px);
+  line-height: 1.35;
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  background: var(--glass-bg, rgba(255, 255, 255, 0.1));
+  color: var(--glass-text, #fff);
+}
+
+.play-bubble p {
+  margin: 0;
+  font-family: Nunito, system-ui, sans-serif;
+  font-size: calc(0.95rem * var(--font-scale-ui, 1));
+}
+
+.play-bubble--mentor {
+  align-self: flex-start;
+}
+
+.play-bubble--explorer {
+  align-self: flex-end;
+  background: var(--glass-bg-strong, rgba(255, 255, 255, 0.22));
+  border-color: var(--glass-border-strong, rgba(255, 255, 255, 0.55));
+}
+
+.play-bubble__who {
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+  opacity: 0.75;
+  margin-bottom: 0.25rem;
+  font-family: Nunito, system-ui, sans-serif;
+}
+
+.play-panel__compose {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: auto;
+}
+
+.play-panel__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.play-panel__option {
+  /* hereda .crew-panel__chip / .glass-chip */
+  cursor: pointer;
+}
+
+.play-panel__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.play-panel__form .crew-panel__label {
+  margin: 0;
+}
+
+.play-panel__form .crew-panel__btn {
+  align-self: stretch;
+}

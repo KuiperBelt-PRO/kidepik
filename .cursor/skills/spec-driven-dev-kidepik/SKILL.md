@@ -64,6 +64,15 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 **URLs:** [.cursor/plan/PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md) — `http://localhost:8082`.  
 **Diagramas:** [.cursor/diagrams/README.md](../../diagrams/README.md) — matriz tarea→spec→diagrama en [14-agent-decision-tree.md](../../diagrams/14-agent-decision-tree.md).
 
+### UI autenticada (puerta obligatoria)
+
+Si el cambio toca `web/` visible en rutas con sesión (`#/crew`, `#/settings`, `#/account`, `#/play/…`, etc.):
+
+1. Leer [.cursor/DESIGN.md](../../DESIGN.md) § tokens + **«Nuevas superficies autenticadas»**.
+2. Leer [SPEC_APP_SECTION_FRAME.md](../../specify/SPEC_APP_SECTION_FRAME.md) (matriz de rutas).
+3. **No** inventar chrome: `mountLoaderChrome` + `mountSectionFrame` + controles `glass-*`.
+4. Validar con skill `web-mobile-preview` (mundo animado visible detrás del marco).
+
 ---
 
 ## Inventario documental — consultar antes de proponer

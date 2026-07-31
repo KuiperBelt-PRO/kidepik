@@ -12,6 +12,7 @@ import {
   patchCrewMember,
   patchCrewPermissions,
 } from "../lib/crew-api.js";
+import { fetchJourneyTimeline } from "../lib/play-api.js";
 import {
   bindGlassIconTheme,
   createGlassIconSvg,
@@ -317,7 +318,18 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       ${
         isTutor
           ? ""
-          : `<section class="crew-panel__block crew-panel__block--danger">
+          : `<section class="crew-panel__block">
+        <h2 class="crew-panel__block-title">Aventura</h2>
+        <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-play>Entrar en la aventura</button>
+      </section>
+      <section class="crew-panel__block" data-journey-block>
+        <h2 class="crew-panel__block-title">Diario del viaje</h2>
+        <p class="crew-panel__helper" data-journey-summary>Cargando resumen…</p>
+        <ol class="crew-panel__timeline" data-journey-timeline aria-label="Cronología del viaje"></ol>
+        <button type="button" class="crew-panel__btn" data-journey-more hidden>Ver más</button>
+        <p class="crew-panel__status" data-journey-status aria-live="polite"></p>
+      </section>
+      <section class="crew-panel__block crew-panel__block--danger">
         <h2 class="crew-panel__block-title">Zona peligrosa</h2>
         <button type="button" class="crew-panel__btn crew-panel__btn--danger" data-delete></button>
       </section>`
@@ -327,7 +339,12 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     paintBtn(root, "[data-save-profile]", "save", "Guardar perfil");
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
     if (!isTutor) {
+      paintBtn(root, "[data-play]", "save", "Entrar en la aventura");
       paintBtn(root, "[data-delete]", "danger", "Eliminar de la tripulación", { dangerIcon: true });
+      root.querySelector("[data-play]")?.addEventListener("click", () => {
+        void navigateShellRoute(`/play/${member.id}`);
+      });
+      void loadJourneyTimeline(root, session, member.id);
     }
     const hero = root.querySelector(".crew-card--hero");
     if (hero instanceof HTMLElement) paintCrewCardIcons(hero, { hero: true });
@@ -457,6 +474,69 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       root.remove();
     },
   };
+}
+
+/**
+ * @param {HTMLElement} root
+ * @param {import('@supabase/supabase-js').Session} session
+ * @param {string} childId
+ */
+async function loadJourneyTimeline(root, session, childId) {
+  const summaryEl = root.querySelector("[data-journey-summary]");
+  const listEl = root.querySelector("[data-journey-timeline]");
+  const moreBtn = root.querySelector("[data-journey-more]");
+  const statusEl = root.querySelector("[data-journey-status]");
+  if (!(listEl instanceof HTMLOListElement)) return;
+
+  /** @type {string | null} */
+  let cursor = null;
+
+  /**
+   * @param {boolean} append
+   */
+  async function fetchPage(append) {
+    if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+    const res = await fetchJourneyTimeline(session, childId, { cursor: cursor ?? undefined, limit: 12 });
+    if (!res.ok || !res.data) {
+      if (summaryEl instanceof HTMLElement) {
+        summaryEl.textContent = "Aún no hay diario del viaje, o no se ha podido cargar.";
+      }
+      if (statusEl instanceof HTMLElement) statusEl.textContent = "No hemos podido cargar la cronología.";
+      return;
+    }
+    const data = res.data;
+    if (!append && summaryEl instanceof HTMLElement) {
+      summaryEl.textContent = data.summary
+        ? String(data.summary)
+        : "Todavía no hay un resumen condensado; aparecen abajo los hitos del ledger.";
+    }
+    const events = Array.isArray(data.events) ? data.events : [];
+    if (!append) listEl.innerHTML = "";
+    for (const ev of events) {
+      const li = document.createElement("li");
+      li.className = "crew-panel__timeline-item";
+      const kind = escapeHtml(String(ev.kind || "system"));
+      const summary = escapeHtml(String(ev.summary || ""));
+      const at = escapeHtml(String(ev.at || "").replace("T", " ").slice(0, 16));
+      li.innerHTML = `<span class="crew-panel__timeline-kind">${kind}</span>
+        <span class="crew-panel__timeline-text">${summary}</span>
+        <time class="crew-panel__timeline-at" datetime="${escapeAttr(String(ev.at || ""))}">${at}</time>`;
+      listEl.appendChild(li);
+    }
+    if (!append && events.length === 0 && summaryEl instanceof HTMLElement && !data.summary) {
+      summaryEl.textContent = "Este tripulante aún no tiene hitos de viaje.";
+    }
+    cursor = data.next_cursor ?? null;
+    if (moreBtn instanceof HTMLButtonElement) {
+      moreBtn.hidden = !cursor;
+      paintBtn(root, "[data-journey-more]", "chevron", "Ver más");
+    }
+  }
+
+  moreBtn?.addEventListener("click", () => {
+    void fetchPage(true);
+  });
+  await fetchPage(false);
 }
 
 /** @param {string} s */

@@ -37,4 +37,8 @@ describe("world-band-layout", () => {
     assert.equal(shouldCompressWorldBands("crew/new"), true);
     assert.equal(shouldCompressWorldBands("crew/abc"), true);
   });
+
+  it("play comprime bandas (aventura en marco glass)", () => {
+    assert.equal(shouldCompressWorldBands("play/abc"), true);
+  });
 });

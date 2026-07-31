@@ -197,12 +197,33 @@ Los botones «Volver» locales en paneles (`crew-panel__link`) se sustituyen por
 
 | Pantalla | Controles glass |
 | --- | --- |
-| **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) |
+| **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) · **Diario del viaje** (timeline L1 + summary L2, tokens glass) |
+| **Aventura** `#/play/:childId` | Mismo **loader-chrome + section-frame** que Tripulación; log en burbujas glass; opciones = `crew-panel__chip`; input = `glass-field`; enviar = `glass-btn` icono+texto. **Sin** fondo plano ni chrome inventado. |
 | **Ajustes** | `mountDurationSlider` · chips tema UI / texto · botones `save` / `close` |
 | **Cuenta** | Fields · checkboxes · botones (`signout`, etc.) |
 | **Demo** | `web/tmp/glass-controls-demo.html` — catálogo completo sobre loader real |
 
 Duración de sesión: **solo** slider (`normalizeSessionMinutes`, `formatDurationMinutes`), nunca chips.
+
+---
+
+## Nuevas superficies autenticadas (obligatorio)
+
+Cualquier ruta nueva con sesión (play, timeline, wizards tutor, etc.) **debe**:
+
+1. Conservar el **mundo dual animado** vía `mountLoaderChrome({ compactSection: true })` + `applySectionEnter`.
+2. Montar contenido en **`mountSectionFrame`** (logo + scroll + fade + flechas).
+3. Reutilizar tokens / helpers de `glass-controls` y tipografía `data-shell-theme`.
+4. Registrar la ruta en `isShellRoutePath`, `shouldCompressWorldBands` e `inferShellNavParent` cuando aplique.
+5. Documentar la pantalla en esta tabla **antes o en el mismo cambio**.
+
+**Prohibido:**
+
+- `destroyAppShell()` + escena a pantalla completa con gradiente/fondo propio (rompe coherencia y el mundo procedural).
+- Bubbles / botones / inputs con colores de acento (azul, naranja, verde sistema).
+- Inventar un segundo design system «de juego» sin actualizar este documento y `SPEC_APP_SECTION_FRAME`.
+
+El HUD infantil full-bleed futuro, si existe, será una **spec aparte**; hasta entonces `#/play/:id` se trata como sección de gestión/aventura en marco glass.
 
 ---
 
@@ -244,6 +265,8 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 - Panel select con tinte oscuro o degradado blanco “lechoso” encima del blur.
 - Panel select `position: fixed` + sync JS en cada scroll (lag).
 - Listeners de cierre en el marco que no filtran interacción dentro del panel (`composedPath`).
+- Nueva sección autenticada **sin** `section-frame` / mundo animado (fondo plano, shell destruido).
+- Timeline u otros listados con fills negros opacos en lugar de `--glass-bg` / `--glass-border`.
 
 ---
 
@@ -254,7 +277,7 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 | Tokens + CSS | `web/css/components/glass-controls.css` |
 | Helpers JS | `web/js/components/glass-controls.js` |
 | Iconos | `web/js/components/shell-ui-icons.js` |
-| Consumo | `crew-panel.js`, `settings-panel.js`, `account-panel.js` |
+| Consumo | `crew-panel.js`, `settings-panel.js`, `account-panel.js`, `scenes/play.js` |
 | Demo local | `http://localhost:8082/tmp/glass-controls-demo.html` (loader real + `poc-up.ps1`) |
 
 ### Helpers JS exportados

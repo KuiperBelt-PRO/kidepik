@@ -1,43 +1,45 @@
 # 11 — Pipeline de aventura infantil (contrato)
 
-**Specs:** [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_PLACEMENT_EXAM.md](../specify/SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](../specify/SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_SESSION.md](../specify/SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_PROGRESSION_RANKS.md](../specify/SPEC_APP_PROGRESSION_RANKS.md)
+**Specs:** [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](../specify/SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_AGE_BANDS.md](../specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](../specify/SPEC_APP_MENTOR.md), [SPEC_APP_JOURNEY_MEMORY.md](../specify/SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_PLACEMENT_EXAM.md](../specify/SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](../specify/SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_SESSION.md](../specify/SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_PROGRESSION_RANKS.md](../specify/SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](../specify/SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_OPENROUTER_GATEWAY.md](../specify/SPEC_AI_OPENROUTER_GATEWAY.md), [SPEC_AI_PLAY_ORCHESTRATION.md](../specify/SPEC_AI_PLAY_ORCHESTRATION.md)
 
-> **Estado:** contrato de producto aprobado — **sin UI `#/play` ni orquestación IA en código** (jul 2026). Tripulación Fase A sí existe.
+> **Estado:** contratos + **propuestas IA** (jul 2026) — **sin UI `#/play` en código**. Plan: [tasks/AI_ADVENTURE_SYSTEM_PLAN.md](../tasks/AI_ADVENTURE_SYSTEM_PLAN.md). Tripulantes: **cualquier edad** (5–99).
 
 ```mermaid
 flowchart TB
-  Crew["Tripulación: plaza creada\nonboarding_step=pending_entry"]
-  Play["#/play/:childId futuro"]
-  FR[first_run diálogo]
-  World[elige mundo fantasy|sci-fi]
+  Crew["Tripulación: plaza\npending_entry"]
+  Play["#/play/:id futuro"]
+  Host[Host neutro pre-mundo]
+  World[elige mundo]
+  Mentor[Mentor canónico\nGuardián / Arquitecto]
   Name[nombre]
-  Age[edad]
-  Exam[placement exam]
-  Sess[adventure session]
-  Rank[progression ranks marco]
+  Age[edad → age_band]
+  Char[traits]
+  Exam[placement]
+  Zone[zona]
+  Sess[adventure]
+  Mem["Memoria L1 ledger\nL2 condensado\nL3 reciente"]
+  Free[OpenRouter free\ndiscovery+rank]
 
-  Crew --> Play
-  Play --> FR
-  FR --> World --> Name --> Age --> Exam --> Sess
-  Sess -.-> Rank
+  Crew --> Play --> Host --> World --> Mentor
+  Mentor --> Name --> Age --> Char --> Exam --> Zone --> Sess
+  Free -.-> Mentor
+  Free -.-> Sess
+  Mem --- Sess
+  Mem --- Mentor
 ```
 
-## Persistencia prevista en `children`
+## Persistencia
 
-| Campo | Uso |
+| Capa | Qué |
 | --- | --- |
-| `onboarding_step` | `pending_entry` → `choose_world` → `choose_name` → `choose_age` → `placement` → `complete` |
-| `world_theme` | `fantasy` \| `sci-fi` |
-| `placement_status` | `not_started` \| `in_progress` \| `completed` |
-| `effective_age_band` | Tras examen / edad |
-
-## Diálogo IA (contrato)
-
-- Turnos tipados + opciones; tema visual según mundo.
-- Examen: niveles por materia + general ponderado; sin “nota” visible al niño.
+| Perfil | mundo, nombre, edad/banda, traits, niveles, mentor_id |
+| L1 | dialogue_turns + story_beats + decisions (trazable) |
+| L2 | story_summaries condensed_full |
+| L3 | últimos beats/turns al retomar |
 
 ## Anti-errores
 
-- No implementar play improvisando sin Plan SDD / spec de implementación.
-- No fijar mundo del niño en el alta del tutor (lo elige el niño en first_run).
-- No confundir chrome de gestión con HUD de sesión de juego (specs futuras).
+- No implementar sin aprobación P0 del plan.
+- No modelos de pago (`AI_ALLOW_PAID=false`).
+- No segunda voz de chat: solo mentor.
+- No versionar `OPENROUTER_API_KEY`.

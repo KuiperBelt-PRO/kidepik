@@ -299,7 +299,7 @@ final class CrewServiceValidationIntegrationTest extends TestCase
 
         $updated = $crew->updateProfileForAuthUser($authUserId, $childId, ['age_years' => 10]);
 
-        self::assertSame('age_9', $updated['age_band']);
+        self::assertSame('band_child', $updated['age_band']);
     }
 
     public function testListForUnknownParentThrows(): void
@@ -377,8 +377,16 @@ final class CrewServiceValidationIntegrationTest extends TestCase
         ]);
 
         $list = $crew->listForAuthUser($authUserId);
+        $member = null;
+        foreach ($list['members'] as $row) {
+            if (($row['id'] ?? '') === $childId) {
+                $member = $row;
+                break;
+            }
+        }
 
-        self::assertSame('Scout', $list['members'][0]['tutor_label']);
+        self::assertNotNull($member);
+        self::assertSame('Scout', $member['tutor_label']);
     }
 
     public function testProfileClearsAgeYears(): void

@@ -1,0 +1,119 @@
+{
+  "math": [
+    {
+      "item_key": "math_add_2",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "¿Cuánto es 2 + 2?",
+      "options": [
+        {"id": "a", "label": "3"},
+        {"id": "b", "label": "4"},
+        {"id": "c", "label": "5"}
+      ],
+      "canonical_answer": {"option_id": "b"},
+      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    },
+    {
+      "item_key": "math_mul_7",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "¿Cuánto es 7 × 3?",
+      "options": [
+        {"id": "a", "label": "21"},
+        {"id": "b", "label": "24"},
+        {"id": "c", "label": "18"}
+      ],
+      "canonical_answer": {"option_id": "a"},
+      "bands": ["band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    },
+    {
+      "item_key": "math_pct_20",
+      "item_type": "numeric",
+      "difficulty": 3,
+      "prompt_text": "¿Cuánto es el 20% de 50?",
+      "canonical_answer": {"numeric": 10, "tolerance": 0},
+      "bands": ["band_tween", "band_teen", "band_adult", "band_senior"]
+    }
+  ],
+  "language": [
+    {
+      "item_key": "lang_syn_feliz",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "¿Cuál palabra significa casi lo mismo que «feliz»?",
+      "options": [
+        {"id": "a", "label": "alegre"},
+        {"id": "b", "label": "triste"},
+        {"id": "c", "label": "rápido"}
+      ],
+      "canonical_answer": {"option_id": "a"},
+      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    },
+    {
+      "item_key": "lang_plural",
+      "item_type": "short_text",
+      "difficulty": 2,
+      "prompt_text": "Escribe el plural de «luz».",
+      "canonical_answer": {"keywords": ["luces"]},
+      "bands": ["band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    }
+  ],
+  "logic": [
+    {
+      "item_key": "logic_seq_2_4_6",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "¿Qué número sigue: 2, 4, 6, …?",
+      "options": [
+        {"id": "a", "label": "7"},
+        {"id": "b", "label": "8"},
+        {"id": "c", "label": "10"}
+      ],
+      "canonical_answer": {"option_id": "b"},
+      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    },
+    {
+      "item_key": "logic_odd_one",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "¿Cuál no encaja: sol, luna, mesa, estrella?",
+      "options": [
+        {"id": "a", "label": "sol"},
+        {"id": "b", "label": "mesa"},
+        {"id": "c", "label": "luna"}
+      ],
+      "canonical_answer": {"option_id": "b"},
+      "bands": ["band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    }
+  ],
+  "science": [
+    {
+      "item_key": "sci_water_state",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "El agua helada se convierte en…",
+      "options": [
+        {"id": "a", "label": "hielo"},
+        {"id": "b", "label": "humo"},
+        {"id": "c", "label": "arena"}
+      ],
+      "canonical_answer": {"option_id": "a"},
+      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    }
+  ],
+  "culture": [
+    {
+      "item_key": "cult_spain_capital",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "¿Cuál es la capital de España?",
+      "options": [
+        {"id": "a", "label": "Barcelona"},
+        {"id": "b", "label": "Madrid"},
+        {"id": "c", "label": "Sevilla"}
+      ],
+      "canonical_answer": {"option_id": "b"},
+      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+    }
+  ]
+}

@@ -7,7 +7,8 @@ import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
 import { renderHome } from "./scenes/home.js?v=184";
 import { renderAccount } from "./scenes/account.js?v=184";
 import { renderSettings } from "./scenes/settings.js?v=221";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=226";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=228";
+import { renderPlay } from "./scenes/play.js?v=2";
 import { renderLegal } from "./scenes/legal.js?v=184";
 
 function updateOfflineBanner() {
@@ -40,6 +41,7 @@ function boot() {
   registerRoute("crew", () => renderCrew());
   registerRoute("crew/new", () => renderCrewNew());
   registerRoute("crew/:id", (params) => renderCrewDetail(params));
+  registerRoute("play/:childId", (params) => renderPlay({ childId: params.childId }));
   registerRoute("legal/terminos", () => renderLegal({ slug: "terminos" }));
   registerRoute("legal/privacidad", () => renderLegal({ slug: "privacidad" }));
 

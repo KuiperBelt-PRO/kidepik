@@ -41,7 +41,7 @@ Definir el patrón reutilizable de **sección de gestión autenticada** para imp
 | Contenido concreto de Cuenta | [SPEC_APP_ACCOUNT_SECTION.md](SPEC_APP_ACCOUNT_SECTION.md) |
 | Rediseño de Legal (marco glass) | Fuera; solo reutiliza bandas compactas ya existentes |
 | Home welcome | Sin marco glass; bandas **expandidas** |
-| HUD de juego infantil | Distinto del chrome de gestión |
+| HUD de juego infantil **full-bleed** (futuro) | Distinto del chrome de gestión; requiere spec + DESIGN propios. El play MVP tutor usa marco glass. |
 | Tripulación / Ajustes | [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_SETTINGS_SECTION.md](SPEC_APP_SETTINGS_SECTION.md) (propuesta) |
 
 ---
@@ -83,6 +83,7 @@ Reutilizar el mecanismo actual de legal (`animateWorldBands` / `setWorldBandLayo
 | `#/legal/privacidad` (sesión) | **Compacto** | No (layout legal) |
 | `#/settings` | **Compacto** | **Sí** |
 | `#/crew`, `#/crew/new`, `#/crew/:id` | **Compacto** | **Sí** |
+| `#/play/:childId` | **Compacto** | **Sí** (aventura en marco glass; ver [DESIGN.md](../DESIGN.md)) |
 | Otras gestión futuras | **Compacto** | **Sí** (por defecto) |
 | `#/loader`, `#/auth/*` | N/A (sin shell de gestión) | No |
 

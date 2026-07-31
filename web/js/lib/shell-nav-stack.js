@@ -158,6 +158,9 @@ export function inferShellNavParent(path) {
   if (root === "crew") {
     return child ? "crew" : "home";
   }
+  if (root === "play" && child) {
+    return `crew/${child}`;
+  }
   if (root === "settings" || root === "account") return "home";
   return null;
 }

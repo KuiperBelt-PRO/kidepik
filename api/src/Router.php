@@ -11,6 +11,7 @@ use Kidepik\Api\Controllers\LegalController;
 use Kidepik\Api\Controllers\MigrationsController;
 use Kidepik\Api\Controllers\ParentsController;
 use Kidepik\Api\Controllers\ParentSettingsController;
+use Kidepik\Api\Controllers\PlayDialogueController;
 use Kidepik\Api\Controllers\StorageController;
 use Kidepik\Api\Http\JsonResponse;
 
@@ -23,6 +24,40 @@ final class Router
 
         if ($method === 'GET' && preg_match('#^/api/v1/legal/([^/]+)$#', $path, $matches) === 1) {
             return (new LegalController())->show(rawurldecode($matches[1]));
+        }
+
+        if (preg_match('#^/api/v1/play/([^/]+)/dialogue/session$#', $path, $playSess) === 1) {
+            if ($method === 'POST') {
+                return (new PlayDialogueController())->openSession(
+                    $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                    rawurldecode($playSess[1]),
+                    file_get_contents('php://input') ?: null,
+                );
+            }
+        }
+
+        if (preg_match('#^/api/v1/play/([^/]+)/dialogue/turn$#', $path, $playTurn) === 1) {
+            if ($method === 'POST') {
+                return (new PlayDialogueController())->submitTurn(
+                    $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                    rawurldecode($playTurn[1]),
+                    file_get_contents('php://input') ?: null,
+                );
+            }
+        }
+
+        if ($method === 'GET' && preg_match('#^/api/v1/play/([^/]+)/journey/summary$#', $path, $playSum) === 1) {
+            return (new PlayDialogueController())->journeySummary(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                rawurldecode($playSum[1]),
+            );
+        }
+
+        if ($method === 'GET' && preg_match('#^/api/v1/play/([^/]+)/journey/timeline$#', $path, $playTl) === 1) {
+            return (new PlayDialogueController())->journeyTimeline(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                rawurldecode($playTl[1]),
+            );
         }
 
         if (preg_match('#^/api/v1/crew/([^/]+)/permissions$#', $path, $crewPerm) === 1) {

@@ -114,3 +114,7 @@ Credenciales override: `E2E_TUTOR_EMAIL`, `E2E_TUTOR_PASSWORD` en entorno.
 - Sin React/Vite — ES modules servidos por **Docker nginx** (`poc-up.ps1`)
 - Config: `web/js/config.js` (generado por `poc-write-config` / `poc-up`)
 - Query params de depuración del loader: ver JSDoc de `parseWorldLayerQuery` en `web/js/components/loader-world-utils.js`
+
+## UI autenticada
+
+Rutas con sesión (crew, settings, account, **play**, legal) deben mostrar el **mundo dual animado** detrás del **marco glass**. Si una captura de play enseña fondo plano oscuro o sin bandas sci-fi/fantasía, el montaje es incorrecto — ver `.cursor/DESIGN.md`.

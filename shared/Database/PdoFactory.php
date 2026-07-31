@@ -47,6 +47,19 @@ final class PdoFactory
         return self::$shared;
     }
 
+    /**
+     * PDO compartido desde Config::databaseUrl(), o null si no hay URL.
+     */
+    public static function fromConfig(): ?PDO
+    {
+        $url = \Kidepik\Shared\Config::databaseUrl();
+        if ($url === null || $url === '') {
+            return null;
+        }
+
+        return self::sharedFromDatabaseUrl($url);
+    }
+
     public static function resetSharedForTests(): void
     {
         self::$shared = null;

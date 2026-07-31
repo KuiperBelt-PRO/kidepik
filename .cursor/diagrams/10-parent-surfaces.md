@@ -10,12 +10,14 @@ flowchart TB
   Shell --> Home[home welcome]
   Shell --> Acc[account-panel]
   Shell --> Set[settings-panel]
-  Shell --> Crew[crew-panel lista/alta/ficha]
+  Shell --> Crew[crew-panel lista/alta/ficha/diario]
+  Shell --> Play[play-panel diálogo aventura]
   Shell --> Legal[legal markdown]
 
   Acc --> Frame
   Set --> Frame
   Crew --> Frame
+  Play --> Frame
   Legal --> Frame
 ```
 
@@ -25,9 +27,9 @@ flowchart TB
 | --- | --- | --- |
 | Cuenta | Implementada | `GET/PATCH/DELETE /parents/me` |
 | Ajustes | Fase A gestión | `GET/PATCH /parents/me/settings` |
-| Tripulación | Fase A gestión + **cartas TCG** ([SPEC_APP_CREW_MEMBER_CARDS.md](../specify/SPEC_APP_CREW_MEMBER_CARDS.md)) | `/crew`, `/crew/:id`, permissions |
+| Tripulación | Fase A gestión + **cartas TCG** + diario viaje | `/crew`, `/crew/:id`, permissions; `GET …/journey/timeline` |
+| Play (`#/play/:id`) | Vertical slice en **marco glass** ([DESIGN.md](../DESIGN.md)) | dialogue session/turn |
 | Legal autenticado | Shell + vuelta a home sin logout | `GET /legal/:slug` |
-| Play desde crew | **Pendiente** (contrato en 11) | — |
 
 ## Navegación típica
 

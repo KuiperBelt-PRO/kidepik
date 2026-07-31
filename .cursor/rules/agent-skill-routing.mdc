@@ -10,7 +10,8 @@ Si la petición encaja en una fila, **lee** el `SKILL.md` indicado y aplícalo a
 | Petición | Skill |
 | --- | --- |
 | SDD, TDD, tests o feature en **este repo** | `.cursor/skills/spec-driven-dev-kidepik/SKILL.md` |
-| Probar cliente web (loader/auth/legal), Playwright móvil 390×844, Electron preview | `.cursor/skills/web-mobile-preview/SKILL.md` |
+| Probar cliente web (loader/auth/legal/play), Playwright móvil 390×844, Electron preview | `.cursor/skills/web-mobile-preview/SKILL.md` |
+| UI autenticada nueva o cambio visual en `web/` | Leer **obligatorio** `.cursor/DESIGN.md` (+ `SPEC_APP_SECTION_FRAME`) antes de maquetar |
 | Commit, push, stage selectivo | `Vibe-Coding/.cursor/skills/git-workflow/SKILL.md` |
 | Revisar PR, rama o parche | `Vibe-Coding/.cursor/skills/code-review/SKILL.md` |
 | Crear o editar reglas `.mdc` | `Vibe-Coding/.cursor/skills/create-rule/SKILL.md` |

@@ -18,7 +18,7 @@ flowchart TB
 | Loader / gate / auth Google | SPEC_LOADER_APP_GATE, SPEC_APP_AUTH* | 08, 09 |
 | Shell / drawer / FABs | SPEC_APP_SHELL_CHROME | 07, 10 |
 | Cuenta / ajustes / crew | SPEC_APP_*_SECTION | 10, 05 |
-| Play / examen / diálogo | SPEC_APP_PLAY_* / DIALOGUE / SESSION | 11 (contrato) |
+| Play / examen / diálogo / IA / mentor / memoria | SPEC_APP_PLAY_* / MENTOR / JOURNEY_MEMORY / AGE_BANDS / SPEC_AI_* | 11 |
 | Ruta API nueva | SPEC_PHP_BACKEND + Router.php | 04 |
 | Migración SQL | supabase/migrations + MigrationRunner | 05, 03 |
 | Media / upload | SPEC_MEDIA_STORAGE | 12 |

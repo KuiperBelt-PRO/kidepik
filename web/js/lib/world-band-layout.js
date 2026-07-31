@@ -25,7 +25,8 @@ export function shouldCompressWorldBands(path = "") {
     normalized === "crew" ||
     normalized.startsWith("crew/") ||
     normalized === "settings" ||
-    normalized === "family"
+    normalized === "family" ||
+    normalized.startsWith("play/")
   ) {
     return true;
   }

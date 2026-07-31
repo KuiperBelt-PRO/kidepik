@@ -1,11 +1,11 @@
 # Spec: Sistema de diálogo de aventura (IA)
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos ampliables; **sin implementación** hasta Plan del motor de play  
-> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §10.6
+> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos en [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md) / gateway en [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md); **sin implementación** hasta Plan del motor de play  
+> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §10.6
 
 ## Contexto
 
-Los miembros de la tripulación, al entrar en su aventura (primera vez y siguientes), interactúan con un **sistema de diálogo impulsado por IA**: el agente plantea situaciones y preguntas; el niño responde eligiendo **opciones** o **escribiendo texto**. Es el canal principal de onboarding, examen de acceso y (más adelante) de la aventura narrativa.
+Los miembros de la tripulación, al entrar en su aventura (primera vez y siguientes), interactúan con un **sistema de diálogo impulsado por IA**: el agente plantea situaciones y preguntas; el niño responde eligiendo **opciones** o **escribiendo texto**. Es el canal principal de onboarding (incl. personaje), examen de acceso y de la aventura narrativa.
 
 ## Objetivo
 
@@ -24,7 +24,9 @@ Definir el **contrato de UI, estado, API y seguridad** del diálogo de aventura,
 | Tema visual = mundo del niño | Tipografía, iconos y tono siguen `world_theme` cuando ya existe; antes del mundo: tema neutro o dual suave |
 | Persistencia de turnos | Cada intercambio relevante se guarda (no regenerar el pasado) |
 | Apta infancia | Filtros de tono; sin violencia gráfica ni miedo intenso |
-| Tutor en sesión | JWT adulto; `child_id` autorizado; el niño no tiene cuenta |
+| Tutor en sesión | JWT titular; `child_id` autorizado; el tripulante no tiene cuenta |
+| Voz IA | Siempre el mentor del mundo (o host neutro pre-mundo) |
+| Memoria | Ledger + resumen condensado + ventana reciente |
 | Cuota IA | Rate limit + mensaje amable si no hay cuota ([docs/kidepik.md](../../docs/kidepik.md)) |
 
 ---
@@ -82,7 +84,8 @@ El backend inyecta en el system prompt el `world_theme` (o «aún sin mundo»), 
 ## 2. Modelo de turno
 
 ```ts
-type DialogueRole = "agent" | "child" | "system";
+type DialogueRole = "mentor" | "explorer" | "system";
+// Legacy alias en lectura: agent→mentor, child→explorer
 
 interface DialogueTurn {
   id: string;
@@ -94,14 +97,14 @@ interface DialogueTurn {
   text: string;
   options?: { id: string; label: string }[];
   input_mode: "options_only" | "text_only" | "options_or_text" | "continue" | "blocked";
-  child_reply?: { kind: "option" | "text"; option_id?: string; text?: string };
-  meta?: Record<string, unknown>; // p.ej. subject_id en examen
+  explorer_reply?: { kind: "option" | "text"; option_id?: string; text?: string };
+  meta?: Record<string, unknown>; // mentor_id, subject_id, …
   model_used?: string;
   created_at: string;
 }
 ```
 
-Persistencia sugerida: tabla `dialogue_turns` o reutilizar/extender `story_beats` con `flow_id` — **decisión de implementación:** tabla `dialogue_turns` separada del viaje narrativo largo para no mezclar onboarding con beats de historia; los beats de aventura pueden referenciar turnos o vivir en `story_beats` post-examen.
+La burbuja de salida IA muestra siempre el nombre del mentor ([SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md)). Persistencia completa del historial: [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md).
 
 ---
 
@@ -195,9 +198,11 @@ Validación estructurada obligatoria (JSON schema / DTO PHP) — el LLM no escri
 
 | Flow | Effects permitidos |
 | --- | --- |
-| `first_run` | `set_world_theme`, `set_display_name`, `set_age`, `advance_onboarding` |
-| `placement` | `record_answer`, `set_subject_level`, `set_general_level`, `set_effective_age_band`, `advance_onboarding` |
-| `adventure` | `append_story_beat`, `set_choice`, `update_quest` (detalle en SPEC_APP_ADVENTURE_SESSION) |
+| `first_run` | `set_world_theme`, `set_display_name`, `set_age`, `set_traits`, `patch_traits`, `advance_onboarding` |
+| `placement` | `record_answer`, `set_subject_level`, `set_general_level`, `set_effective_age_band`, `grant_rank`, `advance_onboarding` |
+| `adventure` | `append_story_beat`, `set_choice`, `update_quest`, `update_journey`, `record_learning_result`, `update_subject_level`, `append_achievement`, `grant_rank` |
+
+Orquestación detallada (roles, PlayerState, envelopes JSON): [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md). Transporte OpenRouter: [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md).
 
 ---
 

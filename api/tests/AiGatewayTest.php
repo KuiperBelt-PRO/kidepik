@@ -1,0 +1,107 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Kidepik\Api\Tests;
+
+use Kidepik\Shared\Ai\AgeBand;
+use Kidepik\Shared\Ai\AiGateway;
+use Kidepik\Shared\Ai\FreeModelCatalog;
+use Kidepik\Shared\Ai\FreeModelRanker;
+use Kidepik\Shared\Ai\LLMException;
+use Kidepik\Shared\Ai\MentorCatalog;
+use Kidepik\Shared\Ai\MockAiGateway;
+use PHPUnit\Framework\TestCase;
+
+final class AiGatewayTest extends TestCase
+{
+    public function testCatalogKeepsOnlyFreeModels(): void
+    {
+        $catalog = new FreeModelCatalog();
+        $free = $catalog->filterFree([
+            ['id' => 'paid/model', 'pricing' => ['prompt' => '0.001', 'completion' => '0.002']],
+            ['id' => 'acme/good:free', 'pricing' => ['prompt' => '0', 'completion' => '0'], 'name' => 'Good', 'context_length' => 8192],
+            ['id' => 'acme/zero', 'pricing' => ['prompt' => 0, 'completion' => 0], 'context_length' => 4096],
+            ['id' => 'acme/embed:free', 'pricing' => ['prompt' => '0', 'completion' => '0']],
+            ['id' => 'deny/me:free', 'pricing' => ['prompt' => '0', 'completion' => '0']],
+        ], ['deny/me:free']);
+
+        $ids = array_column($free, 'id');
+        self::assertSame(['acme/good:free', 'acme/zero'], $ids);
+    }
+
+    public function testRankerOrdersByPreferenceThenScore(): void
+    {
+        $ranker = new FreeModelRanker();
+        $ranked = $ranker->rank([
+            ['id' => 'b:free', 'fail_count_window' => 0],
+            ['id' => 'a:free', 'fail_count_window' => 0, 'last_success_at' => '2026-01-01'],
+            ['id' => 'c:free', 'fail_count_window' => 5],
+        ], ['a:free', 'b:free', 'c:free']);
+
+        self::assertSame('a:free', $ranked[0]['id']);
+        self::assertSame('c:free', $ranked[count($ranked) - 1]['id']);
+    }
+
+    public function testGatewayFallsBackToNextModel(): void
+    {
+        $calls = [];
+        $gateway = new AiGateway(
+            modelQueue: ['bad:free', 'good:free'],
+            chatFn: static function (string $model, array $messages, array $opts) use (&$calls): array {
+                $calls[] = $model;
+                if ($model === 'bad:free') {
+                    throw new LLMException('upstream HTTP 429', 429);
+                }
+
+                return ['content' => '{"agent_text":"ok","input_mode":"continue"}', 'raw_model' => $model];
+            },
+        );
+
+        $result = $gateway->complete([['role' => 'user', 'content' => 'hola']]);
+        self::assertSame(['bad:free', 'good:free'], $calls);
+        self::assertSame('good:free', $result['model']);
+        self::assertStringContainsString('ok', $result['content']);
+    }
+
+    public function testGatewaySkipsPaidWhenNotAllowed(): void
+    {
+        $gateway = new AiGateway(
+            modelQueue: ['paid/model', 'ok:free'],
+            chatFn: static fn (string $model, array $m, array $o): array => [
+                'content' => 'hi',
+                'raw_model' => $model,
+            ],
+            allowPaid: false,
+        );
+
+        $result = $gateway->complete([['role' => 'user', 'content' => 'x']]);
+        self::assertSame('ok:free', $result['model']);
+    }
+
+    public function testMockEnvelope(): void
+    {
+        $out = MockAiGateway::complete('mock/local', [
+            ['role' => 'user', 'content' => 'quiero fantasía'],
+        ], ['purpose' => 'dialogue']);
+        $json = json_decode($out['content'], true);
+        self::assertIsArray($json);
+        self::assertArrayHasKey('agent_text', $json);
+        self::assertArrayHasKey('input_mode', $json);
+    }
+
+    public function testAgeBandMapping(): void
+    {
+        self::assertSame(AgeBand::EARLY, AgeBand::fromAgeYears(6));
+        self::assertSame(AgeBand::ADULT, AgeBand::fromAgeYears(42));
+        self::assertSame(AgeBand::SENIOR, AgeBand::fromAgeYears(70));
+        self::assertSame(AgeBand::CHILD, AgeBand::fromLegacy('age_7', 8));
+    }
+
+    public function testMentorCatalog(): void
+    {
+        self::assertSame(MentorCatalog::FANTASY, MentorCatalog::idForWorldTheme('fantasy'));
+        self::assertSame('El Arquitecto del Saber', MentorCatalog::profile(MentorCatalog::SCIFI)['display_name']);
+        self::assertSame(MentorCatalog::NEUTRAL, MentorCatalog::idForWorldTheme(null));
+    }
+}

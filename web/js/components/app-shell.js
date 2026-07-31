@@ -44,6 +44,7 @@ export function isShellRoutePath(path = hashRoutePath()) {
     path === "settings" ||
     path === "crew" ||
     path.startsWith("crew/") ||
+    path.startsWith("play/") ||
     path.startsWith("legal/")
   );
 }

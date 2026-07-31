@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kidepik\Api\Services;
 
 use InvalidArgumentException;
+use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Config;
 use Kidepik\Shared\Database\PdoFactory;
 use PDO;
@@ -267,14 +268,19 @@ class CrewService
         }
         if (array_key_exists('age_years', $payload)) {
             $age = $payload['age_years'];
-            if ($age !== null && (!is_int($age) || $age < 5 || $age > 14)) {
-                throw new InvalidArgumentException('age_years invalid');
+            if ($age !== null) {
+                if (!is_int($age)) {
+                    throw new InvalidArgumentException('age_years invalid');
+                }
+                AgeBand::assertAgeYears($age);
             }
             $fields[] = 'age_years = :age_years';
             $params['age_years'] = $age;
             if (is_int($age)) {
                 $fields[] = 'age_band = :age_band';
-                $params['age_band'] = $age <= 8 ? 'age_7' : 'age_9';
+                $params['age_band'] = AgeBand::fromAgeYears($age);
+                $fields[] = 'effective_age_band = :effective_age_band';
+                $params['effective_age_band'] = AgeBand::fromAgeYears($age);
             }
         }
         if (array_key_exists('status', $payload)) {
