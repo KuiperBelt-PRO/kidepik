@@ -4,9 +4,10 @@ description: >-
   SDD + TDD en el repositorio kidepik (producto Kuiper Belt). Usar cuando el
   cambio sea código de este repo y se pida especificación, tests primero o
   feature con cobertura. Incluye puerta de descubrimiento en .cursor/specify/
-  y .cursor/diagrams/ antes de proponer docs nuevas, y mantenimiento vivo de
-  specs, diagramas e índice CURRENT_SPECS durante el desarrollo. Delega el
-  método en la skill genérica spec-driven-dev del hub Vibe-Coding.
+  y .cursor/diagrams/ antes de proponer docs nuevas, mantenimiento vivo de
+  specs, diagramas e índice CURRENT_SPECS, y uso de logs en web/logs/ para
+  depurar. Delega el método en la skill genérica spec-driven-dev del hub
+  Vibe-Coding.
 ---
 
 # SDD + TDD para kidepik
@@ -59,8 +60,10 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 | Preview dev móvil | Electron + Playwright viewport 390×844 | `tools/preview-electron/`, `poc-up.ps1`, `poc-web-preview.ps1` |
 | Orquestación local | Docker Compose (nginx+php) + Supabase CLI | `docker/compose.yaml`, `scripts/poc-up.ps1` |
 | Hosting prod | DreamHost PHP | SPEC_HOSTING_FREE_TIER_STACK |
+| **Logs local (depuración)** | JSONL en `web/logs/` (volumen Docker) | `shared/Logging/AppLogger.php`, `web/js/lib/app-logger.js` |
 
 **Specs POC:** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](../../specify/SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md), [SPEC_MEDIA_STORAGE.md](../../specify/SPEC_MEDIA_STORAGE.md).  
+**Logs en disco:** [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md) — canales `api`, `ai`, `compose`, `client`; más detalle con `APP_DEBUG_AI=true`.  
 **URLs:** [.cursor/plan/PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md) — `http://localhost:8082`.  
 **Diagramas:** [.cursor/diagrams/README.md](../../diagrams/README.md) — matriz tarea→spec→diagrama en [14-agent-decision-tree.md](../../diagrams/14-agent-decision-tree.md).
 
@@ -72,6 +75,40 @@ Si el cambio toca `web/` visible en rutas con sesión (`#/crew`, `#/settings`, `
 2. Leer [SPEC_APP_SECTION_FRAME.md](../../specify/SPEC_APP_SECTION_FRAME.md) (matriz de rutas).
 3. **No** inventar chrome: `mountLoaderChrome` + `mountSectionFrame` + controles `glass-*`.
 4. Validar con skill `web-mobile-preview` (mundo animado visible detrás del marco).
+
+---
+
+## Logs en disco (depuración local)
+
+En POC Docker, la app escribe **JSONL** bajo `web/logs/` (accesible desde Cursor y desde el contenedor en `/var/www/html/logs`). **No versionar** el contenido (`web/logs/*` en `.gitignore`; solo `.gitkeep`).
+
+| Canal / archivo | Qué buscar |
+| --- | --- |
+| `api-{Y-m-d}.log` | Cada request HTTP (`http_request`: path, status, `duration_ms`) |
+| `ai-{Y-m-d}.log` | Intentos LLM (`llm_attempt`: modelo, `ok`, `error_class`, latencia); cooldown (`models_in_cooldown`) |
+| `compose-{Y-m-d}.log` | Fallos placement (`placement_compose_failed`, `handoff_compose_failed` + `compose_debug`) |
+| `client-{Y-m-d}.log` | Front: `route_change`, `api_call` (status 504/401…), `window_error`, `ui_click` (debug) |
+
+**Contrato:** [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md). Modo debug IA (panel + umbral `debug` en logs): [SPEC_APP_DEBUG_MODE.md](../../specify/SPEC_APP_DEBUG_MODE.md).
+
+### Cuándo consultar logs (obligatorio en depuración)
+
+| Situación | Orden de lectura |
+| --- | --- |
+| Fallo en play / prueba placement | `client` → `api` → `ai` → `compose` (correlacionar timestamp y `child_id` / `session_id`) |
+| Timeout 504 en turno | `client` (`api_call` 504) + `api` (¿llegó el request?) + `ai` (¿sigue el fallback?) |
+| Compose / mentor amable sin JSON | `compose` + `ai` (todos `llm_attempt` fallan vs fallo post-LLM) |
+| Cambio en gateway, colas, cooldown | `ai` + CLI `api/bin/inspect-ai-queues.php` (colas BD + cooldowns activos) |
+
+### Cómo leer (agente)
+
+1. Reproducir el fallo en navegador (o pedir al usuario que lo haya hecho).
+2. **Leer** los `.log` del día en `web/logs/` (herramienta Read o el usuario los adjunta).
+3. `Get-Content web\logs\ai-2026-08-01.log -Tail 30` (PowerShell) si hace falta desde shell.
+4. No sustituir logs por `docker logs` del contenedor PHP salvo migraciones/arranque; el detalle de producto está en `web/logs/`.
+5. En el informe al usuario: citar **message** + campos clave del JSONL (modelo, status, `error_class`), no secretos.
+
+Variables relevantes en `.env.poc`: `LOG_TO_FILES`, `LOG_LEVEL`, `APP_DEBUG_AI`, `LOG_CLIENT_INGEST` (ver `.env.poc.sample`).
 
 ---
 
@@ -90,6 +127,7 @@ Ejecutar en este orden (paralelizar lecturas cuando sea posible):
 5. **`.cursor/tasks/`** — si hay plan de ejecución abierto para la misma iniciativa.
 6. **Código** — `codegraph explore` / lectura dirigida si la spec dice «implementada».
 7. **Engram** (`mem_search`) — decisiones previas del proyecto que no estén aún en `.cursor/`.
+8. **Logs** (`web/logs/*.log`) — si el encargo es **depurar un fallo reproducido** (play, IA, API, navegación): leer § Logs en disco antes de hipótesis o parches.
 
 Si tras esto **ya cubre** el cambio una spec existente → **ampliar o actualizar** esa spec (y su diagrama), no crear otra paralela.
 
@@ -204,6 +242,7 @@ docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/ph
 2. **API:** `GET http://localhost:8082/api/v1/health` y rutas de la spec.
 3. **UI:** [cursor-browser-mcp-testing.mdc](../../rules/cursor-browser-mcp-testing.mdc) + [web-mobile-preview](../web-mobile-preview/SKILL.md). Capturas bajo `tmp/playwright-output/`.
 4. **Preview móvil:** `./scripts/poc-web-preview.ps1` cuando haga falta.
+5. **Logs:** tras flujos de play, IA o API, revisar `web/logs/` (§ Logs en disco). Si el usuario reporta fallo, **leer logs antes de cerrar** la tarea o proponer otro fix.
 
 ### Fase 5 — Cerrar
 
@@ -222,5 +261,6 @@ docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/ph
 | --- | --- |
 | Método SDD + TDD (canónico) | `Vibe-Coding/.cursor/skills/spec-driven-dev/SKILL.md` |
 | Patrones en este repo | [patterns.md](patterns.md) |
+| Logs JSONL local (`web/logs/`) | [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md) |
 | Docker Compose local | `Vibe-Coding/.cursor/skills/docker-compose-operations/SKILL.md` |
 | Git commit / push | `Vibe-Coding/.cursor/skills/git-workflow/SKILL.md` |

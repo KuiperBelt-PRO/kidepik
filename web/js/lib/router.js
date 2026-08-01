@@ -2,6 +2,7 @@
 
 import { isWorldRouteHash } from "./world-session.js";
 import { onShellPathChange, setShellNavNavigate } from "./shell-nav-stack.js";
+import { appLogRoute } from "./app-logger.js";
 
 /** @type {Map<string, RouteHandler>} */
 const routes = new Map();
@@ -93,6 +94,7 @@ export function startRouter() {
       if (out && typeof out.destroy === "function") {
         routeTeardown = out.destroy;
       }
+      appLogRoute(fromPath, nextPath, { world_handoff });
     } else {
       navigate("/loader");
     }

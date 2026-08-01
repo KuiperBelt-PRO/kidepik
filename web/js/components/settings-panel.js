@@ -18,6 +18,14 @@ import {
   normalizeSessionMinutes,
   setGlassButton,
 } from "./glass-controls.js?v=221";
+import {
+  isDebugAiClientActive,
+  isDebugAiAllowed,
+  setDebugAiClientActive,
+  setDebugAiServerAllowed,
+} from "../lib/debug-ai.js?v=243";
+import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=243";
+import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=243";
 
 /**
  * @param {HTMLElement} root
@@ -151,9 +159,20 @@ export function mountSettingsPanel(container, { session }) {
           <button type="button" class="settings-panel__chip" data-cd-sessions="null" aria-pressed="${settings.crew_defaults.session_limit_per_day == null}">Sin límite</button>
         </div>
       </section>
+
+      <section class="settings-panel__group" data-debug-section hidden aria-labelledby="set-debug">
+        <h2 id="set-debug" class="settings-panel__group-title">Diagnóstico</h2>
+        <p class="settings-panel__helper">Solo en entornos de desarrollo. Ayuda a ver modelos IA y fallos de compose.</p>
+        <label class="settings-panel__check">
+          <input type="checkbox" data-debug-toggle ${isDebugAiClientActive() ? "checked" : ""} />
+          Activar diagnóstico IA en la app
+        </label>
+        <button type="button" class="settings-panel__btn" data-open-debug></button>
+      </section>
     `;
 
     paintBtn(root, "[data-go-crew]", "crew", "Ver tripulación");
+    paintBtn(root, "[data-open-debug]", "settings", "Abrir diagnóstico IA");
     unsubIcons = bindGlassIconTheme(root);
 
     const durationHost = root.querySelector("[data-duration-host]");
@@ -271,6 +290,36 @@ export function mountSettingsPanel(container, { session }) {
     root.querySelector("[data-go-crew]")?.addEventListener("click", () => {
       debouncer?.flush();
       navigateShellRoute("/crew");
+    });
+    root.querySelector("[data-debug-toggle]")?.addEventListener("change", (ev) => {
+      const input = ev.target;
+      if (!(input instanceof HTMLInputElement)) return;
+      setDebugAiClientActive(input.checked);
+      if (input.checked) {
+        void fetchDebugAiStatus(session).then((res) => {
+          if (res.ok && res.data?.debug_allowed) setDebugAiServerAllowed(true);
+        });
+      }
+    });
+    root.querySelector("[data-open-debug]")?.addEventListener("click", () => {
+      if (!isDebugAiAllowed()) {
+        setDebugAiClientActive(true);
+        void fetchDebugAiStatus(session).then((res) => {
+          if (res.ok && res.data?.debug_allowed) {
+            setDebugAiServerAllowed(true);
+            void openDebugAiPanel({ session });
+          }
+        });
+        return;
+      }
+      void openDebugAiPanel({ session });
+    });
+    void fetchDebugAiStatus(session).then((res) => {
+      if (res.ok && res.data?.debug_allowed) {
+        setDebugAiServerAllowed(true);
+        const section = root.querySelector("[data-debug-section]");
+        if (section instanceof HTMLElement) section.hidden = false;
+      }
     });
   }
 

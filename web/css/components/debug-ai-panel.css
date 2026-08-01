@@ -1,0 +1,75 @@
+.debug-ai-fab {
+  position: fixed;
+  right: 12px;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  z-index: 120;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(12, 16, 28, 0.72);
+  color: #e8f0ff;
+  font-family: "Orbitron", system-ui, sans-serif;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  backdrop-filter: blur(10px);
+}
+
+.debug-ai-panel__line {
+  margin: 0 0 0.55rem;
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.debug-ai-panel__mono {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #dbe7ff;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.debug-ai-panel__mono--short {
+  max-height: 140px;
+}
+
+.debug-ai-panel__list ol {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.debug-ai-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+}
+
+.debug-ai-panel__btn {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.play-panel__debug-chip {
+  margin: 0.35rem 0 0;
+  font-size: 0.82rem;
+}
+
+.play-panel__debug-chip button {
+  border: none;
+  background: transparent;
+  color: #9fd0ff;
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}

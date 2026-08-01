@@ -111,6 +111,7 @@ final class MockAiGateway
         $theme = is_array($decoded) ? (string) ($decoded['world_theme'] ?? 'fantasy') : 'fantasy';
         $band = is_array($decoded) ? (string) ($decoded['age_band'] ?? AgeBand::CHILD) : AgeBand::CHILD;
         [$minDiff, $maxDiff] = SubjectCatalog::difficultyRange($band);
+        $allowedTypes = SubjectCatalog::allowedItemTypes($band);
         $diff = (int) floor(($minDiff + $maxDiff) / 2);
         $seed = abs(crc32($nonce));
         $items = [];
@@ -125,8 +126,12 @@ final class MockAiGateway
             $wrap = $theme === 'sci-fi'
                 ? "Un nodo de datos se abre ante ti (eco {$nonce})."
                 : "El umbral murmura un enigma fresco (eco {$nonce}).";
-            $item = match ($subject) {
-                'math', 'finance' => [
+            $preferNumeric = in_array($subject, ['math', 'finance'], true) && in_array('numeric', $allowedTypes, true);
+            $preferShort = in_array($subject, ['language', 'reading', 'communication'], true)
+                && in_array('short_text', $allowedTypes, true)
+                && !$preferNumeric;
+            if ($preferNumeric) {
+                $item = [
                     'slot' => $slotIdx,
                     'subject_id' => $subject,
                     'item_key' => "agent_{$subject}_{$nonce}_{$slotIdx}",
@@ -136,8 +141,9 @@ final class MockAiGateway
                     'narrative_wrapper' => $wrap,
                     'explanation' => "{$n} + {$m} = " . ($n + $m) . '.',
                     'canonical_answer' => ['numeric' => $n + $m, 'tolerance' => 0],
-                ],
-                'language', 'reading', 'communication' => [
+                ];
+            } elseif ($preferShort) {
+                $item = [
                     'slot' => $slotIdx,
                     'subject_id' => $subject,
                     'item_key' => "agent_{$subject}_{$nonce}_{$slotIdx}",
@@ -147,36 +153,39 @@ final class MockAiGateway
                     'narrative_wrapper' => $wrap,
                     'explanation' => 'El plural de luz es luces.',
                     'canonical_answer' => ['keywords' => ['luces']],
-                ],
-                default => [
+                ];
+            } else {
+                $sum = $n + $m;
+                $item = [
                     'slot' => $slotIdx,
                     'subject_id' => $subject,
                     'item_key' => "agent_{$subject}_{$nonce}_{$slotIdx}",
                     'item_type' => 'mcq',
                     'difficulty' => $diff,
-                    'prompt_text' => "¿Cuál principio refuerza mejor la convivencia en una comunidad ({$subject}, eco {$n})?",
+                    'prompt_text' => in_array($subject, ['math', 'finance'], true)
+                        ? "¿Cuánto es {$n} + {$m}?"
+                        : "¿Cuál principio refuerza mejor la convivencia en una comunidad ({$subject}, eco {$n})?",
                     'narrative_wrapper' => $wrap,
-                    'explanation' => 'La opción correcta equilibra derechos y responsabilidades sin concentrar el poder.',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'Concentrar todas las decisiones en una sola autoridad sin revisión'],
-                        ['id' => 'b', 'label' => 'Distribuir poder con contrapesos y revisión periódica de acuerdos'],
-                        ['id' => 'c', 'label' => 'Eliminar toda norma para que cada persona decida sin límites'],
-                        ['id' => 'd', 'label' => 'Delegar el gobierno solo a expertos sin participación ciudadana'],
+                    'explanation' => in_array($subject, ['math', 'finance'], true)
+                        ? "{$n} + {$m} = {$sum}."
+                        : 'La opción correcta equilibra derechos y responsabilidades sin concentrar el poder.',
+                    'options' => in_array($subject, ['math', 'finance'], true)
+                        ? [
+                            ['id' => 'a', 'label' => (string) $sum],
+                            ['id' => 'b', 'label' => (string) ($sum + 1)],
+                            ['id' => 'c', 'label' => (string) max(1, $sum - 1)],
+                            ['id' => 'd', 'label' => (string) ($sum + 2)],
+                        ]
+                        : [
+                            ['id' => 'a', 'label' => 'Concentrar todas las decisiones en una sola autoridad sin revisión'],
+                            ['id' => 'b', 'label' => 'Distribuir poder con contrapesos y revisión periódica de acuerdos'],
+                            ['id' => 'c', 'label' => 'Eliminar toda norma para que cada persona decida sin límites'],
+                            ['id' => 'd', 'label' => 'Delegar el gobierno solo a expertos sin participación ciudadana'],
+                        ],
+                    'canonical_answer' => [
+                        'option_id' => in_array($subject, ['math', 'finance'], true) ? 'a' : 'b',
                     ],
-                    'canonical_answer' => ['option_id' => 'b'],
-                ],
-            };
-            // band_early solo mcq
-            if ($band === AgeBand::EARLY && ($item['item_type'] ?? '') !== 'mcq') {
-                $item['item_type'] = 'mcq';
-                $item['options'] = [
-                    ['id' => 'a', 'label' => (string) ($n + $m)],
-                    ['id' => 'b', 'label' => (string) ($n + $m + 1)],
-                    ['id' => 'c', 'label' => (string) max(1, $n - 1)],
                 ];
-                $item['canonical_answer'] = ['option_id' => 'a'];
-                $item['prompt_text'] = "¿Cuánto es {$n} + {$m}?";
-                unset($item['canonical_answer']['numeric'], $item['canonical_answer']['keywords'], $item['canonical_answer']['tolerance']);
             }
             $items[] = $item;
         }

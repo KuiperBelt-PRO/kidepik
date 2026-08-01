@@ -16,6 +16,7 @@ use Kidepik\Shared\Ai\PlacementNarrator;
 use Kidepik\Shared\Ai\SubjectCatalog;
 use Kidepik\Shared\Config;
 use Kidepik\Shared\Database\PdoFactory;
+use Kidepik\Shared\Logging\AppLogger;
 use PDO;
 use RuntimeException;
 
@@ -26,6 +27,9 @@ final class DialogueService
 {
     /** @var list<array<string,mixed>> */
     private array $lastEffects = [];
+
+    /** @var array<string,mixed>|null */
+    private ?array $lastComposeDebug = null;
 
     public function __construct(
         private readonly ?PDO $pdo = null,
@@ -96,6 +100,8 @@ final class DialogueService
             'flow_id' => (string) $session['flow_id'],
             'onboarding_step' => (string) ($child['onboarding_step'] ?? 'pending_entry'),
             'world_theme' => $child['world_theme'] ?? null,
+            'age_band' => $child['age_band'] ?? $child['effective_age_band'] ?? null,
+            'age_years' => isset($child['age_years']) ? (int) $child['age_years'] : null,
             'display_name' => $child['display_name'] ?? null,
             'mentor' => MentorCatalog::profile(
                 (string) ($session['mentor_id'] ?? MentorCatalog::idForWorldTheme($child['world_theme'] ?? null))
@@ -109,8 +115,13 @@ final class DialogueService
      * @param array{kind:string,option_id?:string,text?:string} $reply
      * @return array<string,mixed>
      */
-    public function submitTurn(string $authUserId, string $childId, string $sessionId, array $reply): array
-    {
+    public function submitTurn(
+        string $authUserId,
+        string $childId,
+        string $sessionId,
+        array $reply,
+        bool $attachDebug = false,
+    ): array {
         $crew = $this->crew();
         $child = $crew->getForAuthUser($authUserId, $childId);
         $pdo = $this->pdo();
@@ -159,6 +170,7 @@ final class DialogueService
             'model_used' => null,
         ]);
 
+        $this->lastComposeDebug = null;
         $effects = [];
         $agentTurns = [];
         $step = (string) ($child['onboarding_step'] ?? 'pending_entry');
@@ -243,9 +255,20 @@ final class DialogueService
                     ->execute(['id' => $sessionId]);
                 $effects = $started['effects'];
                 $agentTurns[] = $this->insertTurn($pdo, $started['turn']);
-            } catch (InvalidArgumentException $e) {
-                if ($e->getMessage() !== 'placement_compose_failed') {
-                    throw $e;
+            } catch (PlacementComposeFailedException $e) {
+                $this->lastComposeDebug = $e->composeDebug;
+                AppLogger::channel('compose')->warning('handoff_compose_failed', [
+                    'child_id' => $childId,
+                    'session_id' => $sessionId,
+                    'compose_debug' => $e->composeDebug,
+                ]);
+                $meta = [
+                    'phase' => 'handoff_placement',
+                    'mentor_id' => $mentorId,
+                    'compose_failed' => true,
+                ];
+                if ($attachDebug) {
+                    $meta['compose_debug'] = $e->composeDebug;
                 }
                 $agentTurns[] = $this->insertTurn($pdo, [
                     'session_id' => $sessionId,
@@ -258,9 +281,11 @@ final class DialogueService
                     'input_mode' => 'options_only',
                     'options' => [['id' => 'start_placement', 'label' => 'Reintentar prueba']],
                     'explorer_reply' => null,
-                    'meta' => ['phase' => 'handoff_placement', 'mentor_id' => $mentorId, 'compose_failed' => true],
+                    'meta' => $meta,
                     'model_used' => null,
                 ]);
+            } catch (InvalidArgumentException $e) {
+                throw $e;
             }
         } elseif ($flowId === 'first_run' || in_array($step, ['pending_entry', 'choose_world', 'choose_name', 'choose_age', 'choose_character'], true)) {
             [$effects, $agentTurns, $step] = $this->advanceFirstRun(
@@ -305,7 +330,7 @@ final class DialogueService
 
         $fresh = $crew->getForAuthUser($authUserId, $childId);
 
-        return [
+        $response = [
             'agent_turns' => $agentTurns,
             'effects' => $effects,
             'flow_complete' => ($fresh['onboarding_step'] ?? '') === 'complete'
@@ -316,7 +341,36 @@ final class DialogueService
                 MentorCatalog::idForWorldTheme($fresh['world_theme'] ?? null)
             ),
             'world_theme' => $fresh['world_theme'] ?? null,
+            'age_band' => $fresh['age_band'] ?? $fresh['effective_age_band'] ?? null,
+            'age_years' => isset($fresh['age_years']) ? (int) $fresh['age_years'] : null,
         ];
+
+        if ($attachDebug) {
+            $response['debug'] = $this->buildDebugPayload();
+        }
+
+        return $response;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildDebugPayload(): array
+    {
+        $payload = [
+            'ai' => [
+                'enabled' => Config::aiEnabled(),
+                'mock' => Config::aiMock(),
+                'key_present' => Config::openRouterKeyPresent(),
+                'max_attempts' => Config::aiMaxModelAttempts(),
+                'debug_allowed' => Config::aiDebugEnabled(),
+            ],
+        ];
+        if ($this->lastComposeDebug !== null) {
+            $payload['compose'] = $this->lastComposeDebug;
+        }
+
+        return $payload;
     }
 
     /**

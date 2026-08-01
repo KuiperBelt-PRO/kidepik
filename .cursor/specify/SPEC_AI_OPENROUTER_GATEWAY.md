@@ -177,6 +177,44 @@ Tabla `ai_purpose_model_queues` (`purpose`, `model_id`, `position`, `enabled`).
 
 Purposes semilla: `placement_exam_composer`, `placement_exam_batch_writer`, `placement_item_writer`, `dialogue`, `journey_summarizer`.
 
+### 4.4 Cooldown temporal de modelos (ago 2026)
+
+Tabla `ai_model_cooldowns` (`purpose`, `model_id`, `error_class`, `expires_at`).
+
+| Regla | Valor |
+| --- | --- |
+| Trigger | Tras fallo LLM en `AiGateway` (no en cola inyectada de tests) |
+| TTL | Por clase: transport/timeout 6 h, HTTP 404 24 h, 429 2 h, empty 4 h, HTTP otro 6 h (env `AI_COOLDOWN_*_HOURS`) |
+| Éxito | Borra la fila cooldown para ese purpose+modelo |
+| Resolución | Modelos en cooldown se omiten; se rellena con discovery hasta `AI_MAX_MODEL_ATTEMPTS` |
+| Presupuesto | `AI_GATEWAY_WALL_BUDGET_SECONDS` (default 90) — aborta fallback antes de timeout nginx |
+
+### 4.5 Discovery periódico en colas BD (ago 2026)
+
+`FreeModelQueueSync`: cada `AI_DISCOVERY_INTERVAL_HOURS` (default 6), `GET /models` → inserta hasta `AI_DISCOVERY_MAX_NEW_PER_PURPOSE` modelos free nuevos por purpose en `ai_purpose_model_queues` (`notes=auto-discovery`).
+
+Arranque contenedor PHP (`sync-ai-discovery.php`) + chequeo ligero en cada request API (`syncIfStale`). Estado en `ai_runtime_state`.
+
+### 4.6 Prioridad por éxito reciente (delta A2 — implementada)
+
+Complementa §4.4. Objetivo: modelos free que **completan** `placement_exam_composer` (u otros purposes) suben al frente de la cola resuelta.
+
+| Señal | Fuente | Efecto |
+| --- | --- | --- |
+| Éxito `ok=true` reciente | `ai_call_attempts` (ventana `AI_SUCCESS_BOOST_HOURS`, default **48**) | Boost score / prepend en `resolved_models` |
+| Fallos soft (`empty`, JSON inválido post-parse en composer) | Contador opcional o intentos `ok=false` | Soft demote (no cooldown duro salvo umbral) |
+| Cooldown activo | `ai_model_cooldowns` | Exclusión dura hasta TTL |
+
+Orden de resolución propuesto:
+
+```
+available = db_queue ⊕ discovery  − cooldown
+sorted = sort_by(success_count_desc, position_asc, discovery_rank)
+attempts = sorted[:AI_MAX_MODEL_ATTEMPTS]
+```
+
+Uso en compose paralelo: ver [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) §A2 (lotes + sticky winner).
+
 ---
 
 ## 5. Política «nunca de pago»
@@ -225,9 +263,55 @@ Por `child_id` (miembro) / día: `AI_RATE_LIMIT_PER_CHILD_DAY` (nombre históric
 6. Mock no usa red; PHPUnit con fixture de catálogo.
 7. Telemetría guarda `model` real usado.
 
+---
+
+## 9. Telemetría de intentos y modo debug (delta — ago 2026)
+
+> Contrato UI/API de activación: [SPEC_APP_DEBUG_MODE.md](SPEC_APP_DEBUG_MODE.md).  
+> Estado: **pendiente de aprobación** junto a esa spec.
+
+### 9.1 Problema
+
+`complete()` hace fallback silencioso: cada `LLMException` se traga sin registro. Sin traza no se puede distinguir 429 vs JSON vacío vs cola vacía vs validación de placement.
+
+### 9.2 Obligaciones del gateway
+
+| Obligación | Detalle |
+| --- | --- |
+| Traza por request | Lista de intentos (`model_id`, `ok`, `http_status`, `latency_ms`, `error_class`) |
+| Cola resuelta | Incluir snapshot de `resolveAttempts` + `queue_source` |
+| Éxito | Seguir devolviendo `model` real; escribir `api_usage` (implementar `AiUsageTracker`) |
+| Debug off | Traza solo en memoria/log local si `APP_DEBUG_AI`; no filtrar al cliente |
+| Debug on | Adjuntar traza a callers / respuestas según SPEC_APP_DEBUG_MODE |
+
+### 9.3 Clasificación de errores
+
+| `error_class` | Cuándo |
+| --- | --- |
+| `timeout` | Guzzle timeout / connect |
+| `http` | Status ≥ 400 con cuerpo |
+| `empty` | HTTP OK sin content |
+| `json` | Content no parseable cuando se exige JSON |
+| `transport` | Error de red genérico |
+| `other` | Resto |
+
+### 9.4 Env
+
+| Variable | Default | Rol |
+| --- | --- | --- |
+| `APP_DEBUG_AI` | `false` | Habilita traza hacia cliente + endpoints `/debug/ai` (solo si `APP_ENV` no es production) |
+| `AI_MAX_MODEL_ATTEMPTS` | `12` | Alinear compose.yaml sample con Config |
+
+### 9.5 Criterios añadidos
+
+8. Con gateway stub (fail, fail, ok), la traza lista 3 intentos y `winner_model` = el tercero.
+9. Con todos fail, la traza lista N intentos y la excepción final sigue siendo `all free models failed` / última LLMException.
+10. `api_usage` recibe al menos una fila en éxito (purpose + model).
+
 ## Aprobación
 
 - [ ] Solo OpenRouter free + discovery `GET /models`
 - [ ] Ranking interno + fallback decreciente
 - [ ] `AI_ALLOW_PAID=false` por defecto
 - [ ] Caché persistida + penalización por fallos
+- [ ] §9 Telemetría de intentos + enlace SPEC_APP_DEBUG_MODE

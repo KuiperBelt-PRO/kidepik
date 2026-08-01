@@ -42,6 +42,9 @@
 - **Catálogo de materias (14 áreas):** [specify/SPEC_APP_SUBJECT_CATALOG.md](specify/SPEC_APP_SUBJECT_CATALOG.md) — **implementada** 31 jul 2026; `reading` separada; base por banda; activación por tripulante en ficha
 - **Placement adaptativo + prosa mentor:** [specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) — **implementada** 31 jul 2026; **A1** (1 ago 2026): examen solo agente, sin banco seed; castellano ES; fallo → reintento
   - Colas LLM por purpose en BD: `ai_purpose_model_queues` ([SPEC_AI_OPENROUTER_GATEWAY](specify/SPEC_AI_OPENROUTER_GATEWAY.md) §4.3) — **B1**
+  - **A2 (implementada 1 ago 2026):** compose en lotes paralelos (≤4 slots, concurrency 3, sticky winner) + priorización por éxito ([§A2](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md#a2--compose-paralelo-por-lotes--priorización-de-modelos-1-ago-2026)); gateway §4.6; copy espera sin «armar»/«examen», rotación ≥ 8 s, variantes por `age_band` + mundo
+- **Modo debug IA (tutor / local):** [specify/SPEC_APP_DEBUG_MODE.md](specify/SPEC_APP_DEBUG_MODE.md) — **implementada** 1 ago 2026; traza de fallback OpenRouter + panel UI; delta gateway §9
+- **Logs en disco (web/logs):** [specify/SPEC_APP_FILE_LOGGING.md](specify/SPEC_APP_FILE_LOGGING.md) — **implementada** 1 ago 2026; JSONL por canal/nivel; más detalle con `APP_DEBUG_AI`
 - **Notificaciones glass:** [specify/SPEC_APP_GLASS_TOAST.md](specify/SPEC_APP_GLASS_TOAST.md) — **implementada** jul 2026; errores/warnings/success/info reutilizables
 - **Modales glass:** [specify/SPEC_APP_GLASS_MODAL.md](specify/SPEC_APP_GLASS_MODAL.md) — **implementada** jul 2026; alerta y confirmación reutilizables; tripulación y cuenta
 - **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** + delta `choose_character`

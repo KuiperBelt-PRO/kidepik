@@ -13,6 +13,7 @@ use Kidepik\Api\Services\JourneyMemoryService;
 use Kidepik\Api\Services\JourneyTimelineService;
 use Kidepik\Api\Services\ParentAccountService;
 use Kidepik\Api\Services\SupabaseAuthService;
+use Kidepik\Shared\Config;
 use Kidepik\Shared\Database\PdoFactory;
 use RuntimeException;
 use Throwable;
@@ -61,12 +62,15 @@ final class PlayDialogueController
             }
             try {
                 /** @var array{kind:string,option_id?:string,text?:string} $reply */
+                $attachDebug = Config::shouldAttachDebugResponse($_SERVER['HTTP_X_KIDEPIK_DEBUG_AI'] ?? null);
+
                 return JsonResponse::ok(
                     ($this->dialogue ?? new DialogueService())->submitTurn(
                         $authUserId,
                         $childId,
                         $sessionId,
-                        $reply
+                        $reply,
+                        $attachDebug,
                     )
                 );
             } catch (InvalidArgumentException $e) {

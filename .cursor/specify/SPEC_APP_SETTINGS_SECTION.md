@@ -318,7 +318,7 @@ Export y retención pueden implementarse en una tarea posterior **dentro** de es
 | --- | --- |
 | Versión | Mostrar versión web (`import.meta` / `APP_VERSION` inyectado) + build hash corto si existe |
 | Limpiar caché UI | Borra keys `localStorage` de preferencias UI **excepto** sesión auth; rehidrata desde servidor; toast «Caché local limpiada» |
-| Diagnóstico | Solo builds no-prod: flag `?debug=1` o menú oculto — fuera de UI producción |
+| Diagnóstico | Solo no-prod: ver [SPEC_APP_DEBUG_MODE.md](SPEC_APP_DEBUG_MODE.md) (`APP_DEBUG_AI`, `?debugAi=1`, panel tras fallo de compose) |
 
 No incluir «Cerrar sesión» ni «Eliminar cuenta» (viven en drawer / Cuenta).
 

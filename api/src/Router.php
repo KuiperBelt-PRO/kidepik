@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Kidepik\Api;
 
+use Kidepik\Api\Controllers\ClientLogController;
+use Kidepik\Api\Controllers\DebugAiController;
 use Kidepik\Api\Controllers\ArchitectureController;
 use Kidepik\Api\Controllers\CrewController;
 use Kidepik\Api\Controllers\HealthController;
@@ -118,6 +120,26 @@ final class Router
                 $_SERVER['HTTP_AUTHORIZATION'] ?? null,
             ),
             $method === 'POST' && $path === '/api/v1/crew' => (new CrewController())->create(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                file_get_contents('php://input') ?: null,
+            ),
+            $method === 'GET' && $path === '/api/v1/debug/ai/status' => (new DebugAiController())->status(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+            ),
+            $method === 'GET' && $path === '/api/v1/debug/ai/queues' => (new DebugAiController())->queues(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+            ),
+            $method === 'GET' && $path === '/api/v1/debug/ai/resolve' => (new DebugAiController())->resolve(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+            ),
+            $method === 'GET' && $path === '/api/v1/debug/ai/attempts' => (new DebugAiController())->attempts(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+            ),
+            $method === 'POST' && $path === '/api/v1/debug/ai/ping' => (new DebugAiController())->ping(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                file_get_contents('php://input') ?: null,
+            ),
+            $method === 'POST' && $path === '/api/v1/client/logs' => (new ClientLogController())->ingest(
                 $_SERVER['HTTP_AUTHORIZATION'] ?? null,
                 file_get_contents('php://input') ?: null,
             ),

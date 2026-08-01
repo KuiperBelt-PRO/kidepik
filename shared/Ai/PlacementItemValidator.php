@@ -22,6 +22,7 @@ final class PlacementItemValidator
         int $maxDiff,
         array $allowedTypes,
         int $slotIndex,
+        bool $lenientMcq = false,
     ): ?array {
         $subject = (string) ($raw['subject_id'] ?? $expectedSubject);
         if ($subject !== $expectedSubject || !SubjectCatalog::isValid($subject)) {
@@ -80,7 +81,7 @@ final class PlacementItemValidator
             if ($want === '' || !in_array($want, $ids, true)) {
                 return null;
             }
-            if (!$this->mcqOptionsArePlausible($options, $want, $prompt, $ageBand)) {
+            if (!$lenientMcq && !$this->mcqOptionsArePlausible($options, $want, $prompt, $ageBand)) {
                 return null;
             }
             $item['options'] = $options;

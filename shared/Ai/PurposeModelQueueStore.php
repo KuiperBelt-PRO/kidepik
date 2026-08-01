@@ -58,6 +58,55 @@ class PurposeModelQueueStore
     }
 
     /**
+     * @return list<array{purpose:string,model_id:string,position:int,enabled:bool,notes?:string}>
+     */
+    public function listRows(?string $purpose = null): array
+    {
+        $pdo = $this->pdo ?? PdoFactory::fromConfig();
+        if (!$pdo instanceof PDO) {
+            return [];
+        }
+
+        try {
+            if ($purpose !== null && $purpose !== '') {
+                $stmt = $pdo->prepare(
+                    'select purpose, model_id, position, enabled, notes
+                     from ai_purpose_model_queues
+                     where purpose = :purpose
+                     order by position asc'
+                );
+                $stmt->execute(['purpose' => $purpose]);
+            } else {
+                $stmt = $pdo->query(
+                    'select purpose, model_id, position, enabled, notes
+                     from ai_purpose_model_queues
+                     order by purpose asc, position asc'
+                );
+            }
+            if ($stmt === false) {
+                return [];
+            }
+            $out = [];
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $out[] = [
+                    'purpose' => (string) ($row['purpose'] ?? ''),
+                    'model_id' => (string) ($row['model_id'] ?? ''),
+                    'position' => (int) ($row['position'] ?? 0),
+                    'enabled' => (bool) ($row['enabled'] ?? true),
+                    'notes' => isset($row['notes']) ? (string) $row['notes'] : null,
+                ];
+            }
+
+            return $out;
+        } catch (PDOException) {
+            return [];
+        }
+    }
+
+    /**
      * @return array<string, list<array{model_id:string,position:int}>>
      */
     private function loadAll(): array

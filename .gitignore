@@ -30,6 +30,10 @@ dist/
 build/
 *.log
 
+# Logs de aplicación (API / IA) — no versionar
+web/logs/*
+!web/logs/.gitkeep
+
 # Supabase CLI (estado local; versionar config.toml + migrations/)
 supabase/.branches/
 supabase/.temp/

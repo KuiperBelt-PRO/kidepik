@@ -93,7 +93,7 @@ final class PlacementService
         $composer = new PlacementExamComposer(narrator: $this->narrator);
         $queue = $composer->compose($child, $subjects, $recentKeys, $recentPrompts);
         if ($queue === []) {
-            throw new InvalidArgumentException('placement_compose_failed');
+            throw new PlacementComposeFailedException($composer->getLastComposeDebug());
         }
 
         $ins = $this->pdo->prepare(

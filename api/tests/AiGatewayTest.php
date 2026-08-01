@@ -13,6 +13,7 @@ use Kidepik\Shared\Ai\FreeModelRanker;
 use Kidepik\Shared\Ai\LLMException;
 use Kidepik\Shared\Ai\MentorCatalog;
 use Kidepik\Shared\Ai\MockAiGateway;
+use Kidepik\Shared\Ai\PurposeModelQueueStore;
 use PHPUnit\Framework\TestCase;
 
 final class AiGatewayTest extends TestCase
@@ -126,6 +127,9 @@ final class AiGatewayTest extends TestCase
             }
         };
 
+        $queueStore = $this->createStub(PurposeModelQueueStore::class);
+        $queueStore->method('idsForPurpose')->willReturn([]);
+
         $calls = [];
         $gateway = new AiGateway(
             chatFn: static function (string $model, array $messages, array $opts) use (&$calls): array {
@@ -134,6 +138,7 @@ final class AiGatewayTest extends TestCase
                 return ['content' => '{"agent_text":"ok","input_mode":"continue"}', 'raw_model' => $model];
             },
             discovery: $discovery,
+            purposeQueues: $queueStore,
         );
 
         $gateway->complete([['role' => 'user', 'content' => 'hola']], ['purpose' => 'dialogue']);

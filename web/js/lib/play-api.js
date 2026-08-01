@@ -3,6 +3,9 @@
  * @module play-api
  */
 
+import { debugAiRequestHeaders } from "./debug-ai.js";
+import { appLogApi } from "./app-logger.js";
+
 /**
  * @param {import('@supabase/supabase-js').Session} session
  * @param {string} childId
@@ -16,15 +19,18 @@ export async function openDialogueSession(session, childId, flowId = "first_run"
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         "Content-Type": "application/json",
+        ...debugAiRequestHeaders(),
       },
       body: JSON.stringify({ flow_id: flowId }),
     });
     if (!res.ok) {
+      appLogApi("play/dialogue/session", res.status, { child_id: childId });
       return { ok: false, status: res.status };
     }
     return { ok: true, data: await res.json() };
   } catch (err) {
     console.warn("play session error", err);
+    appLogApi("play/dialogue/session", 0, { child_id: childId, transport: true });
     return { ok: false };
   }
 }
@@ -43,6 +49,7 @@ export async function submitDialogueTurn(session, childId, sessionId, reply) {
       headers: {
         Authorization: `Bearer ${session.access_token}`,
         "Content-Type": "application/json",
+        ...debugAiRequestHeaders(),
       },
       body: JSON.stringify({ session_id: sessionId, reply }),
     });
@@ -54,11 +61,13 @@ export async function submitDialogueTurn(session, childId, sessionId, reply) {
       } catch {
         /* ignore */
       }
+      appLogApi("play/dialogue/turn", res.status, { child_id: childId, session_id: sessionId, error: detail });
       return { ok: false, status: res.status, error: detail };
     }
     return { ok: true, data: await res.json() };
   } catch (err) {
     console.warn("play turn error", err);
+    appLogApi("play/dialogue/turn", 0, { child_id: childId, transport: true });
     return { ok: false };
   }
 }
@@ -78,7 +87,10 @@ export async function fetchJourneyTimeline(session, childId, opts = {}) {
     const res = await fetch(
       `${config.apiUrl}/play/${encodeURIComponent(childId)}/journey/timeline${qs ? `?${qs}` : ""}`,
       {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          ...debugAiRequestHeaders(),
+        },
       },
     );
     if (!res.ok) {

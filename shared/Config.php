@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Kidepik\Shared;
 
+use Kidepik\Shared\Logging\LogLevel;
+
 final class Config
 {
     private static bool $loaded = false;
@@ -218,6 +220,90 @@ final class Config
         return max(1, (int) self::get('AI_MAX_MODEL_ATTEMPTS', '12'));
     }
 
+    public static function aiGatewayWallBudgetSeconds(): int
+    {
+        return max(1, (int) self::get('AI_GATEWAY_WALL_BUDGET_SECONDS', '90'));
+    }
+
+    public static function aiCooldownTransportHours(): int
+    {
+        return max(1, (int) self::get('AI_COOLDOWN_TRANSPORT_HOURS', '6'));
+    }
+
+    public static function aiCooldownNotFoundHours(): int
+    {
+        return max(1, (int) self::get('AI_COOLDOWN_NOT_FOUND_HOURS', '24'));
+    }
+
+    public static function aiCooldownRateLimitHours(): int
+    {
+        return max(1, (int) self::get('AI_COOLDOWN_RATE_LIMIT_HOURS', '2'));
+    }
+
+    public static function aiCooldownEmptyHours(): int
+    {
+        return max(1, (int) self::get('AI_COOLDOWN_EMPTY_HOURS', '4'));
+    }
+
+    public static function aiCooldownHttpHours(): int
+    {
+        return max(1, (int) self::get('AI_COOLDOWN_HTTP_HOURS', '6'));
+    }
+
+    public static function aiCooldownDefaultHours(): int
+    {
+        return max(1, (int) self::get('AI_COOLDOWN_DEFAULT_HOURS', '6'));
+    }
+
+    public static function aiCooldownComposeParseHours(): int
+    {
+        return max(1, (int) self::get('AI_COOLDOWN_COMPOSE_PARSE_HOURS', '2'));
+    }
+
+    public static function aiDiscoveryEnabled(): bool
+    {
+        if (self::aiMock() || self::openRouterApiKey() === '') {
+            return false;
+        }
+
+        return filter_var(self::get('AI_DISCOVERY_SYNC', 'true'), FILTER_VALIDATE_BOOL);
+    }
+
+    public static function aiDiscoveryIntervalHours(): int
+    {
+        return max(1, (int) self::get('AI_DISCOVERY_INTERVAL_HOURS', '6'));
+    }
+
+    public static function aiDiscoveryMaxNewPerPurpose(): int
+    {
+        return max(1, (int) self::get('AI_DISCOVERY_MAX_NEW_PER_PURPOSE', '5'));
+    }
+
+    public static function aiComposeBatchMaxSlots(): int
+    {
+        return max(1, (int) self::get('AI_COMPOSE_BATCH_MAX_SLOTS', '4'));
+    }
+
+    public static function aiComposeBatchConcurrency(): int
+    {
+        return max(1, (int) self::get('AI_COMPOSE_BATCH_CONCURRENCY', '3'));
+    }
+
+    public static function aiComposeBatchRetries(): int
+    {
+        return max(0, (int) self::get('AI_COMPOSE_BATCH_RETRIES', '2'));
+    }
+
+    public static function aiComposeStickyWinner(): bool
+    {
+        return filter_var(self::get('AI_COMPOSE_STICKY_WINNER', 'true'), FILTER_VALIDATE_BOOL);
+    }
+
+    public static function aiSuccessBoostHours(): int
+    {
+        return max(1, (int) self::get('AI_SUCCESS_BOOST_HOURS', '48'));
+    }
+
     public static function aiTimeoutSeconds(): int
     {
         return max(5, (int) self::get('AI_TIMEOUT_SECONDS', '30'));
@@ -236,6 +322,80 @@ final class Config
     public static function aiRateLimitPerChildDay(): int
     {
         return max(1, (int) self::get('AI_RATE_LIMIT_PER_CHILD_DAY', '80'));
+    }
+
+    public static function aiDebugEnvAllowed(): bool
+    {
+        return in_array(self::appEnv(), ['local', 'development', 'test'], true);
+    }
+
+    public static function aiDebugEnabled(): bool
+    {
+        if (!self::aiDebugEnvAllowed()) {
+            return false;
+        }
+
+        return filter_var(self::get('APP_DEBUG_AI', 'false'), FILTER_VALIDATE_BOOL);
+    }
+
+    public static function shouldAttachDebugResponse(?string $debugHeader): bool
+    {
+        if (!self::aiDebugEnabled()) {
+            return false;
+        }
+
+        return trim((string) $debugHeader) === '1';
+    }
+
+    public static function openRouterKeyPresent(): bool
+    {
+        return self::openRouterApiKey() !== '';
+    }
+
+    public static function fileLoggingEnabled(): bool
+    {
+        if (self::appEnv() === 'production') {
+            return filter_var(self::get('LOG_TO_FILES', 'false'), FILTER_VALIDATE_BOOL);
+        }
+
+        return filter_var(self::get('LOG_TO_FILES', 'true'), FILTER_VALIDATE_BOOL);
+    }
+
+    public static function logDir(): string
+    {
+        $dir = self::get('LOG_DIR', '/var/www/html/logs');
+
+        return $dir !== '' ? $dir : '/var/www/html/logs';
+    }
+
+    public static function logLevel(): string
+    {
+        $default = self::appEnv() === 'production' ? 'warning' : 'info';
+        $raw = self::get('LOG_LEVEL', $default);
+
+        return LogLevel::normalize($raw);
+    }
+
+    public static function clientLogIngestEnabled(): bool
+    {
+        if (!self::fileLoggingEnabled()) {
+            return false;
+        }
+
+        if (self::appEnv() === 'production') {
+            return filter_var(self::get('LOG_CLIENT_INGEST', 'false'), FILTER_VALIDATE_BOOL);
+        }
+
+        return filter_var(self::get('LOG_CLIENT_INGEST', 'true'), FILTER_VALIDATE_BOOL);
+    }
+
+    public static function clientLogLevel(): string
+    {
+        if (self::aiDebugEnabled()) {
+            return LogLevel::DEBUG;
+        }
+
+        return self::logLevel();
     }
 
     private static function get(string $key, string $default = ''): string

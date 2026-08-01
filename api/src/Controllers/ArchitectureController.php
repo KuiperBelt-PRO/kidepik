@@ -27,6 +27,8 @@ final class ArchitectureController
             'supabase_url' => Config::publicSupabaseUrl(),
             'storage_public_url' => Config::mediaPublicBaseUrl(),
             'media_base_url' => Config::mediaPublicBaseUrl(),
+            'client_logging' => Config::clientLogIngestEnabled(),
+            'client_log_level' => Config::clientLogLevel(),
             'note' => 'Same-origin app: web + API + /media on one host.',
         ]);
     }

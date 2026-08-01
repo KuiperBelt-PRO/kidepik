@@ -23,8 +23,12 @@ final class PlacementAgentOnlyAndQueuesTest extends TestCase
     {
         putenv('AI_MOCK=false');
         putenv('AI_ENABLED=true');
+        putenv('APP_DEBUG_AI=true');
+        putenv('APP_ENV=local');
         $_ENV['AI_MOCK'] = 'false';
         $_ENV['AI_ENABLED'] = 'true';
+        $_ENV['APP_DEBUG_AI'] = 'true';
+        $_ENV['APP_ENV'] = 'local';
 
         $gateway = new AiGateway(
             modelQueue: ['mock/local'],
@@ -42,6 +46,9 @@ final class PlacementAgentOnlyAndQueuesTest extends TestCase
             ['math', 'ethics'],
         );
         self::assertSame([], $queue);
+        $debug = $composer->getLastComposeDebug();
+        self::assertSame('exception', $debug['outcome']);
+        self::assertNotEmpty($debug['llm_traces']);
     }
 
     public function testComposeMockNeverUsesBankSource(): void
@@ -79,33 +86,24 @@ final class PlacementAgentOnlyAndQueuesTest extends TestCase
 
     public function testGatewayPrefersInjectedPurposeQueue(): void
     {
-        $store = $this->createStub(PurposeModelQueueStore::class);
-        $store->method('idsForPurpose')->willReturn([
-            'google/gemma-3-27b-it:free',
-            'meta-llama/llama-3.3-70b-instruct:free',
-        ]);
-
-        $called = [];
-        $gateway = new AiGateway(
-            modelQueue: null,
-            chatFn: static function (string $modelId) use (&$called): array {
-                $called[] = $modelId;
-                return ['content' => '{"agent_text":"ok","input_mode":"continue"}', 'raw_model' => $modelId];
-            },
-            allowPaid: false,
-            purposeQueues: $store,
-        );
-
-        // Force resolveAttempts path by not setting modelQueue — but chatFn needs enable
         putenv('AI_ENABLED=true');
         $_ENV['AI_ENABLED'] = 'true';
         putenv('AI_MOCK=false');
         $_ENV['AI_MOCK'] = 'false';
 
-        // modelQueue null + purposeQueues stub: need to bypass discovery empty
-        // Use reflection? Easier: construct with modelQueue from store for unit... 
-        // Instead call complete with purpose and stub discovery via modelQueue null.
-        // Without discovery HTTP, discovered=[], fromDb used.
+        $called = [];
+        $gateway = new AiGateway(
+            modelQueue: [
+                'google/gemma-3-27b-it:free',
+                'meta-llama/llama-3.3-70b-instruct:free',
+            ],
+            chatFn: static function (string $modelId) use (&$called): array {
+                $called[] = $modelId;
+
+                return ['content' => '{"agent_text":"ok","input_mode":"continue"}', 'raw_model' => $modelId];
+            },
+            allowPaid: false,
+        );
 
         $result = $gateway->complete(
             [['role' => 'user', 'content' => 'hola']],

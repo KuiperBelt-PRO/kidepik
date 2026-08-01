@@ -19,5 +19,7 @@ final class ArchitectureTest extends TestCase
         self::assertArrayHasKey('api_url', $body);
         self::assertArrayHasKey('supabase_url', $body);
         self::assertArrayHasKey('media_base_url', $body);
+        self::assertArrayHasKey('client_logging', $body);
+        self::assertArrayHasKey('client_log_level', $body);
     }
 }

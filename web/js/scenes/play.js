@@ -16,9 +16,11 @@ import { navigate } from "../lib/router.js";
 import { navigateShellRoute } from "../lib/shell-navigation.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
-import { openDialogueSession, submitDialogueTurn } from "../lib/play-api.js";
+import { openDialogueSession, submitDialogueTurn } from "../lib/play-api.js?v=243";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
+import { isDebugAiClientActive } from "../lib/debug-ai.js?v=244";
+import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=243";
 
 /** Copy canónico de elección de mundo (fallback si el turno no trae description). */
 const WORLD_THEME_HINTS = Object.freeze({
@@ -149,6 +151,8 @@ async function mountPlayPanel(root, ctx) {
   let explorerDisplayName = null;
   /** @type {'fantasy' | 'sci-fi' | null} */
   let playWorldTheme = null;
+  /** @type {string | null} */
+  let playAgeBand = null;
   let onboardingStep = "";
   /** @type {object | null} */
   let lastPendingTurn = null;
@@ -188,6 +192,9 @@ async function mountPlayPanel(root, ctx) {
       playWorldTheme = data.world_theme;
       applyPlayWorldTheme(data.world_theme);
     }
+    if (typeof data.age_band === "string" && data.age_band.trim()) {
+      playAgeBand = data.age_band.trim();
+    }
     if (typeof data.onboarding_step === "string") {
       onboardingStep = data.onboarding_step;
     }
@@ -203,6 +210,32 @@ async function mountPlayPanel(root, ctx) {
       if (effect?.type === "set_display_name" && typeof effect.value === "string") {
         explorerDisplayName = effect.value.trim();
       }
+      if (effect?.type === "set_age" && effect.value && typeof effect.value.age_band === "string") {
+        playAgeBand = effect.value.age_band;
+      }
+      if (effect?.type === "set_effective_age_band" && typeof effect.value === "string") {
+        playAgeBand = effect.value;
+      }
+    }
+  }
+
+  /**
+   * Agrupa bandas para tono de espera del mentor.
+   * @returns {'early' | 'child' | 'teen' | 'adult'}
+   */
+  function waitingToneBand() {
+    switch (playAgeBand) {
+      case "band_early":
+        return "early";
+      case "band_tween":
+      case "band_teen":
+        return "teen";
+      case "band_adult":
+      case "band_senior":
+        return "adult";
+      case "band_child":
+      default:
+        return "child";
     }
   }
 
@@ -358,24 +391,50 @@ async function mountPlayPanel(root, ctx) {
   function thinkingLines(kind) {
     const name = mentorLabel;
     const fantasy = playWorldTheme !== "sci-fi";
+    const tone = waitingToneBand();
     if (kind === "preparing_exam") {
-      return fantasy
-        ? [
-            `${name} prepara tu prueba de ingreso: busca las mejores preguntas en la biblioteca de la Escuela…`,
-            `${name} recorre los anaqueles del saber para elegir retos a tu medida…`,
-            `${name} consulta pergaminos antiguos y arma un examen único para ti…`,
-            `${name} sopesa materias y dificultades antes de abrir el umbral…`,
-            `${name} enciende los faroles de la biblioteca: cada reto se escribe ahora mismo…`,
-          ]
-        : [
-            `${name} compila tu prueba de acceso: consulta los archivos de la Academia…`,
-            `${name} rastrea la biblioteca estelar en busca de retos a tu nivel…`,
-            `${name} sincroniza módulos de saber y diseña un examen nuevo para ti…`,
-            `${name} calcula dificultad y materias antes de abrir el protocolo de ingreso…`,
-            `${name} descarga nodos de conocimiento: cada desafío se genera ahora…`,
-          ];
+      return preparingExamLines(name, fantasy, tone);
     }
     if (kind === "evaluating_answer") {
+      if (tone === "early") {
+        return fantasy
+          ? [
+              `${name} mira tu respuesta con cariño…`,
+              `${name} piensa un momentito y te dice cómo seguir…`,
+              `${name} escucha el eco suave de tu idea…`,
+            ]
+          : [
+              `${name} revisa tu señal con calma…`,
+              `${name} mira la pantallita y te responde…`,
+              `${name} comprueba que todo vaya bien…`,
+            ];
+      }
+      if (tone === "teen") {
+        return fantasy
+          ? [
+              `${name} contrapone tu respuesta a las runas del umbral…`,
+              `${name} anota el resultado y prepara el siguiente tramo…`,
+              `${name} escucha el eco de tu respuesta en las bóvedas…`,
+            ]
+          : [
+              `${name} coteja tu respuesta con el protocolo de la Academia…`,
+              `${name} registra el resultado y carga el siguiente nodo…`,
+              `${name} verifica la telemetría de tu respuesta…`,
+            ];
+      }
+      if (tone === "adult") {
+        return fantasy
+          ? [
+              `${name} contrasta tu respuesta con el criterio del umbral…`,
+              `${name} registra el matiz y abre el siguiente tramo…`,
+              `${name} sopesa el eco de tu respuesta en las bóvedas…`,
+            ]
+          : [
+              `${name} valida tu respuesta frente al protocolo de acceso…`,
+              `${name} registra el resultado y prepara el siguiente nodo…`,
+              `${name} revisa la telemetría antes de continuar…`,
+            ];
+      }
       return fantasy
         ? [
             `${name} compara tu respuesta con las runas del umbral…`,
@@ -389,6 +448,17 @@ async function mountPlayPanel(root, ctx) {
           ];
     }
     if (kind === "adventure") {
+      if (tone === "early") {
+        return fantasy
+          ? [
+              `${name} mira el mapita del reino contigo…`,
+              `${name} busca el caminito más seguro…`,
+            ]
+          : [
+              `${name} mira las estrellitas del mapa…`,
+              `${name} elige la ruta más clara para ti…`,
+            ];
+      }
       return fantasy
         ? [
             `${name} contempla el mapa del reino antes de responder…`,
@@ -397,6 +467,19 @@ async function mountPlayPanel(root, ctx) {
         : [
             `${name} traza la ruta en el mapa estelar…`,
             `${name} consulta sensores y bitácora de la misión…`,
+          ];
+    }
+    if (tone === "early") {
+      return fantasy
+        ? [
+            `${name} piensa un momentito…`,
+            `${name} busca palabras suaves para ti…`,
+            `${name} escucha el viento del umbral…`,
+          ]
+        : [
+            `${name} espera un segundo…`,
+            `${name} ajusta la radio para hablarte…`,
+            `${name} mira la bitácora un momento…`,
           ];
     }
     return fantasy
@@ -410,6 +493,86 @@ async function mountPlayPanel(root, ctx) {
           `${name} ajusta la frecuencia de la respuesta…`,
           `${name} consulta la bitácora breve…`,
         ];
+  }
+
+  /**
+   * Frases de espera al componer la prueba — mundo + edad; sin «armar» ni «examen».
+   * @param {string} name
+   * @param {boolean} fantasy
+   * @param {'early' | 'child' | 'teen' | 'adult'} tone
+   * @returns {string[]}
+   */
+  function preparingExamLines(name, fantasy, tone) {
+    if (fantasy) {
+      if (tone === "early") {
+        return [
+          `${name} prepara tu prueba de ingreso: busca retos divertidos en la biblioteca…`,
+          `${name} abre libritos mágicos para elegir preguntas a tu medida…`,
+          `${name} enciende farolitos suaves: cada reto se escribe ahora…`,
+          `${name} pide ayuda a los pergaminos amigos antes de abrir el umbral…`,
+          `${name} junta chispas de saber para tu camino de ingreso…`,
+        ];
+      }
+      if (tone === "teen") {
+        return [
+          `${name} prepara tu prueba de ingreso entre los anaqueles de la Escuela…`,
+          `${name} elige retos a tu nivel: ni demasiado fáciles ni imposibles…`,
+          `${name} consulta pergaminos y diseña una prueba distinta para ti…`,
+          `${name} sopesa materias y dificultad antes de abrir el umbral…`,
+          `${name} enciende los faroles: cada reto se escribe ahora mismo…`,
+        ];
+      }
+      if (tone === "adult") {
+        return [
+          `${name} compone tu prueba de ingreso con criterio en la biblioteca de la Escuela…`,
+          `${name} selecciona retos calibrados a tu recorrido entre los anaqueles…`,
+          `${name} consulta fuentes del saber y diseña una prueba singular…`,
+          `${name} equilibra materias y exigencia antes de franquear el umbral…`,
+          `${name} ilumina el scriptorium: cada reto toma forma ahora…`,
+        ];
+      }
+      return [
+        `${name} prepara tu prueba de ingreso: busca las mejores preguntas en la biblioteca…`,
+        `${name} recorre los anaqueles del saber para elegir retos a tu medida…`,
+        `${name} consulta pergaminos antiguos y diseña una prueba única para ti…`,
+        `${name} sopesa materias y dificultades antes de abrir el umbral…`,
+        `${name} enciende los faroles de la biblioteca: cada reto se escribe ahora mismo…`,
+      ];
+    }
+    if (tone === "early") {
+      return [
+        `${name} prepara tu prueba de acceso: busca retos guays en la Academia…`,
+        `${name} mira pantallas de estrellas para elegir desafíos a tu tamaño…`,
+        `${name} enciende luces suaves: cada reto se crea ahora…`,
+        `${name} pide datos a la biblioteca espacial antes de abrir la puerta…`,
+        `${name} junta piezas de saber para tu ingreso…`,
+      ];
+    }
+    if (tone === "teen") {
+      return [
+        `${name} prepara tu protocolo de acceso consultando los archivos de la Academia…`,
+        `${name} rastrea la biblioteca estelar en busca de retos a tu nivel…`,
+        `${name} sincroniza módulos de saber y diseña una prueba nueva para ti…`,
+        `${name} calcula dificultad y materias antes de abrir el protocolo de ingreso…`,
+        `${name} descarga nodos de conocimiento: cada desafío se genera ahora…`,
+      ];
+    }
+    if (tone === "adult") {
+      return [
+        `${name} compone tu protocolo de acceso a partir de los archivos de la Academia…`,
+        `${name} selecciona desafíos calibrados en la biblioteca estelar…`,
+        `${name} sincroniza módulos de conocimiento y diseña una prueba precisa…`,
+        `${name} equilibra carga cognitiva y materias antes del protocolo de ingreso…`,
+        `${name} despliega nodos de saber: cada desafío se materializa ahora…`,
+      ];
+    }
+    return [
+      `${name} prepara tu prueba de acceso: consulta los archivos de la Academia…`,
+      `${name} rastrea la biblioteca estelar en busca de retos a tu nivel…`,
+      `${name} sincroniza módulos de saber y diseña una prueba nueva para ti…`,
+      `${name} calcula dificultad y materias antes de abrir el protocolo de ingreso…`,
+      `${name} descarga nodos de conocimiento: cada desafío se genera ahora…`,
+    ];
   }
 
   /**
@@ -474,7 +637,7 @@ async function mountPlayPanel(root, ctx) {
         thinkingTextEl.textContent = next;
         bubble.setAttribute("aria-label", next);
         scrollLogToEnd();
-      }, kind === "preparing_exam" ? 3200 : 4500);
+      }, kind === "preparing_exam" ? 9000 : 4500);
     }
   }
 
@@ -653,6 +816,33 @@ async function mountPlayPanel(root, ctx) {
     syncFooterChrome();
   }
 
+  /** @type {object | null} */
+  let lastComposeDebug = null;
+
+  /**
+   * @param {object | null | undefined} composeDebug
+   */
+  function showComposeDebugChip(composeDebug) {
+    if (!isDebugAiClientActive() || !(logEl instanceof HTMLElement)) return;
+    logEl.querySelector("[data-compose-debug-chip]")?.remove();
+    const p = document.createElement("p");
+    p.className = "play-panel__debug-chip";
+    p.setAttribute("data-compose-debug-chip", "");
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = "Ver diagnóstico de la prueba";
+    btn.addEventListener("click", () => {
+      void openDebugAiPanel({
+        session: ctx.session,
+        childId: ctx.childId,
+        composeDebug: composeDebug ?? lastComposeDebug,
+      });
+    });
+    p.appendChild(btn);
+    logEl.appendChild(p);
+    scrollLogToEnd();
+  }
+
   /**
    * @param {object} turn
    */
@@ -716,6 +906,12 @@ async function mountPlayPanel(root, ctx) {
     }
     syncFooterChrome();
     lastPendingTurn = turn;
+    if (turn?.meta?.compose_failed) {
+      lastComposeDebug = turn.meta.compose_debug ?? lastComposeDebug;
+      showComposeDebugChip(lastComposeDebug);
+    } else {
+      logEl?.querySelector("[data-compose-debug-chip]")?.remove();
+    }
     scrollLogToEnd();
   }
 
@@ -776,6 +972,9 @@ async function mountPlayPanel(root, ctx) {
     appendBubble("explorer", shown);
 
     const data = result.data;
+    if (data.debug?.compose) {
+      lastComposeDebug = data.debug.compose;
+    }
     applyDialogueState(data);
     if (data.mentor?.display_name && mentorNameEl instanceof HTMLElement) {
       mentorLabel = data.mentor.display_name;
@@ -793,6 +992,10 @@ async function mountPlayPanel(root, ctx) {
         onboardingStep = "placement";
       } else if (phase) {
         onboardingStep = phase;
+      }
+      if (last.meta?.compose_failed) {
+        lastComposeDebug = last.meta.compose_debug ?? data.debug?.compose ?? lastComposeDebug;
+        showComposeDebugChip(lastComposeDebug);
       }
       renderPending(last);
     }

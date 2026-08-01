@@ -27,4 +27,8 @@ if should_run_migrations; then
   done
 fi
 
+if [ "${AI_DISCOVERY_ON_START:-true}" != "false" ]; then
+  php /var/www/api/bin/sync-ai-discovery.php || echo "sync-ai-discovery: warning (non-fatal)" >&2
+fi
+
 exec docker-php-entrypoint "$@"

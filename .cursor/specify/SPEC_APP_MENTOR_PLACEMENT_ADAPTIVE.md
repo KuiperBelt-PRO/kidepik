@@ -1,7 +1,8 @@
 # Spec: Placement adaptado por edad y prosa narrativa del mentor
 
-> Estado: **implementada** (31 jul 2026)  
-> Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)  
+> Estado: **implementada** (31 jul 2026) — **delta A2 implementada** (1 ago 2026): compose paralelo por lotes + copy de espera por mundo/`age_band`  
+> Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md) §4.4–4.6  
+> Diagrama: [11-child-adventure-pipeline.md](../diagrams/11-child-adventure-pipeline.md)  
 > **Delta** — catálogo y activación: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md).
 
 ## Contexto
@@ -123,7 +124,7 @@ Intro, cada reto, feedback, cierre: agente con `PlayerState` (edad, banda, trait
 | --- | --- |
 | Specify | Cerrada (aprobada) |
 | Plan / Task | [SUBJECT_CATALOG_PLACEMENT_ADAPTIVE_PLAN.md](../tasks/SUBJECT_CATALOG_PLACEMENT_ADAPTIVE_PLAN.md) |
-| Implement | **Hecha** — `PlacementExamComposer` genera el examen completo vía agente; **sin banco seed** (A1 ago 2026); fallo → reintento UI |
+| Implement | **Hecha** — `PlacementExamComposer` genera el examen completo vía agente; **sin banco seed** (A1 ago 2026); fallo → reintento UI; **A2** lotes ≤4 + paralelismo + sticky + copy espera por edad/mundo |
 | Validate | PHPUnit `PlacementAdaptiveTest` + `PlacementAgentOnlyAndQueuesTest` |
 
 ### Entregado
@@ -135,3 +136,142 @@ Intro, cada reto, feedback, cierre: agente con `PlayerState` (edad, banda, trait
 5. `PlacementNarrator` + feedback con explicación
 6. Prompts `shared/Ai/prompts/placement_exam_composer.es.md` (castellano ES)
 7. Colas de modelo por purpose en BD (`ai_purpose_model_queues`, B1)
+
+---
+
+## A2 — Compose paralelo por lotes + priorización de modelos (1 ago 2026)
+
+> Estado: **implementada** (1 ago 2026) — aprobada e implementada.  
+> Motivación (logs locales): con `slot_count=16` un único `complete()` produce `json_invalid` o agota wall budget; modelos free fiables (p. ej. `ling-3.0-flash`) responden mejor a payloads pequeños.
+
+### A2.1 Problema
+
+Hoy `PlacementExamComposer` pide **todos los slots en una sola llamada** LLM. Con muchas materias activas:
+
+1. El JSON es demasiado grande → `json_invalid` / truncado.
+2. Un solo intento lento + reintentos → UX lenta y riesgo de 504 / wall budget.
+3. La cola BD prioriza modelos «grandes» que timeout; no favorece modelos con **éxito reciente** en este purpose.
+
+### A2.2 Objetivo
+
+1. Partir el plan de slots en **lotes pequeños** que cualquier modelo free razonable pueda completar.
+2. Ejecutar lotes en **paralelo** (concurrency acotada) para reducir latencia wall-clock.
+3. **Priorizar modelos válidos** (éxito reciente, no en cooldown) al resolver la cola de `placement_exam_composer`.
+4. UX: mensajes de espera del mentor **sin** «armar un examen» / jerga de «examen» escolar; rotación **lenta** para poder leer.
+
+### A2.3 Partición de slots
+
+| Parámetro | Default | Env |
+| --- | --- | --- |
+| `COMPOSE_BATCH_MAX_SLOTS` | **4** | `AI_COMPOSE_BATCH_MAX_SLOTS` |
+| Umbral «pocos slots» (una sola petición) | ≤ `COMPOSE_BATCH_MAX_SLOTS` | — |
+| Concurrencia máx. de lotes | **3** | `AI_COMPOSE_BATCH_CONCURRENCY` |
+| Reintentos por lote (tras fallo JSON/slots) | **2** | `AI_COMPOSE_BATCH_RETRIES` |
+
+Algoritmo:
+
+```
+slots = examSubjectSlots(band, active_subjects)   # orden barajado como hoy
+if count(slots) <= COMPOSE_BATCH_MAX_SLOTS:
+  batches = [slots]                                 # camino actual (1 LLM)
+else:
+  batches = chunk(slots, COMPOSE_BATCH_MAX_SLOTS)  # p. ej. 16 → 4+4+4+4
+```
+
+Cada lote llama al mismo purpose `placement_exam_composer` con **solo** los `slots` del chunk (misma schema JSON, menos ítems). El prompt indica `slot` local 0..n-1 **o** conserva el índice global del plan — **decisión:** conservar **índice global** del plan original en el campo `slot` para merge trivial.
+
+### A2.4 Paralelismo (PHP)
+
+| Regla | Valor |
+| --- | --- |
+| Runtime | `curl_multi` / Guzzle Pool **dentro** de `PlacementExamComposer` (no N requests HTTP del cliente) |
+| Aislamiento | Cada lote = 1 `AiGateway::complete` independiente (propia traza / call_id) |
+| Fallo de un lote | Reintentar ese lote (hasta `AI_COMPOSE_BATCH_RETRIES`); si sigue fallando → compose fallido completo (mensaje reintento al explorador, A1) |
+| Merge | Concatenar ítems por `slot` ascendente; `requireCompleteSlots` sobre la cola unida |
+| Wall budget | Presupuesto **por lote** = `AI_GATEWAY_WALL_BUDGET_SECONDS`; wall-clock total esperado ≈ ceil(n_batches / concurrency) × latencia_media_lote |
+| Timeout nginx | Ya 300 s en `/api/v1/play/*`; objetivo UX: **&lt; 45 s** típico con 3×4 slots en paralelo |
+
+```mermaid
+flowchart LR
+  Plan[slots N] --> Chunk[chunk ≤4]
+  Chunk --> P1[lote 1 LLM]
+  Chunk --> P2[lote 2 LLM]
+  Chunk --> P3[lote 3 LLM]
+  P1 --> Merge[merge + validate]
+  P2 --> Merge
+  P3 --> Merge
+  Merge --> Queue[item_queue completa]
+```
+
+### A2.5 Priorización de modelos «válidos»
+
+Complementa cooldown ([SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md) §4.4):
+
+| Señal | Efecto en resolución de cola |
+| --- | --- |
+| Cooldown activo | Omitir |
+| Éxito reciente en `placement_exam_composer` (p. ej. última ventana 24–72 h en `ai_call_attempts` o contador en `ai_runtime_state` / tabla ligera) | **Subir** al frente de la cola resuelta |
+| Fallo `json_invalid` / `empty` reciente (sin cooldown duro) | **Bajar** prioridad (soft demote), no ban permanente |
+| Orden BD `position` | Desempate tras score de éxito |
+
+Detalle de persistencia: ver gateway §4.6 (delta). Composer y gateway siguen **solo free**.
+
+Para lotes en paralelo: preferible **reutilizar el mismo modelo ganador** del primer lote exitoso en los lotes restantes de la misma compose (opcional, env `AI_COMPOSE_STICKY_WINNER=true` default **true**) para homogeneidad y menos fallos JSON.
+
+### A2.6 Contrato de debug / logs
+
+| Canal | Eventos nuevos |
+| --- | --- |
+| `compose` | `placement_compose_batch` (batch_index, slot_count, model, ok, latency_ms) |
+| `compose` | `placement_compose_failed` incluye `batches: [{index, outcome, call_id}]` |
+| `ai` | Un `llm_attempt` por lote (como hoy) |
+| Panel debug | `compose_debug.batches[]` |
+
+### A2.7 Copy de espera (cliente `#/play`) — UX
+
+Problema anterior (`web/js/scenes/play.js` `thinkingLines('preparing_exam')`):
+
+- Usaba «**arma un examen**» / «diseña un **examen**» (prohibido en producto narrativo; el prompt del composer ya lo evita).
+- Rotación cada **3,2 s** en `preparing_exam` — demasiado rápido para leer.
+- No diferenciaba tono por **edad** del explorador.
+
+| Regla | Valor |
+| --- | --- |
+| Léxico | Preferir **prueba de ingreso / umbral / protocolo de acceso**; **prohibido** «armar» y preferible evitar «examen» en burbujas de espera |
+| Rotación `preparing_exam` | **≥ 8 s** entre frases (default **9000** ms) |
+| Rotación otros kinds | Sin cambio obligatorio (mantener ≥ 4,5 s) |
+| Mundo | Variantes **fantasy** y **sci-fi** |
+| Edad (`age_band`) | Variantes de tono: `early` (suave/corto), `child` (aventura clara), `teen`/`tween` (directo), `adult`/`senior` (más denso/literario) |
+| API | `openSession` / `submitTurn` exponen `age_band` (+ `age_years`) para que el cliente elija el tono |
+
+Ejemplos fantasy (orientativos):
+
+- early: «{mentor} prepara tu prueba de ingreso: busca retos divertidos en la biblioteca…»
+- child: «{mentor} prepara tu prueba de ingreso: busca las mejores preguntas en la biblioteca…»
+- teen: «{mentor} prepara tu prueba de ingreso entre los anaqueles de la Escuela…»
+- adult: «{mentor} compone tu prueba de ingreso con criterio en la biblioteca de la Escuela…»
+
+### A2.8 Criterios de aceptación
+
+1. Con `slot_count ≤ 4`: una sola llamada LLM (regresión del camino actual).
+2. Con `slot_count = 16`: ≥ 2 lotes; concurrency ≤ 3; merge completa todos los slots o fallo A1.
+3. Modelos en cooldown no se usan; modelos con éxito reciente aparecen antes en la cola resuelta.
+4. Logs `compose` muestran batches; fallo parcial de un lote no entrega cola incompleta al niño.
+5. UI espera: sin «armar»; sin «examen» en las frases de `preparing_exam`; intervalo ≥ 8 s; tono según `age_band` + mundo.
+6. PHPUnit: chunk/merge; mock gateway con N completes; soft-rank por éxito.
+7. Latencia wall-clock esperada menor que un monolito de 16 slots (medible en logs `duration_ms` del turn).
+
+### A2.9 Fuera de alcance
+
+- Cambiar el número de materias del tutor o recortar el catálogo.
+- Streaming token-a-token al cliente.
+- Modelos de pago.
+- Generar lotes desde el **navegador** (todo el paralelismo es servidor).
+
+### A2.10 Aprobación
+
+- [x] Partición ≤ 4 slots + paralelismo servidor (concurrency 3)
+- [x] Sticky winner opcional entre lotes de la misma compose
+- [x] Prioridad por éxito + cooldown (gateway §4.6)
+- [x] Copy espera sin «armar» / sin «examen»; rotación ≥ 8 s; variantes por `age_band` + mundo
+- [x] OK explícito del usuario (1 ago 2026) → implementada

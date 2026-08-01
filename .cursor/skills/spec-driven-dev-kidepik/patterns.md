@@ -41,6 +41,21 @@ Nuevos módulos: bajo `api/src/` + `shared/`; tests en `api/tests/`. Spec: [SPEC
 | Spec nueva o delta redactado | Contrato revisable antes de código |
 | Aprobación del usuario | Solo entonces Fase 2+ |
 | Al cerrar: spec + CURRENT_SPECS + diagrama | Documentación alineada con el código |
+| Depuración con logs | Tras reproducir fallo, leí `web/logs/` del día (§ SKILL.md Logs en disco) |
+
+---
+
+## Logs en disco (`web/logs/`)
+
+- **Ruta host:** `kidepik/web/logs/` — volumen Docker → `/var/www/html/logs`.
+- **Formato:** JSONL por canal y día (`api-`, `ai-`, `compose-`, `client-`).
+- **Spec:** [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md).
+- **Activación local:** `LOG_TO_FILES=true` (default en POC); cliente vía `LOG_CLIENT_INGEST`.
+- **Depuración IA / placement:** correlacionar `client` (504, clics) → `api` (duración) → `ai` (`llm_attempt`) → `compose` (`placement_compose_failed`).
+- **CLI colas + cooldowns:** `docker compose … exec php php /var/www/api/bin/inspect-ai-queues.php`.
+- **No** commitear `*.log`; el agente debe **leer** estos ficheros (o los que adjunte el usuario) antes de diagnosticar fallos de producto.
+
+---
 
 ### Mapa spec ↔ diagrama (atajos)
 
@@ -56,6 +71,6 @@ Nuevos módulos: bajo `api/src/` + `shared/`; tests en `api/tests/`. Spec: [SPEC
 | Cuenta / crew / ajustes / legal | `SPEC_APP_*_SECTION`, `SPEC_LEGAL_*` | 10 |
 | Play / examen / diálogo | `SPEC_APP_PLAY_*`, `SPEC_APP_ADVENTURE_*` | 11 |
 | Media filesystem | `SPEC_MEDIA_*` | 12 |
-| Tests / validación UI | `SPEC_WEB_DEV_PREVIEW`, `SPEC_DEV_TEST_CI` | 13 |
+| Tests / validación UI / **logs** | `SPEC_WEB_DEV_PREVIEW`, `SPEC_DEV_TEST_CI`, `SPEC_APP_FILE_LOGGING` | 13 |
 | Playwright auth local (agentes) | `SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT` | 13 |
 | ¿Qué abrir primero? | — | 14 |
