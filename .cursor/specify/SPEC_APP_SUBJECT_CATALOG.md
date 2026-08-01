@@ -1,6 +1,6 @@
 # Spec: Catálogo de materias (aprendizaje y examen de acceso)
 
-> Estado: **aprobada** (31 jul 2026) — **sin implementación** hasta OK explícito del titular  
+> Estado: **implementada** (31 jul 2026)  
 > Relacionado: [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_SETTINGS_SECTION.md](SPEC_APP_SETTINGS_SECTION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [docs/kidepik.md](../../docs/kidepik.md) §3  
 > **Fuente de verdad** para ids, labels, pesos y reglas de activación por tripulante.
 
@@ -26,8 +26,8 @@ Principio rector (jul 2026):
 
 | `subject_id` | Label tutor (es-ES) | Familia UI | Peso default \(w\) | Zona canon MVP |
 | --- | --- | --- | --- | --- |
-| `math` | Matemáticas | Fundamentales | 0.14 | `zone_math` |
-| `language` | Lengua y gramática | Fundamentales | 0.14 | `zone_language` |
+| `math` | Matemáticas | Fundamentales | 0.13 | `zone_math` |
+| `language` | Lengua y gramática | Fundamentales | 0.13 | `zone_language` |
 | `reading` | Comprensión lectora *(separada de lengua)* | Fundamentales | 0.09 | `zone_language` * |
 | `logic` | Lógica y razonamiento | Fundamentales | 0.09 | `zone_logic` |
 | `science` | Ciencias naturales | Ciencias | 0.09 | `zone_science` |
@@ -39,7 +39,7 @@ Principio rector (jul 2026):
 | `politics` | Política y ciudadanía | Sociedad | 0.04 | — |
 | `arts` | Arte (plástica, música, cine…) | Expresión | 0.05 | — |
 | `sports` | Deporte y salud | Expresión | 0.03 | — |
-| `finance` | Finanzas y economía cotidiana | Vida práctica | 0.07 | — |
+| `finance` | Finanzas y economía cotidiana | Vida práctica | 0.05 | — |
 
 \* Comparten metáfora de zona en MVP; `zone_id` en retos puede ser el de la familia hasta que existan zonas dedicadas.
 
@@ -222,9 +222,9 @@ Solo 5 zonas MVP en [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CAN
 
 | Fase | Estado |
 | --- | --- |
-| Specify | **Cerrada** (aprobada) |
-| Plan / Task | Pendiente al recibir OK de implementación |
-| Implement | **Bloqueada** — no escribir código hasta OK explícito |
-| Validate | — |
+| Specify | Cerrada (aprobada) |
+| Plan / Task | [SUBJECT_CATALOG_PLACEMENT_ADAPTIVE_PLAN.md](../tasks/SUBJECT_CATALOG_PLACEMENT_ADAPTIVE_PLAN.md) |
+| Implement | **Hecha** — `SubjectCatalog`, ficha crew, Ajustes defaults, pesos |
+| Validate | PHPUnit `SubjectCatalogTest` + Node `subject-catalog.test.js` |
 
-**Depende de:** [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) (mismo gate de implementación).
+**Código:** `shared/Ai/SubjectCatalog.php`, `web/js/lib/subject-catalog.js`, `CrewService` PATCH `learning`, UI checklist en `crew-panel.js`.

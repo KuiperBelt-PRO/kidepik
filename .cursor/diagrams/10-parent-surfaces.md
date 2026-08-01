@@ -5,31 +5,30 @@
 ```mermaid
 flowchart TB
   Shell[app-shell FABs + drawer]
-  Frame[section-frame bandas glass logo scroll-fade]
+  Frame[section-frame cabecera fija logo+titulo scroll-fade]
 
   Shell --> Home[home welcome]
   Shell --> Acc[account-panel]
   Shell --> Set[settings-panel]
   Shell --> Crew[crew-panel lista/alta/ficha/diario]
   Shell --> Play[play-panel diálogo aventura]
-  Shell --> Legal[legal markdown]
+  Shell --> Legal[legal markdown sin marco glass]
 
   Acc --> Frame
   Set --> Frame
   Crew --> Frame
   Play --> Frame
-  Legal --> Frame
 ```
 
-## Estado de implementación (jul 2026)
+## Estado de implementación (ago 2026)
 
 | Superficie | Estado | API |
 | --- | --- | --- |
-| Cuenta | Implementada | `GET/PATCH/DELETE /parents/me` |
-| Ajustes | Fase A gestión | `GET/PATCH /parents/me/settings` |
-| Tripulación | Fase A gestión + **cartas TCG** + diario viaje | `/crew`, `/crew/:id`, permissions; `GET …/journey/timeline` |
-| Play (`#/play/:id`) | Vertical slice en **marco glass** ([DESIGN.md](../DESIGN.md)) | dialogue session/turn |
-| Legal autenticado | Shell + vuelta a home sin logout | `GET /legal/:slug` |
+| Cuenta | Implementada; título «Cuenta» en cabecera | `GET/PATCH/DELETE /parents/me` |
+| Ajustes | Fase A gestión; título en cabecera | `GET/PATCH /parents/me/settings` |
+| Tripulación | Fase A + cartas TCG + diario; título fijo / `setTitle` en ficha | `/crew`, `/crew/:id`, permissions; `GET …/journey/timeline` |
+| Play (`#/play/:id`) | Vertical slice; título «Aventura» en cabecera | dialogue session/turn |
+| Legal autenticado | Shell + vuelta a home; **sin** section-frame | `GET /legal/:slug` |
 
 ## Navegación típica
 

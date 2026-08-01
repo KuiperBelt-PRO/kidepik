@@ -46,6 +46,7 @@ import { scheduleShellFrameSync } from "../lib/shell-frame.js";
 import { mountWorldLogo } from "./world-layers.js";
 import { bindLegalLinkTransitions } from "../scenes/legal.js?v=183";
 import { shouldResumeShellTransition } from "../lib/legal-navigation.js";
+import { syncLogoRevealState } from "../lib/logo-reveal.js";
 
 /**
  * @param {HTMLElement} logoWrap
@@ -59,9 +60,8 @@ function revealLoadedWorldLogo(logoWrap) {
   // src presente pero imagen rota / aún no decodificada → no revelar como ok
   if (!logoImg.complete || logoImg.naturalWidth <= 0) return false;
 
-  logoImg.hidden = false;
+  syncLogoRevealState(logoWrap, "ready");
   if (fallback instanceof HTMLElement) fallback.hidden = true;
-  logoWrap.classList.add("is-ready");
   return true;
 }
 
@@ -530,25 +530,24 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage,
       return;
     }
 
+    syncLogoRevealState(logoWrap, "pending");
+
     const logoSrc = assetUrl("loader.logo");
     if (!logoSrc) {
-      logoImg.hidden = true;
-      logoFallback.hidden = false;
+      syncLogoRevealState(logoWrap, "error");
       markLogoAssetReady();
       return;
     }
 
     const logoOk = await probeImage(logoSrc);
     if (!logoOk) {
-      logoImg.hidden = true;
-      logoFallback.hidden = false;
+      syncLogoRevealState(logoWrap, "error");
       markLogoAssetReady();
       return;
     }
 
     const reveal = () => {
-      logoImg.hidden = false;
-      logoFallback.hidden = true;
+      syncLogoRevealState(logoWrap, "ready");
       markLogoAssetReady();
     };
 
@@ -556,8 +555,7 @@ export function mountLoaderChrome(app, { pingHealth, welcomeHome, statusMessage,
     logoImg.addEventListener(
       "error",
       () => {
-        logoImg.hidden = true;
-        logoFallback.hidden = false;
+        syncLogoRevealState(logoWrap, "error");
         markLogoAssetReady();
       },
       { once: true },

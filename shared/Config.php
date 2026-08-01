@@ -117,6 +117,37 @@ final class Config
         return rtrim(self::get('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1'), '/');
     }
 
+    /**
+     * Semilla opcional de ranking (solo si el operador define env). Vacío = puro discovery+ranking.
+     *
+     * @return list<string>
+     */
+    public static function aiModelPreferenceSeed(string $purpose = 'dialogue'): array
+    {
+        if (self::isPlacementPurpose($purpose)) {
+            $placement = self::get('AI_MODEL_PREFERENCE_PLACEMENT', '');
+            if ($placement !== '') {
+                return self::parseCsvList($placement);
+            }
+        }
+
+        if (self::isJourneyPurpose($purpose)) {
+            $journey = self::get('AI_MODEL_PREFERENCE_JOURNEY', '');
+            if ($journey !== '') {
+                return self::parseCsvList($journey);
+            }
+        }
+
+        if (self::aiUsesQualityFreeModels($purpose)) {
+            $quality = self::get('AI_MODEL_PREFERENCE_QUALITY', '');
+            if ($quality !== '') {
+                return self::parseCsvList($quality);
+            }
+        }
+
+        return self::aiModelPreference();
+    }
+
     /** @return list<string> */
     public static function aiModelPreference(): array
     {
@@ -124,10 +155,53 @@ final class Config
         if ($raw === '') {
             $raw = self::get('OPENROUTER_MODELS', '');
         }
-        if ($raw === '') {
-            $raw = 'google/gemma-3-27b-it:free,meta-llama/llama-3.3-70b-instruct:free,qwen/qwen3-30b-a3b:free';
-        }
 
+        return $raw !== '' ? self::parseCsvList($raw) : [];
+    }
+
+    public static function aiUsesQualityFreeModels(string $purpose): bool
+    {
+        return in_array($purpose, [
+            'dialogue',
+            'journey_summarizer',
+            'placement_exam_composer',
+            'placement_exam_batch_writer',
+            'placement_item_writer',
+        ], true)
+            || str_starts_with($purpose, 'placement_')
+            || str_starts_with($purpose, 'adventure_');
+    }
+
+    /**
+     * @deprecated Use aiModelPreferenceSeed(); sin env devuelve [].
+     *
+     * @return list<string>
+     */
+    public static function aiModelPreferenceFor(string $purpose): array
+    {
+        return self::aiModelPreferenceSeed($purpose);
+    }
+
+    private static function isPlacementPurpose(string $purpose): bool
+    {
+        return in_array($purpose, [
+            'placement_exam_composer',
+            'placement_exam_batch_writer',
+            'placement_item_writer',
+        ], true) || str_starts_with($purpose, 'placement_');
+    }
+
+    private static function isJourneyPurpose(string $purpose): bool
+    {
+        return in_array($purpose, ['dialogue', 'journey_summarizer'], true)
+            || str_starts_with($purpose, 'adventure_');
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function parseCsvList(string $raw): array
+    {
         return array_values(array_filter(array_map('trim', explode(',', $raw)), static fn (string $s): bool => $s !== ''));
     }
 
@@ -141,7 +215,7 @@ final class Config
 
     public static function aiMaxModelAttempts(): int
     {
-        return max(1, (int) self::get('AI_MAX_MODEL_ATTEMPTS', '8'));
+        return max(1, (int) self::get('AI_MAX_MODEL_ATTEMPTS', '12'));
     }
 
     public static function aiTimeoutSeconds(): int

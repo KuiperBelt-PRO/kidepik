@@ -22,6 +22,7 @@ final class AiGateway
         private FreeModelCatalog $catalog = new FreeModelCatalog(),
         private FreeModelRanker $ranker = new FreeModelRanker(),
         private ?FreeModelDiscovery $discovery = null,
+        private ?PurposeModelQueueStore $purposeQueues = null,
     ) {
     }
 
@@ -114,6 +115,8 @@ final class AiGateway
     }
 
     /**
+     * Orden: cola BD por purpose → discovery+ranking (con semilla env) → semilla env sola.
+     *
      * @return list<string>
      */
     private function resolveAttempts(string $purpose): array
@@ -122,27 +125,52 @@ final class AiGateway
             return array_values($this->modelQueue);
         }
 
-        $preference = Config::aiModelPreference();
         $max = Config::aiMaxModelAttempts();
 
-        // 1) Discovery OpenRouter (solo free rankeados); 2) fallback preferencia estática.
+        $fromDb = $this->purposeQueueIds($purpose);
         $discovered = [];
         try {
             $discovery = $this->discovery ?? new FreeModelDiscovery();
-            $discovered = $discovery->rankedIds();
+            $discovered = $discovery->rankedIds(null, $purpose);
         } catch (\Throwable) {
             $discovered = [];
         }
 
-        if ($discovered !== []) {
-            $ids = [];
-            foreach ($discovered as $id) {
-                if ($this->allowPaid || $this->looksFreeId($id)) {
-                    $ids[] = $id;
+        if ($fromDb !== []) {
+            $ordered = [];
+            $seen = [];
+            foreach ($fromDb as $id) {
+                if (!$this->allowPaid && !$this->looksFreeId($id)) {
+                    continue;
                 }
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $ordered[] = $id;
             }
+            foreach ($discovered as $id) {
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                if (!$this->allowPaid && !$this->looksFreeId($id) && $id !== 'mock/local') {
+                    continue;
+                }
+                $seen[$id] = true;
+                $ordered[] = $id;
+            }
+            if ($ordered !== []) {
+                return array_slice($ordered, 0, $max);
+            }
+        }
 
-            return array_slice($ids, 0, $max);
+        if ($discovered !== []) {
+            return array_slice($discovered, 0, $max);
+        }
+
+        $preference = Config::aiModelPreferenceSeed($purpose);
+        if ($preference === []) {
+            return [];
         }
 
         $seed = [];
@@ -151,10 +179,21 @@ final class AiGateway
                 $seed[] = ['id' => $id, 'context_length' => 8192, 'last_success_at' => null, 'fail_count_window' => 0];
             }
         }
-        $ranked = $this->ranker->rank($seed, $preference);
+        $profile = Config::aiUsesQualityFreeModels($purpose)
+            ? FreeModelRanker::PROFILE_QUALITY
+            : FreeModelRanker::PROFILE_DEFAULT;
+        $ranked = $this->ranker->rank($seed, $preference, $profile);
         $ids = array_map(static fn (array $r): string => $r['id'], $ranked);
 
         return array_slice($ids, 0, $max);
+    }
+
+    /** @return list<string> */
+    private function purposeQueueIds(string $purpose): array
+    {
+        $store = $this->purposeQueues ?? new PurposeModelQueueStore();
+
+        return $store->idsForPurpose($purpose);
     }
 
     private function looksFreeId(string $modelId): bool

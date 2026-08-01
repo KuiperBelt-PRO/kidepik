@@ -158,14 +158,18 @@ Tras cerrar: **400 ms** sin reabrir el trigger (evita “ghost click” del popo
 
 Barras redondeadas con shimmer (Privacidad/Términos). Ver helpers `renderGlassSkeletonHtml`, `fillGlassSkeleton`, `mountGlassSkeleton`. Presets: `document` | `panel` | `lines`.
 
+También: skeleton del **wordmark** en el slot del marco (`.section-frame__logo-skeleton`) mientras el logo está `is-logo-pending` — ver `SPEC_APP_SECTION_FRAME` §2.4d y `logo-reveal.js`.
+
 ### 12. Navegación del marco (`section-frame` + `shell-nav-stack`)
 
-Flecha **atrás** arriba a la **izquierda** del cajetín; **adelante** arriba a la **derecha** (logo centrado). Pila acotada (`SHELL_NAV_STACK_MAX = 16`).
+Flecha **atrás** arriba a la **izquierda** del cajetín; **adelante** arriba a la **derecha**; **logo + título de sección** centrados en cabecera fija (no scroll). Pila acotada (`SHELL_NAV_STACK_MAX = 16`).
 
 | Pieza | Path |
 | --- | --- |
 | Pila + API | `web/js/lib/shell-nav-stack.js` |
 | Botones en marco | `mountSectionFrame` → `section-frame__nav-btn--back` / `--forward` |
+| Título de sección | `mountSectionFrame({ title })` + `setTitle()` → `.section-frame__title` |
+| Logo reveal | `web/js/lib/logo-reveal.js` + `syncLogoSkeleton` |
 | Rutas hash + transiciones | `navigateShellRoute` (menú, enlaces entre secciones) |
 | Registro en pila | `router.js` → `onShellPathChange` |
 

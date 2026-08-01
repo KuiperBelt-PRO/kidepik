@@ -5,21 +5,15 @@ declare(strict_types=1);
 namespace Kidepik\Shared\Ai;
 
 /**
- * Banco de ítems de placement + scoring PHP (SPEC_APP_PLACEMENT_EXAM).
+ * Banco de ítems de placement + scoring PHP (SPEC_APP_PLACEMENT_EXAM + SUBJECT_CATALOG).
  */
 final class PlacementBank
 {
-    /** @var list<string> */
-    public const SUBJECTS = ['math', 'language', 'logic', 'science', 'culture'];
+    /** @deprecated use SubjectCatalog::ALL */
+    public const SUBJECTS = SubjectCatalog::ALL;
 
-    /** @var array<string,float> */
-    public const WEIGHTS = [
-        'math' => 0.30,
-        'language' => 0.30,
-        'logic' => 0.20,
-        'science' => 0.10,
-        'culture' => 0.10,
-    ];
+    /** @deprecated use SubjectCatalog::WEIGHTS */
+    public const WEIGHTS = SubjectCatalog::WEIGHTS;
 
     /** @param array<string,mixed>|null $decoded */
     public function __construct(private ?array $decoded = null)
@@ -37,26 +31,61 @@ final class PlacementBank
 
     /**
      * @param list<string>|null $activeSubjects
+     * @param list<string> $recentKeys ítems recientes del tripulante a evitar si hay alternativas
      * @return list<array<string,mixed>>
      */
-    public function pickQueue(string $ageBand, ?array $activeSubjects = null, int $maxItems = 5): array
-    {
-        $subjects = $activeSubjects ?: self::SUBJECTS;
-        $subjects = array_values(array_filter(
-            $subjects,
-            static fn (string $s): bool => in_array($s, self::SUBJECTS, true)
-        ));
-        if ($subjects === []) {
-            $subjects = self::SUBJECTS;
+    public function pickQueue(
+        string $ageBand,
+        ?array $activeSubjects = null,
+        ?int $maxItems = null,
+        array $recentKeys = [],
+    ): array {
+        if ($activeSubjects === null || $activeSubjects === []) {
+            $subjects = SubjectCatalog::baseSubjectsForBand($ageBand);
+        } else {
+            try {
+                $subjects = SubjectCatalog::normalizeActiveSubjects($activeSubjects);
+            } catch (\InvalidArgumentException) {
+                $subjects = SubjectCatalog::baseSubjectsForBand($ageBand);
+            }
+        }
+
+        $extras = SubjectCatalog::extraChallengeSubjects($ageBand);
+        $queuePlan = [];
+        foreach ($subjects as $subject) {
+            $queuePlan[] = $subject;
+            if (in_array($subject, $extras, true)) {
+                $queuePlan[] = $subject;
+            }
+        }
+
+        // Orden de materias aleatorio (no siempre math→language→…)
+        $this->shuffleList($queuePlan);
+
+        if ($maxItems !== null && $maxItems > 0) {
+            $queuePlan = array_slice($queuePlan, 0, $maxItems);
         }
 
         $queue = [];
-        foreach ($subjects as $subject) {
-            if (count($queue) >= $maxItems) {
-                break;
+        $usedKeys = [];
+        [$minDiff, $maxDiff] = SubjectCatalog::difficultyRange($ageBand);
+        $softExclude = array_values(array_unique(array_filter(
+            $recentKeys,
+            static fn ($k): bool => is_string($k) && $k !== '',
+        )));
+
+        foreach ($queuePlan as $subject) {
+            $hardExclude = $usedKeys;
+            $item = $this->pickOne($subject, $ageBand, $minDiff, $maxDiff, array_merge($hardExclude, $softExclude));
+            if ($item === null && $softExclude !== []) {
+                // Si todo el pool reciente está agotado, permitir repetición fuera de usedKeys.
+                $item = $this->pickOne($subject, $ageBand, $minDiff, $maxDiff, $hardExclude);
             }
-            $item = $this->pickOne($subject, $ageBand);
             if ($item !== null) {
+                $key = (string) ($item['item_key'] ?? '');
+                if ($key !== '') {
+                    $usedKeys[] = $key;
+                }
                 $queue[] = $item;
             }
         }
@@ -64,36 +93,93 @@ final class PlacementBank
         return $queue;
     }
 
-    /** @return array<string,mixed>|null */
-    private function pickOne(string $subject, string $ageBand): ?array
-    {
+    /**
+     * @param list<string> $excludeKeys
+     * @return array<string,mixed>|null
+     */
+    private function pickOne(
+        string $subject,
+        string $ageBand,
+        int $minDiff,
+        int $maxDiff,
+        array $excludeKeys,
+    ): ?array {
         $bank = $this->decoded[$subject] ?? [];
         if (!is_array($bank)) {
             return null;
         }
-        $candidates = [];
+
+        $bandMatched = [];
         foreach ($bank as $row) {
             if (!is_array($row)) {
+                continue;
+            }
+            $key = (string) ($row['item_key'] ?? '');
+            if ($key !== '' && in_array($key, $excludeKeys, true)) {
                 continue;
             }
             $bands = $row['bands'] ?? null;
             if (is_array($bands) && $bands !== [] && !in_array($ageBand, $bands, true)) {
                 continue;
             }
-            $candidates[] = $row;
-        }
-        if ($candidates === []) {
-            $first = $bank[0] ?? null;
-            if (!is_array($first)) {
-                return null;
-            }
-            $candidates = [$first];
+            $bandMatched[] = $row;
         }
 
-        $chosen = $candidates[array_key_first($candidates)];
+        if ($bandMatched === []) {
+            foreach ($bank as $row) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $key = (string) ($row['item_key'] ?? '');
+                if ($key !== '' && in_array($key, $excludeKeys, true)) {
+                    continue;
+                }
+                $bandMatched[] = $row;
+            }
+        }
+
+        if ($bandMatched === []) {
+            return null;
+        }
+
+        $inRange = [];
+        foreach ($bandMatched as $row) {
+            $diff = (int) ($row['difficulty'] ?? 1);
+            if ($diff >= $minDiff && $diff <= $maxDiff) {
+                $inRange[] = $row;
+            }
+        }
+
+        $pool = $inRange !== [] ? $inRange : $bandMatched;
+        $mid = (int) floor(($minDiff + $maxDiff) / 2);
+
+        // Peso: más cerca de la dificultad media → más probabilidad, pero NUNCA fijo el primero.
+        $weighted = [];
+        foreach ($pool as $row) {
+            $dist = abs(((int) ($row['difficulty'] ?? 1)) - $mid);
+            $weight = max(1, 5 - $dist);
+            for ($i = 0; $i < $weight; $i++) {
+                $weighted[] = $row;
+            }
+        }
+        $this->shuffleList($weighted);
+        $chosen = $weighted[0];
         $chosen['subject_id'] = $subject;
 
         return $chosen;
+    }
+
+    /** @param list<mixed> $list */
+    private function shuffleList(array &$list): void
+    {
+        if (count($list) < 2) {
+            return;
+        }
+        // Fisher–Yates con random_int (criptográficamente fuerte; evita sesgo mt_rand en tests locales).
+        for ($i = count($list) - 1; $i > 0; $i--) {
+            $j = random_int(0, $i);
+            [$list[$i], $list[$j]] = [$list[$j], $list[$i]];
+        }
     }
 
     /**
@@ -124,7 +210,6 @@ final class PlacementBank
             return abs($got - $want) <= $tol ? 1.0 : 0.0;
         }
 
-        // short_text: keyword match
         $text = mb_strtolower(trim((string) ($reply['text'] ?? '')));
         $keywords = $canonical['keywords'] ?? [];
         if (!is_array($keywords) || $keywords === []) {
@@ -143,13 +228,136 @@ final class PlacementBank
     }
 
     /**
+     * Etiqueta legible de la respuesta del explorador.
+     *
+     * @param array<string,mixed> $item
+     * @param array{kind?:string,option_id?:string,text?:string} $reply
+     */
+    public function replyLabel(array $item, array $reply): ?string
+    {
+        $type = (string) ($item['item_type'] ?? 'mcq');
+
+        if ($type === 'mcq') {
+            $got = (string) ($reply['option_id'] ?? '');
+            if ($got === '') {
+                return null;
+            }
+            foreach ($item['options'] ?? [] as $opt) {
+                if (!is_array($opt)) {
+                    continue;
+                }
+                if ((string) ($opt['id'] ?? '') === $got) {
+                    return (string) ($opt['label'] ?? $got);
+                }
+            }
+
+            return $got;
+        }
+
+        $text = trim((string) ($reply['text'] ?? ''));
+        if ($text !== '') {
+            return $text;
+        }
+        $opt = trim((string) ($reply['option_id'] ?? ''));
+
+        return $opt !== '' ? $opt : null;
+    }
+
+    /**
+     * Etiqueta legible de la respuesta correcta canónica.
+     *
+     * @param array<string,mixed> $item
+     */
+    public function correctAnswerLabel(array $item): string
+    {
+        $type = (string) ($item['item_type'] ?? 'mcq');
+        $canonical = is_array($item['canonical_answer'] ?? null) ? $item['canonical_answer'] : [];
+
+        if ($type === 'mcq') {
+            $want = (string) ($canonical['option_id'] ?? '');
+            foreach ($item['options'] ?? [] as $opt) {
+                if (!is_array($opt)) {
+                    continue;
+                }
+                if ((string) ($opt['id'] ?? '') === $want) {
+                    return (string) ($opt['label'] ?? $want);
+                }
+            }
+
+            return $want !== '' ? $want : 'la opción correcta';
+        }
+
+        if ($type === 'numeric') {
+            $n = $canonical['numeric'] ?? null;
+
+            return is_numeric((string) $n) ? (string) $n : 'el valor correcto';
+        }
+
+        $keywords = $canonical['keywords'] ?? [];
+        if (is_array($keywords) && $keywords !== []) {
+            $parts = array_values(array_filter($keywords, static fn ($k): bool => is_string($k) && $k !== ''));
+
+            return $parts !== [] ? implode(' / ', $parts) : 'la respuesta esperada';
+        }
+
+        return 'la respuesta esperada';
+    }
+
+    /**
+     * Explicación pedagógica breve (banco o derivada).
+     *
+     * @param array<string,mixed> $item
+     */
+    public function explanationText(array $item): string
+    {
+        $stored = trim((string) ($item['explanation'] ?? ''));
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        $key = (string) ($item['item_key'] ?? '');
+        $derived = match ($key) {
+            'math_add_2' => '2 + 2 suma dos unidades más dos unidades, y el resultado es 4.',
+            'math_mul_7' => '7 × 3 es sumar siete tres veces: 7 + 7 + 7 = 21.',
+            'math_pct_20' => 'El 20 % de 50 es la quinta parte de 50: 50 ÷ 5 = 10.',
+            'math_frac_half' => '3/4 y 1/4 comparten el mismo denominador; al sumar numeradores obtienes 4/4 = 1.',
+            'math_prop_speed' => 'A 60 km/h de media, en 5 horas recorres 60 × 5 = 300 km.',
+            'math_avg_speed' => 'Velocidad = distancia ÷ tiempo: 90 ÷ 1,5 = 60 km/h.',
+            'math_ratio_mix' => '3 de cada 5 es el 60 %; el 60 % de 20 es 12.',
+            'lang_syn_feliz' => '«Alegre» comparte el sentido de contento o feliz; «triste» y «rápido» no.',
+            'lang_plural' => 'Las palabras en -z forman el plural en -ces: luz → luces.',
+            'lang_homophone' => '«Haber» es el verbo; «a ver» y «aver» no sustituyen esa forma.',
+            'lang_antonym' => '«Abundante» expresa lo contrario de «escaso».',
+            default => '',
+        };
+        if ($derived !== '') {
+            return $derived;
+        }
+
+        $type = (string) ($item['item_type'] ?? 'mcq');
+        if ($type === 'mcq') {
+            return 'Repasa el enunciado: solo una opción encaja con lo que se pregunta.';
+        }
+        if ($type === 'numeric') {
+            return 'Comprueba las operaciones paso a paso antes de responder.';
+        }
+
+        return 'Piensa en la regla o la pista del enunciado antes de seguir.';
+    }
+
+    /**
      * @param array<string,list<float>> $scoresBySubject
+     * @param list<string>|null $activeSubjects
      * @return array{subjects:array<string,string>,general:string}
      */
-    public function computeLevels(array $scoresBySubject): array
+    public function computeLevels(array $scoresBySubject, ?array $activeSubjects = null): array
     {
         $levels = [];
-        foreach (self::SUBJECTS as $subject) {
+        $subjects = $activeSubjects !== null && $activeSubjects !== []
+            ? SubjectCatalog::normalizeActiveSubjects($activeSubjects)
+            : array_keys($scoresBySubject);
+
+        foreach ($subjects as $subject) {
             $scores = $scoresBySubject[$subject] ?? [];
             if ($scores === []) {
                 continue;
@@ -158,18 +366,29 @@ final class PlacementBank
             $levels[$subject] = $this->scoreToLevel($avg);
         }
 
+        // Also include any scored subjects not in active list (legacy exams)
+        foreach ($scoresBySubject as $subject => $scores) {
+            if (isset($levels[$subject]) || $scores === []) {
+                continue;
+            }
+            if (!SubjectCatalog::isValid($subject)) {
+                continue;
+            }
+            $avg = array_sum($scores) / count($scores);
+            $levels[$subject] = $this->scoreToLevel($avg);
+        }
+
         $active = array_keys($levels);
-        $weightSum = 0.0;
+        if ($active === []) {
+            return ['subjects' => [], 'general' => 'L1'];
+        }
+
+        $weights = SubjectCatalog::renormalizeWeights($active);
         $weighted = 0.0;
         foreach ($active as $subject) {
-            $w = self::WEIGHTS[$subject] ?? 0.0;
-            $weightSum += $w;
-            $weighted += $w * $this->levelIndex($levels[$subject]);
+            $weighted += ($weights[$subject] ?? 0.0) * $this->levelIndex($levels[$subject]);
         }
-        if ($weightSum <= 0) {
-            return ['subjects' => $levels, 'general' => 'L1'];
-        }
-        $g = (int) round($weighted / $weightSum);
+        $g = (int) round($weighted);
         $g = max(1, min(5, $g));
 
         return ['subjects' => $levels, 'general' => 'L' . $g];
@@ -200,6 +419,8 @@ final class PlacementBank
 
     /**
      * Promote effective band one step if strong performance.
+     *
+     * @param array<string,string> $subjectLevels
      */
     public function promoteBand(string $ageBand, string $generalLevel, array $subjectLevels): string
     {
@@ -222,6 +443,9 @@ final class PlacementBank
         return $ageBand;
     }
 
+    /**
+     * @return array{id:string,label_child:string,tier:int}
+     */
     public function rankForGeneral(string $worldTheme, string $generalLevel): array
     {
         $tier = $this->levelIndex($generalLevel);

@@ -96,7 +96,7 @@ Dentro del marco glass:
 ┌─────────────────────────────────┐
 │         [ logo K pequeño ]      │
 │─────────────────────────────────│
-│  Ajustes                        │  ← título
+│  Ajustes                        │  ← título en cabecera del marco (fijo)
 │  Preferencias de la cuenta      │  ← subtítulo
 │  de gestión                     │
 │                                 │

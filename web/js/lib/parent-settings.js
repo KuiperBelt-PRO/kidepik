@@ -42,7 +42,16 @@ export function defaultParentSettings() {
     },
     learning: {
       adaptation_policy: "balanced",
-      active_subjects: ["math", "language", "logic", "science", "culture"],
+      active_subjects: [
+        "math",
+        "language",
+        "reading",
+        "logic",
+        "science",
+        "arts",
+        "communication",
+        "sports",
+      ],
       show_levels_to_child: false,
       pause_adaptation: false,
     },

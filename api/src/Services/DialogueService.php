@@ -8,9 +8,12 @@ use InvalidArgumentException;
 use Kidepik\Shared\Text\CharacterSummaryBuilder;
 use Kidepik\Shared\Text\DisplayNameExtractor;
 use Kidepik\Shared\Text\SpeciesExtractor;
+use Kidepik\Shared\Text\Utf8Text;
 use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Ai\AiGateway;
 use Kidepik\Shared\Ai\MentorCatalog;
+use Kidepik\Shared\Ai\PlacementNarrator;
+use Kidepik\Shared\Ai\SubjectCatalog;
 use Kidepik\Shared\Config;
 use Kidepik\Shared\Database\PdoFactory;
 use PDO;
@@ -234,11 +237,31 @@ final class DialogueService
             && ($replyKind === 'continue' || ($reply['option_id'] ?? '') === 'start_placement' || $phase === 'handoff_placement')
         ) {
             $placement = PlacementService::withDefaultBank($pdo);
-            $started = $placement->startExam($childId, $child, $sessionId, 'placement', $seq + 1, $mentorId);
-            $pdo->prepare("update dialogue_sessions set flow_id = 'placement', updated_at = now() where id = :id")
-                ->execute(['id' => $sessionId]);
-            $effects = $started['effects'];
-            $agentTurns[] = $this->insertTurn($pdo, $started['turn']);
+            try {
+                $started = $placement->startExam($childId, $child, $sessionId, 'placement', $seq + 1, $mentorId);
+                $pdo->prepare("update dialogue_sessions set flow_id = 'placement', updated_at = now() where id = :id")
+                    ->execute(['id' => $sessionId]);
+                $effects = $started['effects'];
+                $agentTurns[] = $this->insertTurn($pdo, $started['turn']);
+            } catch (InvalidArgumentException $e) {
+                if ($e->getMessage() !== 'placement_compose_failed') {
+                    throw $e;
+                }
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => $flowId,
+                    'sequence' => $seq + 1,
+                    'role' => 'mentor',
+                    'text' => 'La Escuela aún no ha abierto el umbral: no he podido preparar tu prueba ahora mismo. '
+                        . 'Cuando quieras, lo intentamos de nuevo.',
+                    'input_mode' => 'options_only',
+                    'options' => [['id' => 'start_placement', 'label' => 'Reintentar prueba']],
+                    'explorer_reply' => null,
+                    'meta' => ['phase' => 'handoff_placement', 'mentor_id' => $mentorId, 'compose_failed' => true],
+                    'model_used' => null,
+                ]);
+            }
         } elseif ($flowId === 'first_run' || in_array($step, ['pending_entry', 'choose_world', 'choose_name', 'choose_age', 'choose_character'], true)) {
             [$effects, $agentTurns, $step] = $this->advanceFirstRun(
                 $pdo,
@@ -252,6 +275,22 @@ final class DialogueService
                 $child,
                 $mentorId,
             );
+        } elseif ($step === 'placement' && !$this->hasOpenExam($pdo, $childId)) {
+            $subjects = PlacementService::activeSubjectsForChild($child);
+            $intro = (new PlacementNarrator())->intro($child, $mentorId, $subjects);
+            $agentTurns[] = $this->insertTurn($pdo, [
+                'session_id' => $sessionId,
+                'child_id' => $childId,
+                'flow_id' => $flowId,
+                'sequence' => $seq + 1,
+                'role' => 'mentor',
+                'text' => $intro,
+                'input_mode' => 'options_only',
+                'options' => [['id' => 'start_placement', 'label' => 'Comenzar prueba']],
+                'explorer_reply' => null,
+                'meta' => ['phase' => 'handoff_placement', 'mentor_id' => $mentorId],
+                'model_used' => null,
+            ]);
         } else {
             $agentTurns[] = $this->llmMentorTurn(
                 $pdo,
@@ -431,9 +470,14 @@ final class DialogueService
             AgeBand::assertAgeYears($age);
             $band = AgeBand::fromAgeYears($age);
             $crew->updateProfileForAuthUser($authUserId, $childId, ['age_years' => $age]);
+            $this->suggestLearningSubjects($authUserId, $childId, $band);
             $this->setOnboarding($pdo, $childId, 'choose_character');
             $effects[] = ['type' => 'set_age', 'value' => ['age_years' => $age, 'age_band' => $band]];
             $effects[] = ['type' => 'advance_onboarding', 'to' => 'choose_character'];
+            $effects[] = [
+                'type' => 'suggest_active_subjects',
+                'value' => SubjectCatalog::baseSubjectsForBand($band),
+            ];
 
             $theme = $child['world_theme'] ?? null;
             $suggestions = $theme === 'sci-fi'
@@ -580,7 +624,9 @@ final class DialogueService
         ];
         $effects[] = ['type' => 'advance_onboarding', 'to' => 'placement'];
 
-        $profile = MentorCatalog::profile($mentorId);
+        $child = $this->crew()->getForAuthUser($authUserId, $childId);
+        $subjects = PlacementService::activeSubjectsForChild($child);
+        $intro = (new PlacementNarrator())->intro($child, $mentorId, $subjects);
         $agentTurns = [$this->insertTurn($pdo, [
             'session_id' => $sessionId,
             'child_id' => $childId,
@@ -588,10 +634,10 @@ final class DialogueService
             'sequence' => $nextSeq,
             'role' => 'mentor',
             'text' => sprintf(
-                'Listo: %s de tono %s. %s te espera en la prueba de ingreso. Pulsa continuar cuando quieras empezar.',
+                'Listo: %s de tono %s. %s',
                 $species,
                 $palette,
-                $profile['display_name']
+                $intro,
             ),
             'input_mode' => 'continue',
             'options' => [['id' => 'start_placement', 'label' => 'Comenzar prueba']],
@@ -601,6 +647,14 @@ final class DialogueService
         ])];
 
         return [$effects, $agentTurns, 'placement'];
+    }
+
+    /**
+     * Suggest active_subjects on first age declaration without overwriting tutor edits.
+     */
+    private function suggestLearningSubjects(string $authUserId, string $childId, string $band): void
+    {
+        $this->crew()->suggestLearningSubjectsForAuthUser($authUserId, $childId, $band);
     }
 
     /** @param array<string,mixed> $child */
@@ -660,6 +714,7 @@ final class DialogueService
         string $userText,
     ): array {
         $profile = MentorCatalog::profile($mentorId);
+        $mentorRules = $this->mentorProseRules();
         $gateway = $this->gateway();
         $packBuilder = new JourneyContextPack($pdo);
         $pack = $packBuilder->build($childId);
@@ -668,8 +723,10 @@ final class DialogueService
             [
                 'role' => 'system',
                 'content' => 'Eres ' . $profile['display_name'] . '. ' . $profile['short_description']
+                    . "\n\n" . $mentorRules
                     . "\n\n" . $memoryBlock
-                    . "\n\nResponde SOLO JSON con keys agent_text, input_mode, options, effects, meta. Español de España.",
+                    . "\n\nResponde SOLO JSON con keys agent_text, input_mode, options, effects, meta. "
+                    . 'Castellano de España (no latinoamericano).',
             ],
             ['role' => 'user', 'content' => $userText !== '' ? $userText : 'continuar'],
         ];
@@ -686,7 +743,7 @@ final class DialogueService
                 $modelUsed = $result['model'];
                 $parsed = json_decode($result['content'], true);
                 if (is_array($parsed)) {
-                    $text = (string) ($parsed['agent_text'] ?? $text);
+                    $text = Utf8Text::normalize((string) ($parsed['agent_text'] ?? $text));
                     $inputMode = (string) ($parsed['input_mode'] ?? $inputMode);
                     $options = is_array($parsed['options'] ?? null) ? $parsed['options'] : [];
                 }
@@ -708,6 +765,21 @@ final class DialogueService
             'meta' => ['mentor_id' => $mentorId],
             'model_used' => $modelUsed,
         ]);
+    }
+
+    private function mentorProseRules(): string
+    {
+        $path = dirname(__DIR__, 3) . '/shared/Ai/prompts/_mentor_prose_rules.es.md';
+        if (!is_readable($path)) {
+            return 'Di «preparar / diseñar / componer la prueba»; nunca «armar un examen».';
+        }
+
+        $raw = file_get_contents($path);
+        if (!is_string($raw) || trim($raw) === '') {
+            return 'Di «preparar / diseñar / componer la prueba»; nunca «armar un examen».';
+        }
+
+        return trim(preg_replace('/^#.*$/m', '', $raw) ?? $raw);
     }
 
     /** @param array<string,mixed> $child */
@@ -863,7 +935,7 @@ final class DialogueService
             'flow_id' => $row['flow_id'],
             'sequence' => $row['sequence'],
             'role' => $row['role'],
-            'text' => $row['text'],
+            'text' => Utf8Text::normalize((string) $row['text']),
             'options' => isset($row['options']) ? json_encode($row['options'], JSON_UNESCAPED_UNICODE) : null,
             'input_mode' => $row['input_mode'] ?? null,
             'explorer_reply' => isset($row['explorer_reply'])
@@ -915,7 +987,7 @@ final class DialogueService
             'flow_id' => (string) $row['flow_id'],
             'sequence' => (int) $row['sequence'],
             'role' => (string) $row['role'],
-            'text' => (string) $row['text'],
+            'text' => Utf8Text::normalize((string) $row['text']),
             'options' => is_array($options) ? $options : null,
             'input_mode' => $row['input_mode'] ?? null,
             'explorer_reply' => is_array($reply) ? $reply : null,
@@ -945,6 +1017,12 @@ final class DialogueService
         $turns = [];
         $n = $sequence;
 
+        $feedbackMeta = ['phase' => 'placement_feedback'];
+        if (isset($result['index'], $result['total'])) {
+            $feedbackMeta['index'] = (int) $result['index'];
+            $feedbackMeta['total'] = (int) $result['total'];
+        }
+
         $turns[] = $this->insertTurn($pdo, [
             'session_id' => $sessionId,
             'child_id' => $childId,
@@ -955,7 +1033,7 @@ final class DialogueService
             'input_mode' => 'continue',
             'options' => null,
             'explorer_reply' => null,
-            'meta' => ['phase' => 'placement_feedback'],
+            'meta' => $feedbackMeta,
             'model_used' => null,
         ]);
 
@@ -995,6 +1073,7 @@ final class DialogueService
                     $next,
                     (int) ($result['index'] ?? 0),
                     (int) ($result['total'] ?? 1),
+                    $child,
                 )
             );
         }

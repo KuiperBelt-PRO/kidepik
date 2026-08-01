@@ -26,6 +26,11 @@ import {
 } from "./glass-controls.js?v=224";
 import { showGlassConfirm } from "./glass-modal.js?v=2";
 import {
+  normalizeActiveSubjects,
+  renderSubjectsChecklistHtml,
+  SUBJECT_CATALOG,
+} from "../lib/subject-catalog.js";
+import {
   buildCrewMemberCardInner,
   escapeHtml,
   memberCardAriaLabel,
@@ -121,7 +126,6 @@ export function mountCrewListPanel(container, { session }) {
             ? "Solo tu perfil de tutor por ahora"
             : `${res.member_count} de ${res.member_limit} tripulantes`;
     root.innerHTML = `
-      <h1 class="crew-panel__title">Tripulación</h1>
       <p class="crew-panel__subtitle">Tripulantes a tu cargo</p>
       <p class="crew-panel__count" aria-live="polite">${escapeHtml(countLabel)}</p>
       <div class="crew-panel__grid" data-list></div>
@@ -171,7 +175,7 @@ export function mountCrewNewPanel(container, { session }) {
   const root = document.createElement("div");
   root.className = "crew-panel";
   root.innerHTML = `
-    <h1 class="crew-panel__title">Nuevo tripulante</h1>
+    <p class="crew-panel__subtitle">Reserva una plaza para un nuevo explorador.</p>
     <p class="crew-panel__body">El tripulante elegirá mundo, nombre y edad en su primera aventura. Aquí configurarás límites y permisos.</p>
     <label class="crew-panel__label">Nota para ti (opcional)
       <input class="crew-panel__input" type="text" maxlength="40" data-label placeholder="p. ej. El de Marta" />
@@ -223,9 +227,9 @@ export function mountCrewNewPanel(container, { session }) {
 
 /**
  * @param {HTMLElement} container
- * @param {{ session: import('@supabase/supabase-js').Session; childId: string }} options
+ * @param {{ session: import('@supabase/supabase-js').Session; childId: string; onTitleChange?: (title: string) => void }} options
  */
-export function mountCrewDetailPanel(container, { session, childId }) {
+export function mountCrewDetailPanel(container, { session, childId, onTitleChange }) {
   const root = document.createElement("div");
   root.className = "crew-panel";
   container.appendChild(root);
@@ -258,6 +262,11 @@ export function mountCrewDetailPanel(container, { session, childId }) {
   /** @param {any} member */
   function paint(member) {
     resetCleanups();
+    onTitleChange?.(memberTitle({
+      display_name: member.display_name,
+      tutor_label: member.settings?.tutor_label ?? member.tutor_label ?? "",
+      is_tutor_profile: Boolean(member.is_tutor_profile),
+    }));
     const p = member.permissions || {};
     const isTutor = Boolean(member.is_tutor_profile);
     const tutorLabel = member.settings?.tutor_label ?? member.tutor_label ?? "";
@@ -373,6 +382,19 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       ${
         isTutor
           ? ""
+          : `<section class="crew-panel__block" data-subjects-block>
+        <h2 class="crew-panel__block-title">Materias de aprendizaje</h2>
+        <p class="crew-panel__helper">Las materias activas se usan en el examen de acceso y en la aventura. El nivel de cada reto se adapta a la edad del explorador, no a la materia elegida.</p>
+        <div class="crew-panel__subjects" data-subjects-host></div>
+        <p class="crew-panel__helper" data-subjects-warn hidden>Más de 10 materias: el examen puede ser largo; se puede reanudar.</p>
+        <p class="crew-panel__status" data-subjects-status aria-live="polite"></p>
+        <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-subjects></button>
+      </section>`
+      }
+
+      ${
+        isTutor
+          ? ""
           : `<section class="crew-panel__block">
         <h2 class="crew-panel__block-title">Aventura</h2>
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-play>Entrar en la aventura</button>
@@ -397,6 +419,29 @@ export function mountCrewDetailPanel(container, { session, childId }) {
     }
     paintBtn(root, "[data-save-profile]", "save", "Guardar perfil");
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
+    if (!isTutor) {
+      paintBtn(root, "[data-save-subjects]", "save", "Guardar materias");
+      const catalog =
+        Array.isArray(member.subject_catalog) && member.subject_catalog.length
+          ? member.subject_catalog
+          : SUBJECT_CATALOG;
+      const active = normalizeActiveSubjects(
+        member.active_subjects ?? member.settings?.learning?.active_subjects,
+      );
+      const host = root.querySelector("[data-subjects-host]");
+      if (host instanceof HTMLElement) {
+        host.innerHTML = renderSubjectsChecklistHtml(catalog, active);
+      }
+      const warn = root.querySelector("[data-subjects-warn]");
+      const syncWarn = () => {
+        const n = root.querySelectorAll("[data-subject]:checked").length;
+        if (warn instanceof HTMLElement) warn.hidden = n <= 10;
+      };
+      syncWarn();
+      root.querySelectorAll("[data-subject]").forEach((el) => {
+        el.addEventListener("change", syncWarn);
+      });
+    }
     if (!isTutor) {
       paintBtn(root, "[data-play]", "save", "Entrar en la aventura");
       paintBtn(root, "[data-delete]", "danger", "Eliminar de la tripulación", { dangerIcon: true });
@@ -557,6 +602,31 @@ export function mountCrewDetailPanel(container, { session, childId }) {
       const res = await patchCrewPermissions(session, childId, patch);
       if (status instanceof HTMLElement) {
         status.textContent = res.ok ? "Guardado" : res.error || "No hemos podido guardar.";
+      }
+      if (res.ok) paint(res.member);
+    });
+
+    root.querySelector("[data-save-subjects]")?.addEventListener("click", async () => {
+      if (isTutor) return;
+      /** @type {string[]} */
+      const selected = [];
+      root.querySelectorAll("[data-subject]").forEach((input) => {
+        if (!(input instanceof HTMLInputElement)) return;
+        const id = input.getAttribute("data-subject");
+        if (id && input.checked) selected.push(id);
+      });
+      const status = root.querySelector("[data-subjects-status]");
+      if (selected.length < 1) {
+        if (status instanceof HTMLElement) {
+          status.textContent = "Activa al menos una materia.";
+        }
+        return;
+      }
+      const res = await patchCrewMember(session, childId, {
+        learning: { active_subjects: selected },
+      });
+      if (status instanceof HTMLElement) {
+        status.textContent = res.ok ? "Materias guardadas" : "No hemos podido guardar las materias.";
       }
       if (res.ok) paint(res.member);
     });

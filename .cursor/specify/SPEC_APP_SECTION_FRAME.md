@@ -138,10 +138,10 @@ function shouldCompressWorldBands(path) {
 ┌─────────────────────────────────────┐
 │ [≡]              [◐] [☺]            │  ← shell chrome (fijo)
 │    ╭───────────────────────────╮    │
-│    │      [ logo K pequeño ]   │    │  ← cabecera del marco (no scroll o sticky)
+│    │  [←]  [logo / skel]  [→]  │    │  ← cabecera FIJA (no scroll)
+│    │       Tripulación         │    │  ← título de sección FIJO
 │    │───────────────────────────│    │
-│    │                           │    │
-│    │   contenido de sección    │    │  ← scroll interno + fade
+│    │   subtítulo / contenido   │    │  ← scroll interno + fade
 │    │   (formulario, listas…)   │    │
 │    │                           │    │
 │    ╰───────────────────────────╯    │
@@ -191,7 +191,47 @@ Tokens alineados a [SPEC_APP_SHELL_CHROME.md](SPEC_APP_SHELL_CHROME.md) §2.2 / 
 | Motion | Sin órbita en sección; morph sincronizado con bandas cuando aplique |
 | Accesibilidad | `alt="KidepiK"` en la imagen del logo compartido |
 
-La cabecera del logo es **sticky** dentro del marco; el **scroll** aplica solo a la zona de contenido (§3).
+La cabecera del logo es **fija** dentro del marco (fuera del scroll); el **scroll** aplica solo a la zona de contenido (§3).
+
+### 2.4c Título de sección (cabecera fija)
+
+| Requisito | Valor |
+| --- | --- |
+| Elemento | `<h1 class="section-frame__title">` en `.section-frame__header` (debajo del logo) |
+| Scroll | **No** — el título no entra en `.section-frame__scroll` |
+| Tipografía | Misma matriz §2.5 (display según `data-shell-theme`) |
+| Tamaño | `calc(1.35rem * var(--font-scale-ui, 1))` |
+| API | `mountSectionFrame(host, { title })` + `setTitle(text)` |
+| Accesibilidad | `aria-labelledby` → id del `h1`; `ariaLabel` solo si no hay título |
+
+**Matriz de títulos**
+
+| Ruta | Título en cabecera |
+| --- | --- |
+| `#/account` | Cuenta |
+| `#/settings` | Ajustes |
+| `#/crew` | Tripulación |
+| `#/crew/new` | Nuevo tripulante |
+| `#/crew/:id` | Nombre del tripulante (`setTitle` tras carga) |
+| `#/play/:childId` | Aventura (MVP) |
+
+Subtítulos contextuales (`crew-panel__subtitle`, helpers, mentor en play) **siguen en scroll**. Prohibido duplicar el `<h1>` de sección dentro del panel.
+
+### 2.4d Logo — skeleton y estados de carga
+
+| Estado | Clase en `.loader-logo-wrap` | Visible |
+| --- | --- | --- |
+| Pending | `is-logo-pending` | Skeleton glass en `.section-frame__logo-mount` |
+| Ready | `is-logo-ready` (+ `is-ready`) | `<img class="loader-logo">` |
+| Error | `is-logo-error` | Solo `.loader-logo-fallback` |
+
+| Regla | Detalle |
+| --- | --- |
+| Helper | `syncLogoRevealState` / `inferLogoRevealState` (`web/js/lib/logo-reveal.js`) |
+| Pending | Prohibido mostrar img rota o fallback textual |
+| Ready ya en caché (home→sección) | Sin flash de skeleton |
+| Skeleton | `.section-frame__logo-skeleton` + patrón glass-skeleton (`DESIGN.md` §11) |
+| Reduced motion | Sin shimmer agresivo |
 
 ### 2.4b Animación del marco (fade)
 
@@ -264,7 +304,7 @@ Con `prefers-reduced-motion`: máscara puede permanecer (no es motion temporal);
 
 ### 3.3 Contenido
 
-- Los elementos de cada sección (textos, botones, campos, iconos) viven **solo** dentro de la zona scrolleable del marco.
+- El **título de sección** vive en la cabecera fija (§2.4c); el resto (textos, botones, campos, subtítulos, iconos) vive en la zona scrolleable.
 - Estilo acorde a controles ya existentes (FABs glass, botones auth, tipografía dual).
 - No introducir un design system paralelo.
 
@@ -274,23 +314,37 @@ Con `prefers-reduced-motion`: máscara puede permanecer (no es motion temporal);
 
 | Fichero | Responsabilidad |
 | --- | --- |
-| `web/js/components/section-frame.js` | Montar marco + logo + slot de contenido; API `mountSectionFrame(root, { title? })` |
+| `web/js/components/section-frame.js` | Montar marco + logo + título fijo + slot de contenido; API `mountSectionFrame(host, { title?, ariaLabel?, navigation? })` → `{ contentEl, logoMountEl, titleEl, setTitle, syncLogoSkeleton, destroy }` |
+| `web/js/lib/logo-reveal.js` | Estados pending/ready/error del wordmark |
 | `web/js/lib/world-band-layout.js` (o extender `world-transition.js`) | `shouldCompressWorldBands(path)`, orquestar compact/expand en navegación shell |
-| `web/css/components/section-frame.css` | Glass, geometría, scroll, máscara fade |
+| `web/css/components/section-frame.css` | Glass, geometría, cabecera, scroll, máscara fade, skeleton logo |
 | `web/tests/world-band-layout.test.js` | Matriz home vs compactas |
-| Escenas | `account.js` (primera consumidora); legal **no** monta este marco |
+| `web/tests/logo-reveal.test.js` | Estados de revelación del logo |
+| `web/tests/section-frame.test.js` | `setTitle` / `titleEl` (si hay DOM) |
+| Escenas | account, settings, crew, play; legal **no** monta este marco |
 
 API mínima:
 
 ```js
 /**
  * @param {HTMLElement} host
- * @param {{ logoSize?: "sm" }} [options]
- * @returns {{ contentEl: HTMLElement; destroy: () => void }}
+ * @param {{
+ *   ariaLabel?: string;
+ *   title?: string;
+ *   navigation?: boolean | { back?: boolean; forward?: boolean };
+ * }} [options]
+ * @returns {{
+ *   root: HTMLElement;
+ *   contentEl: HTMLElement;
+ *   logoMountEl: HTMLElement;
+ *   titleEl: HTMLElement | null;
+ *   setTitle: (text: string) => void;
+ *   syncLogoSkeleton: (logoWrap?: HTMLElement | null) => void;
+ *   destroy: () => Promise<void>;
+ * }}
  */
 export function mountSectionFrame(host, options = {})
 ```
-
 ---
 
 ## 5. Capas z-index (extensión shell)
@@ -310,11 +364,13 @@ export function mountSectionFrame(host, options = {})
 2. Navegar Home → `#/account`: bandas se **comprimen** con animación ~720 ms (o reduced).
 3. Navegar `#/account` → Home: bandas se **expanden** con animación.
 4. `#/account` muestra marco glass central con borde 1 px blanco semitransparente y blur visible sobre el mundo.
-5. Logo KidepiK centrado arriba dentro del marco, tamaño menor que en legal.
-6. Contenido largo scrollea **dentro** del marco; fade superior e inferior visibles.
-7. Toggle tema cambia tipografía (e iconos si hay) del contenido del marco al instante.
-8. Legal autenticado sigue compacto **sin** adoptar el marco glass.
-9. Playwright 390×844: capturas `tmp/playwright-output/section-frame-*.png` (home expandido, account compacto, transición documentada en informe).
+5. Logo KidepiK centrado arriba dentro del marco, tamaño menor que en legal; durante pending solo skeleton (sin img rota ni fallback textual).
+6. Título de sección fijo en cabecera (p. ej. «Tripulación» / «Cuenta» / «Aventura»); al hacer scroll del contenido el título permanece visible.
+7. No hay `<h1>` de sección duplicado en el área scrolleable.
+8. Contenido largo scrollea **dentro** del marco; fade superior e inferior visibles.
+9. Toggle tema cambia tipografía (e iconos si hay) del título y contenido del marco al instante.
+10. Legal autenticado sigue compacto **sin** adoptar el marco glass.
+11. Playwright 390×844: capturas `tmp/playwright-output/section-header-title-scroll-v1.png`, `section-logo-skeleton-v1.png` (si viable).
 
 ---
 
@@ -323,7 +379,8 @@ export function mountSectionFrame(host, options = {})
 | Test | Archivo |
 | --- | --- |
 | `shouldCompressWorldBands`: home false; account/legal true | `web/tests/world-band-layout.test.js` |
-| Mount frame expone `contentEl` y limpia en destroy | `web/tests/section-frame.test.js` (si hay DOM test runner) |
+| Mount frame expone `titleEl` / `setTitle` y limpia en destroy | `web/tests/section-frame.test.js` |
+| `syncLogoRevealState` pending/ready/error | `web/tests/logo-reveal.test.js` |
 
 ---
 

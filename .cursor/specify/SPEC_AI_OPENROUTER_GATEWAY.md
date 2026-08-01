@@ -157,11 +157,25 @@ Si un id preferido **no** está free/disponible hoy → se omite (no se usa de p
 ### 4.2 Orden de intento
 
 ```
+db_queue = ai_purpose_model_queues(purpose)  // si hay filas enabled
 ranked = sort_desc(score) ∩ is_free ∩ not_denied
-attempts = ranked[:AI_MAX_MODEL_ATTEMPTS]  // default 8
+attempts = (db_queue ⊕ ranked_unique)[:AI_MAX_MODEL_ATTEMPTS]  // default 8
 ```
 
 Ante fallo: siguiente. Éxito: `last_success_at`, reset parcial de fails.
+
+### 4.3 Colas por purpose en BD (B1 — ago 2026)
+
+Tabla `ai_purpose_model_queues` (`purpose`, `model_id`, `position`, `enabled`).
+
+| Regla | Valor |
+| --- | --- |
+| Prioridad | Filas BD enabled primero; luego discovery rankeado (sin duplicar) |
+| Vacío | Si no hay filas para el purpose → semilla env `AI_MODEL_PREFERENCE_*` + discovery (legacy) |
+| Operación | `INSERT`/`UPDATE`/`DELETE` sin redeploy; caché PHP ~120 s |
+| Código | `PurposeModelQueueStore` + `AiGateway::resolveAttempts` |
+
+Purposes semilla: `placement_exam_composer`, `placement_exam_batch_writer`, `placement_item_writer`, `dialogue`, `journey_summarizer`.
 
 ---
 

@@ -99,7 +99,8 @@ Grid responsive (**3 columnas máximo**) con **fichas tipo carta coleccionable**
 
 ```
 ┌─────────────────────────────────┐
-│  Tripulación                    │
+│  (título «Tripulación» en cabecera del marco) │
+│  Tripulantes a tu cargo …                   │
 │  Exploradores a tu cargo        │
 │                                 │
 │  ┌╌╌ Carta ═════════════════┐  │

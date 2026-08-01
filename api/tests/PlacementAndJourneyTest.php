@@ -17,7 +17,14 @@ final class PlacementAndJourneyTest extends TestCase
         $queue = $bank->pickQueue('band_child', ['math', 'language', 'logic'], 3);
         self::assertCount(3, $queue);
 
-        $math = $queue[0];
+        $math = null;
+        foreach ($queue as $item) {
+            if (($item['subject_id'] ?? '') === 'math') {
+                $math = $item;
+                break;
+            }
+        }
+        self::assertNotNull($math);
         self::assertSame(1.0, $bank->score($math, [
             'kind' => 'option',
             'option_id' => (string) ($math['canonical_answer']['option_id'] ?? ''),

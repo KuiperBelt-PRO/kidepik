@@ -9,6 +9,9 @@ namespace Kidepik\Shared\Ai;
  */
 final class FreeModelRanker
 {
+    public const PROFILE_DEFAULT = 'default';
+    public const PROFILE_QUALITY = 'quality';
+
     /**
      * @param list<array{
      *   id:string,
@@ -17,11 +20,14 @@ final class FreeModelRanker
      *   fail_count_window?:int,
      *   last_success_at?:string|null
      * }> $models
-     * @param list<string> $preferenceOrdered
+     * @param list<string> $preferenceOrdered semilla opcional (solo si el operador la define en env)
      * @return list<array{id:string,score:float,name?:string|null,context_length?:int|null}>
      */
-    public function rank(array $models, array $preferenceOrdered = []): array
-    {
+    public function rank(
+        array $models,
+        array $preferenceOrdered = [],
+        string $profile = self::PROFILE_DEFAULT,
+    ): array {
         $prefIndex = [];
         foreach (array_values($preferenceOrdered) as $i => $id) {
             $prefIndex[$id] = $i;
@@ -41,7 +47,21 @@ final class FreeModelRanker
             }
 
             $ctx = (int) ($model['context_length'] ?? 0);
-            if ($ctx > 0) {
+            if ($profile === self::PROFILE_QUALITY) {
+                if ($ctx > 0) {
+                    $score += min(22.0, $ctx / 5500.0);
+                }
+                $params = $this->inferParamBillions($id);
+                if ($params > 0.0) {
+                    $score += min(30.0, $params * 0.42);
+                }
+                if (preg_match('/(instruct|chat)/i', $id) === 1) {
+                    $score += 6.0;
+                }
+                if (preg_match('/(embed|vision|image|ocr)/i', $id) === 1) {
+                    $score -= 28.0;
+                }
+            } elseif ($ctx > 0) {
                 $score += min(10.0, $ctx / 16000.0);
             }
 
@@ -67,5 +87,14 @@ final class FreeModelRanker
         });
 
         return $scored;
+    }
+
+    private function inferParamBillions(string $modelId): float
+    {
+        if (preg_match('/(\d+(?:\.\d+)?)\s*b\b/i', $modelId, $match) !== 1) {
+            return 0.0;
+        }
+
+        return (float) $match[1];
     }
 }

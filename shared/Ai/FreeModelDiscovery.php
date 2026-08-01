@@ -12,7 +12,7 @@ use Kidepik\Shared\Config;
 /**
  * Descubre modelos free vía GET /api/v1/models y los rankea.
  */
-final class FreeModelDiscovery
+class FreeModelDiscovery
 {
     public function __construct(
         private ?ClientInterface $http = null,
@@ -25,11 +25,14 @@ final class FreeModelDiscovery
      * @param list<array<string,mixed>>|null $rawOverride fixture para tests
      * @return list<string> model ids ordenados
      */
-    public function rankedIds(?array $rawOverride = null): array
+    public function rankedIds(?array $rawOverride = null, string $purpose = 'dialogue'): array
     {
         $raw = $rawOverride ?? $this->fetchRaw();
         $free = $this->catalog->filterFree($raw, Config::aiModelDenylist());
-        $ranked = $this->ranker->rank($free, Config::aiModelPreference());
+        $profile = Config::aiUsesQualityFreeModels($purpose)
+            ? FreeModelRanker::PROFILE_QUALITY
+            : FreeModelRanker::PROFILE_DEFAULT;
+        $ranked = $this->ranker->rank($free, Config::aiModelPreferenceSeed($purpose), $profile);
 
         return array_map(static fn (array $r): string => $r['id'], $ranked);
     }

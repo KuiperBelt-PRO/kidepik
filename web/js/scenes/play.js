@@ -3,8 +3,8 @@
  * @module scenes/play
  */
 
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=185";
-import { mountSectionFrame } from "../components/section-frame.js?v=188";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
+import { mountSectionFrame } from "../components/section-frame.js?v=236";
 import {
   bindGlassIconTheme,
   createGlassIconSvg,
@@ -15,7 +15,7 @@ import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=18
 import { navigate } from "../lib/router.js";
 import { navigateShellRoute } from "../lib/shell-navigation.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
-import { applySectionEnter } from "../lib/shell-section-transition.js?v=185";
+import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 import { openDialogueSession, submitDialogueTurn } from "../lib/play-api.js";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
@@ -43,7 +43,13 @@ export function renderPlay(params) {
 
   /** @type {{ destroy: (o?: object) => void; sectionHost?: HTMLElement } | null} */
   let chromeHandle = null;
-  /** @type {{ destroy: () => Promise<void>; contentEl?: HTMLElement; logoMountEl?: HTMLElement } | null} */
+  /** @type {{
+   *   destroy: () => Promise<void>;
+   *   contentEl?: HTMLElement;
+   *   logoMountEl?: HTMLElement;
+   *   root?: HTMLElement;
+   *   syncLogoSkeleton?: (logoWrap?: HTMLElement | null) => void;
+   * } | null} */
   let frameHandle = null;
   let cancelled = false;
   /** @type {(() => void)[]} */
@@ -77,6 +83,7 @@ export function renderPlay(params) {
     if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) return;
 
     frameHandle = mountSectionFrame(host, {
+      title: "Aventura",
       ariaLabel: "Aventura",
       navigation: { forward: false },
     });
@@ -86,7 +93,12 @@ export function renderPlay(params) {
     frameHandle.contentEl?.appendChild(root);
     fillGlassSkeleton(root, { preset: "panel", ariaLabel: "Cargando aventura" });
 
-    await applySectionEnter({ scene: sceneEl, logoMount: frameHandle.logoMountEl });
+    await applySectionEnter({
+      scene: sceneEl,
+      logoMount: frameHandle.logoMountEl,
+      onLogoSettled: (logoWrap) => frameHandle?.syncLogoSkeleton?.(logoWrap),
+    });
+    frameHandle.syncLogoSkeleton?.();
     if (cancelled) return;
 
     await mountPlayPanel(root, {
@@ -233,6 +245,7 @@ async function mountPlayPanel(root, ctx) {
   const footer = document.createElement("div");
   footer.className = "section-frame__footer play-panel__footer";
   footer.innerHTML = `
+    <p class="play-panel__footer-progress" data-exam-progress hidden aria-live="polite"></p>
     <div class="play-panel__options" data-options role="group" aria-label="Opciones"></div>
     <form class="play-compose" data-form hidden>
       <textarea
@@ -262,6 +275,7 @@ async function mountPlayPanel(root, ctx) {
   const formEl = footer.querySelector("[data-form]");
   const statusEl = root.querySelector("[data-status]");
   const mentorNameEl = root.querySelector("[data-mentor-name]");
+  const progressEl = footer.querySelector("[data-exam-progress]");
   const inputEl = footer.querySelector("#play-reply");
   const sendBtn = footer.querySelector("[data-send]");
 
@@ -293,6 +307,187 @@ async function mountPlayPanel(root, ctx) {
    */
   function syncFooterComposeMode(composeVisible) {
     footer.classList.toggle("play-panel__footer--compose", composeVisible);
+    syncFooterChrome();
+  }
+
+  /** Oculta borde/fondo del footer cuando no hay opciones ni campo de texto. */
+  function syncFooterChrome() {
+    const optionsEmpty = !(optionsEl instanceof HTMLElement) || optionsEl.childElementCount === 0;
+    const composeHidden = !(formEl instanceof HTMLElement) || formEl.hidden;
+    const progressVisible = progressEl instanceof HTMLElement && !progressEl.hidden;
+    footer.classList.toggle(
+      "play-panel__footer--idle",
+      optionsEmpty && composeHidden && !progressVisible,
+    );
+  }
+
+  /** @type {HTMLElement | null} */
+  let thinkingBubbleEl = null;
+  /** @type {ReturnType<typeof setInterval> | null} */
+  let thinkingRotateTimer = null;
+  /** @type {HTMLElement | null} */
+  let thinkingTextEl = null;
+
+  /**
+   * @param {{ kind: string, option_id?: string }} reply
+   * @returns {'preparing_exam' | 'evaluating_answer' | 'adventure' | 'general'}
+   */
+  function resolveThinkingKind(reply) {
+    const phase =
+      typeof lastPendingTurn?.meta?.phase === "string" ? lastPendingTurn.meta.phase : "";
+    if (
+      phase === "handoff_placement" ||
+      reply.option_id === "start_placement" ||
+      (reply.kind === "continue" && onboardingStep === "placement" && phase !== "placement_item")
+    ) {
+      return "preparing_exam";
+    }
+    if (phase === "placement_item" || phase === "placement_feedback") {
+      return "evaluating_answer";
+    }
+    if (phase === "choose_zone" || phase === "adventure_challenge") {
+      return "adventure";
+    }
+    return "general";
+  }
+
+  /**
+   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure' | 'general'} kind
+   * @returns {string[]}
+   */
+  function thinkingLines(kind) {
+    const name = mentorLabel;
+    const fantasy = playWorldTheme !== "sci-fi";
+    if (kind === "preparing_exam") {
+      return fantasy
+        ? [
+            `${name} prepara tu prueba de ingreso: busca las mejores preguntas en la biblioteca de la Escuela…`,
+            `${name} recorre los anaqueles del saber para elegir retos a tu medida…`,
+            `${name} consulta pergaminos antiguos y arma un examen único para ti…`,
+            `${name} sopesa materias y dificultades antes de abrir el umbral…`,
+            `${name} enciende los faroles de la biblioteca: cada reto se escribe ahora mismo…`,
+          ]
+        : [
+            `${name} compila tu prueba de acceso: consulta los archivos de la Academia…`,
+            `${name} rastrea la biblioteca estelar en busca de retos a tu nivel…`,
+            `${name} sincroniza módulos de saber y diseña un examen nuevo para ti…`,
+            `${name} calcula dificultad y materias antes de abrir el protocolo de ingreso…`,
+            `${name} descarga nodos de conocimiento: cada desafío se genera ahora…`,
+          ];
+    }
+    if (kind === "evaluating_answer") {
+      return fantasy
+        ? [
+            `${name} compara tu respuesta con las runas del umbral…`,
+            `${name} anota el resultado y prepara el siguiente tramo…`,
+            `${name} escucha el eco de tu respuesta en las bóvedas…`,
+          ]
+        : [
+            `${name} coteja tu respuesta con el protocolo de la Academia…`,
+            `${name} registra el resultado y carga el siguiente nodo…`,
+            `${name} verifica la telemetría de tu respuesta…`,
+          ];
+    }
+    if (kind === "adventure") {
+      return fantasy
+        ? [
+            `${name} contempla el mapa del reino antes de responder…`,
+            `${name} consulta el camino y las señales del territorio…`,
+          ]
+        : [
+            `${name} traza la ruta en el mapa estelar…`,
+            `${name} consulta sensores y bitácora de la misión…`,
+          ];
+    }
+    return fantasy
+      ? [
+          `${name} medita un instante antes de hablar…`,
+          `${name} busca las palabras justas…`,
+          `${name} escucha el viento del umbral…`,
+        ]
+      : [
+          `${name} procesa el enlace un momento…`,
+          `${name} ajusta la frecuencia de la respuesta…`,
+          `${name} consulta la bitácora breve…`,
+        ];
+  }
+
+  /**
+   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure' | 'general'} [kind]
+   */
+  function showThinking(kind = "general") {
+    if (!(logEl instanceof HTMLElement)) return;
+    hideThinking();
+    footer.classList.add("play-panel__footer--thinking");
+    syncFooterChrome();
+
+    const lines = thinkingLines(kind);
+    let lineIndex = Math.floor(Math.random() * lines.length);
+    const firstLine = lines[lineIndex] || `${mentorLabel} está pensando…`;
+
+    if (kind === "preparing_exam") {
+      syncExamProgress(null);
+    }
+
+    const bubble = document.createElement("div");
+    bubble.className = "play-bubble play-bubble--mentor play-bubble--thinking";
+    bubble.setAttribute("role", "status");
+    bubble.setAttribute("aria-live", "polite");
+    bubble.setAttribute("aria-label", firstLine);
+
+    const head = document.createElement("div");
+    head.className = "play-bubble__head";
+    const iconSlot = document.createElement("span");
+    iconSlot.className = "play-bubble__icon";
+    iconSlot.appendChild(createGlassIconSvg(mentorIconId(), { size: 16 }));
+    head.appendChild(iconSlot);
+    const name = document.createElement("div");
+    name.className = "play-bubble__who";
+    name.textContent = mentorLabel;
+    head.appendChild(name);
+    bubble.appendChild(head);
+    localCleanups.push(bindGlassIconTheme(bubble));
+
+    const body = document.createElement("p");
+    body.className = "play-thinking";
+    const textSpan = document.createElement("span");
+    textSpan.className = "play-thinking__text";
+    textSpan.textContent = firstLine;
+    body.appendChild(textSpan);
+    const dots = document.createElement("span");
+    dots.className = "play-thinking__dots";
+    dots.setAttribute("aria-hidden", "true");
+    dots.innerHTML = "<span></span><span></span><span></span>";
+    body.appendChild(dots);
+    bubble.appendChild(body);
+
+    logEl.appendChild(bubble);
+    thinkingBubbleEl = bubble;
+    thinkingTextEl = textSpan;
+    scrollLogToEnd();
+
+    if (lines.length > 1) {
+      thinkingRotateTimer = setInterval(() => {
+        if (!(thinkingTextEl instanceof HTMLElement)) return;
+        lineIndex = (lineIndex + 1) % lines.length;
+        const next = lines[lineIndex];
+        thinkingTextEl.textContent = next;
+        bubble.setAttribute("aria-label", next);
+        scrollLogToEnd();
+      }, kind === "preparing_exam" ? 3200 : 4500);
+    }
+  }
+
+  function hideThinking() {
+    if (thinkingRotateTimer != null) {
+      clearInterval(thinkingRotateTimer);
+      thinkingRotateTimer = null;
+    }
+    footer.classList.remove("play-panel__footer--thinking");
+    thinkingBubbleEl?.remove();
+    thinkingBubbleEl = null;
+    thinkingTextEl = null;
+    syncFooterChrome();
   }
 
   if (inputEl instanceof HTMLTextAreaElement) {
@@ -426,6 +621,39 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * @param {object | null | undefined} turn
+   * @returns {string | null}
+   */
+  function examProgressLabel(turn) {
+    const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
+    if (phase !== "placement_item" && phase !== "placement_feedback") return null;
+    const index = Number(turn?.meta?.index);
+    const total = Number(turn?.meta?.total);
+    if (!Number.isFinite(index) || !Number.isFinite(total) || total <= 0) return null;
+    const n = index + 1;
+    return playWorldTheme === "sci-fi" ? `Secuencia ${n} de ${total}` : `Reto ${n} de ${total}`;
+  }
+
+  /**
+   * @param {object | null | undefined} turn
+   */
+  function syncExamProgress(turn) {
+    if (!(progressEl instanceof HTMLElement)) return;
+    const label = examProgressLabel(turn);
+    if (label) {
+      progressEl.hidden = false;
+      progressEl.textContent = label;
+      progressEl.setAttribute("aria-label", `Progreso de la prueba: ${label}`);
+      syncFooterChrome();
+      return;
+    }
+    progressEl.hidden = true;
+    progressEl.textContent = "";
+    progressEl.removeAttribute("aria-label");
+    syncFooterChrome();
+  }
+
+  /**
    * @param {object} turn
    */
   function renderPending(turn) {
@@ -434,6 +662,7 @@ async function mountPlayPanel(root, ctx) {
     formEl.hidden = true;
     syncFooterComposeMode(false);
     clearWorldHints();
+    syncExamProgress(turn);
 
     const mode = turn.input_mode || "continue";
     /** @type {{ id: string, label?: string, description?: string }[]} */
@@ -485,6 +714,7 @@ async function mountPlayPanel(root, ctx) {
     } else {
       syncFooterComposeMode(false);
     }
+    syncFooterChrome();
     lastPendingTurn = turn;
     scrollLogToEnd();
   }
@@ -503,7 +733,14 @@ async function mountPlayPanel(root, ctx) {
       autoGrowTextarea(inputEl);
     }
 
-    if (statusEl instanceof HTMLElement) statusEl.textContent = "…";
+    if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+    const thinkingKind = resolveThinkingKind(reply);
+    showThinking(thinkingKind);
+    if (thinkingKind === "evaluating_answer") {
+      syncExamProgress(lastPendingTurn);
+    } else if (thinkingKind !== "preparing_exam") {
+      syncExamProgress(null);
+    }
     clearWorldHints();
     if (optionsEl instanceof HTMLElement) optionsEl.innerHTML = "";
     if (formEl instanceof HTMLElement) formEl.hidden = true;
@@ -529,12 +766,13 @@ async function mountPlayPanel(root, ctx) {
         inputEl.value = reply.text || "";
         autoGrowTextarea(inputEl);
       }
-      if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+      hideThinking();
       sending = false;
       if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
       return;
     }
 
+    hideThinking();
     appendBubble("explorer", shown);
 
     const data = result.data;
@@ -550,13 +788,13 @@ async function mountPlayPanel(root, ctx) {
     }
     const last = turns[turns.length - 1];
     if (last) {
-      if (typeof last.meta?.phase === "string") {
-        onboardingStep = last.meta.phase;
+      const phase = typeof last.meta?.phase === "string" ? last.meta.phase : "";
+      if (phase === "placement_item" || phase === "placement_feedback") {
+        onboardingStep = "placement";
+      } else if (phase) {
+        onboardingStep = phase;
       }
       renderPending(last);
-    }
-    if (statusEl instanceof HTMLElement) {
-      statusEl.textContent = "";
     }
     scrollLogToEnd();
     sending = false;
@@ -610,6 +848,7 @@ async function mountPlayPanel(root, ctx) {
 
   ctx.onReady({
     destroy() {
+      hideThinking();
       applyPlayWorldTheme(null);
       footer.remove();
       localCleanups.forEach((fn) => fn());

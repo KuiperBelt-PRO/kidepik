@@ -1,0 +1,41 @@
+-- Ampliar colas free por purpose: fallback de más potente a menos (OpenRouter jul 2026).
+-- Editable sin redeploy; on conflict actualiza posición.
+
+insert into public.ai_purpose_model_queues (purpose, model_id, position, notes) values
+  ('placement_exam_composer', 'nvidia/nemotron-3-ultra-550b-a55b:free', 1, 'free tier quality'),
+  ('placement_exam_composer', 'nvidia/nemotron-3-super-120b-a12b:free', 2, 'free tier quality'),
+  ('placement_exam_composer', 'meta-llama/llama-3.3-70b-instruct:free', 3, 'free tier quality'),
+  ('placement_exam_composer', 'google/gemma-4-26b-a4b-it:free', 4, 'free tier quality'),
+  ('placement_exam_composer', 'google/gemma-3-27b-it:free', 5, 'free tier quality'),
+  ('placement_exam_composer', 'inclusionai/ling-3.0-flash:free', 6, 'free tier fast'),
+  ('placement_exam_composer', 'nvidia/nemotron-3-nano-30b-a3b:free', 7, 'free tier fast'),
+  ('placement_exam_composer', 'qwen/qwen3-30b-a3b:free', 8, 'free tier fast'),
+  ('placement_exam_composer', 'cohere/north-mini-code:free', 9, 'free tier coding'),
+  ('placement_exam_composer', 'google/gemma-4-31b-it:free', 10, 'free tier backup'),
+  ('placement_exam_composer', 'poolside/laguna-s-2.1:free', 11, 'free tier backup'),
+  ('placement_exam_composer', 'poolside/laguna-xs-2.1:free', 12, 'free tier backup'),
+  ('placement_exam_batch_writer', 'google/gemma-4-26b-a4b-it:free', 1, 'free rewrite'),
+  ('placement_exam_batch_writer', 'nvidia/nemotron-3-super-120b-a12b:free', 2, 'free rewrite'),
+  ('placement_exam_batch_writer', 'google/gemma-3-27b-it:free', 3, 'free rewrite'),
+  ('placement_exam_batch_writer', 'meta-llama/llama-3.3-70b-instruct:free', 4, 'free rewrite'),
+  ('placement_exam_batch_writer', 'inclusionai/ling-3.0-flash:free', 5, 'free rewrite'),
+  ('placement_item_writer', 'google/gemma-4-26b-a4b-it:free', 1, 'free item'),
+  ('placement_item_writer', 'nvidia/nemotron-3-super-120b-a12b:free', 2, 'free item'),
+  ('placement_item_writer', 'google/gemma-3-27b-it:free', 3, 'free item'),
+  ('placement_item_writer', 'meta-llama/llama-3.3-70b-instruct:free', 4, 'free item'),
+  ('dialogue', 'nvidia/nemotron-3-super-120b-a12b:free', 1, 'free dialogue'),
+  ('dialogue', 'google/gemma-4-26b-a4b-it:free', 2, 'free dialogue'),
+  ('dialogue', 'meta-llama/llama-3.3-70b-instruct:free', 3, 'free dialogue'),
+  ('dialogue', 'google/gemma-3-27b-it:free', 4, 'free dialogue'),
+  ('dialogue', 'inclusionai/ling-3.0-flash:free', 5, 'free dialogue'),
+  ('dialogue', 'cohere/north-mini-code:free', 6, 'free dialogue'),
+  ('dialogue', 'nvidia/nemotron-3-nano-30b-a3b:free', 7, 'free dialogue'),
+  ('dialogue', 'qwen/qwen3-30b-a3b:free', 8, 'free dialogue'),
+  ('journey_summarizer', 'nvidia/nemotron-3-super-120b-a12b:free', 1, 'free journey'),
+  ('journey_summarizer', 'meta-llama/llama-3.3-70b-instruct:free', 2, 'free journey'),
+  ('journey_summarizer', 'google/gemma-4-26b-a4b-it:free', 3, 'free journey')
+on conflict (purpose, model_id) do update set
+  position = excluded.position,
+  enabled = true,
+  notes = excluded.notes,
+  updated_at = now();

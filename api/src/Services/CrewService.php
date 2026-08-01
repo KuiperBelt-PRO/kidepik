@@ -6,6 +6,7 @@ namespace Kidepik\Api\Services;
 
 use InvalidArgumentException;
 use Kidepik\Shared\Ai\AgeBand;
+use Kidepik\Shared\Ai\SubjectCatalog;
 use Kidepik\Shared\Config;
 use Kidepik\Shared\Database\PdoFactory;
 use Kidepik\Shared\Text\CharacterSummaryBuilder;
@@ -320,6 +321,45 @@ class CrewService
             $fields[] = 'settings = CAST(:settings AS jsonb)';
             $params['settings'] = json_encode($settings, JSON_THROW_ON_ERROR);
         }
+        if (array_key_exists('learning', $payload)) {
+            if (!empty($detail['is_tutor_profile'])) {
+                throw new InvalidArgumentException('Cannot set learning on tutor profile');
+            }
+            $settings = is_array($detail['settings'] ?? null) ? $detail['settings'] : [];
+            // If tutor_label was also patched in same request, reuse settings being built
+            if (isset($params['settings']) && is_string($params['settings'])) {
+                $decoded = json_decode($params['settings'], true);
+                if (is_array($decoded)) {
+                    $settings = $decoded;
+                }
+            }
+            $incoming = $payload['learning'];
+            if (!is_array($incoming)) {
+                throw new InvalidArgumentException('learning invalid');
+            }
+            $currentLearning = is_array($settings['learning'] ?? null) ? $settings['learning'] : [];
+            if (array_key_exists('active_subjects', $incoming)) {
+                if (!is_array($incoming['active_subjects'])) {
+                    throw new InvalidArgumentException('learning.active_subjects invalid');
+                }
+                $currentLearning['active_subjects'] = SubjectCatalog::normalizeActiveSubjects(
+                    $incoming['active_subjects'],
+                );
+                $currentLearning['subjects_locked_by_tutor'] = true;
+            }
+            foreach (['adaptation_policy', 'show_levels_to_child', 'pause_adaptation'] as $key) {
+                if (array_key_exists($key, $incoming)) {
+                    $currentLearning[$key] = $incoming[$key];
+                }
+            }
+            $settings['learning'] = $currentLearning;
+            $fields = array_values(array_filter(
+                $fields,
+                static fn (string $f): bool => !str_starts_with($f, 'settings ='),
+            ));
+            $fields[] = 'settings = CAST(:settings AS jsonb)';
+            $params['settings'] = json_encode($settings, JSON_THROW_ON_ERROR);
+        }
 
         $traitsUpdated = false;
         if (array_key_exists('character_summary', $payload)) {
@@ -350,6 +390,59 @@ class CrewService
             );
             $stmt->execute(['id' => $childId]);
         }
+
+        return $this->getForAuthUser($authUserId, $childId);
+    }
+
+    /**
+     * Suggest learning.active_subjects after age is known (SPEC_APP_SUBJECT_CATALOG §2.1).
+     *
+     * @return array<string, mixed>
+     */
+    public function suggestLearningSubjectsForAuthUser(string $authUserId, string $childId, string $band): array
+    {
+        $detail = $this->getForAuthUser($authUserId, $childId);
+        if (!empty($detail['is_tutor_profile'])) {
+            return $detail;
+        }
+        $settings = is_array($detail['settings'] ?? null) ? $detail['settings'] : [];
+        $learning = is_array($settings['learning'] ?? null) ? $settings['learning'] : [];
+        if (!empty($learning['subjects_locked_by_tutor'])) {
+            return $detail;
+        }
+        if (!empty($learning['active_subjects']) && is_array($learning['active_subjects'])) {
+            try {
+                SubjectCatalog::normalizeActiveSubjects($learning['active_subjects']);
+
+                return $detail;
+            } catch (InvalidArgumentException) {
+                // replace
+            }
+        }
+
+        $parentId = $this->requireParentId($authUserId);
+        $household = null;
+        try {
+            $merged = ($this->settingsRepo ?? new ParentSettingsRepository($this->pdo))
+                ->getMergedSettingsForParentId($parentId);
+            $hl = $merged['learning']['active_subjects'] ?? null;
+            $household = is_array($hl) ? $hl : null;
+        } catch (Throwable) {
+            $household = null;
+        }
+
+        $settings['learning'] = array_merge($learning, [
+            'active_subjects' => SubjectCatalog::suggestActiveSubjects($band, $household),
+            'suggested_from_band' => $band,
+        ]);
+        $pdo = $this->resolvePdo();
+        $pdo->prepare(
+            "update public.children set settings = CAST(:settings AS jsonb), updated_at = now()
+             where id = :id and status <> 'deleted'"
+        )->execute([
+            'settings' => json_encode($settings, JSON_THROW_ON_ERROR),
+            'id' => $childId,
+        ]);
 
         return $this->getForAuthUser($authUserId, $childId);
     }
@@ -505,6 +598,15 @@ class CrewService
         $settings = $this->decodeJson($row['settings'] ?? null) ?? [];
         $learning = $this->decodeJson($row['learning_overrides'] ?? null) ?? [];
         $hours = $this->decodeJson($row['allowed_hours'] ?? null);
+        $learningSettings = is_array($settings['learning'] ?? null) ? $settings['learning'] : [];
+        $activeSubjects = is_array($learningSettings['active_subjects'] ?? null)
+            ? $learningSettings['active_subjects']
+            : SubjectCatalog::baseSubjectsForBand(
+                AgeBand::fromLegacy(
+                    $row['age_band'] ?? null,
+                    isset($row['age_years']) ? (int) $row['age_years'] : null,
+                ) ?? AgeBand::CHILD,
+            );
 
         return [
             'id' => (string) $row['id'],
@@ -520,6 +622,8 @@ class CrewService
             'placement_status' => (string) $row['placement_status'],
             'is_tutor_profile' => $this->toBool($row['is_tutor_profile'] ?? false),
             'settings' => $settings,
+            'subject_catalog' => SubjectCatalog::listForUi(),
+            'active_subjects' => $activeSubjects,
             'permissions' => [
                 'allow_solo_start' => $this->toBool($row['allow_solo_start'] ?? true),
                 'require_exit_pin' => $this->toBool($row['require_exit_pin'] ?? false),

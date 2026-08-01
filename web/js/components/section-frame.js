@@ -1,5 +1,5 @@
 /**
- * Marco glass de sección autenticada (logo + scroll con fade).
+ * Marco glass de sección autenticada (logo + título fijo + scroll con fade).
  * @module section-frame
  */
 
@@ -10,8 +10,10 @@ import {
   subscribeShellNav,
 } from "../lib/shell-nav-stack.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
+import { inferLogoRevealState, isLogoAssetReady, syncLogoRevealState } from "../lib/logo-reveal.js";
 
 const EXIT_MS = 220;
+let titleSeq = 0;
 
 /**
  * @param {string} direction
@@ -96,19 +98,72 @@ function mountSectionNav(header, navOptions) {
 }
 
 /**
+ * Skeleton del wordmark en el slot del marco.
+ * @param {HTMLElement} logoMount
+ * @returns {{ destroy: () => void; syncFromLogo: (logoWrap: HTMLElement | null) => void }}
+ */
+function mountLogoSkeleton(logoMount) {
+  const skel = document.createElement("div");
+  skel.className = "section-frame__logo-skeleton glass-skeleton__line";
+  skel.setAttribute("aria-hidden", "true");
+  logoMount.appendChild(skel);
+
+  function syncFromLogo(logoWrap) {
+    if (!(logoWrap instanceof HTMLElement)) {
+      skel.hidden = false;
+      logoMount.classList.add("is-logo-slot-pending");
+      logoMount.classList.remove("is-logo-slot-ready", "is-logo-slot-error");
+      return;
+    }
+    // Autosanación: si el asset ya está decodificado, no dejar pending colgado
+    if (isLogoAssetReady(logoWrap) && !logoWrap.classList.contains("is-logo-error")) {
+      syncLogoRevealState(logoWrap, "ready");
+    }
+    const state = inferLogoRevealState(logoWrap);
+    const pending = state === "pending";
+    skel.hidden = !pending;
+    logoMount.classList.toggle("is-logo-slot-pending", pending);
+    logoMount.classList.toggle("is-logo-slot-ready", state === "ready");
+    logoMount.classList.toggle("is-logo-slot-error", state === "error");
+  }
+
+  syncFromLogo(null);
+
+  return {
+    destroy() {
+      skel.remove();
+      logoMount.classList.remove("is-logo-slot-pending", "is-logo-slot-ready", "is-logo-slot-error");
+    },
+    syncFromLogo,
+  };
+}
+
+/**
  * @param {HTMLElement} host
- * @param {{ ariaLabel?: string; navigation?: boolean | { back?: boolean; forward?: boolean } }} [options]
- * @returns {{ root: HTMLElement; contentEl: HTMLElement; logoMountEl: HTMLElement; destroy: () => Promise<void> }}
+ * @param {{
+ *   ariaLabel?: string;
+ *   title?: string;
+ *   navigation?: boolean | { back?: boolean; forward?: boolean };
+ * }} [options]
+ * @returns {{
+ *   root: HTMLElement;
+ *   contentEl: HTMLElement;
+ *   logoMountEl: HTMLElement;
+ *   titleEl: HTMLElement | null;
+ *   setTitle: (text: string) => void;
+ *   syncLogoSkeleton: (logoWrap?: HTMLElement | null) => void;
+ *   destroy: () => Promise<void>;
+ * }}
  */
 export function mountSectionFrame(host, options = {}) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const exitMs = reducedMotion ? 80 : EXIT_MS;
   const navOptions = resolveNavOptions(options.navigation);
+  const titleId = `section-frame-title-${++titleSeq}`;
 
   const root = document.createElement("div");
   root.className = "section-frame is-entering";
   root.setAttribute("role", "region");
-  root.setAttribute("aria-label", options.ariaLabel ?? "Sección");
 
   const header = document.createElement("div");
   header.className = "section-frame__header";
@@ -119,10 +174,34 @@ export function mountSectionFrame(host, options = {}) {
     navHandle = mountSectionNav(header, navOptions);
   }
 
+  const brand = document.createElement("div");
+  brand.className = "section-frame__brand";
+
   const logoMount = document.createElement("div");
   logoMount.className = "section-frame__logo-mount";
   logoMount.setAttribute("aria-hidden", "true");
-  header.appendChild(logoMount);
+  brand.appendChild(logoMount);
+
+  const logoSkeleton = mountLogoSkeleton(logoMount);
+
+  /** @type {HTMLHeadingElement | null} */
+  let titleEl = null;
+  const initialTitle = typeof options.title === "string" ? options.title.trim() : "";
+  if (initialTitle !== "" || options.title !== undefined) {
+    titleEl = document.createElement("h1");
+    titleEl.className = "section-frame__title";
+    titleEl.id = titleId;
+    titleEl.textContent = initialTitle;
+    brand.appendChild(titleEl);
+  }
+
+  header.appendChild(brand);
+
+  if (titleEl) {
+    root.setAttribute("aria-labelledby", titleId);
+  } else {
+    root.setAttribute("aria-label", options.ariaLabel ?? "Sección");
+  }
 
   const scroll = document.createElement("div");
   scroll.className = "section-frame__scroll";
@@ -138,14 +217,39 @@ export function mountSectionFrame(host, options = {}) {
     root.classList.remove("is-entering");
   });
 
+  /**
+   * @param {string} text
+   */
+  function setTitle(text) {
+    const next = String(text ?? "").trim();
+    if (!titleEl) {
+      titleEl = document.createElement("h1");
+      titleEl.className = "section-frame__title";
+      titleEl.id = titleId;
+      brand.appendChild(titleEl);
+      root.removeAttribute("aria-label");
+      root.setAttribute("aria-labelledby", titleId);
+    }
+    titleEl.textContent = next;
+    titleEl.hidden = next === "";
+  }
+
   return {
     root,
     contentEl: content,
     logoMountEl: logoMount,
+    get titleEl() {
+      return titleEl;
+    },
+    setTitle,
+    syncLogoSkeleton(logoWrap) {
+      logoSkeleton.syncFromLogo(logoWrap ?? logoMount.querySelector(".loader-logo-wrap"));
+    },
     destroy() {
       return new Promise((resolve) => {
         navHandle?.destroy();
         navHandle = null;
+        logoSkeleton.destroy();
         if (!root.isConnected) {
           resolve();
           return;

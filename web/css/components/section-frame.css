@@ -5,6 +5,7 @@
   --section-frame-fade-ramp: clamp(48px, 12dvh, 96px);
   --section-frame-radius: 18px;
   --section-frame-logo: clamp(56px, 14vw, 72px);
+  --section-frame-header-pad-y: clamp(10px, 2.5vh, 14px);
   --section-frame-scrollbar: 6px;
   position: absolute;
   z-index: 4;
@@ -48,8 +49,31 @@
   flex: 0 0 auto;
   display: grid;
   place-items: center;
-  padding: 12px 16px 12px;
-  min-height: calc(var(--section-frame-logo) * 0.42 + 24px);
+  padding: var(--section-frame-header-pad-y, clamp(10px, 2.5vh, 14px)) 16px;
+  min-height: calc(var(--section-frame-logo) * 0.42 + 2.2rem + 24px);
+}
+
+.section-frame__brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: min(100%, 16rem);
+  pointer-events: none;
+}
+
+.section-frame__title {
+  margin: 0;
+  text-align: center;
+  font-size: calc(1.35rem * var(--font-scale-ui, 1));
+  line-height: 1.15;
+  font-weight: 700;
+  color: #fff;
+  font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
+}
+
+html[data-shell-theme="sci-fi"] .section-frame__title {
+  font-family: var(--font-shell-sci, "Bruno Ace", "Orbitron", system-ui, sans-serif);
 }
 
 .section-frame__nav-btn {
@@ -105,10 +129,30 @@
 }
 
 .section-frame__logo-mount {
+  position: relative;
   width: var(--section-frame-logo);
   min-height: calc(var(--section-frame-logo) * 0.42);
   display: grid;
   place-items: center;
+}
+
+.section-frame__logo-skeleton {
+  position: absolute !important;
+  left: 4%;
+  right: 4%;
+  top: 30%;
+  bottom: 30%;
+  width: auto !important;
+  height: auto !important;
+  min-height: 12px;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.section-frame__logo-mount.is-logo-slot-ready .section-frame__logo-skeleton,
+.section-frame__logo-mount.is-logo-slot-error .section-frame__logo-skeleton {
+  display: none;
 }
 
 .section-frame__logo-mount .loader-logo-wrap {
@@ -117,6 +161,12 @@
   transform: none !important;
   left: auto !important;
   top: auto !important;
+  opacity: 1;
+}
+
+.section-frame__logo-mount .loader-logo-wrap.is-logo-pending .loader-logo,
+.section-frame__logo-mount .loader-logo-wrap.is-logo-pending .loader-logo-fallback {
+  visibility: hidden;
 }
 
 .section-frame__logo-mount .loader-logo {

@@ -69,9 +69,10 @@ Dentro del marco glass ([SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md)):
 
 ```
 ┌─────────────────────────────────┐
-│         [ logo K pequeño ]      │
+│         [ logo K / skeleton ]   │
+│  Cuenta                         │  ← título en cabecera del marco (fijo)
 │─────────────────────────────────│
-│  Cuenta de padre, madre o tutor │  ← subtítulo
+│  Cuenta de padre, madre o tutor │  ← subtítulo (scroll)
 │                                 │
 │  ┌─ Avatar (opcional) ────────┐ │
 │  │  (foto Google o inicial)   │ │

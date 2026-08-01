@@ -3,13 +3,13 @@
  * @module scenes/settings
  */
 
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=185";
-import { mountSectionFrame } from "../components/section-frame.js?v=188";
-import { mountSettingsPanel } from "../components/settings-panel.js?v=221";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
+import { mountSectionFrame } from "../components/section-frame.js?v=236";
+import { mountSettingsPanel } from "../components/settings-panel.js?v=236";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=185";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
-import { applySectionEnter } from "../lib/shell-section-transition.js?v=185";
+import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 
 export function renderSettings() {
   const app = document.getElementById("app");
@@ -17,7 +17,12 @@ export function renderSettings() {
 
   /** @type {{ destroy: (o?: object) => void; sectionHost?: HTMLElement } | null} */
   let chromeHandle = null;
-  /** @type {{ destroy: () => Promise<void>; contentEl?: HTMLElement; logoMountEl?: HTMLElement } | null} */
+  /** @type {{
+   *   destroy: () => Promise<void>;
+   *   contentEl?: HTMLElement;
+   *   logoMountEl?: HTMLElement;
+   *   syncLogoSkeleton?: (logoWrap?: HTMLElement | null) => void;
+   * } | null} */
   let frameHandle = null;
   /** @type {{ destroy: () => void } | null} */
   let panelHandle = null;
@@ -46,9 +51,14 @@ export function renderSettings() {
     const host = chromeHandle.sectionHost;
     if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) return;
 
-    frameHandle = mountSectionFrame(host, { ariaLabel: "Ajustes" });
+    frameHandle = mountSectionFrame(host, { title: "Ajustes", ariaLabel: "Ajustes" });
     panelHandle = mountSettingsPanel(frameHandle.contentEl, { session });
-    await applySectionEnter({ scene: sceneEl, logoMount: frameHandle.logoMountEl });
+    await applySectionEnter({
+      scene: sceneEl,
+      logoMount: frameHandle.logoMountEl,
+      onLogoSettled: (logoWrap) => frameHandle?.syncLogoSkeleton?.(logoWrap),
+    });
+    frameHandle.syncLogoSkeleton?.();
   })();
 
   return {

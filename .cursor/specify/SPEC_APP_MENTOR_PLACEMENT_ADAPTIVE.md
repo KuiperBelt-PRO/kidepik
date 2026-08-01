@@ -1,6 +1,6 @@
 # Spec: Placement adaptado por edad y prosa narrativa del mentor
 
-> Estado: **aprobada** (31 jul 2026) — **sin implementación** hasta OK explícito del titular  
+> Estado: **implementada** (31 jul 2026)  
 > Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)  
 > **Delta** — catálogo y activación: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md).
 
@@ -30,7 +30,11 @@ Ver [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) para el listado c
 | Respuesta correcta | Agente propone → PHP valida → persistir |
 | Niveles / banda efectiva | PHP |
 
-**Fallback:** banco seed solo si falla agente o gateway.
+### Fallback (A1 — 1 ago 2026)
+
+**Prohibido** degradar a banco seed (`default.json` / `pickQueue`) en el examen real. Si el agente no compone una cola completa tras reintentos: mensaje de reintento al explorador, sin ítems plantilla.
+
+`PlacementBank` permanece para scoring helpers y tests; no rellena `item_queue` de producción.
 
 ### 1.2 Qué materias entran en el examen
 
@@ -117,16 +121,17 @@ Intro, cada reto, feedback, cierre: agente con `PlayerState` (edad, banda, trait
 
 | Fase | Estado |
 | --- | --- |
-| Specify | **Cerrada** (aprobada) |
-| Plan / Task | Pendiente al recibir OK de implementación |
-| Implement | **Bloqueada** — no escribir código hasta OK explícito |
-| Validate | PHPUnit + Playwright según §3 y [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §6 |
+| Specify | Cerrada (aprobada) |
+| Plan / Task | [SUBJECT_CATALOG_PLACEMENT_ADAPTIVE_PLAN.md](../tasks/SUBJECT_CATALOG_PLACEMENT_ADAPTIVE_PLAN.md) |
+| Implement | **Hecha** — `PlacementExamComposer` genera el examen completo vía agente; **sin banco seed** (A1 ago 2026); fallo → reintento UI |
+| Validate | PHPUnit `PlacementAdaptiveTest` + `PlacementAgentOnlyAndQueuesTest` |
 
-### Orden de implementación sugerido (cuando haya OK)
+### Entregado
 
-1. `SubjectCatalog` (PHP) + tests — 14 ids, pesos, base por banda, renormalización.
-2. `children.settings.learning` + API PATCH crew + UI checklist ficha tripulación.
-3. `PlacementBank` / queue por `active_subjects`; dificultad por banda.
-4. Prompts `shared/Ai/` + `PlacementItemWriter` / `PlacementNarrator` (agente generador).
-5. Sustituir strings fijos en `PlacementService` / `DialogueService`.
-6. Validación navegador: handoff → examen con prosa y materias activas.
+1. `SubjectCatalog` + tests
+2. `children.settings.learning` + API PATCH + UI checklist
+3. `PlacementExamComposer` + `PlacementItemValidator` (agente primero)
+4. ~~`PlacementBank` como fallback seed~~ **retirado del camino feliz (A1)**
+5. `PlacementNarrator` + feedback con explicación
+6. Prompts `shared/Ai/prompts/placement_exam_composer.es.md` (castellano ES)
+7. Colas de modelo por purpose en BD (`ai_purpose_model_queues`, B1)

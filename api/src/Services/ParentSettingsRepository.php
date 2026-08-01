@@ -129,7 +129,8 @@ class ParentSettingsRepository
         try {
             $stmt = $pdo->prepare(
                 "select count(*)::int as c from public.children
-                 where parent_id = :parent_id and status <> 'deleted'",
+                 where parent_id = :parent_id and status <> 'deleted'
+                   and coalesce(is_tutor_profile, false) = false",
             );
             $stmt->execute(['parent_id' => $parentId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);

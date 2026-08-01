@@ -17,7 +17,10 @@ final class JsonResponse
     /** @param array<string, mixed> $data */
     public static function ok(array $data, int $status = 200): self
     {
-        return new self($status, json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
+        return new self(
+            $status,
+            json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        );
     }
 
     public static function error(string $message, int $status): self

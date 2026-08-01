@@ -3,13 +3,13 @@
  * @module scenes/crew
  */
 
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=185";
-import { mountSectionFrame } from "../components/section-frame.js?v=188";
-import { mountCrewListPanel, mountCrewNewPanel, mountCrewDetailPanel } from "../components/crew-panel.js?v=234";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
+import { mountSectionFrame } from "../components/section-frame.js?v=236";
+import { mountCrewListPanel, mountCrewNewPanel, mountCrewDetailPanel } from "../components/crew-panel.js?v=236";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=185";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
-import { applySectionEnter } from "../lib/shell-section-transition.js?v=185";
+import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 
 /**
  * @param {'list'|'new'|'detail'} mode
@@ -21,7 +21,13 @@ function renderCrewMode(mode, opts = {}) {
 
   /** @type {{ destroy: (o?: object) => void; sectionHost?: HTMLElement } | null} */
   let chromeHandle = null;
-  /** @type {{ destroy: () => Promise<void>; contentEl?: HTMLElement; logoMountEl?: HTMLElement } | null} */
+  /** @type {{
+   *   destroy: () => Promise<void>;
+   *   contentEl?: HTMLElement;
+   *   logoMountEl?: HTMLElement;
+   *   setTitle?: (text: string) => void;
+   *   syncLogoSkeleton?: (logoWrap?: HTMLElement | null) => void;
+   * } | null} */
   let frameHandle = null;
   /** @type {{ destroy: () => void } | null} */
   let panelHandle = null;
@@ -48,9 +54,9 @@ function renderCrewMode(mode, opts = {}) {
     const host = chromeHandle.sectionHost;
     if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) return;
 
-    const label =
+    const title =
       mode === "new" ? "Nuevo tripulante" : mode === "detail" ? "Tripulante" : "Tripulación";
-    frameHandle = mountSectionFrame(host, { ariaLabel: label });
+    frameHandle = mountSectionFrame(host, { title, ariaLabel: title });
 
     if (mode === "new") {
       panelHandle = mountCrewNewPanel(frameHandle.contentEl, { session });
@@ -58,12 +64,18 @@ function renderCrewMode(mode, opts = {}) {
       panelHandle = mountCrewDetailPanel(frameHandle.contentEl, {
         session,
         childId: opts.childId,
+        onTitleChange: (next) => frameHandle?.setTitle?.(next),
       });
     } else {
       panelHandle = mountCrewListPanel(frameHandle.contentEl, { session });
     }
 
-    await applySectionEnter({ scene: sceneEl, logoMount: frameHandle.logoMountEl });
+    await applySectionEnter({
+      scene: sceneEl,
+      logoMount: frameHandle.logoMountEl,
+      onLogoSettled: (logoWrap) => frameHandle?.syncLogoSkeleton?.(logoWrap),
+    });
+    frameHandle.syncLogoSkeleton?.();
   })();
 
   return {

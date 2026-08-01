@@ -6,12 +6,26 @@
       "difficulty": 1,
       "prompt_text": "¿Cuánto es 2 + 2?",
       "options": [
-        {"id": "a", "label": "3"},
-        {"id": "b", "label": "4"},
-        {"id": "c", "label": "5"}
+        {
+          "id": "a",
+          "label": "3"
+        },
+        {
+          "id": "b",
+          "label": "4"
+        },
+        {
+          "id": "c",
+          "label": "5"
+        }
       ],
-      "canonical_answer": {"option_id": "b"},
-      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "option_id": "b"
+      },
+      "bands": [
+        "band_early",
+        "band_child"
+      ]
     },
     {
       "item_key": "math_mul_7",
@@ -19,20 +33,129 @@
       "difficulty": 2,
       "prompt_text": "¿Cuánto es 7 × 3?",
       "options": [
-        {"id": "a", "label": "21"},
-        {"id": "b", "label": "24"},
-        {"id": "c", "label": "18"}
+        {
+          "id": "a",
+          "label": "21"
+        },
+        {
+          "id": "b",
+          "label": "24"
+        },
+        {
+          "id": "c",
+          "label": "18"
+        }
       ],
-      "canonical_answer": {"option_id": "a"},
-      "bands": ["band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_child",
+        "band_tween",
+        "band_teen"
+      ]
     },
     {
       "item_key": "math_pct_20",
       "item_type": "numeric",
       "difficulty": 3,
       "prompt_text": "¿Cuánto es el 20% de 50?",
-      "canonical_answer": {"numeric": 10, "tolerance": 0},
-      "bands": ["band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "numeric": 10,
+        "tolerance": 0
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "math_frac_half",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "¿Cuánto es 3/4 + 1/4?",
+      "options": [
+        {
+          "id": "a",
+          "label": "1"
+        },
+        {
+          "id": "b",
+          "label": "1/2"
+        },
+        {
+          "id": "c",
+          "label": "2/4"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "math_prop_speed",
+      "item_type": "numeric",
+      "difficulty": 5,
+      "prompt_text": "Si un tren recorre 120 km en 2 horas a velocidad constante, ¿cuántos km recorrerá en 5 horas?",
+      "canonical_answer": {
+        "numeric": 300,
+        "tolerance": 0
+      },
+      "bands": [
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "math_avg_speed",
+      "item_type": "numeric",
+      "difficulty": 4,
+      "prompt_text": "Un coche recorre 90 km en 1,5 horas a velocidad constante. ¿Cuál es su velocidad en km/h?",
+      "canonical_answer": {
+        "numeric": 60,
+        "tolerance": 0
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "math_ratio_mix",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "Si 3 de cada 5 piezas son verdes y hay 20 piezas, ¿cuántas son verdes?",
+      "options": [
+        {
+          "id": "a",
+          "label": "12"
+        },
+        {
+          "id": "b",
+          "label": "15"
+        },
+        {
+          "id": "c",
+          "label": "8"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
     }
   ],
   "language": [
@@ -42,20 +165,217 @@
       "difficulty": 1,
       "prompt_text": "¿Cuál palabra significa casi lo mismo que «feliz»?",
       "options": [
-        {"id": "a", "label": "alegre"},
-        {"id": "b", "label": "triste"},
-        {"id": "c", "label": "rápido"}
+        {
+          "id": "a",
+          "label": "alegre"
+        },
+        {
+          "id": "b",
+          "label": "triste"
+        },
+        {
+          "id": "c",
+          "label": "rápido"
+        }
       ],
-      "canonical_answer": {"option_id": "a"},
-      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_early",
+        "band_child",
+        "band_tween"
+      ]
     },
     {
       "item_key": "lang_plural",
       "item_type": "short_text",
       "difficulty": 2,
       "prompt_text": "Escribe el plural de «luz».",
-      "canonical_answer": {"keywords": ["luces"]},
-      "bands": ["band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "keywords": [
+          "luces"
+        ]
+      },
+      "bands": [
+        "band_child",
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "lang_accent_corazon",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "¿Cuál está bien escrita?",
+      "options": [
+        {
+          "id": "a",
+          "label": "corazon"
+        },
+        {
+          "id": "b",
+          "label": "corazón"
+        },
+        {
+          "id": "c",
+          "label": "corazóon"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "b"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "lang_homophone",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "¿Cuál frase usa correctamente «haber»?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Debería de haber llegado ya"
+        },
+        {
+          "id": "b",
+          "label": "Debería de a ver llegado ya"
+        },
+        {
+          "id": "c",
+          "label": "Debería de aver llegado ya"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "lang_antonym",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "¿Cuál es el antónimo más claro de «escaso»?",
+      "options": [
+        {
+          "id": "a",
+          "label": "abundante"
+        },
+        {
+          "id": "b",
+          "label": "breve"
+        },
+        {
+          "id": "c",
+          "label": "oscuro"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "reading": [
+    {
+      "item_key": "read_cat_nap",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "«El gato duerme al sol.» ¿Qué hace el gato?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Duerme"
+        },
+        {
+          "id": "b",
+          "label": "Corre"
+        },
+        {
+          "id": "c",
+          "label": "Come"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_child",
+        "band_tween"
+      ]
+    },
+    {
+      "item_key": "read_infer_rain",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "«María cerró la ventana porque el cielo se oscurecía.» ¿Qué se puede inferir?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Va a llover o hay tormenta"
+        },
+        {
+          "id": "b",
+          "label": "Hace mucho calor"
+        },
+        {
+          "id": "c",
+          "label": "Es de noche siempre"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "read_tone_irony",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "«Qué puntual, llegas solo con media hora de retraso.» ¿Qué tono predomina?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Ironía"
+        },
+        {
+          "id": "b",
+          "label": "Admiración sincera"
+        },
+        {
+          "id": "c",
+          "label": "Miedo"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
     }
   ],
   "logic": [
@@ -65,12 +385,27 @@
       "difficulty": 1,
       "prompt_text": "¿Qué número sigue: 2, 4, 6, …?",
       "options": [
-        {"id": "a", "label": "7"},
-        {"id": "b", "label": "8"},
-        {"id": "c", "label": "10"}
+        {
+          "id": "a",
+          "label": "7"
+        },
+        {
+          "id": "b",
+          "label": "8"
+        },
+        {
+          "id": "c",
+          "label": "10"
+        }
       ],
-      "canonical_answer": {"option_id": "b"},
-      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "option_id": "b"
+      },
+      "bands": [
+        "band_early",
+        "band_child",
+        "band_tween"
+      ]
     },
     {
       "item_key": "logic_odd_one",
@@ -78,12 +413,86 @@
       "difficulty": 2,
       "prompt_text": "¿Cuál no encaja: sol, luna, mesa, estrella?",
       "options": [
-        {"id": "a", "label": "sol"},
-        {"id": "b", "label": "mesa"},
-        {"id": "c", "label": "luna"}
+        {
+          "id": "a",
+          "label": "sol"
+        },
+        {
+          "id": "b",
+          "label": "mesa"
+        },
+        {
+          "id": "c",
+          "label": "luna"
+        }
       ],
-      "canonical_answer": {"option_id": "b"},
-      "bands": ["band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "option_id": "b"
+      },
+      "bands": [
+        "band_child",
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "logic_syllogism",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "Todos los guardianes son valientes. Mira es guardiana. ¿Qué se sigue?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Mira es valiente"
+        },
+        {
+          "id": "b",
+          "label": "Mira no es valiente"
+        },
+        {
+          "id": "c",
+          "label": "Nadie es valiente"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "logic_false_cause",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "«Llovió y luego aprobé; la lluvia me hizo aprobar.» ¿Qué falla?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Confunde correlación con causa"
+        },
+        {
+          "id": "b",
+          "label": "Usa mal el plural"
+        },
+        {
+          "id": "c",
+          "label": "No hay lluvia en math"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
     }
   ],
   "science": [
@@ -93,12 +502,113 @@
       "difficulty": 1,
       "prompt_text": "El agua helada se convierte en…",
       "options": [
-        {"id": "a", "label": "hielo"},
-        {"id": "b", "label": "humo"},
-        {"id": "c", "label": "arena"}
+        {
+          "id": "a",
+          "label": "hielo"
+        },
+        {
+          "id": "b",
+          "label": "humo"
+        },
+        {
+          "id": "c",
+          "label": "arena"
+        }
       ],
-      "canonical_answer": {"option_id": "a"},
-      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_early",
+        "band_child",
+        "band_tween"
+      ]
+    },
+    {
+      "item_key": "sci_photosynthesis",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "¿Qué gas liberan las plantas al hacer la fotosíntesis?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Oxígeno"
+        },
+        {
+          "id": "b",
+          "label": "Nitrógeno"
+        },
+        {
+          "id": "c",
+          "label": "Helio"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "sci_gravity",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "En la Tierra, ¿qué fuerza atrae los objetos hacia el centro del planeta?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Gravedad"
+        },
+        {
+          "id": "b",
+          "label": "Magnetismo del frigorífico"
+        },
+        {
+          "id": "c",
+          "label": "El viento solar"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "sci_states_matter",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "Al calentar hielo hasta fundirse y luego hervir el agua, ¿qué cambios de estado ocurren en ese orden?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Fusión y luego vaporización"
+        },
+        {
+          "id": "b",
+          "label": "Sublimación y solidificación"
+        },
+        {
+          "id": "c",
+          "label": "Condensación y fusión"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
     }
   ],
   "culture": [
@@ -108,12 +618,851 @@
       "difficulty": 1,
       "prompt_text": "¿Cuál es la capital de España?",
       "options": [
-        {"id": "a", "label": "Barcelona"},
-        {"id": "b", "label": "Madrid"},
-        {"id": "c", "label": "Sevilla"}
+        {
+          "id": "a",
+          "label": "Barcelona"
+        },
+        {
+          "id": "b",
+          "label": "Madrid"
+        },
+        {
+          "id": "c",
+          "label": "Sevilla"
+        }
       ],
-      "canonical_answer": {"option_id": "b"},
-      "bands": ["band_early", "band_child", "band_tween", "band_teen", "band_adult", "band_senior"]
+      "canonical_answer": {
+        "option_id": "b"
+      },
+      "bands": [
+        "band_early",
+        "band_child",
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "cult_cervantes",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "¿Quién escribió «Don Quijote de la Mancha»?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Miguel de Cervantes"
+        },
+        {
+          "id": "b",
+          "label": "Federico García Lorca"
+        },
+        {
+          "id": "c",
+          "label": "Antonio Machado"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "cult_un_year",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "¿Cuántos días tiene un año no bisiesto?",
+      "options": [
+        {
+          "id": "a",
+          "label": "365"
+        },
+        {
+          "id": "b",
+          "label": "360"
+        },
+        {
+          "id": "c",
+          "label": "366"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_child",
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "geography": [
+    {
+      "item_key": "geo_continent_spain",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "¿En qué continente está España?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Europa"
+        },
+        {
+          "id": "b",
+          "label": "Asia"
+        },
+        {
+          "id": "c",
+          "label": "Oceanía"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior",
+        "band_child"
+      ]
+    },
+    {
+      "item_key": "geo_amazon",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "¿En qué continente se encuentra principalmente la selva amazónica?",
+      "options": [
+        {
+          "id": "a",
+          "label": "América del Sur"
+        },
+        {
+          "id": "b",
+          "label": "Europa"
+        },
+        {
+          "id": "c",
+          "label": "Antártida"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "geo_meridian",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "Los meridianos sirven principalmente para medir…",
+      "options": [
+        {
+          "id": "a",
+          "label": "Longitud (este-oeste)"
+        },
+        {
+          "id": "b",
+          "label": "Altitud sobre el nivel del mar"
+        },
+        {
+          "id": "c",
+          "label": "Temperatura media"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "mythology": [
+    {
+      "item_key": "myth_zeus",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "En la mitología griega, ¿quién es el rey de los dioses del Olimpo?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Zeus"
+        },
+        {
+          "id": "b",
+          "label": "Hades"
+        },
+        {
+          "id": "c",
+          "label": "Hermes"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "myth_athena",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "En la mitología griega, Atenea es diosa principalmente de…",
+      "options": [
+        {
+          "id": "a",
+          "label": "La sabiduría y la estrategia"
+        },
+        {
+          "id": "b",
+          "label": "El mar y los terremotos"
+        },
+        {
+          "id": "c",
+          "label": "El vino y la fiesta"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "myth_odysseus",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "¿Quién protagoniza el largo viaje de regreso a Ítaca en la Odisea?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Ulises / Odiseo"
+        },
+        {
+          "id": "b",
+          "label": "Aquiles"
+        },
+        {
+          "id": "c",
+          "label": "Orfeo"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "ethics": [
+    {
+      "item_key": "ethics_share",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "Si ves a alguien triste sin juguete, ¿qué es más amable?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Ofrecer compartir"
+        },
+        {
+          "id": "b",
+          "label": "Reírse"
+        },
+        {
+          "id": "c",
+          "label": "Ignorarlo"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_early",
+        "band_child",
+        "band_tween"
+      ]
+    },
+    {
+      "item_key": "ethics_promise",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "Prometiste ayudar a un amigo y surge algo más divertido. ¿Qué es lo correcto?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Cumplir la promesa o avisar y renegociar"
+        },
+        {
+          "id": "b",
+          "label": "Desaparecer sin avisar"
+        },
+        {
+          "id": "c",
+          "label": "Mentir sobre estar enfermo"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "ethics_privacy",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "Encuentras el diario abierto de un compañero. ¿Qué es más ético?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Cerrarlo y no leerlo"
+        },
+        {
+          "id": "b",
+          "label": "Leerlo y contarlo"
+        },
+        {
+          "id": "c",
+          "label": "Publicarlo en redes"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "communication": [
+    {
+      "item_key": "comm_listen",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "Cuando alguien habla, ¿qué ayuda a escucharlo bien?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Mirar y prestar atención"
+        },
+        {
+          "id": "b",
+          "label": "Interrumpir siempre"
+        },
+        {
+          "id": "c",
+          "label": "Gritar más fuerte"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_early",
+        "band_child",
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "comm_feedback",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "Para dar una crítica útil, ¿qué suele ayudar más?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Ser específico y respetuoso"
+        },
+        {
+          "id": "b",
+          "label": "Atacar a la persona"
+        },
+        {
+          "id": "c",
+          "label": "Callar siempre el problema"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "comm_assertive",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "Decir «necesito que bajes el volumen, me cuesta concentrarme» es un ejemplo de…",
+      "options": [
+        {
+          "id": "a",
+          "label": "Comunicación asertiva"
+        },
+        {
+          "id": "b",
+          "label": "Agresividad"
+        },
+        {
+          "id": "c",
+          "label": "Silencio pasivo"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "politics": [
+    {
+      "item_key": "pol_vote",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "En una democracia, ¿para qué sirve el voto?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Elegir representantes o decisiones colectivas"
+        },
+        {
+          "id": "b",
+          "label": "Comprar comida"
+        },
+        {
+          "id": "c",
+          "label": "Apagar la luz"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "pol_separation",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "¿Para qué sirve la separación de poderes en un Estado democrático?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Evitar que el poder se concentre en una sola mano"
+        },
+        {
+          "id": "b",
+          "label": "Elegir el color de la bandera"
+        },
+        {
+          "id": "c",
+          "label": "Fijar el precio del pan"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "pol_constitution",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "Una constitución es, en esencia…",
+      "options": [
+        {
+          "id": "a",
+          "label": "La norma fundamental que organiza el Estado y derechos"
+        },
+        {
+          "id": "b",
+          "label": "Un libro de cocina"
+        },
+        {
+          "id": "c",
+          "label": "Un tratado solo comercial"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "arts": [
+    {
+      "item_key": "arts_primary_colors",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "¿Cuál es un color primario?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Rojo"
+        },
+        {
+          "id": "b",
+          "label": "Verde"
+        },
+        {
+          "id": "c",
+          "label": "Rosa"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_early",
+        "band_child",
+        "band_tween"
+      ]
+    },
+    {
+      "item_key": "arts_cinema_shot",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "En cine, un plano muy cercano del rostro se llama…",
+      "options": [
+        {
+          "id": "a",
+          "label": "Primer plano"
+        },
+        {
+          "id": "b",
+          "label": "Plano general"
+        },
+        {
+          "id": "c",
+          "label": "Plano aéreo"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "arts_perspective",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "En pintura, la perspectiva lineal sirve para…",
+      "options": [
+        {
+          "id": "a",
+          "label": "Crear sensación de profundidad en un plano"
+        },
+        {
+          "id": "b",
+          "label": "Mezclar solo colores primarios"
+        },
+        {
+          "id": "c",
+          "label": "Afinar un instrumento"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "arts_tempo",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "En música, el tempo indica principalmente…",
+      "options": [
+        {
+          "id": "a",
+          "label": "La velocidad del pulso"
+        },
+        {
+          "id": "b",
+          "label": "El color de la partitura"
+        },
+        {
+          "id": "c",
+          "label": "El tamaño del escenario"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "sports": [
+    {
+      "item_key": "sports_fair_play",
+      "item_type": "mcq",
+      "difficulty": 1,
+      "prompt_text": "En el deporte, ¿qué es el «juego limpio»?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Respetar reglas y rivales"
+        },
+        {
+          "id": "b",
+          "label": "Hacer trampas"
+        },
+        {
+          "id": "c",
+          "label": "Abandonar siempre"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_child",
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "sports_warmup",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "¿Para qué sirve un calentamiento antes del ejercicio intenso?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Preparar el cuerpo y reducir riesgo de lesión"
+        },
+        {
+          "id": "b",
+          "label": "Ganar el partido automáticamente"
+        },
+        {
+          "id": "c",
+          "label": "Evitar beber agua"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_child",
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "sports_team",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "En un deporte de equipo, ¿qué suele mejorar el rendimiento colectivo?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Comunicación y cooperación"
+        },
+        {
+          "id": "b",
+          "label": "Ignorar al resto"
+        },
+        {
+          "id": "c",
+          "label": "Romper las reglas a propósito"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    }
+  ],
+  "finance": [
+    {
+      "item_key": "fin_save_coin",
+      "item_type": "mcq",
+      "difficulty": 2,
+      "prompt_text": "Si guardas 2 monedas cada día durante 3 días, ¿cuántas tienes?",
+      "options": [
+        {
+          "id": "a",
+          "label": "6"
+        },
+        {
+          "id": "b",
+          "label": "5"
+        },
+        {
+          "id": "c",
+          "label": "3"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_child",
+        "band_tween",
+        "band_teen"
+      ]
+    },
+    {
+      "item_key": "fin_budget",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "Tienes 50 € y gastas 18 €. ¿Cuánto te queda?",
+      "options": [
+        {
+          "id": "a",
+          "label": "32 €"
+        },
+        {
+          "id": "b",
+          "label": "28 €"
+        },
+        {
+          "id": "c",
+          "label": "68 €"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "fin_interest",
+      "item_type": "mcq",
+      "difficulty": 4,
+      "prompt_text": "Si ahorras 100 € con un 10 % de interés simple en un año (sin capitalizar), ¿cuánto tienes al final?",
+      "options": [
+        {
+          "id": "a",
+          "label": "110 €"
+        },
+        {
+          "id": "b",
+          "label": "100 €"
+        },
+        {
+          "id": "c",
+          "label": "90 €"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
+    },
+    {
+      "item_key": "fin_need_want",
+      "item_type": "mcq",
+      "difficulty": 3,
+      "prompt_text": "¿Cuál es más bien una necesidad básica que un capricho?",
+      "options": [
+        {
+          "id": "a",
+          "label": "Alimentación"
+        },
+        {
+          "id": "b",
+          "label": "La décima figura de colección"
+        },
+        {
+          "id": "c",
+          "label": "Cambiar de móvil cada mes"
+        }
+      ],
+      "canonical_answer": {
+        "option_id": "a"
+      },
+      "bands": [
+        "band_tween",
+        "band_teen",
+        "band_adult",
+        "band_senior"
+      ]
     }
   ]
 }

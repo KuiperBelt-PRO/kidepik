@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Kidepik\Api\Tests;
 
+use Kidepik\Shared\Config;
 use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Ai\AiGateway;
 use Kidepik\Shared\Ai\FreeModelCatalog;
+use Kidepik\Shared\Ai\FreeModelDiscovery;
 use Kidepik\Shared\Ai\FreeModelRanker;
 use Kidepik\Shared\Ai\LLMException;
 use Kidepik\Shared\Ai\MentorCatalog;
@@ -77,6 +79,65 @@ final class AiGatewayTest extends TestCase
 
         $result = $gateway->complete([['role' => 'user', 'content' => 'x']]);
         self::assertSame('ok:free', $result['model']);
+    }
+
+    public function testRankerQualityProfilePrefersLargerInstructModels(): void
+    {
+        $ranker = new FreeModelRanker();
+        $ranked = $ranker->rank([
+            ['id' => 'google/gemma-3-27b-it:free', 'context_length' => 8192],
+            ['id' => 'meta-llama/llama-3.3-70b-instruct:free', 'context_length' => 131072],
+            ['id' => 'tiny/embed:free', 'context_length' => 4096],
+        ], [], FreeModelRanker::PROFILE_QUALITY);
+
+        self::assertSame('meta-llama/llama-3.3-70b-instruct:free', $ranked[0]['id']);
+    }
+
+    public function testDiscoveryRanksFreeModelsForDialoguePurpose(): void
+    {
+        $discovery = new FreeModelDiscovery();
+        $ranked = $discovery->rankedIds([
+            ['id' => 'google/gemma-3-27b-it:free', 'pricing' => ['prompt' => '0', 'completion' => '0'], 'context_length' => 8192],
+            ['id' => 'meta-llama/llama-3.3-70b-instruct:free', 'pricing' => ['prompt' => '0', 'completion' => '0'], 'context_length' => 131072],
+            ['id' => 'qwen/qwen3-30b-a3b:free', 'pricing' => ['prompt' => '0', 'completion' => '0'], 'context_length' => 32768],
+        ], 'dialogue');
+
+        self::assertSame('meta-llama/llama-3.3-70b-instruct:free', $ranked[0]);
+    }
+
+    public function testQualityPurposesFlagNarrativeRankingProfile(): void
+    {
+        self::assertTrue(Config::aiUsesQualityFreeModels('dialogue'));
+        self::assertTrue(Config::aiUsesQualityFreeModels('journey_summarizer'));
+        self::assertTrue(Config::aiUsesQualityFreeModels('placement_exam_composer'));
+        self::assertFalse(Config::aiUsesQualityFreeModels('embedding_index'));
+    }
+
+    public function testGatewayUsesDiscoveryRankingForDialogue(): void
+    {
+        $discovery = new class extends FreeModelDiscovery {
+            /** @return list<string> */
+            public function rankedIds(?array $rawOverride = null, string $purpose = 'dialogue'): array
+            {
+                return [
+                    'meta-llama/llama-3.3-70b-instruct:free',
+                    'google/gemma-3-27b-it:free',
+                ];
+            }
+        };
+
+        $calls = [];
+        $gateway = new AiGateway(
+            chatFn: static function (string $model, array $messages, array $opts) use (&$calls): array {
+                $calls[] = $model;
+
+                return ['content' => '{"agent_text":"ok","input_mode":"continue"}', 'raw_model' => $model];
+            },
+            discovery: $discovery,
+        );
+
+        $gateway->complete([['role' => 'user', 'content' => 'hola']], ['purpose' => 'dialogue']);
+        self::assertSame('meta-llama/llama-3.3-70b-instruct:free', $calls[0]);
     }
 
     public function testMockEnvelope(): void

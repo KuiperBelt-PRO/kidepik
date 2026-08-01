@@ -83,7 +83,6 @@ export function mountSettingsPanel(container, { session }) {
     const theme = settings.ui_theme;
     root.className = "settings-panel";
     root.innerHTML = `
-      <h1 class="settings-panel__title">Ajustes</h1>
       <p class="settings-panel__subtitle">Preferencias de la cuenta de gestión</p>
       <p class="settings-panel__status" data-save-status aria-live="polite"></p>
 

@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Kidepik\Api\Services;
 
 use InvalidArgumentException;
+use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Ai\MentorCatalog;
 use Kidepik\Shared\Ai\PlacementBank;
-use Kidepik\Shared\Ai\PlacementItemWriter;
+use Kidepik\Shared\Ai\PlacementExamComposer;
+use Kidepik\Shared\Ai\PlacementNarrator;
+use Kidepik\Shared\Ai\SubjectCatalog;
 use PDO;
 
 /**
@@ -15,10 +18,14 @@ use PDO;
  */
 final class PlacementService
 {
+    private readonly PlacementNarrator $narrator;
+
     public function __construct(
         private readonly PDO $pdo,
         private readonly PlacementBank $bank,
+        ?PlacementNarrator $narrator = null,
     ) {
+        $this->narrator = $narrator ?? new PlacementNarrator();
     }
 
     public static function withDefaultBank(PDO $pdo): self
@@ -28,7 +35,39 @@ final class PlacementService
 
     /**
      * @param array<string,mixed> $child
-     * @return array{exam_id:string,turn:array<string,mixed>,effects:list<array<string,mixed>>}
+     * @return list<string>
+     */
+    public static function activeSubjectsForChild(array $child): array
+    {
+        $settings = $child['settings'] ?? [];
+        if (is_string($settings)) {
+            $decoded = json_decode($settings, true);
+            $settings = is_array($decoded) ? $decoded : [];
+        }
+        if (!is_array($settings)) {
+            $settings = [];
+        }
+        $learning = $settings['learning'] ?? [];
+        $raw = is_array($learning) ? ($learning['active_subjects'] ?? null) : null;
+        $band = AgeBand::fromLegacy(
+            $child['age_band'] ?? null,
+            isset($child['age_years']) ? (int) $child['age_years'] : null,
+        ) ?? AgeBand::CHILD;
+
+        if (is_array($raw) && $raw !== []) {
+            try {
+                return SubjectCatalog::normalizeActiveSubjects($raw);
+            } catch (InvalidArgumentException) {
+                // fall through to band base
+            }
+        }
+
+        return SubjectCatalog::baseSubjectsForBand($band);
+    }
+
+    /**
+     * @param array<string,mixed> $child
+     * @return array{exam_id:string,turn:array<string,mixed>,effects:list<array<string,mixed>>,intro_turn?:array<string,mixed>}
      */
     public function startExam(
         string $childId,
@@ -39,18 +78,22 @@ final class PlacementService
         string $mentorId,
     ): array {
         $theme = (string) ($child['world_theme'] ?? 'fantasy');
-        $band = \Kidepik\Shared\Ai\AgeBand::fromLegacy(
+        $band = AgeBand::fromLegacy(
             $child['age_band'] ?? null,
-            isset($child['age_years']) ? (int) $child['age_years'] : null
-        ) ?? \Kidepik\Shared\Ai\AgeBand::CHILD;
+            isset($child['age_years']) ? (int) $child['age_years'] : null,
+        ) ?? AgeBand::CHILD;
 
         $this->pdo->prepare(
             "update placement_exams set status = 'abandoned' where child_id = :cid and status = 'in_progress'"
         )->execute(['cid' => $childId]);
 
-        $queue = $this->bank->pickQueue($band);
+        $subjects = self::activeSubjectsForChild($child);
+        $recentKeys = $this->recentItemKeys($childId);
+        $recentPrompts = $this->recentPrompts($childId);
+        $composer = new PlacementExamComposer(narrator: $this->narrator);
+        $queue = $composer->compose($child, $subjects, $recentKeys, $recentPrompts);
         if ($queue === []) {
-            throw new InvalidArgumentException('placement bank empty');
+            throw new InvalidArgumentException('placement_compose_failed');
         }
 
         $ins = $this->pdo->prepare(
@@ -69,8 +112,8 @@ final class PlacementService
             "update children set placement_status = 'in_progress', onboarding_step = 'placement', updated_at = now() where id = :id"
         )->execute(['id' => $childId]);
 
-        $first = (new PlacementItemWriter())->rewrite($queue[0], $child);
-        $turn = $this->itemToTurn($sessionId, $childId, $flowId, $sequence, $mentorId, $theme, $first, 0, count($queue));
+        $first = $queue[0];
+        $turn = $this->itemToTurn($sessionId, $childId, $flowId, $sequence, $mentorId, $theme, $first, 0, count($queue), $child);
 
         return [
             'exam_id' => $examId,
@@ -132,11 +175,7 @@ final class PlacementService
         ];
 
         $theme = (string) ($child['world_theme'] ?? 'fantasy');
-        $feedback = $score >= 1.0
-            ? 'Bien visto. El saber vuelve a brillar un poco más.'
-            : ($score >= 0.5
-                ? 'Casi. Sigamos: cada intento enseña el camino.'
-                : 'No pasa nada. Anoto y seguimos.');
+        $feedback = $this->narrator->feedbackForItem($item, $reply, $score, $child, $this->bank);
 
         if ($index >= count($queue)) {
             $complete = $this->finalize($childId, $child, $exam['id'], $mentorId, $theme);
@@ -152,7 +191,7 @@ final class PlacementService
         return [
             'complete' => false,
             'feedback' => $feedback,
-            'next_item' => (new PlacementItemWriter())->rewrite($queue[$index], $child),
+            'next_item' => $queue[$index],
             'index' => $index,
             'total' => count($queue),
             'theme' => $theme,
@@ -179,11 +218,12 @@ final class PlacementService
             $bySubject[$sid][] = (float) $row['score'];
         }
 
-        $levels = $this->bank->computeLevels($bySubject);
-        $ageBand = \Kidepik\Shared\Ai\AgeBand::fromLegacy(
+        $active = self::activeSubjectsForChild($child);
+        $levels = $this->bank->computeLevels($bySubject, $active);
+        $ageBand = AgeBand::fromLegacy(
             $child['age_band'] ?? null,
-            isset($child['age_years']) ? (int) $child['age_years'] : null
-        ) ?? \Kidepik\Shared\Ai\AgeBand::CHILD;
+            isset($child['age_years']) ? (int) $child['age_years'] : null,
+        ) ?? AgeBand::CHILD;
         $effective = $this->bank->promoteBand($ageBand, $levels['general'], $levels['subjects']);
         $rank = $this->bank->rankForGeneral($theme, $levels['general']);
 
@@ -237,12 +277,7 @@ final class PlacementService
             'id' => $childId,
         ]);
 
-        $profile = MentorCatalog::profile($mentorId);
-        $closing = sprintf(
-            'Has sido admitido. Tu rango: %s. Yo, %s, te guiaré. ¿Hacia qué territorio de saber viajamos primero?',
-            $rank['label_child'],
-            $profile['display_name']
-        );
+        $closing = $this->narrator->closing($child, $mentorId, $rank);
 
         $zoneOptions = [
             ['id' => 'zone_math', 'label' => $theme === 'sci-fi' ? 'Nebulosa Matemática' : 'Bosque de los Números'],
@@ -266,6 +301,90 @@ final class PlacementService
                 ['type' => 'advance_onboarding', 'to' => 'complete'],
             ],
         ];
+    }
+
+    /**
+     * Ítems ya usados en exámenes previos (evitar repetir en el siguiente intento).
+     *
+     * @return list<string>
+     */
+    private function recentItemKeys(string $childId): array
+    {
+        $keys = [];
+
+        $ans = $this->pdo->prepare(
+            'select distinct pa.item_key
+             from placement_answers pa
+             join placement_exams pe on pe.id = pa.exam_id
+             where pe.child_id = :cid
+             limit 60'
+        );
+        $ans->execute(['cid' => $childId]);
+        foreach ($ans->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $k = (string) ($row['item_key'] ?? '');
+            if ($k !== '') {
+                $keys[] = $k;
+            }
+        }
+
+        $qStmt = $this->pdo->prepare(
+            'select item_queue from placement_exams
+             where child_id = :cid
+             order by started_at desc limit 5'
+        );
+        $qStmt->execute(['cid' => $childId]);
+        foreach ($qStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $queue = $row['item_queue'] ?? [];
+            if (is_string($queue)) {
+                $queue = json_decode($queue, true);
+            }
+            if (!is_array($queue)) {
+                continue;
+            }
+            foreach ($queue as $item) {
+                if (is_array($item) && isset($item['item_key'])) {
+                    $keys[] = (string) $item['item_key'];
+                }
+            }
+        }
+
+        return array_values(array_unique($keys));
+    }
+
+    /**
+     * Enunciados recientes (evitar eco literal del agente).
+     *
+     * @return list<string>
+     */
+    private function recentPrompts(string $childId): array
+    {
+        $prompts = [];
+        $qStmt = $this->pdo->prepare(
+            'select item_queue from placement_exams
+             where child_id = :cid
+             order by started_at desc limit 5'
+        );
+        $qStmt->execute(['cid' => $childId]);
+        foreach ($qStmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $queue = $row['item_queue'] ?? [];
+            if (is_string($queue)) {
+                $queue = json_decode($queue, true);
+            }
+            if (!is_array($queue)) {
+                continue;
+            }
+            foreach ($queue as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                $p = trim((string) ($item['prompt_text'] ?? ''));
+                if ($p !== '') {
+                    $prompts[] = $p;
+                }
+            }
+        }
+
+        return array_values(array_unique($prompts));
     }
 
     /**
@@ -299,6 +418,7 @@ final class PlacementService
 
     /**
      * @param array<string,mixed> $item
+     * @param array<string,mixed> $child
      * @return array<string,mixed>
      */
     public function itemToTurn(
@@ -311,10 +431,13 @@ final class PlacementService
         array $item,
         int $index,
         int $total,
+        ?array $child = null,
     ): array {
-        $wrapper = $theme === 'sci-fi'
-            ? sprintf('Prueba %d de %d en la Academia. ', $index + 1, $total)
-            : sprintf('Prueba %d de %d en la Escuela. ', $index + 1, $total);
+        $child ??= ['world_theme' => $theme];
+        $text = trim((string) ($item['presentation_text'] ?? ''));
+        if ($text === '') {
+            $text = $this->narrator->wrapItem($child, $item, $index, $total);
+        }
 
         $type = (string) ($item['item_type'] ?? 'mcq');
         $inputMode = match ($type) {
@@ -329,7 +452,7 @@ final class PlacementService
             'flow_id' => $flowId,
             'sequence' => $sequence,
             'role' => 'mentor',
-            'text' => $wrapper . (string) ($item['prompt_text'] ?? ''),
+            'text' => $text,
             'input_mode' => $inputMode,
             'options' => $item['options'] ?? null,
             'explorer_reply' => null,
@@ -338,6 +461,8 @@ final class PlacementService
                 'subject_id' => $item['subject_id'] ?? null,
                 'item_key' => $item['item_key'] ?? null,
                 'mentor_id' => $mentorId,
+                'index' => $index,
+                'total' => $total,
             ],
             'model_used' => null,
         ];

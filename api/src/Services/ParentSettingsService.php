@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Kidepik\Api\Services;
 
 use InvalidArgumentException;
+use Kidepik\Shared\Ai\AgeBand;
+use Kidepik\Shared\Ai\SubjectCatalog;
 
 /**
  * Merge y validación de parent_accounts.settings (jsonb).
@@ -36,7 +38,7 @@ final class ParentSettingsService
             ],
             'learning' => [
                 'adaptation_policy' => 'balanced',
-                'active_subjects' => ['math', 'language', 'logic', 'science', 'culture'],
+                'active_subjects' => SubjectCatalog::baseSubjectsForBand(AgeBand::CHILD),
                 'show_levels_to_child' => false,
                 'pause_adaptation' => false,
             ],
@@ -127,11 +129,7 @@ final class ParentSettingsService
         if (!is_array($subjects) || $subjects === []) {
             throw new InvalidArgumentException('learning.active_subjects must be non-empty');
         }
-        foreach ($subjects as $subject) {
-            if (!is_string($subject) || $subject === '') {
-                throw new InvalidArgumentException('learning.active_subjects invalid');
-            }
-        }
+        SubjectCatalog::normalizeActiveSubjects($subjects);
 
         $narrative = $settings['narrative'] ?? null;
         if (!is_array($narrative)) {

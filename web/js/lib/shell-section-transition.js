@@ -16,6 +16,7 @@ import {
   setWorldBandLayout,
 } from "./world-transition.js";
 import { getWorldSession } from "./world-session.js";
+import { inferLogoRevealState, isLogoAssetReady, syncLogoRevealState } from "./logo-reveal.js";
 
 /**
  * @returns {HTMLElement | null}
@@ -29,6 +30,10 @@ export function findShellLogoElement() {
 
   const inFocal = document.querySelector(".loader-focal .loader-logo-wrap");
   if (inFocal instanceof HTMLElement) return inFocal;
+
+  // Morph / handoff: a veces queda en body sin ancla conocida
+  const orphan = document.querySelector("body > .loader-logo-wrap");
+  if (orphan instanceof HTMLElement) return orphan;
 
   return null;
 }
@@ -90,10 +95,10 @@ export async function applyWorldBandTarget(scene, targetCompressed, opts = {}) {
 
 /**
  * Entrada a sección con marco: bandas compactas + morph del logo al slot del marco.
- * @param {{ scene: HTMLElement; logoMount: HTMLElement }} opts
+ * @param {{ scene: HTMLElement; logoMount: HTMLElement; onLogoSettled?: (logoWrap: HTMLElement) => void }} opts
  * @returns {Promise<void>}
  */
-export async function applySectionEnter({ scene, logoMount }) {
+export async function applySectionEnter({ scene, logoMount, onLogoSettled }) {
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const durationMs = reducedMotion ? 0 : 720;
   const { snapshot, intent } = consumeWorldTransition();
@@ -109,11 +114,17 @@ export async function applySectionEnter({ scene, logoMount }) {
   const toLogo = measureSectionFrameLogoTarget(logoMount);
 
   logoEl.classList.remove("is-auth-positioned", "legal-logo-wrap");
-  logoEl.classList.add("is-ready");
+  if (isLogoAssetReady(logoEl)) {
+    syncLogoRevealState(logoEl, "ready");
+  } else {
+    const inferred = inferLogoRevealState(logoEl);
+    syncLogoRevealState(logoEl, inferred === "error" ? "error" : "pending");
+  }
 
   if (!fromLogo || !toLogo || durationMs <= 0) {
     logoMount.appendChild(logoEl);
     clearLogoPinStyles(logoEl);
+    settleLogoReveal(logoEl, onLogoSettled);
     return;
   }
 
@@ -125,4 +136,34 @@ export async function applySectionEnter({ scene, logoMount }) {
 
   logoMount.appendChild(logoEl);
   clearLogoPinStyles(logoEl);
+  settleLogoReveal(logoEl, onLogoSettled);
+}
+
+/**
+ * @param {HTMLElement} logoEl
+ * @param {((logoWrap: HTMLElement) => void) | undefined} onLogoSettled
+ */
+function settleLogoReveal(logoEl, onLogoSettled) {
+  onLogoSettled?.(logoEl);
+  if (isLogoAssetReady(logoEl)) {
+    syncLogoRevealState(logoEl, "ready");
+    onLogoSettled?.(logoEl);
+    return;
+  }
+  const logoImg = logoEl.querySelector(".loader-logo");
+  if (!(logoImg instanceof HTMLImageElement)) {
+    syncLogoRevealState(logoEl, "error");
+    onLogoSettled?.(logoEl);
+    return;
+  }
+  const finish = (state) => {
+    syncLogoRevealState(logoEl, state);
+    onLogoSettled?.(logoEl);
+  };
+  if (logoImg.complete && logoImg.naturalWidth > 0) {
+    finish("ready");
+    return;
+  }
+  logoImg.addEventListener("load", () => finish("ready"), { once: true });
+  logoImg.addEventListener("error", () => finish("error"), { once: true });
 }

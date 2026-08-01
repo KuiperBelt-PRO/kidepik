@@ -3,13 +3,13 @@
  * @module scenes/account
  */
 
-import { mountLoaderChrome } from "../components/loader-chrome.js?v=183";
-import { mountSectionFrame } from "../components/section-frame.js?v=188";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
+import { mountSectionFrame } from "../components/section-frame.js?v=236";
 import { mountAccountPanel } from "../components/account-panel.js?v=183";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=183";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
-import { applySectionEnter } from "../lib/shell-section-transition.js?v=183";
+import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 
 /**
  * @returns {{ destroy: () => void }}
@@ -20,7 +20,12 @@ export function renderAccount() {
 
   /** @type {{ destroy: () => void; sectionHost?: HTMLElement } | null} */
   let chromeHandle = null;
-  /** @type {{ destroy: () => Promise<void>; logoMountEl?: HTMLElement } | null} */
+  /** @type {{
+   *   destroy: () => Promise<void>;
+   *   contentEl?: HTMLElement;
+   *   logoMountEl?: HTMLElement;
+   *   syncLogoSkeleton?: (logoWrap?: HTMLElement | null) => void;
+   * } | null} */
   let frameHandle = null;
   /** @type {{ destroy: () => void } | null} */
   let panelHandle = null;
@@ -59,7 +64,7 @@ export function renderAccount() {
       return;
     }
 
-    frameHandle = mountSectionFrame(host, { ariaLabel: "Cuenta" });
+    frameHandle = mountSectionFrame(host, { title: "Cuenta", ariaLabel: "Cuenta" });
     panelHandle = mountAccountPanel(frameHandle.contentEl, {
       session,
       onDeleted: afterDeleted,
@@ -68,7 +73,9 @@ export function renderAccount() {
     await applySectionEnter({
       scene: sceneEl,
       logoMount: frameHandle.logoMountEl,
+      onLogoSettled: (logoWrap) => frameHandle?.syncLogoSkeleton?.(logoWrap),
     });
+    frameHandle.syncLogoSkeleton?.();
   })();
 
   return {

@@ -26,7 +26,7 @@
 - **Auth Google — spec de implementación:** [specify/SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md](specify/SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md) — **implementada** jul 2026; OAuth PKCE, config GCP/Supabase, `parent_accounts`, bootstrap API, tests; plan [tasks/APP_AUTH_GOOGLE_IMPLEMENTATION_PLAN.md](tasks/APP_AUTH_GOOGLE_IMPLEMENTATION_PLAN.md)
 - **Shell post-login (chrome global):** [specify/SPEC_APP_SHELL_CHROME.md](specify/SPEC_APP_SHELL_CHROME.md) — **aprobada** jul 2026; FABs glass (menú / tema sci-fi↔fantasía / cuenta), drawer (Inicio, Tripulación, Legal, Ajustes, Cuenta, Cerrar sesión), tema UI padre ≠ tema mundo niño
 - **Legal con sesión autenticada:** [specify/SPEC_LEGAL_AUTHENTICATED_SESSION.md](specify/SPEC_LEGAL_AUTHENTICATED_SESSION.md) — **aprobada** jul 2026; shell en Términos/Privacidad, vuelta a home sin cerrar sesión, tipografía según `uiTheme`
-- **Marco de sección autenticada (bandas + glass):** [specify/SPEC_APP_SECTION_FRAME.md](specify/SPEC_APP_SECTION_FRAME.md) — **aprobada** jul 2026; bandas compactas en todas las rutas de gestión salvo home; marco glass + logo + scroll con fade
+- **Marco de sección autenticada (bandas + glass):** [specify/SPEC_APP_SECTION_FRAME.md](specify/SPEC_APP_SECTION_FRAME.md) — **aprobada** jul 2026; bandas compactas en gestión salvo home; marco glass + **título fijo en cabecera** (§2.4c) + **skeleton logo** (§2.4d) + scroll con fade
 - **Sección Cuenta (padre/tutor):** [specify/SPEC_APP_ACCOUNT_SECTION.md](specify/SPEC_APP_ACCOUNT_SECTION.md) — **aprobada** jul 2026; datos Google, alias editable, eliminación con confirmación; depende del marco de sección
 - **Sección Ajustes (tutor):** [specify/SPEC_APP_SETTINGS_SECTION.md](specify/SPEC_APP_SETTINGS_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (tema, tipografía, defaults, resumen); `parent_accounts.settings` jsonb
 - **Sección Tripulación (perfiles infantiles):** [specify/SPEC_APP_CREW_SECTION.md](specify/SPEC_APP_CREW_SECTION.md) — **aprobada** jul 2026; **Fase A gestión implementada** (plaza, lista, ficha, permisos); play/first-run pendiente
@@ -39,8 +39,9 @@
   - Adventure: [SPEC_APP_ADVENTURE_SESSION](specify/SPEC_APP_ADVENTURE_SESSION.md) — vertical slice zona/reto
   - Timeline tutor: `GET …/journey/timeline` + «Diario del viaje» en ficha crew
 - **Diálogo de aventura (IA):** [specify/SPEC_APP_ADVENTURE_DIALOGUE.md](specify/SPEC_APP_ADVENTURE_DIALOGUE.md) — **implementada** jul 2026; toast, burbujas con icono, compose chat, tema por mundo
-- **Catálogo de materias (14 áreas):** [specify/SPEC_APP_SUBJECT_CATALOG.md](specify/SPEC_APP_SUBJECT_CATALOG.md) — **aprobada** 31 jul 2026; `reading` separada de `language`; base por banda; activación por tripulante en ficha; **sin implementar** hasta OK
-- **Placement adaptativo + prosa mentor:** [specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) — **aprobada** 31 jul 2026; 1 reto/materia activa; dificultad/prosa por `age_band`; agente generador con validación PHP; **sin implementar** hasta OK
+- **Catálogo de materias (14 áreas):** [specify/SPEC_APP_SUBJECT_CATALOG.md](specify/SPEC_APP_SUBJECT_CATALOG.md) — **implementada** 31 jul 2026; `reading` separada; base por banda; activación por tripulante en ficha
+- **Placement adaptativo + prosa mentor:** [specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) — **implementada** 31 jul 2026; **A1** (1 ago 2026): examen solo agente, sin banco seed; castellano ES; fallo → reintento
+  - Colas LLM por purpose en BD: `ai_purpose_model_queues` ([SPEC_AI_OPENROUTER_GATEWAY](specify/SPEC_AI_OPENROUTER_GATEWAY.md) §4.3) — **B1**
 - **Notificaciones glass:** [specify/SPEC_APP_GLASS_TOAST.md](specify/SPEC_APP_GLASS_TOAST.md) — **implementada** jul 2026; errores/warnings/success/info reutilizables
 - **Modales glass:** [specify/SPEC_APP_GLASS_MODAL.md](specify/SPEC_APP_GLASS_MODAL.md) — **implementada** jul 2026; alerta y confirmación reutilizables; tripulación y cuenta
 - **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** + delta `choose_character`

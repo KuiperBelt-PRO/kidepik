@@ -2,13 +2,13 @@ import { registerRoute, startRouter } from "./lib/router.js";
 import "./lib/shell-navigation.js";
 import { initTheme } from "./lib/theme.js";
 import { initShellUiTheme } from "./lib/shell-theme.js";
-import { renderLoader } from "./scenes/loader.js?v=184";
+import { renderLoader } from "./scenes/loader.js?v=236";
 import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
-import { renderHome } from "./scenes/home.js?v=184";
-import { renderAccount } from "./scenes/account.js?v=184";
-import { renderSettings } from "./scenes/settings.js?v=221";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=234";
-import { renderPlay } from "./scenes/play.js?v=8";
+import { renderHome } from "./scenes/home.js?v=236";
+import { renderAccount } from "./scenes/account.js?v=236";
+import { renderSettings } from "./scenes/settings.js?v=236";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=236";
+import { renderPlay } from "./scenes/play.js?v=236";
 import { renderLegal } from "./scenes/legal.js?v=184";
 
 function updateOfflineBanner() {
