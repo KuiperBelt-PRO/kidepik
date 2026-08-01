@@ -114,6 +114,12 @@ export function mapPlayApiError(code) {
       return "Escribe una respuesta antes de enviar.";
     case "session not found":
       return "La sesión de diálogo ha caducado. Vuelve a entrar en la aventura.";
+    case "session_expired":
+      return "Tu sesión ha caducado. Vuelve al inicio e inicia sesión de nuevo.";
+    case "Invalid token: Supabase auth rejected":
+      return "Tu sesión ha caducado. Vuelve al inicio e inicia sesión de nuevo.";
+    case "Invalid token: Supabase auth unreachable":
+      return "No se pudo verificar la sesión. Comprueba que Supabase local está activo y reintenta.";
     case "world_theme locked":
       return "El mundo ya está bloqueado y no se puede cambiar desde la aventura.";
     default:

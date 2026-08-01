@@ -5,14 +5,27 @@
 
 import { debugAiRequestHeaders } from "./debug-ai.js";
 import { appLogApi } from "./app-logger.js";
+import { getValidSession } from "./supabase.js";
+
+/**
+ * @returns {Promise<import('@supabase/supabase-js').Session | null>}
+ */
+async function requirePlaySession() {
+  return getValidSession();
+}
 
 /**
  * @param {import('@supabase/supabase-js').Session} session
  * @param {string} childId
  * @param {string} [flowId]
  */
-export async function openDialogueSession(session, childId, flowId = "first_run") {
+export async function openDialogueSession(_session, childId, flowId = "first_run") {
   try {
+    const session = await requirePlaySession();
+    if (!session) {
+      appLogApi("play/dialogue/session", 401, { child_id: childId, error: "session_expired" });
+      return { ok: false, status: 401, error: "session_expired" };
+    }
     const { config } = await import("../config.js");
     const res = await fetch(`${config.apiUrl}/play/${encodeURIComponent(childId)}/dialogue/session`, {
       method: "POST",
@@ -41,8 +54,17 @@ export async function openDialogueSession(session, childId, flowId = "first_run"
  * @param {string} sessionId
  * @param {{ kind: string, option_id?: string, text?: string }} reply
  */
-export async function submitDialogueTurn(session, childId, sessionId, reply) {
+export async function submitDialogueTurn(_session, childId, sessionId, reply) {
   try {
+    const session = await requirePlaySession();
+    if (!session) {
+      appLogApi("play/dialogue/turn", 401, {
+        child_id: childId,
+        session_id: sessionId,
+        error: "session_expired",
+      });
+      return { ok: false, status: 401, error: "session_expired" };
+    }
     const { config } = await import("../config.js");
     const res = await fetch(`${config.apiUrl}/play/${encodeURIComponent(childId)}/dialogue/turn`, {
       method: "POST",
@@ -77,8 +99,12 @@ export async function submitDialogueTurn(session, childId, sessionId, reply) {
  * @param {string} childId
  * @param {{ cursor?: string, limit?: number }} [opts]
  */
-export async function fetchJourneyTimeline(session, childId, opts = {}) {
+export async function fetchJourneyTimeline(_session, childId, opts = {}) {
   try {
+    const session = await requirePlaySession();
+    if (!session) {
+      return { ok: false, status: 401, error: "session_expired" };
+    }
     const { config } = await import("../config.js");
     const q = new URLSearchParams();
     if (opts.cursor) q.set("cursor", opts.cursor);

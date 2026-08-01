@@ -14,7 +14,11 @@ class SupabaseAuthService
 
     public function __construct(?Client $http = null)
     {
-        $this->http = $http ?? new Client(['timeout' => 5.0]);
+        $this->http = $http ?? new Client([
+            'timeout' => 5.0,
+            // Distinguish HTTP 401 from transport errors (Guzzle throws on 4xx by default).
+            'http_errors' => false,
+        ]);
     }
 
     /** @return array{sub: string, role: string, email?: string|null, display_name?: string|null, avatar_url?: string|null} */
@@ -40,8 +44,12 @@ class SupabaseAuthService
             throw new AuthException('Invalid token: Supabase auth unreachable', 0, $e);
         }
 
-        if ($response->getStatusCode() !== 200) {
+        $status = $response->getStatusCode();
+        if ($status === 401 || $status === 403) {
             throw new AuthException('Invalid token: Supabase auth rejected');
+        }
+        if ($status !== 200) {
+            throw new AuthException('Invalid token: Supabase auth unreachable');
         }
 
         /** @var array<string, mixed> $user */

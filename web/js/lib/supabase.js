@@ -94,6 +94,9 @@ export function cleanOAuthParamsFromUrl() {
   window.history.replaceState({}, document.title, url.toString());
 }
 
+/** Seconds before expiry when we proactively refresh (long play turns can exceed JWT lifetime). */
+const SESSION_REFRESH_SKEW_SEC = 120;
+
 /**
  * @returns {Promise<Session | null>}
  */
@@ -102,8 +105,18 @@ export async function getValidSession() {
     const supabase = await getSupabaseClient();
     const { data, error } = await supabase.auth.getSession();
     if (error) return null;
-    const session = data.session;
+    let session = data.session;
     if (!session?.access_token) return null;
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const expiresAt = typeof session.expires_at === "number" ? session.expires_at : 0;
+    const shouldRefresh = expiresAt > 0 && expiresAt <= nowSec + SESSION_REFRESH_SKEW_SEC;
+    if (shouldRefresh) {
+      const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshed.session?.access_token) return null;
+      session = refreshed.session;
+    }
+
     return session;
   } catch {
     return null;

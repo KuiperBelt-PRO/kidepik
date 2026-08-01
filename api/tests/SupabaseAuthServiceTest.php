@@ -58,10 +58,30 @@ final class SupabaseAuthServiceTest extends TestCase
         $mock = new MockHandler([
             new Response(401, [], '{}'),
         ]);
-        $client = new Client(['handler' => HandlerStack::create($mock)]);
+        $client = new Client(['handler' => HandlerStack::create($mock), 'http_errors' => false]);
         $service = new SupabaseAuthService($client);
 
-        $this->expectException(AuthException::class);
-        $service->validateBearer('Bearer bad');
+        try {
+            $service->validateBearer('Bearer bad');
+            self::fail('Expected AuthException');
+        } catch (AuthException $e) {
+            self::assertSame('Invalid token: Supabase auth rejected', $e->getMessage());
+        }
+    }
+
+    public function testUpstreamErrorIsUnreachable(): void
+    {
+        $mock = new MockHandler([
+            new Response(503, [], '{}'),
+        ]);
+        $client = new Client(['handler' => HandlerStack::create($mock), 'http_errors' => false]);
+        $service = new SupabaseAuthService($client);
+
+        try {
+            $service->validateBearer('Bearer t');
+            self::fail('Expected AuthException');
+        } catch (AuthException $e) {
+            self::assertSame('Invalid token: Supabase auth unreachable', $e->getMessage());
+        }
     }
 }
