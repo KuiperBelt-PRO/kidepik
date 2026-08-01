@@ -182,10 +182,49 @@ final class DialogueService
 
         if ($phase === 'choose_zone' || ($step === 'complete' && str_starts_with((string) ($reply['option_id'] ?? ''), 'zone_'))) {
             $zoneId = (string) ($reply['option_id'] ?? '');
-            $adv = new AdventureService($pdo, $this->gateway());
-            $result = $adv->chooseZone($childId, $child, $zoneId, $sessionId, 'adventure', $seq + 1, $mentorId);
-            $effects = $result['effects'];
+            $offered = is_array($lastMentor['meta']['choices_offered'] ?? null)
+                ? $lastMentor['meta']['choices_offered']
+                : [];
+            $chosenLabel = AdventureService::zoneTitle(
+                (string) ($child['world_theme'] ?? 'fantasy'),
+                $zoneId,
+            );
+            /** @var list<array{id:string,label:string}> $discarded */
+            $discarded = [];
+            foreach ($offered as $opt) {
+                if (!is_array($opt)) {
+                    continue;
+                }
+                $oid = (string) ($opt['id'] ?? '');
+                if ($oid === $zoneId) {
+                    $chosenLabel = (string) ($opt['label'] ?? $chosenLabel);
+                } elseif ($oid !== '') {
+                    $discarded[] = ['id' => $oid, 'label' => (string) ($opt['label'] ?? $oid)];
+                }
+            }
             $n = $seq + 1;
+            $agentTurns[] = $this->insertTurn($pdo, [
+                'session_id' => $sessionId,
+                'child_id' => $childId,
+                'flow_id' => 'adventure',
+                'sequence' => $n++,
+                'role' => 'mentor',
+                'text' => 'Muy bien. Vamos a ' . $chosenLabel . '.',
+                'input_mode' => 'continue',
+                'options' => [['id' => 'continue', 'label' => 'Continuar']],
+                'explorer_reply' => null,
+                'meta' => [
+                    'phase' => 'choice_resolved',
+                    'decision_key' => 'choose_zone',
+                    'choices_offered' => $offered,
+                    'choice_taken' => ['id' => $zoneId, 'label' => $chosenLabel],
+                    'choices_discarded' => $discarded,
+                ],
+                'model_used' => null,
+            ]);
+            $adv = new AdventureService($pdo, $this->gateway());
+            $result = $adv->chooseZone($childId, $child, $zoneId, $sessionId, 'adventure', $n, $mentorId);
+            $effects = $result['effects'];
             foreach ($result['turns'] as $payload) {
                 $agentTurns[] = $this->insertTurn($pdo, [
                     'session_id' => $sessionId,
@@ -203,6 +242,48 @@ final class DialogueService
             }
             $pdo->prepare("update dialogue_sessions set flow_id = 'adventure', updated_at = now() where id = :id")
                 ->execute(['id' => $sessionId]);
+        } elseif ($phase === 'admission_map') {
+            // El closing ya se mostró; re-emitir pitches si el continue llega sin options en cliente
+            $levels = $this->subjectLevelsMap($pdo, $childId);
+            $theme = (string) ($child['world_theme'] ?? 'fantasy');
+            $exclude = AdventureService::completedZoneIds($child);
+            $zoneOptions = AdventureService::zonePitches($theme, $levels, 3, $exclude);
+            $agentTurns[] = $this->insertTurn($pdo, [
+                'session_id' => $sessionId,
+                'child_id' => $childId,
+                'flow_id' => $flowId,
+                'sequence' => $seq + 1,
+                'role' => 'mentor',
+                'text' => AdventureService::zonePitchMapText($zoneOptions),
+                'input_mode' => 'options_only',
+                'options' => $zoneOptions,
+                'explorer_reply' => null,
+                'meta' => ['phase' => 'choose_zone', 'choices_offered' => $zoneOptions],
+                'model_used' => null,
+            ]);
+        } elseif (in_array($phase, ['zone_arrive', 'zone_between'], true)) {
+            $adv = new AdventureService($pdo, $this->gateway());
+            $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
+            $meta['gate_index'] = (int) ($meta['gate_index'] ?? 0);
+            $meta['subject_id'] = (string) ($meta['subject_id'] ?? str_replace('zone_', '', (string) ($meta['zone_id'] ?? 'zone_math')));
+            $result = $adv->presentChallenge($childId, $child, $meta, $sessionId, $mentorId);
+            $effects = $result['effects'];
+            $n = $seq + 1;
+            foreach ($result['turns'] as $payload) {
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => 'adventure',
+                    'sequence' => $n++,
+                    'role' => 'mentor',
+                    'text' => (string) ($payload['text'] ?? ''),
+                    'input_mode' => $payload['input_mode'] ?? 'options_only',
+                    'options' => $payload['options'] ?? null,
+                    'explorer_reply' => null,
+                    'meta' => $payload['meta'] ?? [],
+                    'model_used' => null,
+                ]);
+            }
         } elseif ($phase === 'adventure_challenge') {
             $adv = new AdventureService($pdo, $this->gateway());
             $result = $adv->resolveChallenge(
@@ -214,6 +295,53 @@ final class DialogueService
                 $seq + 1,
                 $mentorId,
             );
+            $effects = $result['effects'];
+            $n = $seq + 1;
+            foreach ($result['turns'] as $payload) {
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => 'adventure',
+                    'sequence' => $n++,
+                    'role' => 'mentor',
+                    'text' => (string) ($payload['text'] ?? ''),
+                    'input_mode' => $payload['input_mode'] ?? 'continue',
+                    'options' => $payload['options'] ?? null,
+                    'explorer_reply' => null,
+                    'meta' => $payload['meta'] ?? [],
+                    'model_used' => null,
+                ]);
+            }
+        } elseif ($phase === 'zone_quest_complete') {
+            $adv = new AdventureService($pdo, $this->gateway());
+            $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
+            $opt = (string) ($reply['option_id'] ?? '');
+            if ($opt === 'stay_a_while' || $opt === 'continue_zone_lore') {
+                $result = $adv->lingerAfterQuest($childId, $child, $meta, $sessionId);
+            } else {
+                $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
+            }
+            $effects = $result['effects'];
+            $n = $seq + 1;
+            foreach ($result['turns'] as $payload) {
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => 'adventure',
+                    'sequence' => $n++,
+                    'role' => 'mentor',
+                    'text' => (string) ($payload['text'] ?? ''),
+                    'input_mode' => $payload['input_mode'] ?? 'continue',
+                    'options' => $payload['options'] ?? null,
+                    'explorer_reply' => null,
+                    'meta' => $payload['meta'] ?? [],
+                    'model_used' => null,
+                ]);
+            }
+        } elseif ($phase === 'session_wrap' || $phase === 'adventure_idle') {
+            $adv = new AdventureService($pdo, $this->gateway());
+            $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
+            $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
             $effects = $result['effects'];
             $n = $seq + 1;
             foreach ($result['turns'] as $payload) {
@@ -316,6 +444,28 @@ final class DialogueService
                 'meta' => ['phase' => 'handoff_placement', 'mentor_id' => $mentorId],
                 'model_used' => null,
             ]);
+        } elseif ($flowId === 'adventure' || $step === 'complete') {
+            // Anti-hueco: nunca LLM libre sin phase en adventure (SPEC_APP_ADVENTURE_STORY_RICHNESS §4.1)
+            $adv = new AdventureService($pdo, $this->gateway());
+            $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
+            $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
+            $effects = $result['effects'];
+            $n = $seq + 1;
+            foreach ($result['turns'] as $payload) {
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => 'adventure',
+                    'sequence' => $n++,
+                    'role' => 'mentor',
+                    'text' => (string) ($payload['text'] ?? ''),
+                    'input_mode' => $payload['input_mode'] ?? 'continue',
+                    'options' => $payload['options'] ?? null,
+                    'explorer_reply' => null,
+                    'meta' => $payload['meta'] ?? [],
+                    'model_used' => null,
+                ]);
+            }
         } else {
             $agentTurns[] = $this->llmMentorTurn(
                 $pdo,
@@ -1161,6 +1311,25 @@ final class DialogueService
         $stmt->execute(['cid' => $childId]);
 
         return (bool) $stmt->fetchColumn();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function subjectLevelsMap(PDO $pdo, string $childId): array
+    {
+        try {
+            $stmt = $pdo->prepare('select subject_id, level_id from user_subject_levels where child_id = :id');
+            $stmt->execute(['id' => $childId]);
+            $out = [];
+            foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                $out[(string) $row['subject_id']] = (string) $row['level_id'];
+            }
+
+            return $out;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function pdo(): PDO

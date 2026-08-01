@@ -1,7 +1,7 @@
 # Spec: Marco de sección autenticada (bandas + glass + scroll)
 
-> Estado: **aprobada** (julio 2026)  
-> Relacionado: [SPEC_APP_SHELL_CHROME.md](SPEC_APP_SHELL_CHROME.md), [SPEC_LEGAL_AUTHENTICATED_SESSION.md](SPEC_LEGAL_AUTHENTICATED_SESSION.md), [SPEC_WORLD_LAYERS_PERSISTENCE.md](SPEC_WORLD_LAYERS_PERSISTENCE.md), [SPEC_APP_ACCOUNT_SECTION.md](SPEC_APP_ACCOUNT_SECTION.md), [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md)
+> Estado: **aprobada** (julio 2026); **delta §2.2b marco play más alto** (ago 2026)  
+> Relacionado: [SPEC_APP_SHELL_CHROME.md](SPEC_APP_SHELL_CHROME.md), [SPEC_LEGAL_AUTHENTICATED_SESSION.md](SPEC_LEGAL_AUTHENTICATED_SESSION.md), [SPEC_WORLD_LAYERS_PERSISTENCE.md](SPEC_WORLD_LAYERS_PERSISTENCE.md), [SPEC_APP_ACCOUNT_SECTION.md](SPEC_APP_ACCOUNT_SECTION.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md)
 
 ## Contexto
 
@@ -163,6 +163,20 @@ function shouldCompressWorldBands(path) {
 | z-index | Por encima del mundo, **por debajo** del shell chrome/drawer |
 
 Responsive: en desktop el marco se limita al ancho de `#app` (mismo frame que el shell), no al viewport completo.
+
+### 2.2b Variante play — cajetín más alto (delta ago 2026)
+
+En rutas `#/play/:childId` el marco debe **bajar más** hacia el paisaje para leer más diálogo de golpe ([SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md) §7; [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md) §1.4).
+
+| Propiedad | Gestión (crew/cuenta/…) | Play (`:has(.play-panel)` o clase `section-frame--play`) |
+| --- | --- | --- |
+| `bottom` | `calc(18% + safe-area)` | **`calc(6% + safe-area)`** (rango aceptable 4%–8%) |
+| Mundo visible bajo el marco | Franja fantasía/sci-fi amplia | Franja menor pero **sigue visible** (no full-bleed opaco) |
+| Compose | N/A o footer corto | Sigue anclado a `.section-frame__footer` |
+
+**Prohibido:** subir el `top` tapando FABs; eliminar el fade del scroll; hacer el marco full-viewport sin ver el mundo.
+
+Criterio visual 390×844: el historial muestra ≈ **40–50 % más** de altura útil de scroll vs gestión; captura `tmp/playwright-output/play-frame-taller-v1.png`.
 
 ### 2.3 Estilo glass (paridad con drawer)
 

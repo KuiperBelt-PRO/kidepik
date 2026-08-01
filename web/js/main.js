@@ -9,7 +9,7 @@ import { renderHome } from "./scenes/home.js?v=236";
 import { renderAccount } from "./scenes/account.js?v=236";
 import { renderSettings } from "./scenes/settings.js?v=236";
 import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=236";
-import { renderPlay } from "./scenes/play.js?v=245";
+import { renderPlay } from "./scenes/play.js?v=246";
 import { renderLegal } from "./scenes/legal.js?v=184";
 import {
   initDebugAiFromUrl,

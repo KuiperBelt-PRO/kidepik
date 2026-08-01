@@ -1,5 +1,10 @@
 /* Play — diálogo en marco glass (mismo lenguaje que Tripulación / Ajustes) */
 
+.section-frame:has(.play-panel) {
+  /* SPEC_APP_SECTION_FRAME §2.2b — cajetín más alto en aventura */
+  bottom: calc(6% + env(safe-area-inset-bottom, 0px));
+}
+
 .section-frame:has(.play-panel) .section-frame__content {
   padding-bottom: calc(var(--section-frame-fade-ramp) * 0.45);
 }
@@ -192,6 +197,51 @@
   line-height: 1.4;
   opacity: 0.9;
   color: #fff;
+}
+
+.play-choice-echo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.1rem 0.05rem;
+}
+
+.play-choice-card {
+  flex: 1 1 7.5rem;
+  min-width: 6.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--glass-radius-field, 12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.22));
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.play-choice-card--chosen {
+  border-color: rgba(144, 238, 180, 0.55);
+  background: rgba(72, 160, 110, 0.22);
+}
+
+.play-choice-card--discarded {
+  opacity: 0.45;
+  border-style: dashed;
+  filter: grayscale(0.35);
+}
+
+.play-choice-card__label {
+  margin: 0;
+  font-family: Nunito, system-ui, sans-serif;
+  font-size: calc(0.82rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  line-height: 1.25;
+  color: #fff;
+}
+
+.play-choice-card__tag {
+  margin: 0.2rem 0 0;
+  font-size: calc(0.68rem * var(--font-scale-ui, 1));
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .play-panel__options {

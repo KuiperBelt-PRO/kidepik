@@ -26,7 +26,7 @@ flowchart TB
 | --- | --- | --- |
 | Cuenta | Implementada; título «Cuenta» en cabecera | `GET/PATCH/DELETE /parents/me` |
 | Ajustes | Fase A gestión; título en cabecera | `GET/PATCH /parents/me/settings` |
-| Tripulación | Fase A + cartas TCG + diario; título fijo / `setTitle` en ficha | `/crew`, `/crew/:id`, permissions; `GET …/journey/timeline` |
+| Tripulación | Fase A + cartas TCG; **ficha v2 propuesta** (pestañas Viaje/Ajustes + progreso) | `/crew`, `/crew/:id`, permissions; `GET …/journey/timeline`; `progress` en crew detail (propuesto) |
 | Play (`#/play/:id`) | Vertical slice; título «Aventura» en cabecera | dialogue session/turn |
 | Legal autenticado | Shell + vuelta a home; **sin** section-frame | `GET /legal/:slug` |
 

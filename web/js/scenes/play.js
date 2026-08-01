@@ -719,6 +719,61 @@ async function mountPlayPanel(root, ctx) {
 
   /**
    * @param {object} turn
+   * @param {string} [who]
+   */
+  function appendMentorTurn(turn, who) {
+    appendBubble("mentor", turn.text || "", who);
+    if (turn?.meta?.phase === "choice_resolved") {
+      renderChoiceResolvedEcho(turn.meta);
+    }
+  }
+
+  /**
+   * @param {object} meta
+   */
+  function renderChoiceResolvedEcho(meta) {
+    if (!(logEl instanceof HTMLElement) || !meta) return;
+    const taken = meta.choice_taken;
+    const discarded = Array.isArray(meta.choices_discarded) ? meta.choices_discarded : [];
+    if (!taken && discarded.length === 0) return;
+
+    const panel = document.createElement("div");
+    panel.className = "play-choice-echo";
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-label", "Elección de destino");
+
+    if (taken && (taken.label || taken.id)) {
+      const chosen = document.createElement("div");
+      chosen.className = "play-choice-card play-choice-card--chosen";
+      const label = document.createElement("p");
+      label.className = "play-choice-card__label";
+      label.textContent = String(taken.label || taken.id);
+      const tag = document.createElement("p");
+      tag.className = "play-choice-card__tag";
+      tag.textContent = "Elegido";
+      chosen.append(label, tag);
+      panel.appendChild(chosen);
+    }
+
+    for (const opt of discarded) {
+      const ghost = document.createElement("div");
+      ghost.className = "play-choice-card play-choice-card--discarded";
+      const label = document.createElement("p");
+      label.className = "play-choice-card__label";
+      label.textContent = String(opt.label || opt.id);
+      const tag = document.createElement("p");
+      tag.className = "play-choice-card__tag";
+      tag.textContent = "Descartado";
+      ghost.append(label, tag);
+      panel.appendChild(ghost);
+    }
+
+    logEl.appendChild(panel);
+    scrollLogToEnd();
+  }
+
+  /**
+   * @param {object} turn
    * @returns {boolean}
    */
   function isChooseWorldTurn(turn) {
@@ -727,6 +782,32 @@ async function mountPlayPanel(root, ctx) {
     if (opts.length < 2) return false;
     const ids = new Set(opts.map((o) => o.id));
     return ids.has("sci-fi") && ids.has("fantasy");
+  }
+
+  /**
+   * @param {object} turn
+   * @returns {boolean}
+   */
+  function isChooseZoneTurn(turn) {
+    if (turn?.meta?.phase === "choose_zone") return true;
+    const opts = Array.isArray(turn?.options) ? turn.options : [];
+    if (opts.length < 2) return false;
+    return opts.every((o) => String(o.id || "").startsWith("zone_"));
+  }
+
+  /**
+   * @param {{ id: string, label?: string, description?: string, why_for_you?: string }[]} opts
+   * @returns {{ id: string, label: string, description: string }[]}
+   */
+  function enrichZoneOptions(opts) {
+    return opts.map((opt) => {
+      const desc = [opt.description, opt.why_for_you].filter(Boolean).join(" ");
+      return {
+        id: opt.id,
+        label: opt.label || opt.id,
+        description: desc || "Un destino del viaje.",
+      };
+    });
   }
 
   /**
@@ -753,15 +834,16 @@ async function mountPlayPanel(root, ctx) {
 
   /**
    * @param {{ id: string, label: string, description: string }[]} hints
+   * @param {string} [ariaLabel]
    */
-  function renderWorldHints(hints) {
+  function renderWorldHints(hints, ariaLabel = "Mundos disponibles") {
     if (!(logEl instanceof HTMLElement) || hints.length === 0) return;
     clearWorldHints();
 
     const panel = document.createElement("div");
     panel.className = "play-world-hints";
     panel.setAttribute("role", "region");
-    panel.setAttribute("aria-label", "Mundos disponibles");
+    panel.setAttribute("aria-label", ariaLabel);
 
     for (const hint of hints) {
       const item = document.createElement("div");
@@ -855,15 +937,18 @@ async function mountPlayPanel(root, ctx) {
     syncExamProgress(turn);
 
     const mode = turn.input_mode || "continue";
-    /** @type {{ id: string, label?: string, description?: string }[]} */
+    /** @type {{ id: string, label?: string, description?: string, why_for_you?: string }[]} */
     let opts = Array.isArray(turn.options) ? turn.options : [];
     if (mode === "continue" && opts.length === 0) {
       opts = [{ id: "continue", label: "Continuar" }];
     }
 
     const chooseWorld = isChooseWorldTurn(turn);
+    const chooseZone = isChooseZoneTurn(turn);
     if (chooseWorld) {
-      renderWorldHints(enrichWorldOptions(opts));
+      renderWorldHints(enrichWorldOptions(opts), "Mundos disponibles");
+    } else if (chooseZone) {
+      renderWorldHints(enrichZoneOptions(opts), "Destinos del viaje");
     }
 
     if (mode === "options_only" || mode === "options_or_text" || mode === "continue") {
@@ -876,6 +961,9 @@ async function mountPlayPanel(root, ctx) {
         btn.textContent = opt.label || opt.id;
         if (chooseWorld && WORLD_THEME_HINTS[opt.id]) {
           const hint = enrichWorldOptions([opt])[0];
+          btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
+        } else if (chooseZone) {
+          const hint = enrichZoneOptions([opt])[0];
           btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
         }
 
@@ -983,7 +1071,7 @@ async function mountPlayPanel(root, ctx) {
 
     const turns = Array.isArray(data.agent_turns) ? data.agent_turns : [];
     for (const t of turns) {
-      appendBubble("mentor", t.text || "", mentorLabel);
+      appendMentorTurn(t, mentorLabel);
     }
     const last = turns[turns.length - 1];
     if (last) {
@@ -1041,7 +1129,11 @@ async function mountPlayPanel(root, ctx) {
   const turns = Array.isArray(data.turns) ? data.turns : [];
   for (const t of turns) {
     const role = t.role === "explorer" || t.role === "child" ? "explorer" : "mentor";
-    appendBubble(role, t.text || "", role === "mentor" ? mentorLabel : undefined);
+    if (role === "mentor") {
+      appendMentorTurn(t, mentorLabel);
+    } else {
+      appendBubble(role, t.text || "", undefined);
+    }
   }
   const pending =
     data.pending_agent_turn ||

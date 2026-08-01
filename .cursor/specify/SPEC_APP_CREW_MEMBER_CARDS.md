@@ -71,7 +71,7 @@ Proporción objetivo **5:7** (análoga a carta física; tolerancia ±2 % en CSS)
 | Título | `crew-card__title` | `display_name` o placeholders de spec crew |
 | Insignia estado | `crew-card__status-gem` | Única etiqueta de estado (Nuevo / Examen / Listo / Pausa / Tú) |
 | Arte | `crew-card__art` | `img` futuro o `data-icon` procedural |
-| Línea de tipo | `crew-card__type-line` | Mundo · edad · banda opcional |
+| Línea de tipo | `crew-card__type-line` | Mundo · edad · **L general** (ficha tutor) |
 | Texto | `crew-card__text-box` | `tutor_label`, helper onboarding o rango tutor |
 | Esquina rango (Fase B) | `crew-card__corner crew-card__corner--rank` | Tier 1–5; pie de carta, no duplica estado |
 
@@ -217,6 +217,8 @@ Un solo control visible: el **gemelo** (`crew-card__status-gem`) en la cabecera.
 ---
 
 ## 7. Rangos y progresión (Fase B visual)
+
+> **Contrato ampliado:** [SPEC_APP_CREW_MEMBER_DETAIL.md](SPEC_APP_CREW_MEMBER_DETAIL.md) + [SPEC_APP_CREW_PROGRESS.md](SPEC_APP_CREW_PROGRESS.md).
 
 Cuando [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md) esté cableado:
 

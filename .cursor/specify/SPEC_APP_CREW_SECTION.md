@@ -138,15 +138,15 @@ CTA añadir deshabilitado si `member_count >= 10`.
 
 ### 1.3 Ficha
 
-1. **Hero card** centrada (misma anatomía que lista, escala mayor) — [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md) §4.2.
-2. Perfil — editar cuando haya datos; helper «Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí.»; incluye **descripción tutor** (`tutor_label`, editable, máx. 40 caracteres) y **descripción del personaje** (`traits.character_summary`, textarea multilínea editable, máx. 600 caracteres; auto-grow hasta ~4 líneas y scroll nativo sin fade).
-3. Mundo — segmentado; disabled si null y onboarding incompleto (solo lectura «Lo elegirá en su primera aventura»); si `lock_world_theme` tras elegido, unlock explícito.
-4. Permisos y límites.
-5. **Materias de aprendizaje** — checklist por familia, `active_subjects` por tripulante ([SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §3).
-6. Viaje — `onboarding_step`, `placement_status`, niveles resumen (cuando existan).
-7. Zona peligrosa — pausar / eliminar.
+> **Delta ago 2026:** anatomía completa en [SPEC_APP_CREW_MEMBER_DETAIL.md](SPEC_APP_CREW_MEMBER_DETAIL.md) — pestañas **Viaje** | **Ajustes**, progreso L*+rango, mapa del viaje. Ajustes: [SPEC_APP_CREW_MEMBER_SETTINGS.md](SPEC_APP_CREW_MEMBER_SETTINGS.md). Progreso API: [SPEC_APP_CREW_PROGRESS.md](SPEC_APP_CREW_PROGRESS.md).
 
-CTA opcional en ficha (cuando permisos lo permitan): «Entrar en la aventura» → `#/play/:id` (implementación en specs play).
+1. **Hero card** centrada (siempre visible) — [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md) §4.2 + rango y L general.
+2. **Pestaña Viaje** — identidad (nombre, edad, mundo, descripciones), progreso general y por materia, mapa viaje, resumen L2, diario.
+3. **Pestaña Ajustes** — permisos, materias, zona peligrosa.
+
+Bloques legacy (scroll único) quedan **obsoletos** tras implementar pestañas.
+
+CTA «Entrar en la aventura» en pestaña Viaje (§2.4 CREW_MEMBER_DETAIL).
 
 ---
 

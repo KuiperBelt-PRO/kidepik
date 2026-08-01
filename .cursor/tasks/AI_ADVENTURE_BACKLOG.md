@@ -20,10 +20,12 @@
 
 ### P0 — producto / pedagogía
 
-1. **Capítulos** más allá de `C1_first_zone` (canon, ceremony, presión antagonista).
-2. **Más zonas** y cola de retos por materia/nivel (no solo 1 reto hardcodeado).
-3. **HUD niño dedicado** (si se separa del play tutor): contrato visual propio, **sin** romper tokens glass ni el mundo dual; documentar en DESIGN antes de implementar.
-4. **Age stepper 5–99** en UI tripulación (backend ya acepta; stepper aún limitado en ficha).
+1. ~~**Riqueza narrativa del viaje**~~ — parcialmente hecho (ago 2026): pitches, 3 gates, anti-hueco, dificultad por nivel. Pendiente: LLM vestido rico, más NPCs/lugares por beat, C2 encrucijada completa.
+2. ~~**Orden del diario**~~ — hecho (ago 2026): sort estable + segundos + dedupe ecos.
+3. ~~**Cajetín play más alto**~~ — hecho (ago 2026): `bottom: 6%` en play.
+4. **Capítulos** más allá de `C1_first_zone` (canon, ceremony, presión antagonista).
+5. **HUD niño dedicado** (si se separa del play tutor): contrato visual propio, **sin** romper tokens glass ni el mundo dual; documentar en DESIGN antes de implementar.
+6. **Age stepper 5–99** en UI tripulación (backend ya acepta; stepper aún limitado en ficha).
 
 ### P1 — IA / calidad
 

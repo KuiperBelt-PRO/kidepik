@@ -99,9 +99,10 @@ Cuando se aborde: nueva versión de esta spec o `SPEC_APP_PROGRESSION_RANKS_V2.m
 
 ## 4. API / UI
 
-- Incluir `rank: { id, label_child, tier }` en DTO play y crew.
+- Incluir `rank: { id, label_child, label_tutor, tier }` en DTO play y crew.
 - Diálogo puede saludar con el rango tras placement.
-- Tripulación (tutor): mostrar label + L general.
+- **Tripulación (tutor):** mostrar **rango + nivel L general + progreso hacia siguiente L** y desglose por materia — [SPEC_APP_CREW_PROGRESS.md](SPEC_APP_CREW_PROGRESS.md).
+- Hero carta: esquina rango + L general en línea de tipo — [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md) §7 Fase B.
 
 ## Aprobación
 

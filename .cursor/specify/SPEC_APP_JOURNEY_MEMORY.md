@@ -1,7 +1,7 @@
 # Spec: Memoria del viaje (ledger + resúmenes para agentes)
 
-> Estado: **propuesta — pendiente de aprobación** (julio 2026)  
-> Relacionado: [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §9
+> Estado: **parcialmente implementada** (jul–ago 2026); **§1.4 ordenación diario implementada** (ago 2026)  
+> Relacionado: [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §9
 
 ## Contexto
 
@@ -62,6 +62,80 @@ Puede ser vista SQL o tabla `journey_events` alimentada por triggers/servicio.
 - Reabrir play **rehidrata** desde L1 (turnos/beats), no regenera.
 - Tutor puede **leer** timeline (Fase B UI); no editar prosa del mentor a mano en MVP.
 - Retención: igual que cuenta; borrado soft del miembro cascadea.
+
+### 1.4 Ordenación del diario / timeline (contrato normativo)
+
+> **Problema observado (ago 2026):** en «Diario del viaje» varios pasos comparten el mismo minuto (`YYYY-MM-DD HH:MM`) y aparecen desordenados (p. ej. reto antes que la decisión de zona). Causa: orden solo por `created_at` truncado a minuto en UI, sin desempate estable, y eventos duplicados (turno mentor + beat con el mismo texto).
+
+#### 1.4.1 Persistencia temporal
+
+| Campo | Requisito |
+| --- | --- |
+| `created_at` / `at` en API | `timestamptz` con **precisión de al menos milisegundos**; serialización ISO-8601 con fracción (`…T13:34:07.123Z` o offset). **Prohibido** redondear a minuto en API. |
+| Escritura en ráfaga | Si varios inserts ocurren en la misma transacción/segundo, el orden canónico **no** depende solo del reloj: usar claves de secuencia (§1.4.2). |
+
+#### 1.4.2 Clave de orden canónica (servidor)
+
+`GET …/journey/timeline` debe ordenar eventos con comparador estable:
+
+1. **`sort_at`** = timestamp ISO completo (ms).
+2. Si empate en `sort_at`: **`seq`** descendente/ascendente según dirección de página:
+   - `dialogue_turns.sequence`
+   - `story_beats.sequence_num`
+   - `journey_decisions`: usar `id` UUID o columna `sequence` si se añade; en su defecto, orden de inserción vía `created_at` + `id`.
+3. Si aún empate: **`kind_rank`** fijo (menor = más temprano en el mismo instante lógico de una acción):
+
+| `kind` | `kind_rank` | Motivo |
+| --- | --- | --- |
+| `decision` | 10 | La elección ocurre antes del efecto |
+| `quest` | 20 | Alta/actualización de misión |
+| `system` (narration / quest_update) | 30 | Beat situacional |
+| `challenge` | 40 | Intro/resultado de reto |
+| `mentor_utterance` | 50 | Prosa al niño (puede duplicar beat; ver dedupe) |
+| `explorer_reply` | 60 | Respuesta del explorador |
+| `level` / `rank` | 70 | Efectos de progresión |
+| otros | 80 | |
+
+Dirección de listado tutor: **más reciente primero** (como hoy), pero **dentro del mismo segundo** el orden relativo debe respetar la causalidad (decisión → narración de llegada → intro de reto → respuesta → resultado).
+
+Cada evento en la respuesta API incluye:
+
+```ts
+{
+  id: string;
+  at: string;           // ISO con ms
+  sort_key: string;     // opaco, estable; cursor puede basarse en él
+  seq?: number;         // sequence / sequence_num cuando exista
+  kind: string;
+  ref_table: string;
+  ref_id: string;
+  summary: string;      // prosa tutor-friendly; sin prefijos crudos "[narration]"
+  source?: "primary" | "echo"; // echo = duplicado narrativo omitible en UI
+}
+```
+
+#### 1.4.3 Deduplicación de ecos
+
+Cuando un `story_beat` y un `dialogue_turns` (mentor) representan el **mismo beat narrativo** (mismo `dialogue_turn_id` en beat, o texto normalizado idéntico ± ventana 2 s):
+
+- El timeline marca el turno mentor como `source: "echo"` **o** lo omite del feed tutor por defecto.
+- El diario muestra **una** entrada canónica (preferir beat tipado: decisión / reto / narración) +, si hace falta, la burbuja de chat solo en la vista de play.
+
+#### 1.4.4 Representación UI (ficha Tripulación)
+
+| Aspecto | Contrato |
+| --- | --- |
+| Timestamp visible | Mostrar **fecha + hora con segundos** (`YYYY-MM-DD HH:MM:SS` local o relativo «hace 2 min»). **No** truncar a minuto si eso colapsa varios eventos. |
+| Orden visual | Exactamente el orden del array `events` del servidor (no re-ordenar en cliente por string truncado). |
+| Labels | `kind` → etiqueta humana (Decisión, Reto, Mentor, …); el `summary` **no** debe empezar por `[challenge_intro]` técnico — el servidor limpia o mapea `beat_kind` a prosa. |
+| «Ver más» | Paginación por `sort_key` / cursor opaco (preferible a offset frágil). |
+
+#### 1.4.5 Criterios de aceptación (diario)
+
+1. Tras elegir zona + 1 reto en el mismo segundo de reloj, el orden tutor es: decisión de zona → narración de llegada → intro de reto → (respuesta) → resultado.
+2. Dos eventos con el mismo minuto de reloj **no** intercambian orden entre recargas.
+3. PHPUnit: fixture con `created_at` idéntico y `sequence` distintos → orden esperado.
+4. UI no muestra el mismo texto dos veces seguidas por eco beat/turno.
 
 ---
 
@@ -166,8 +240,9 @@ Escritura solo vía pipeline de turn/effects (no POST libre de summary desde cli
 1. Tras 8 beats, existe `condensed_full` nuevo con `up_to_sequence` correcto.
 2. Al retomar, el prompt mock incluye L2 + últimos beats literales.
 3. Borrar un beat antiguo vía API no está permitido (403/405).
-4. Export timeline lista mentor utterances y decisiones en orden.
-5. PHPUnit: construcción del context pack; presupuesto de truncado.
+4. Export timeline lista mentor utterances y decisiones en orden **canónico §1.4** (no solo por minuto truncado).
+5. PHPUnit: construcción del context pack; presupuesto de truncado; **orden estable con `created_at` empatado**.
+6. UI diario: segundos visibles o equivalente; sin ecos beat/turno duplicados.
 
 ## Aprobación
 
@@ -175,3 +250,4 @@ Escritura solo vía pipeline de turn/effects (no POST libre de summary desde cli
 - [ ] Conversaciones mentor = dialogue_turns
 - [ ] Context pack al retomar documentado
 - [ ] Summarizer no puede contradecir el ledger
+- [ ] **§1.4 ordenación timeline + dedupe + UI con precisión ≥ segundos** (delta ago 2026)

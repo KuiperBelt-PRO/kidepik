@@ -70,6 +70,7 @@ export function memberAgeLabel(m) {
  */
 export function memberCornerStateLabel(m) {
   if (m.is_tutor_profile) return "Tú";
+  if (m.rank_label) return m.rank_label;
   const tone = memberCardTone(m);
   if (tone === "paused") return "Pausa";
   if (tone === "exam") return "Examen";
@@ -91,7 +92,8 @@ export function memberWorldModifier(m) {
  */
 export function memberTypeLine(m) {
   if (m.is_tutor_profile) return "Perfil de tutor";
-  return `${memberWorldLabel(m)} · ${memberAgeLabel(m)}`;
+  const level = m.general_level ? ` · ${m.general_level}` : "";
+  return `${memberWorldLabel(m)} · ${memberAgeLabel(m)}${level}`;
 }
 
 /**

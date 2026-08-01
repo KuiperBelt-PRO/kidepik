@@ -1,8 +1,8 @@
 # Spec: Sesión de aventura (post-examen) — detalle MVP
 
-> Estado: **propuesta — pendiente de aprobación** (julio 2026) — **sustituye el vacío del marco** manteniendo handoffs previos  
-> Relacionado: [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [docs/kidepik.md](../../docs/kidepik.md) §7–8  
-> El archivo histórico marcó esto como aplazado; **esta versión llena el detalle** para implementación por fases.
+> Estado: **propuesta — pendiente de aprobación** (julio 2026) — **sustituye el vacío del marco** manteniendo handoffs previos; **delta riqueza narrativa** → [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md) (ago 2026)  
+> Relacionado: [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [docs/kidepik.md](../../docs/kidepik.md) §7–8  
+> El archivo histórico marcó esto como aplazado; **esta versión llena el detalle** para implementación por fases. El vertical slice stub (1 reto hardcodeado) **no** cumple aceptación hasta aplicar STORY_RICHNESS.
 
 ## Contexto
 
@@ -94,7 +94,7 @@ interface NarrativeQuest {
 }
 ```
 
-Ejemplo intro zona math fantasy: «Ayuda al guardián del Bosque de los Números a recuperar 2 runas de conteo».
+Ejemplo intro zona math fantasy: «Ayuda al guardián del Bosque de los Números a recuperar **3 runas** de conteo» (`steps_total` / gates ≥ 3 — [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md) §3).
 
 Al completar quest:
 
@@ -214,7 +214,9 @@ Orden de entrega recomendado (ver plan de tasks):
 4. Adventure: 1 zona, 1 quest, 3–5 beats, 2 retos, summary.
 5. Reanudación + Tripulación refleja journey.
 
-No hace falta C4–C7 para llamar “MVP jugable”.
+**Actualización ago 2026:** el stub entregado (1 zona → 1 suma fija → «Hasta pronto» → LLM libre) **queda por debajo** del vertical slice. La puerta de calidad pasa a [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md): pitches de zona, arco multi-reto, planificador anti-hueco, dificultad alineada.
+
+No hace falta C4–C7 para llamar “MVP jugable”, pero **sí** hace falta el arco de zona rico de STORY_RICHNESS §3.
 
 ---
 

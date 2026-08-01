@@ -8,19 +8,33 @@ use Kidepik\Shared\Ai\MentorCatalog;
 use PDO;
 
 /**
- * Timeline L1 unificado para lectura tutor (SPEC_APP_JOURNEY_MEMORY §1.2 / §6).
+ * Timeline L1 unificado para lectura tutor (SPEC_APP_JOURNEY_MEMORY §1.2 / §1.4 / §6).
  */
 final class JourneyTimelineService
 {
+    /** @var array<string, int> kind → rank (menor = más temprano en causalidad) */
+    private const KIND_RANK = [
+        'decision' => 10,
+        'quest' => 20,
+        'system' => 30,
+        'challenge' => 40,
+        'mentor_utterance' => 50,
+        'explorer_reply' => 60,
+        'level' => 70,
+        'rank' => 70,
+    ];
+
     public function __construct(private readonly PDO $pdo)
     {
     }
 
     /**
      * @return array{
-     *   events: list<array{id:string,member_id:string,at:string,kind:string,ref_table:string,ref_id:string,summary:string}>,
+     *   events: list<array<string, mixed>>,
      *   next_cursor: ?string,
-     *   summary: ?string
+     *   summary: ?string,
+     *   explorer_label: string,
+     *   mentor_label: string
      * }
      */
     public function page(string $childId, ?string $cursor = null, int $limit = 30): array
@@ -28,7 +42,8 @@ final class JourneyTimelineService
         $limit = max(1, min(100, $limit));
         $labels = $this->labelsForChild($childId);
         $events = $this->collectEvents($childId);
-        usort($events, static fn (array $a, array $b): int => strcmp($b['at'], $a['at']));
+        $events = $this->dedupeEchoes($events);
+        usort($events, [$this, 'compareNewestFirst']);
 
         $offset = 0;
         if ($cursor !== null && $cursor !== '') {
@@ -49,6 +64,30 @@ final class JourneyTimelineService
             'explorer_label' => $labels['explorer'],
             'mentor_label' => $labels['mentor'],
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $a
+     * @param array<string, mixed> $b
+     */
+    private function compareNewestFirst(array $a, array $b): int
+    {
+        $atCmp = strcmp((string) $b['at'], (string) $a['at']);
+        if ($atCmp !== 0) {
+            return $atCmp;
+        }
+        $seqA = (int) ($a['seq'] ?? 0);
+        $seqB = (int) ($b['seq'] ?? 0);
+        if ($seqA !== $seqB) {
+            return $seqB <=> $seqA;
+        }
+        $rankA = (int) ($a['kind_rank'] ?? 80);
+        $rankB = (int) ($b['kind_rank'] ?? 80);
+        if ($rankA !== $rankB) {
+            return $rankB <=> $rankA;
+        }
+
+        return strcmp((string) $b['id'], (string) $a['id']);
     }
 
     /**
@@ -81,30 +120,42 @@ final class JourneyTimelineService
     }
 
     /**
-     * @return list<array{id:string,member_id:string,at:string,kind:string,ref_table:string,ref_id:string,summary:string}>
+     * @return list<array<string, mixed>>
      */
     private function collectEvents(string $childId): array
     {
         $out = [];
 
         $turns = $this->pdo->prepare(
-            "select id, role, text, created_at from dialogue_turns
+            "select id, role, text, created_at, sequence from dialogue_turns
              where child_id = :id and role in ('mentor','agent','explorer')
              order by created_at asc"
         );
-        $turns->execute(['id' => $childId]);
+        try {
+            $turns->execute(['id' => $childId]);
+        } catch (\Throwable) {
+            $turns = $this->pdo->prepare(
+                "select id, role, text, created_at from dialogue_turns
+                 where child_id = :id and role in ('mentor','agent','explorer')
+                 order by created_at asc"
+            );
+            $turns->execute(['id' => $childId]);
+        }
         foreach ($turns->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $role = (string) $row['role'];
             $kind = in_array($role, ['mentor', 'agent'], true) ? 'mentor_utterance' : 'explorer_reply';
-            $out[] = [
-                'id' => 'turn:' . $row['id'],
-                'member_id' => $childId,
-                'at' => $this->iso((string) $row['created_at']),
-                'kind' => $kind,
-                'ref_table' => 'dialogue_turns',
-                'ref_id' => (string) $row['id'],
-                'summary' => $this->oneLine((string) $row['text']),
-            ];
+            $seq = isset($row['sequence']) ? (int) $row['sequence'] : 0;
+            $out[] = $this->event(
+                'turn:' . $row['id'],
+                $childId,
+                (string) $row['created_at'],
+                $kind,
+                'dialogue_turns',
+                (string) $row['id'],
+                $this->oneLine((string) $row['text']),
+                $seq,
+                'primary',
+            );
         }
 
         $dec = $this->pdo->prepare(
@@ -114,34 +165,47 @@ final class JourneyTimelineService
         $dec->execute(['id' => $childId]);
         foreach ($dec->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $label = (string) ($row['label'] ?? $row['option_id'] ?? $row['decision_key']);
-            $out[] = [
-                'id' => 'decision:' . $row['id'],
-                'member_id' => $childId,
-                'at' => $this->iso((string) $row['created_at']),
-                'kind' => 'decision',
-                'ref_table' => 'journey_decisions',
-                'ref_id' => (string) $row['id'],
-                'summary' => 'Decisión (' . (string) $row['decision_key'] . '): ' . $this->oneLine($label),
-            ];
+            $out[] = $this->event(
+                'decision:' . $row['id'],
+                $childId,
+                (string) $row['created_at'],
+                'decision',
+                'journey_decisions',
+                (string) $row['id'],
+                'Decisión (' . (string) $row['decision_key'] . '): ' . $this->oneLine($label),
+                0,
+                'primary',
+            );
         }
 
         $beats = $this->pdo->prepare(
-            'select id, beat_kind, narrative_text, created_at from story_beats
+            'select id, beat_kind, narrative_text, created_at, sequence_num from story_beats
              where child_id = :id order by sequence_num asc'
         );
         $beats->execute(['id' => $childId]);
         foreach ($beats->fetchAll(PDO::FETCH_ASSOC) as $row) {
             $kindBeat = (string) ($row['beat_kind'] ?? 'narration');
             $eventKind = str_contains($kindBeat, 'challenge') ? 'challenge' : 'system';
-            $out[] = [
-                'id' => 'beat:' . $row['id'],
-                'member_id' => $childId,
-                'at' => $this->iso((string) $row['created_at']),
-                'kind' => $eventKind,
-                'ref_table' => 'story_beats',
-                'ref_id' => (string) $row['id'],
-                'summary' => '[' . $kindBeat . '] ' . $this->oneLine((string) $row['narrative_text']),
-            ];
+            $labelBeat = match ($kindBeat) {
+                'challenge_intro' => 'Reto',
+                'challenge_result' => 'Resultado del reto',
+                'choice' => 'Encrucijada',
+                'quest_update' => 'Misión',
+                'ceremony' => 'Ceremonia',
+                'narration' => 'Narración',
+                default => 'Historia',
+            };
+            $out[] = $this->event(
+                'beat:' . $row['id'],
+                $childId,
+                (string) $row['created_at'],
+                $eventKind,
+                'story_beats',
+                (string) $row['id'],
+                $labelBeat . ': ' . $this->oneLine((string) $row['narrative_text']),
+                (int) ($row['sequence_num'] ?? 0),
+                'primary',
+            );
         }
 
         $quests = $this->pdo->prepare(
@@ -150,18 +214,88 @@ final class JourneyTimelineService
         );
         $quests->execute(['id' => $childId]);
         foreach ($quests->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $out[] = [
-                'id' => 'quest:' . $row['id'],
-                'member_id' => $childId,
-                'at' => $this->iso((string) ($row['updated_at'] ?? $row['created_at'])),
-                'kind' => 'quest',
-                'ref_table' => 'narrative_quests',
-                'ref_id' => (string) $row['id'],
-                'summary' => 'Misión (' . (string) $row['status'] . '): ' . $this->oneLine((string) $row['title_child']),
-            ];
+            $out[] = $this->event(
+                'quest:' . $row['id'],
+                $childId,
+                (string) ($row['updated_at'] ?? $row['created_at']),
+                'quest',
+                'narrative_quests',
+                (string) $row['id'],
+                'Misión (' . (string) $row['status'] . '): ' . $this->oneLine((string) $row['title_child']),
+                0,
+                'primary',
+            );
         }
 
         return $out;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $events
+     * @return list<array<string, mixed>>
+     */
+    private function dedupeEchoes(array $events): array
+    {
+        $beatTexts = [];
+        foreach ($events as $ev) {
+            if (($ev['ref_table'] ?? '') === 'story_beats') {
+                $beatTexts[] = $this->normalizeText((string) ($ev['summary'] ?? ''));
+            }
+        }
+        if ($beatTexts === []) {
+            return $events;
+        }
+
+        $out = [];
+        foreach ($events as $ev) {
+            if (($ev['kind'] ?? '') === 'mentor_utterance') {
+                $norm = $this->normalizeText((string) ($ev['summary'] ?? ''));
+                foreach ($beatTexts as $beatNorm) {
+                    if ($norm !== '' && ($norm === $beatNorm || str_contains($beatNorm, $norm) || str_contains($norm, $beatNorm))) {
+                        $ev['source'] = 'echo';
+                        break;
+                    }
+                }
+                if (($ev['source'] ?? '') === 'echo') {
+                    continue;
+                }
+            }
+            $out[] = $ev;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function event(
+        string $id,
+        string $childId,
+        string $atRaw,
+        string $kind,
+        string $refTable,
+        string $refId,
+        string $summary,
+        int $seq,
+        string $source,
+    ): array {
+        $at = $this->iso($atRaw);
+        $kindRank = self::KIND_RANK[$kind] ?? 80;
+
+        return [
+            'id' => $id,
+            'member_id' => $childId,
+            'at' => $at,
+            'sort_key' => $at . '|' . sprintf('%06d', $seq) . '|' . sprintf('%03d', $kindRank) . '|' . $id,
+            'seq' => $seq,
+            'kind_rank' => $kindRank,
+            'kind' => $kind,
+            'ref_table' => $refTable,
+            'ref_id' => $refId,
+            'summary' => $summary,
+            'source' => $source,
+        ];
     }
 
     private function oneLine(string $text): string
@@ -171,10 +305,20 @@ final class JourneyTimelineService
         return mb_substr($t, 0, 160);
     }
 
+    private function normalizeText(string $text): string
+    {
+        $t = mb_strtolower($this->oneLine($text));
+        $t = preg_replace('/^(narración|reto|resultado del reto|encrucijada|misión|ceremonia|historia):\s*/u', '', $t) ?? $t;
+
+        return $t;
+    }
+
     private function iso(string $at): string
     {
         try {
-            return (new \DateTimeImmutable($at))->format(\DateTimeInterface::ATOM);
+            $dt = new \DateTimeImmutable($at);
+
+            return $dt->format('Y-m-d\TH:i:s.vP');
         } catch (\Throwable) {
             return $at;
         }

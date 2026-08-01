@@ -44,6 +44,84 @@ const CHARACTER_SUMMARY_MIN_HEIGHT_PX = 72;
 const CHARACTER_SUMMARY_MAX_HEIGHT_PX = 104;
 
 /**
+ * @param {string} childId
+ */
+function crewTabStorageKey(childId) {
+  return `crew-tab:${childId}`;
+}
+
+/**
+ * @param {number} percent
+ * @param {string} label
+ */
+function renderLevelBar(percent, label) {
+  const p = Math.max(0, Math.min(100, Number(percent) || 0));
+  return `<div class="crew-progress__row">
+    <div class="crew-progress__row-head"><span>${escapeHtml(label)}</span><span>${p}%</span></div>
+    <div class="crew-progress__bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100">
+      <div class="crew-progress__bar-fill" style="width:${p}%"></div>
+    </div>
+  </div>`;
+}
+
+/**
+ * @param {any} member
+ */
+function renderProgressSection(member) {
+  const prog = member.progress;
+  if (!prog || member.placement_status !== "completed") {
+    return `<section class="crew-panel__block">
+      <h2 class="crew-panel__block-title">Tu explorador en el viaje</h2>
+      <p class="crew-panel__helper">Completa el examen de acceso para ver niveles.</p>
+    </section>`;
+  }
+  const gp = prog.general_progress;
+  const rank = prog.rank;
+  const rankNext = prog.rank_next;
+  let rankLine = rank ? `Rango: ${escapeHtml(rank.label_tutor || rank.label_child)}.` : "";
+  if (rankNext) {
+    rankLine += ` Siguiente: ${escapeHtml(rankNext.label_tutor || rankNext.label_child)} (a partir de ${escapeHtml(rankNext.min_general_level)}).`;
+  }
+  if (prog.rank_eligible_now) {
+    rankLine += " Nuevo rango disponible en la aventura.";
+  }
+  const subjects = Array.isArray(prog.subjects) ? prog.subjects : [];
+  const subjectBars = subjects
+    .filter((s) => s.level_progress)
+    .map((s) => {
+      const lp = s.level_progress;
+      const zone = s.zone_label ? ` · ${s.zone_label}` : "";
+      return renderLevelBar(lp.percent_to_next, `${s.label} · ${lp.current}${zone}`);
+    })
+    .join("");
+  return `<section class="crew-panel__block crew-progress">
+    <h2 class="crew-panel__block-title">Tu explorador en el viaje</h2>
+    ${gp ? renderLevelBar(gp.percent_to_next, `General ${gp.current}${gp.next ? ` → ${gp.next}` : ""}`) : ""}
+    <p class="crew-panel__helper">${escapeHtml(gp?.hint_tutor || "")}</p>
+    ${rankLine ? `<p class="crew-panel__helper">${rankLine}</p>` : ""}
+    ${subjectBars}
+  </section>`;
+}
+
+/**
+ * @param {any} member
+ */
+function renderJourneyMapSection(member) {
+  const j = member.journey;
+  if (!j) return "";
+  const completed = Array.isArray(j.zones_completed_labels) ? j.zones_completed_labels : [];
+  const pending = Array.isArray(j.pending_destinations) ? j.pending_destinations : [];
+  const quest = j.active_quest;
+  return `<section class="crew-panel__block">
+    <h2 class="crew-panel__block-title">Mapa del viaje</h2>
+    ${j.active_zone_label ? `<p class="crew-panel__helper">Zona activa: ${escapeHtml(j.active_zone_label)}</p>` : ""}
+    ${quest ? `<p class="crew-panel__helper">Misión: ${escapeHtml(quest.title_child)} (${quest.steps_done}/${quest.steps_total})</p>` : ""}
+    ${completed.length ? `<p class="crew-panel__helper">Zonas superadas: ${completed.map((z) => escapeHtml(String(z))).join(", ")}</p>` : ""}
+    ${pending.length ? `<p class="crew-panel__helper">Destinos pendientes: ${pending.map((z) => escapeHtml(z.label)).join(", ")}</p>` : ""}
+  </section>`;
+}
+
+/**
  * @param {HTMLTextAreaElement} el
  */
 function autoGrowCharacterSummary(el) {
@@ -285,21 +363,10 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       placement_status: member.placement_status,
       tutor_label: tutorLabel,
       is_tutor_profile: isTutor,
+      rank_label: member.rank?.label_child || member.rank?.label_tutor || "",
+      general_level: member.general_level || member.progress?.general_level || null,
     };
-    const heroTone = memberCardTone(listItem);
-    root.innerHTML = `
-      <div class="crew-panel__hero-wrap">
-        <article
-          class="crew-card crew-card--hero crew-card--${heroTone} ${memberWorldModifier(listItem)}"
-          aria-label="${escapeAttr(memberCardAriaLabel(listItem))}"
-        >${buildCrewMemberCardInner(listItem)}</article>
-      </div>
-      <p class="crew-panel__helper">${
-        isTutor
-          ? "Siempre formas parte de la tripulación. Puedes editar tu nombre y nota, pero no eliminarte."
-          : "Estos datos los rellena la aventura la primera vez; puedes corregirlos aquí."
-      }</p>
-
+    const profileBlock = `
       <section class="crew-panel__block">
         <h2 class="crew-panel__block-title">Perfil</h2>
         <label class="crew-panel__label">${isTutor ? "Tu nombre en la tripulación" : "Nombre de tripulación"}
@@ -328,7 +395,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
             aria-label="Descripción del personaje"
           >${escapeHtml(characterSummary)}</textarea>
         </label>
-        <p class="crew-panel__helper">Evoluciona con la aventura; puedes corregirla aquí.</p>`
+        <p class="crew-panel__helper">La aventura puede actualizar la descripción y los logros; puedes corregirlos aquí.</p>`
             : ""
         }
         ${
@@ -354,8 +421,8 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         }
         <p class="crew-panel__status" data-profile-status aria-live="polite"></p>
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-profile></button>
-      </section>
-
+      </section>`;
+    const permissionsBlock = `
       <section class="crew-panel__block">
         <h2 class="crew-panel__block-title">Permisos y límites</h2>
         <label class="crew-panel__check"><input type="checkbox" data-perm="allow_solo_start" ${p.allow_solo_start ? "checked" : ""}/> Puede empezar la aventura sin mí</label>
@@ -377,25 +444,18 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         </div>
         <p class="crew-panel__status" data-perm-status aria-live="polite"></p>
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-perm></button>
-      </section>
-
-      ${
-        isTutor
-          ? ""
-          : `<section class="crew-panel__block" data-subjects-block>
+      </section>`;
+    const subjectsBlock = `
+      <section class="crew-panel__block" data-subjects-block>
         <h2 class="crew-panel__block-title">Materias de aprendizaje</h2>
         <p class="crew-panel__helper">Las materias activas se usan en el examen de acceso y en la aventura. El nivel de cada reto se adapta a la edad del explorador, no a la materia elegida.</p>
         <div class="crew-panel__subjects" data-subjects-host></div>
         <p class="crew-panel__helper" data-subjects-warn hidden>Más de 10 materias: el examen puede ser largo; se puede reanudar.</p>
         <p class="crew-panel__status" data-subjects-status aria-live="polite"></p>
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-subjects></button>
-      </section>`
-      }
-
-      ${
-        isTutor
-          ? ""
-          : `<section class="crew-panel__block">
+      </section>`;
+    const journeyPlayBlock = `
+      <section class="crew-panel__block">
         <h2 class="crew-panel__block-title">Aventura</h2>
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-play>Entrar en la aventura</button>
       </section>
@@ -405,17 +465,72 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         <ol class="crew-panel__timeline glass-scroll-fade" data-journey-timeline aria-label="Cronología del viaje"></ol>
         <button type="button" class="crew-panel__btn" data-journey-more hidden>Ver más</button>
         <p class="crew-panel__status" data-journey-status aria-live="polite"></p>
-      </section>
+      </section>`;
+    const dangerBlock = `
       <section class="crew-panel__block crew-panel__block--danger">
         <h2 class="crew-panel__block-title">Zona peligrosa</h2>
         <button type="button" class="crew-panel__btn crew-panel__btn--danger" data-delete></button>
-      </section>`
+      </section>`;
+    const heroTone = memberCardTone(listItem);
+    root.innerHTML = `
+      <div class="crew-panel__hero-wrap">
+        <article
+          class="crew-card crew-card--hero crew-card--${heroTone} ${memberWorldModifier(listItem)}"
+          aria-label="${escapeAttr(memberCardAriaLabel(listItem))}"
+        >${buildCrewMemberCardInner(listItem)}</article>
+      </div>
+      ${
+        isTutor
+          ? `<p class="crew-panel__helper">Siempre formas parte de la tripulación. Puedes editar tu nombre y nota, pero no eliminarte.</p>
+      ${profileBlock}
+      ${permissionsBlock}`
+          : `<div class="crew-panel__tabs" role="tablist" aria-label="Secciones del tripulante">
+        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="journey" aria-selected="true">Viaje</button>
+        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="settings" aria-selected="false">Ajustes</button>
+      </div>
+      <div class="crew-panel__tab-panel" data-crew-panel="journey">
+        ${renderProgressSection(member)}
+        ${renderJourneyMapSection(member)}
+        ${profileBlock}
+        ${journeyPlayBlock}
+      </div>
+      <div class="crew-panel__tab-panel" data-crew-panel="settings" hidden>
+        ${permissionsBlock}
+        ${subjectsBlock}
+        ${dangerBlock}
+      </div>`
       }
     `;
 
     if (!isTutor) {
       applyCrewMemberWorldTheme(member.world_theme);
       cleanups.push(() => applyCrewMemberWorldTheme(null));
+      const defaultTab = member.placement_status === "completed" ? "journey" : "settings";
+      /** @type {string} */
+      let activeTab = sessionStorage.getItem(crewTabStorageKey(member.id)) || defaultTab;
+      /**
+       * @param {string} name
+       */
+      const setTab = (name) => {
+        activeTab = name;
+        sessionStorage.setItem(crewTabStorageKey(member.id), name);
+        root.querySelectorAll("[data-crew-tab]").forEach((btn) => {
+          if (!(btn instanceof HTMLButtonElement)) return;
+          const on = btn.getAttribute("data-crew-tab") === name;
+          btn.setAttribute("aria-selected", String(on));
+        });
+        root.querySelectorAll("[data-crew-panel]").forEach((panel) => {
+          if (!(panel instanceof HTMLElement)) return;
+          panel.hidden = panel.getAttribute("data-crew-panel") !== name;
+        });
+      };
+      root.querySelectorAll("[data-crew-tab]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const name = btn.getAttribute("data-crew-tab");
+          if (name) setTab(name);
+        });
+      });
+      setTab(activeTab);
     }
     paintBtn(root, "[data-save-profile]", "save", "Guardar perfil");
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
@@ -732,7 +847,7 @@ async function loadJourneyTimeline(root, session, childId) {
       li.className = "crew-panel__timeline-item";
       const kind = String(ev.kind || "system");
       const summary = escapeHtml(String(ev.summary || ""));
-      const at = escapeHtml(String(ev.at || "").replace("T", " ").slice(0, 16));
+      const at = escapeHtml(formatJourneyAt(String(ev.at || "")));
       li.innerHTML = `<span class="crew-panel__timeline-kind">${escapeHtml(eventKindLabel(kind))}</span>
         <span class="crew-panel__timeline-text">${summary}</span>
         <time class="crew-panel__timeline-at" datetime="${escapeAttr(String(ev.at || ""))}">${at}</time>`;
@@ -760,6 +875,21 @@ async function loadJourneyTimeline(root, session, childId) {
   });
 
   await fetchPage(false);
+}
+
+/**
+ * Timestamp tutor con segundos (SPEC_APP_JOURNEY_MEMORY §1.4.4).
+ * @param {string} iso
+ */
+function formatJourneyAt(iso) {
+  const raw = String(iso || "").trim();
+  if (!raw) return "";
+  const normalized = raw.replace("T", " ");
+  // YYYY-MM-DD HH:MM:SS (+ fracción/zona opcional)
+  const m = normalized.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+  if (m) return m[1];
+  const mMin = normalized.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/);
+  return mMin ? mMin[1] : normalized.slice(0, 19);
 }
 
 /** @param {string} s */

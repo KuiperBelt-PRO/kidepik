@@ -255,6 +255,16 @@ class CrewService
             $detail['traits'] = $traits;
         }
 
+        if (!$detail['is_tutor_profile']) {
+            $progressSvc = new CrewProgressService($pdo);
+            $built = $progressSvc->buildForChild(array_merge($row, ['settings' => $detail['settings']]));
+            $detail['progress'] = $built['progress'];
+            $detail['journey'] = $built['journey'];
+            $detail['general_level'] = $built['progress']['general_level'] ?? null;
+            $detail['rank_id'] = $this->nullableString($row['rank_id'] ?? null);
+            $detail['rank'] = $built['progress']['rank'] ?? null;
+        }
+
         return $detail;
     }
 

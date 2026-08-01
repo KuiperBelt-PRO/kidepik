@@ -279,19 +279,25 @@ final class PlacementService
 
         $closing = $this->narrator->closing($child, $mentorId, $rank);
 
-        $zoneOptions = [
-            ['id' => 'zone_math', 'label' => $theme === 'sci-fi' ? 'Nebulosa Matemática' : 'Bosque de los Números'],
-            ['id' => 'zone_language', 'label' => $theme === 'sci-fi' ? 'Estación Léxico' : 'Montañas de la Gramática'],
-            ['id' => 'zone_logic', 'label' => $theme === 'sci-fi' ? 'Laberinto de Circuitos' : 'Laberinto de Espejos'],
-        ];
+        $exclude = AdventureService::completedZoneIds($child);
+        $zoneOptions = AdventureService::zonePitches($theme, $levels['subjects'], 3, $exclude);
+        $this->appendChoiceBeat($childId, $zoneOptions);
+
+        $mapText = AdventureService::zonePitchMapText($zoneOptions);
 
         return [
             'turns' => [
                 [
                     'text' => $closing,
+                    'input_mode' => 'continue',
+                    'options' => [['id' => 'continue', 'label' => 'Ver los caminos']],
+                    'meta' => ['phase' => 'admission_map', 'rank' => $rank],
+                ],
+                [
+                    'text' => $mapText,
                     'input_mode' => 'options_only',
                     'options' => $zoneOptions,
-                    'meta' => ['phase' => 'choose_zone', 'rank' => $rank],
+                    'meta' => ['phase' => 'choose_zone', 'rank' => $rank, 'choices_offered' => $zoneOptions],
                 ],
             ],
             'effects' => [
@@ -301,6 +307,34 @@ final class PlacementService
                 ['type' => 'advance_onboarding', 'to' => 'complete'],
             ],
         ];
+    }
+
+    /**
+     * @param list<array{id:string,label:string,description?:string,why_for_you?:string}> $zoneOptions
+     */
+    private function appendChoiceBeat(string $childId, array $zoneOptions): void
+    {
+        try {
+            $seqStmt = $this->pdo->prepare('select coalesce(max(sequence_num), 0) from story_beats where child_id = :id');
+            $seqStmt->execute(['id' => $childId]);
+            $seq = ((int) $seqStmt->fetchColumn()) + 1;
+            $this->pdo->prepare(
+                'insert into story_beats (
+                    child_id, session_id, sequence_num, chapter_id, zone_id, beat_kind,
+                    narrative_text, choices_offered, choice_taken
+                 ) values (
+                    :cid, null, :seq, \'C1_first_zone\', null, \'choice\',
+                    :text, :choices::jsonb, null
+                 )'
+            )->execute([
+                'cid' => $childId,
+                'seq' => $seq,
+                'text' => 'Encrucijada: el mentor ofrece destinos del viaje.',
+                'choices' => json_encode($zoneOptions, JSON_UNESCAPED_UNICODE),
+            ]);
+        } catch (\Throwable) {
+            /* beat opcional si la tabla no está en el entorno de test */
+        }
     }
 
     /**

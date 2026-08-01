@@ -1,7 +1,7 @@
 # Spec: Sistema de diálogo de aventura (IA)
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos en [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md) / gateway en [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md); **sin implementación** hasta Plan del motor de play  
-> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §10.6
+> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos en [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md) / gateway en [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md); **deltas §1.1b / §1.4** (ago 2026)  
+> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §10.6
 
 ## Contexto
 
@@ -62,6 +62,7 @@ El bloque de respuesta (opciones + campo de texto) se ancla al **pie del marco g
 | Enviar | Botón circular integrado dentro del campo, a la derecha |
 | Enter | Envía; Shift+Enter inserta salto de línea |
 | Opciones con `description` | Cartas de elección de mundo (título + texto breve) en grid 2 columnas |
+| Opciones con `description` + `why_for_you` | Cartas de **destino de zona** post-examen / encrucijada: título + qué es el lugar + por qué ir ahora ([SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md) §2) |
 
 \* Salir: respeta `require_exit_pin` de Tripulación.
 
@@ -74,6 +75,15 @@ El bloque de respuesta (opciones + campo de texto) se ancla al **pie del marco g
 | `options_or_text` | Chips + «O escribe…» |
 | `continue` | Un CTA «Continuar» / «Siguiente» sin respuesta libre |
 | `blocked` | Esperando red / cuota; spinner + reintentar |
+
+#### 1.1b Claridad de elección (delta ago 2026)
+
+Contrato normativo ampliado en [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md) §6:
+
+- Si el mentor pide elegir camino/lugar/acción, el turno **trae chips** (≥2) **o** el mismo texto ordena explícitamente escribir (modo `text_only` / `options_or_text`).
+- `options_only` / `options_or_text` con &lt;2 options → inválido (servidor rechaza / fallback).
+- Labels de `continue` motivados («Seguir el sendero»), no CTAs opacos; «Hasta pronto» solo en cierre de sesión narrado.
+- Placeholder del compose según contexto: reto → «Escribe tu respuesta…»; narrativo libre → el mentor ya dijo qué escribir.
 
 ### 1.2 Tipografía e iconos según mundo
 
@@ -90,6 +100,10 @@ Al elegir mundo en first-run, **transición ≤ 300 ms** a tipografía/iconos de
 ### 1.3 Tono conversacional
 
 El backend inyecta en el system prompt el `world_theme` (o «aún sin mundo»), edad si existe, `narrative.*` de ajustes del hogar y `avoid_themes`. El LLM **no** inventa datos de perfil ya fijados.
+
+### 1.4 Altura del cajetín en aventura (delta ago 2026)
+
+En `#/play/:childId` el historial necesita **más líneas visibles** (narración rica + pitches). Geometría: [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md) §2.2b — marco más alto (menor margen inferior) solo en play; compose sigue anclado al pie del marco.
 
 ---
 
