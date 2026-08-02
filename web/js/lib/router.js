@@ -94,7 +94,7 @@ export function startRouter() {
       if (out && typeof out.destroy === "function") {
         routeTeardown = out.destroy;
       }
-      appLogRoute(fromPath, nextPath, { world_handoff });
+      appLogRoute(fromPath, nextPath, { world_handoff: worldHandoff });
     } else {
       navigate("/loader");
     }

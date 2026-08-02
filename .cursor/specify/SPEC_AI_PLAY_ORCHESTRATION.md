@@ -30,7 +30,11 @@ El gateway solo habla HTTP (solo modelos **free** rankeados). Esta spec define *
 | `placement_item_writer` | redactar ítem ya elegido por motor | 0.3 | ItemEnvelope |
 | `placement_text_scorer` | solo short_text dudoso | 0.0–0.2 | `{ score: 0\|0.5\|1, rationale }` |
 | `adventure_narrator` | beats (voz mentor) | 0.6 | DialogueEnvelope + beat meta |
+| `zone_pitch_writer` | pitches post-examen / encrucijada | 0.6 | `ZonePitchBundle` — [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) |
+| `zone_scene_writer` | llegada, between, quest complete | 0.6 | DialogueEnvelope + npc meta |
 | `challenge_writer` | vestir reto curricular | 0.4 | ChallengeEnvelope |
+| `challenge_result_writer` | líneas éxito/casi por zona | 0.5 | `{ success_text, near_miss_text }` |
+| `waiting_copy_writer` | burbujas de espera (thinking) | 0.7 | `WaitingCopyBundle` |
 | `journey_summarizer` | L2 condensed ([SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md)) | 0.2 | `{ summary, structured? }` |
 | `safety_rewriter` | re-prompt si falla tono | 0.2 | texto limpio |
 
@@ -141,7 +145,7 @@ interface ItemEnvelope {
 }
 ```
 
-El **banco o el motor** puede fijar `canonical_answer` y pedir al LLM solo `prompt_text` + wrapper. Preferible en MVP: **plantilla + LLM rewrite** para reducir alucinaciones de respuesta correcta.
+El **banco o el motor** fija `canonical_answer`; el LLM redacta `prompt_text` + wrapper. En aventura post-examen el camino feliz es **LLM completo** con validación PHP — ver [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) §2.3. Placement MVP puede seguir plantilla + rewrite.
 
 ### 3.2 ChallengeEnvelope (aventura)
 
@@ -192,10 +196,10 @@ Ver [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md) §4. El dispatcher 
 | Elección de mundo `sci-fi`/`fantasy` | Enum cerrado |
 | Edad por chip numérico | Parseo PHP |
 | MCQ con option_id canónico | Score exacto |
-| `continue` con guion fijo de cierre | Copy versionado |
-| `AI_MOCK` / tests | Fixtures |
+| `continue` con guion fijo de cierre | Solo placement tier histórico; aventura post-examen **sin** guion PHP |
+| Tests / fixtures | Gateway inyectado + JSON en `api/tests/fixtures/` |
 
-Ahorra cuota y reduce no-determinismo.
+**Ya no aplica** (tras [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md)): omitir LLM en pitches, llegadas, retos y esperas de aventura «para ahorrar cuota» — usar caché de esperas y compose por lotes en su lugar.
 
 ---
 
@@ -210,7 +214,10 @@ shared/Ai/prompts/
   placement_narrator.es.md
   placement_item_writer.es.md
   adventure_narrator.es.md
+  zone_pitch_writer.es.md
+  zone_scene_writer.es.md
   challenge_writer.es.md
+  waiting_copy_writer.es.md
   journey_summarizer.es.md
   safety_rewriter.es.md
   _common_child_safety.es.md
@@ -271,7 +278,7 @@ Los effects de **cálculo** (niveles, rango, banda) los emite el **servidor PHP*
 4. Placement score MCQ no usa LLM.
 5. Adventure beat se persiste y el siguiente prompt incluye su texto (no regenera).
 6. PHPUnit: parser envelope, filtro effects, PlayerState serialization snapshot.
-7. Playwright: `AI_MOCK=true` first_run hasta character confirm.
+7. Playwright: flujo post-examen → elegir zona → primer reto — smoke con LLM real local o fixture HTTP grabado.
 
 ## Aprobación
 

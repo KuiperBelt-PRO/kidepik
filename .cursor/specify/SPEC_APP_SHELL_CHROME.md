@@ -126,7 +126,7 @@ Orden horizontal superior:
 | Margen lateral der. (cuenta) | `max(12px, env(safe-area-inset-right))` |
 | Gap entre toggle y cuenta | **10 px** |
 | z-index | Por encima del contenido de sección y del mundo; por debajo de modales futuros (`--z-shell-chrome`) |
-| **Responsive** | El chrome y el drawer se anclan al **frame `#app`** (`max-width: 430px`, centrado), no al viewport completo en desktop |
+| **Responsive** | El chrome y el drawer se anclan al **rect real de `#app`** (`shell-frame.js` + `ResizeObserver`). Con shell activo, `#app` es **ancho completo**; solo `.section-frame` limita su ancho en viewports anchos ([SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md) §2.2c) |
 
 Los tres botones viven en una capa fija alineada con `#app` que **no scrollea** con el contenido de la sección.
 

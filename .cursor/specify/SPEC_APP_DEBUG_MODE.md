@@ -10,7 +10,7 @@ Hoy, cuando falla «preparar la prueba» (placement compose), el tutor solo ve u
 
 - qué modelos de la cola BD se iban a intentar;
 - cuáles se intentaron realmente y con qué HTTP/status;
-- si el fallo fue transporte (429/5xx), JSON inválido, validación de slots incompleta, o `AI_MOCK`/clave ausente;
+- si el fallo fue transporte (429/5xx), JSON inválido, validación de slots incompleta, o clave OpenRouter ausente;
 - qué `purpose` y `AI_MAX_MODEL_ATTEMPTS` aplicaron.
 
 El gateway **sí hace fallback** en código (`AiGateway::complete` recorre la cola), pero **traga** `LLMException` sin telemetría. `api_usage` existe en esquema y **no se escribe** (falta `AiUsageTracker`). `PlacementExamComposer` captura `\Throwable` y devuelve `[]` sin rastro.
@@ -264,7 +264,7 @@ Ver contrato completo en [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md).
 
 ## 9. Criterios de aceptación
 
-1. Con `APP_ENV=local` y `APP_DEBUG_AI=true`, tras «Reintentar prueba» fallido, el tutor puede abrir diagnóstico y ver **lista de modelos intentados** (o «ningún intento: AI_MOCK/key/disabled»).
+1. Con `APP_ENV=local` y `APP_DEBUG_AI=true`, tras «Reintentar prueba» fallido, el tutor puede abrir diagnóstico y ver **lista de modelos intentados** (o «ningún intento: key/disabled/cola vacía»).
 2. `GET /debug/ai/queues?purpose=placement_exam_composer` lista las filas BD en orden (hoy 12 tras migración expand).
 3. `GET /debug/ai/resolve?purpose=…` muestra la cola efectiva (BD primero).
 4. En prod, las rutas `/debug/ai/*` responden 404 y el front no pinta panel aunque `?debugAi=1`.

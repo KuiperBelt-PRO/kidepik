@@ -430,7 +430,7 @@ export function mountAgeStepper(host, opts) {
   };
 }
 
-/** @typedef {'document' | 'panel' | 'lines'} GlassSkeletonPreset */
+/** @typedef {'document' | 'panel' | 'lines' | 'timeline'} GlassSkeletonPreset */
 
 /**
  * @param {string} widthClass
@@ -480,6 +480,13 @@ export function renderGlassSkeletonHtml(opts = {}) {
     </div>`;
   }
 
+  if (preset === "timeline") {
+    return `
+    <div class="glass-skeleton glass-skeleton--timeline" role="status" aria-live="polite" aria-label="${ariaLabel}">
+      ${renderTimelineSkeletonItemsHtml(3)}
+    </div>`;
+  }
+
   return `
     <div class="glass-skeleton" role="status" aria-live="polite" aria-label="${ariaLabel}">
       ${glassSkeletonLine("glass-skeleton__line--title")}
@@ -526,4 +533,108 @@ export function mountGlassSkeleton(host, opts = {}) {
       skeleton?.remove();
     },
   };
+}
+
+/**
+ * HTML de una fila skeleton tipo timeline (cronología / mensajes).
+ * @param {number} [index]
+ * @returns {string}
+ */
+export function renderTimelineSkeletonItemHtml(index = 0) {
+  const delay = (index % 3) * 0.08;
+  return `
+    <li class="glass-skeleton-timeline-item" aria-hidden="true" style="--glass-skeleton-shimmer-delay: ${delay}s">
+      ${glassSkeletonLine("glass-skeleton__line--timeline-kind")}
+      ${glassSkeletonLine("glass-skeleton__line--timeline-text")}
+      ${glassSkeletonLine("glass-skeleton__line--timeline-at")}
+    </li>`;
+}
+
+/**
+ * @param {number} count
+ * @returns {string}
+ */
+export function renderTimelineSkeletonItemsHtml(count = 3) {
+  let html = "";
+  for (let i = 0; i < count; i += 1) {
+    html += renderTimelineSkeletonItemHtml(i);
+  }
+  return html;
+}
+
+/**
+ * Añade filas skeleton al final de una lista (p. ej. «Ver más» en diario).
+ * @param {HTMLElement} host — normalmente `<ol>` o contenedor de lista
+ * @param {{ count?: number }} [opts]
+ * @returns {() => void}
+ */
+export function mountTimelineSkeletonItems(host, opts = {}) {
+  const count = opts.count ?? 3;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = renderTimelineSkeletonItemsHtml(count);
+  /** @type {HTMLElement[]} */
+  const items = [];
+  while (wrap.firstElementChild) {
+    const el = wrap.firstElementChild;
+    if (el instanceof HTMLElement) {
+      host.appendChild(el);
+      items.push(el);
+    }
+  }
+  return () => {
+    items.forEach((el) => el.remove());
+  };
+}
+
+/**
+ * Ejecuta una acción async en botón glass: estado busy + toast de resultado.
+ * @param {HTMLButtonElement} btn
+ * @param {() => Promise<{ ok: boolean; error?: string }>} run
+ * @param {{ successMessage?: string; errorMessage?: string; busyLabel?: string; onSuccess?: (result: { ok: boolean; error?: string }) => void }} [opts]
+ * @returns {Promise<{ ok: boolean; error?: string } | undefined>}
+ */
+export async function runGlassButtonAction(btn, run, opts = {}) {
+  if (!(btn instanceof HTMLButtonElement) || btn.disabled || btn.dataset.busy === "1") {
+    return undefined;
+  }
+
+  const iconId = /** @type {import('./shell-ui-icons.js').UiIconId} */ (
+    btn.dataset.iconId || "save"
+  );
+  const label = btn.dataset.label || "";
+  const busyLabel = opts.busyLabel ?? "Guardando…";
+
+  btn.disabled = true;
+  btn.dataset.busy = "1";
+  btn.setAttribute("aria-busy", "true");
+  setGlassButton(btn, "pending", busyLabel);
+
+  const { showGlassToast } = await import("./glass-toast.js");
+
+  try {
+    const result = await run();
+    if (result.ok) {
+      if (opts.successMessage) {
+        showGlassToast(opts.successMessage, { variant: "success", durationMs: 2400 });
+      }
+      opts.onSuccess?.(result);
+    } else {
+      showGlassToast(
+        result.error || opts.errorMessage || "No hemos podido completar la acción.",
+        { variant: "error" },
+      );
+    }
+    return result;
+  } catch {
+    showGlassToast(
+      opts.errorMessage || "No hemos podido completar la acción.",
+      { variant: "error" },
+    );
+    return { ok: false };
+  } finally {
+    btn.disabled = false;
+    delete btn.dataset.busy;
+    btn.removeAttribute("aria-busy");
+    setGlassButton(btn, iconId, label);
+  }
 }

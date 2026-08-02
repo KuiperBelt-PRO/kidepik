@@ -21,9 +21,11 @@ import {
   mountAgeStepper,
   mountDurationSlider,
   mountGlassSelect,
+  mountTimelineSkeletonItems,
   normalizeSessionMinutes,
+  runGlassButtonAction,
   setGlassButton,
-} from "./glass-controls.js?v=224";
+} from "./glass-controls.js?v=225";
 import { showGlassConfirm } from "./glass-modal.js?v=2";
 import {
   normalizeActiveSubjects,
@@ -426,7 +428,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       <section class="crew-panel__block">
         <h2 class="crew-panel__block-title">Permisos y límites</h2>
         <label class="crew-panel__check"><input type="checkbox" data-perm="allow_solo_start" ${p.allow_solo_start ? "checked" : ""}/> Puede empezar la aventura sin mí</label>
-        <label class="crew-panel__check"><input type="checkbox" data-perm="require_exit_pin" ${p.require_exit_pin ? "checked" : ""}/> Pedir PIN al salir de la aventura</label>
+        <label class="crew-panel__check"><input type="checkbox" data-perm="require_exit_pin" ${p.require_exit_pin ? "checked" : ""}/> Pedir PIN antes de continuar con la aventura</label>
         <label class="crew-panel__label">PIN (4 dígitos)
           <input class="crew-panel__input" data-pin type="password" inputmode="numeric" maxlength="4" placeholder="${p.exit_pin_set ? "••••" : "····"}" />
         </label>
@@ -461,10 +463,9 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       </section>
       <section class="crew-panel__block" data-journey-block>
         <h2 class="crew-panel__block-title">Diario del viaje</h2>
-        <p class="crew-panel__helper" data-journey-summary>Cargando resumen…</p>
+        <div class="crew-panel__helper" data-journey-summary></div>
         <ol class="crew-panel__timeline glass-scroll-fade" data-journey-timeline aria-label="Cronología del viaje"></ol>
         <button type="button" class="crew-panel__btn" data-journey-more hidden>Ver más</button>
-        <p class="crew-panel__status" data-journey-status aria-live="polite"></p>
       </section>`;
     const dangerBlock = `
       <section class="crew-panel__block crew-panel__block--danger">
@@ -667,62 +668,77 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       characterSummaryEl.addEventListener("input", () => autoGrowCharacterSummary(characterSummaryEl));
     }
 
-    root.querySelector("[data-save-profile]")?.addEventListener("click", async () => {
-      const nameInput = root.querySelector('[data-profile="display_name"]');
-      const descInput = root.querySelector('[data-profile="tutor_label"]');
-      const summaryInput = root.querySelector('[data-profile="character_summary"]');
-      /** @type {Record<string, unknown>} */
-      const patch = {
-        age_years: ageStepper?.getValue() ?? null,
-      };
-      if (!isTutor) {
-        patch.status = selectedStatus;
-      }
-      if (nameInput instanceof HTMLInputElement) {
-        patch.display_name = nameInput.value.trim() || null;
-      }
-      if (descInput instanceof HTMLInputElement) {
-        patch.tutor_label = descInput.value.trim() || null;
-      }
-      if (!isTutor && summaryInput instanceof HTMLTextAreaElement) {
-        patch.character_summary = summaryInput.value.trim() || null;
-      }
-      if (!isTutor && selectedWorld && !worldLocked) {
-        patch.world_theme = selectedWorld;
-      }
-      const status = root.querySelector("[data-profile-status]");
-      const res = await patchCrewMember(session, childId, patch);
-      if (status instanceof HTMLElement) {
-        status.textContent = res.ok ? "Guardado" : "No hemos podido guardar.";
-      }
-      if (res.ok) paint(res.member);
+    root.querySelector("[data-save-profile]")?.addEventListener("click", () => {
+      const btn = root.querySelector("[data-save-profile]");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      void runGlassButtonAction(
+        btn,
+        async () => {
+          const nameInput = root.querySelector('[data-profile="display_name"]');
+          const descInput = root.querySelector('[data-profile="tutor_label"]');
+          const summaryInput = root.querySelector('[data-profile="character_summary"]');
+          /** @type {Record<string, unknown>} */
+          const patch = {
+            age_years: ageStepper?.getValue() ?? null,
+          };
+          if (!isTutor) {
+            patch.status = selectedStatus;
+          }
+          if (nameInput instanceof HTMLInputElement) {
+            patch.display_name = nameInput.value.trim() || null;
+          }
+          if (descInput instanceof HTMLInputElement) {
+            patch.tutor_label = descInput.value.trim() || null;
+          }
+          if (!isTutor && summaryInput instanceof HTMLTextAreaElement) {
+            patch.character_summary = summaryInput.value.trim() || null;
+          }
+          if (!isTutor && selectedWorld && !worldLocked) {
+            patch.world_theme = selectedWorld;
+          }
+          const res = await patchCrewMember(session, childId, patch);
+          if (res.ok) paint(res.member);
+          return { ok: res.ok, error: res.ok ? undefined : "No hemos podido guardar el perfil." };
+        },
+        { successMessage: "Perfil guardado" },
+      );
     });
 
-    root.querySelector("[data-save-perm]")?.addEventListener("click", async () => {
-      /** @type {Record<string, unknown>} */
-      const patch = {
-        max_session_minutes: selectedMins,
-        font_scale_play: selectedFont,
-      };
-      root.querySelectorAll("[data-perm]").forEach((input) => {
-        if (!(input instanceof HTMLInputElement)) return;
-        const key = input.getAttribute("data-perm");
-        if (key) patch[key] = input.checked;
-      });
-      const pinInput = root.querySelector("[data-pin]");
-      if (pinInput instanceof HTMLInputElement && pinInput.value.trim()) {
-        patch.exit_pin = pinInput.value.trim();
-      }
-      const status = root.querySelector("[data-perm-status]");
-      const res = await patchCrewPermissions(session, childId, patch);
-      if (status instanceof HTMLElement) {
-        status.textContent = res.ok ? "Guardado" : res.error || "No hemos podido guardar.";
-      }
-      if (res.ok) paint(res.member);
+    root.querySelector("[data-save-perm]")?.addEventListener("click", () => {
+      const btn = root.querySelector("[data-save-perm]");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      void runGlassButtonAction(
+        btn,
+        async () => {
+          /** @type {Record<string, unknown>} */
+          const patch = {
+            max_session_minutes: selectedMins,
+            font_scale_play: selectedFont,
+          };
+          root.querySelectorAll("[data-perm]").forEach((input) => {
+            if (!(input instanceof HTMLInputElement)) return;
+            const key = input.getAttribute("data-perm");
+            if (key) patch[key] = input.checked;
+          });
+          const pinInput = root.querySelector("[data-pin]");
+          if (pinInput instanceof HTMLInputElement && pinInput.value.trim()) {
+            patch.exit_pin = pinInput.value.trim();
+          }
+          const res = await patchCrewPermissions(session, childId, patch);
+          if (res.ok) paint(res.member);
+          return {
+            ok: res.ok,
+            error: res.ok ? undefined : (res.error || "No hemos podido guardar los permisos."),
+          };
+        },
+        { successMessage: "Permisos guardados" },
+      );
     });
 
-    root.querySelector("[data-save-subjects]")?.addEventListener("click", async () => {
+    root.querySelector("[data-save-subjects]")?.addEventListener("click", () => {
       if (isTutor) return;
+      const btn = root.querySelector("[data-save-subjects]");
+      if (!(btn instanceof HTMLButtonElement)) return;
       /** @type {string[]} */
       const selected = [];
       root.querySelectorAll("[data-subject]").forEach((input) => {
@@ -730,20 +746,26 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         const id = input.getAttribute("data-subject");
         if (id && input.checked) selected.push(id);
       });
-      const status = root.querySelector("[data-subjects-status]");
       if (selected.length < 1) {
-        if (status instanceof HTMLElement) {
-          status.textContent = "Activa al menos una materia.";
-        }
+        void import("./glass-toast.js").then(({ showGlassToast }) => {
+          showGlassToast("Activa al menos una materia.", { variant: "warning", durationMs: 3200 });
+        });
         return;
       }
-      const res = await patchCrewMember(session, childId, {
-        learning: { active_subjects: selected },
-      });
-      if (status instanceof HTMLElement) {
-        status.textContent = res.ok ? "Materias guardadas" : "No hemos podido guardar las materias.";
-      }
-      if (res.ok) paint(res.member);
+      void runGlassButtonAction(
+        btn,
+        async () => {
+          const res = await patchCrewMember(session, childId, {
+            learning: { active_subjects: selected },
+          });
+          if (res.ok) paint(res.member);
+          return {
+            ok: res.ok,
+            error: res.ok ? undefined : "No hemos podido guardar las materias.",
+          };
+        },
+        { successMessage: "Materias guardadas" },
+      );
     });
 
     root.querySelector("[data-delete]")?.addEventListener("click", (ev) => {
@@ -787,8 +809,13 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
 async function loadJourneyTimeline(root, session, childId) {
   const summaryEl = root.querySelector("[data-journey-summary]");
   const listEl = root.querySelector("[data-journey-timeline]");
-  const statusEl = root.querySelector("[data-journey-status]");
   if (!(listEl instanceof HTMLOListElement)) return;
+
+  if (summaryEl instanceof HTMLElement) {
+    fillGlassSkeleton(summaryEl, { preset: "lines", ariaLabel: "Cargando resumen del viaje" });
+  }
+  listEl.innerHTML = "";
+  const clearInitialSkeleton = mountTimelineSkeletonItems(listEl, { count: 3 });
 
   /** @type {string | null} */
   let cursor = null;
@@ -816,16 +843,31 @@ async function loadJourneyTimeline(root, session, childId) {
   async function fetchPage(append) {
     if (loading) return;
     loading = true;
-    if (statusEl instanceof HTMLElement) {
-      statusEl.textContent = append ? "Cargando más…" : "";
+    const moreBtn = root.querySelector("[data-journey-more]");
+    if (moreBtn instanceof HTMLButtonElement) {
+      moreBtn.disabled = true;
+    }
+    /** @type {(() => void) | null} */
+    let clearAppendSkeleton = null;
+    if (append) {
+      clearAppendSkeleton = mountTimelineSkeletonItems(listEl, { count: 3 });
     }
     const res = await fetchJourneyTimeline(session, childId, { cursor: cursor ?? undefined, limit: 12 });
+    clearAppendSkeleton?.();
     loading = false;
+    if (moreBtn instanceof HTMLButtonElement) {
+      moreBtn.disabled = false;
+    }
     if (!res.ok || !res.data) {
-      if (summaryEl instanceof HTMLElement) {
-        summaryEl.textContent = "Aún no hay diario del viaje, o no se ha podido cargar.";
+      if (!append) {
+        clearInitialSkeleton();
+        if (summaryEl instanceof HTMLElement) {
+          summaryEl.textContent = "Aún no hay diario del viaje, o no se ha podido cargar.";
+        }
+        listEl.innerHTML = "";
       }
-      if (statusEl instanceof HTMLElement) statusEl.textContent = "No hemos podido cargar la cronología.";
+      const { showGlassToast } = await import("./glass-toast.js");
+      showGlassToast("No hemos podido cargar la cronología.", { variant: "error" });
       return;
     }
     const data = res.data;
@@ -835,13 +877,17 @@ async function loadJourneyTimeline(root, session, childId) {
     if (typeof data.explorer_label === "string" && data.explorer_label.trim()) {
       explorerLabel = data.explorer_label.trim();
     }
-    if (!append && summaryEl instanceof HTMLElement) {
-      summaryEl.textContent = data.summary
-        ? String(data.summary)
-        : "Todavía no hay un resumen condensado; aparecen abajo los hitos del ledger.";
+    if (!append) {
+      clearInitialSkeleton();
+      if (summaryEl instanceof HTMLElement) {
+        summaryEl.innerHTML = "";
+        summaryEl.textContent = data.summary
+          ? String(data.summary)
+          : "Todavía no hay un resumen condensado; aparecen abajo los hitos del ledger.";
+      }
+      listEl.innerHTML = "";
     }
     const events = Array.isArray(data.events) ? data.events : [];
-    if (!append) listEl.innerHTML = "";
     for (const ev of events) {
       const li = document.createElement("li");
       li.className = "crew-panel__timeline-item";
@@ -857,12 +903,10 @@ async function loadJourneyTimeline(root, session, childId) {
       summaryEl.textContent = "Este tripulante aún no tiene hitos de viaje.";
     }
     cursor = data.next_cursor ?? null;
-    const moreBtn = root.querySelector("[data-journey-more]");
     if (moreBtn instanceof HTMLButtonElement) {
       moreBtn.hidden = !cursor;
       paintBtn(root, "[data-journey-more]", "chevron", "Ver más");
     }
-    if (statusEl instanceof HTMLElement) statusEl.textContent = "";
   }
 
   root.addEventListener("click", (ev) => {

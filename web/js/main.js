@@ -6,10 +6,10 @@ import { initAppLogger } from "./lib/app-logger.js";
 import { renderLoader } from "./scenes/loader.js?v=236";
 import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
 import { renderHome } from "./scenes/home.js?v=236";
-import { renderAccount } from "./scenes/account.js?v=236";
+import { renderAccount } from "./scenes/account.js?v=237";
 import { renderSettings } from "./scenes/settings.js?v=236";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=236";
-import { renderPlay } from "./scenes/play.js?v=246";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=237";
+import { renderPlay } from "./scenes/play.js?v=249";
 import { renderLegal } from "./scenes/legal.js?v=184";
 import {
   initDebugAiFromUrl,

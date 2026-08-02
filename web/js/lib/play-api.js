@@ -86,10 +86,69 @@ export async function submitDialogueTurn(_session, childId, sessionId, reply) {
       appLogApi("play/dialogue/turn", res.status, { child_id: childId, session_id: sessionId, error: detail });
       return { ok: false, status: res.status, error: detail };
     }
+    try {
+      return { ok: true, data: await res.json() };
+    } catch (parseErr) {
+      const brief =
+        parseErr instanceof Error ? parseErr.message.slice(0, 160) : "invalid_json";
+      console.warn("play turn JSON error", parseErr);
+      appLogApi("play/dialogue/turn", res.status, {
+        child_id: childId,
+        session_id: sessionId,
+        error: "invalid_json",
+        brief,
+      });
+      return { ok: false, status: res.status, error: "invalid_json", transport: true };
+    }
+  } catch (err) {
+    const brief = err instanceof Error ? err.message.slice(0, 160) : "transport";
+    console.warn("play turn error", err);
+    appLogApi("play/dialogue/turn", 0, { child_id: childId, transport: true, brief });
+    return { ok: false, error: "transport", transport: true };
+  }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').Session} session
+ * @param {string} childId
+ * @param {string} sessionId
+ * @param {number} beforeTurnId
+ * @param {number} [limit]
+ */
+export async function loadDialogueHistory(_session, childId, sessionId, beforeTurnId, limit) {
+  try {
+    const session = await requirePlaySession();
+    if (!session) {
+      appLogApi("play/dialogue/history", 401, { child_id: childId, error: "session_expired" });
+      return { ok: false, status: 401, error: "session_expired" };
+    }
+    const { config } = await import("../config.js");
+    const q = new URLSearchParams({
+      session_id: sessionId,
+      before_turn_id: String(beforeTurnId),
+    });
+    if (limit) q.set("limit", String(limit));
+    const res = await fetch(
+      `${config.apiUrl}/play/${encodeURIComponent(childId)}/dialogue/history?${q}`,
+      {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          ...debugAiRequestHeaders(),
+        },
+      },
+    );
+    if (!res.ok) {
+      appLogApi("play/dialogue/history", res.status, {
+        child_id: childId,
+        session_id: sessionId,
+        before_turn_id: beforeTurnId,
+      });
+      return { ok: false, status: res.status };
+    }
     return { ok: true, data: await res.json() };
   } catch (err) {
-    console.warn("play turn error", err);
-    appLogApi("play/dialogue/turn", 0, { child_id: childId, transport: true });
+    console.warn("play history error", err);
+    appLogApi("play/dialogue/history", 0, { child_id: childId, transport: true });
     return { ok: false };
   }
 }

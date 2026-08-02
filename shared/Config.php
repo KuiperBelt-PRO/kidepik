@@ -101,12 +101,14 @@ final class Config
 
     public static function aiMock(): bool
     {
-        return filter_var(self::get('AI_MOCK', 'false'), FILTER_VALIDATE_BOOL);
+        // Prohibido en runtime de producto (SPEC_AI_OPENROUTER_GATEWAY — máximas inviolables).
+        return false;
     }
 
     public static function aiAllowPaid(): bool
     {
-        return filter_var(self::get('AI_ALLOW_PAID', 'false'), FILTER_VALIDATE_BOOL);
+        // Inviolable: solo modelos free de OpenRouter.
+        return false;
     }
 
     public static function openRouterApiKey(): string
@@ -262,7 +264,7 @@ final class Config
 
     public static function aiDiscoveryEnabled(): bool
     {
-        if (self::aiMock() || self::openRouterApiKey() === '') {
+        if (self::openRouterApiKey() === '') {
             return false;
         }
 
@@ -277,6 +279,16 @@ final class Config
     public static function aiDiscoveryMaxNewPerPurpose(): int
     {
         return max(1, (int) self::get('AI_DISCOVERY_MAX_NEW_PER_PURPOSE', '5'));
+    }
+
+    public static function aiDiscoveryRebuildTop(): int
+    {
+        return max(3, (int) self::get('AI_DISCOVERY_REBUILD_TOP', '15'));
+    }
+
+    public static function aiQueueRefreshMinMinutes(): int
+    {
+        return max(1, (int) self::get('AI_QUEUE_REFRESH_MIN_MINUTES', '5'));
     }
 
     public static function aiComposeBatchMaxSlots(): int
@@ -396,6 +408,13 @@ final class Config
         }
 
         return self::logLevel();
+    }
+
+    public static function playHistoryPageSize(): int
+    {
+        $size = (int) self::get('PLAY_HISTORY_PAGE_SIZE', '24');
+
+        return max(1, min(48, $size));
     }
 
     private static function get(string $key, string $default = ''): string

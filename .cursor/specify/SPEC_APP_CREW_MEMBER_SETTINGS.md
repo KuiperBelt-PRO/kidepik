@@ -20,7 +20,7 @@ Contrato sin cambio respecto a [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.
 | Control | Clave |
 | --- | --- |
 | Empezar solo | `allow_solo_start` |
-| PIN al salir | `require_exit_pin` + PIN 4 dígitos |
+| PIN antes de continuar | `require_exit_pin` + PIN 4 dígitos |
 | Elegir ramas | `can_choose_story_branch` |
 | Bloquear mundo | `lock_world_theme` |
 | Duración sesión | `max_session_minutes` (slider) |

@@ -48,6 +48,13 @@ final class Router
             }
         }
 
+        if ($method === 'GET' && preg_match('#^/api/v1/play/([^/]+)/dialogue/history$#', $path, $playHist) === 1) {
+            return (new PlayDialogueController())->dialogueHistory(
+                $_SERVER['HTTP_AUTHORIZATION'] ?? null,
+                rawurldecode($playHist[1]),
+            );
+        }
+
         if ($method === 'GET' && preg_match('#^/api/v1/play/([^/]+)/journey/summary$#', $path, $playSum) === 1) {
             return (new PlayDialogueController())->journeySummary(
                 $_SERVER['HTTP_AUTHORIZATION'] ?? null,

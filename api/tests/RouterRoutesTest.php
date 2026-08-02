@@ -51,6 +51,7 @@ final class RouterRoutesTest extends TestCase
 
         self::assertSame(401, $router->dispatch('POST', '/api/v1/play/abc/dialogue/session')->status);
         self::assertSame(401, $router->dispatch('POST', '/api/v1/play/abc/dialogue/turn')->status);
+        self::assertSame(401, $router->dispatch('GET', '/api/v1/play/abc/dialogue/history')->status);
         self::assertSame(401, $router->dispatch('GET', '/api/v1/play/abc/journey/summary')->status);
         self::assertSame(401, $router->dispatch('GET', '/api/v1/play/abc/journey/timeline')->status);
     }

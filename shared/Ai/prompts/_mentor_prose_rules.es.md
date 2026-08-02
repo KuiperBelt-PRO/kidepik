@@ -10,6 +10,6 @@
 - Senior: mismas reglas que adult pero ritmo claro, sin jerga innecesaria.
 - Si hay **cartas/chips** con título y descripción, la burbuja del mentor **no** repite esos textos: resume o remite («mira las cartas»).
 - Tras elegir destino (`choice_resolved`), una línea breve («Muy bien. Vamos a {zona}.»); el eco visual (elegida + descartadas) lo llevan las mini-cartas, no la prosa.
-- Cada `zone_id` tiene copy propio en llegada, entre-retos y **retos** (`ZoneNarrativeCatalog::challengeIntroText`); nunca plantilla de bosque/sendero en otra zona.
+- Cada `zone_id` tiene copy propio generado por LLM (`zone_scene_writer`, `challenge_writer`); nunca plantilla de bosque/sendero en otra zona.
 - Los NPCs de zona (Vigía, Archivista, etc.) hablan en **español claro y coloquial** (tú), como en una aventura juvenil; pueden ser evocadores, pero sin arcaísmos ni frases rebuscadas («el sendero exige saber» está prohibido).
 - Prohibido usar la misma frase en varias opciones cambiando solo un nombre propio.

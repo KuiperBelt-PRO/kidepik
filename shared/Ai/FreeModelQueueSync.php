@@ -13,7 +13,7 @@ use PDOException;
 /**
  * Sincroniza modelos free descubiertos en ai_purpose_model_queues (sin redeploy).
  */
-final class FreeModelQueueSync
+class FreeModelQueueSync
 {
     /** @var list<string> */
     public const PURPOSES = [
@@ -22,6 +22,10 @@ final class FreeModelQueueSync
         'placement_item_writer',
         'dialogue',
         'journey_summarizer',
+        'adventure_pitch',
+        'adventure_scene',
+        'adventure_challenge',
+        'adventure_waiting',
     ];
 
     private const STATE_KEY = 'free_model_discovery_last_run';
@@ -44,21 +48,70 @@ final class FreeModelQueueSync
             return false;
         }
 
-        $last = $this->readLastRunEpoch($pdo);
+        $last = $this->readStateEpoch($pdo, self::STATE_KEY);
         $interval = Config::aiDiscoveryIntervalHours() * 3600;
         if ($last !== null && (time() - $last) < $interval) {
             return false;
         }
 
         $stats = $this->sync();
-        $this->writeLastRunEpoch($pdo, time());
+        $this->writeStateEpoch($pdo, self::STATE_KEY, time());
         AppLogger::channel('ai')->info('free_model_discovery_sync', $stats);
 
         return true;
     }
 
     /**
-     * @return array{purposes:int,added:int,skipped:int}
+     * Refresh reactivo tras agotar la cola de un purpose (SPEC_AI_OPENROUTER_GATEWAY §4.5.1).
+     */
+    public function refreshPurposeOnExhaustion(string $purpose): bool
+    {
+        if (!Config::aiDiscoveryEnabled() || $purpose === '') {
+            return false;
+        }
+
+        $pdo = $this->pdo ?? PdoFactory::fromConfig();
+        if (!$pdo instanceof PDO) {
+            return false;
+        }
+
+        $stateKey = 'queue_refresh_' . $purpose;
+        $last = $this->readStateEpoch($pdo, $stateKey);
+        $minInterval = Config::aiQueueRefreshMinMinutes() * 60;
+        if ($last !== null && (time() - $last) < $minInterval) {
+            return false;
+        }
+
+        $stats = $this->rebuildPurposeQueue($purpose, 'auto-refresh-exhaustion');
+        if (($stats['promoted'] ?? 0) <= 0) {
+            return false;
+        }
+
+        $this->writeStateEpoch($pdo, $stateKey, time());
+        AppLogger::channel('ai')->warning('free_model_queue_refresh', [
+            'purpose' => $purpose,
+            'promoted' => $stats['promoted'],
+            'disabled' => $stats['disabled'],
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Deshabilita un modelo en cola tras 404 upstream.
+     */
+    public function markModelUnavailable(string $purpose, string $modelId, string $reason): void
+    {
+        if ($purpose === '' || $modelId === '') {
+            return;
+        }
+
+        $store = $this->queues ?? new PurposeModelQueueStore($this->pdo);
+        $store->disableModel($purpose, $modelId, $reason);
+    }
+
+    /**
+     * @return array{purposes:int,added:int,skipped:int,rebuilt:int}
      */
     public function sync(): array
     {
@@ -68,12 +121,21 @@ final class FreeModelQueueSync
 
         $added = 0;
         $skipped = 0;
+        $rebuilt = 0;
         $purposes = 0;
         $maxNew = Config::aiDiscoveryMaxNewPerPurpose();
 
         foreach (self::PURPOSES as $purpose) {
             $purposes++;
             $existing = $store->idsForPurpose($purpose);
+            if ($existing === []) {
+                $stats = $this->rebuildPurposeQueue($purpose, 'auto-discovery-bootstrap');
+                if (($stats['promoted'] ?? 0) > 0) {
+                    $rebuilt++;
+                }
+                continue;
+            }
+
             $existingSet = array_fill_keys($existing, true);
 
             try {
@@ -105,14 +167,77 @@ final class FreeModelQueueSync
 
         PurposeModelQueueStore::resetCacheForTests();
 
-        return ['purposes' => $purposes, 'added' => $added, 'skipped' => $skipped];
+        return [
+            'purposes' => $purposes,
+            'added' => $added,
+            'skipped' => $skipped,
+            'rebuilt' => $rebuilt,
+        ];
     }
 
-    private function readLastRunEpoch(PDO $pdo): ?int
+    /**
+     * @return array{promoted:int,disabled:int}
+     */
+    private function rebuildPurposeQueue(string $purpose, string $notes): array
+    {
+        $discovery = $this->discovery ?? new FreeModelDiscovery();
+        $store = $this->queues ?? new PurposeModelQueueStore($this->pdo);
+        $pdo = $this->pdo ?? PdoFactory::fromConfig();
+
+        try {
+            $ranked = $discovery->rankedIds(null, $purpose);
+        } catch (\Throwable) {
+            $ranked = [];
+        }
+
+        $top = array_slice($ranked, 0, Config::aiDiscoveryRebuildTop());
+        if ($top === []) {
+            return ['promoted' => 0, 'disabled' => 0];
+        }
+
+        $disabled = $this->disableCooldownNotFound($pdo, $purpose);
+        $promoted = $store->replaceTopModels($purpose, $top, $notes);
+
+        return ['promoted' => $promoted, 'disabled' => $disabled];
+    }
+
+    private function disableCooldownNotFound(?PDO $pdo, string $purpose): int
+    {
+        if (!$pdo instanceof PDO) {
+            return 0;
+        }
+
+        try {
+            $stmt = $pdo->prepare(
+                'select model_id from ai_model_cooldowns
+                 where purpose = :purpose
+                   and http_status = 404
+                   and expires_at > now()'
+            );
+            $stmt->execute(['purpose' => $purpose]);
+            $store = $this->queues ?? new PurposeModelQueueStore($pdo);
+            $count = 0;
+            while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+                if (!is_array($row)) {
+                    continue;
+                }
+                $id = trim((string) ($row['model_id'] ?? ''));
+                if ($id !== '' && $store->disableModel($purpose, $id, 'upstream 404 cooldown')) {
+                    $count++;
+                }
+            }
+
+            return $count;
+        } catch (PDOException) {
+            return 0;
+        }
+    }
+
+    private function readStateEpoch(PDO $pdo, string $key): ?int
     {
         try {
             $stmt = $pdo->prepare('select value from ai_runtime_state where key = :key');
-            $stmt->execute(['key' => self::STATE_KEY]);
+            $stmt->execute(['key' => $key]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
             if (!is_array($row)) {
                 return null;
@@ -125,7 +250,7 @@ final class FreeModelQueueSync
         }
     }
 
-    private function writeLastRunEpoch(PDO $pdo, int $epoch): void
+    private function writeStateEpoch(PDO $pdo, string $key, int $epoch): void
     {
         try {
             $stmt = $pdo->prepare(
@@ -135,7 +260,7 @@ final class FreeModelQueueSync
                     value = excluded.value,
                     updated_at = now()'
             );
-            $stmt->execute(['key' => self::STATE_KEY, 'value' => (string) $epoch]);
+            $stmt->execute(['key' => $key, 'value' => (string) $epoch]);
         } catch (PDOException) {
             // ignore
         }

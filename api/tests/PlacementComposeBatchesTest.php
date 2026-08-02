@@ -8,6 +8,7 @@ use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Ai\AiCallAttemptStore;
 use Kidepik\Shared\Ai\AiGateway;
 use Kidepik\Shared\Ai\LlmJsonPayload;
+use Kidepik\Shared\Ai\MockAiGateway;
 use Kidepik\Shared\Ai\PlacementExamComposer;
 use Kidepik\Shared\Ai\PurposeModelQueueStore;
 use Kidepik\Shared\Ai\SubjectCatalog;
@@ -38,14 +39,12 @@ final class PlacementComposeBatchesTest extends TestCase
 
     public function testComposeSingleBatchWhenFewSlots(): void
     {
-        putenv('AI_MOCK=true');
         putenv('AI_ENABLED=true');
         putenv('AI_COMPOSE_BATCH_MAX_SLOTS=4');
-        $_ENV['AI_MOCK'] = 'true';
         $_ENV['AI_ENABLED'] = 'true';
         $_ENV['AI_COMPOSE_BATCH_MAX_SLOTS'] = '4';
 
-        $composer = new PlacementExamComposer();
+        $composer = new PlacementExamComposer(gateway: $this->mockComposerGateway());
         $queue = $composer->compose(
             [
                 'world_theme' => 'fantasy',
@@ -63,17 +62,15 @@ final class PlacementComposeBatchesTest extends TestCase
 
     public function testComposeManySlotsProducesMultipleBatches(): void
     {
-        putenv('AI_MOCK=true');
         putenv('AI_ENABLED=true');
         putenv('AI_COMPOSE_BATCH_MAX_SLOTS=4');
         putenv('AI_COMPOSE_BATCH_CONCURRENCY=3');
-        $_ENV['AI_MOCK'] = 'true';
         $_ENV['AI_ENABLED'] = 'true';
         $_ENV['AI_COMPOSE_BATCH_MAX_SLOTS'] = '4';
         $_ENV['AI_COMPOSE_BATCH_CONCURRENCY'] = '3';
 
         $subjects = array_slice(SubjectCatalog::ALL, 0, 8);
-        $composer = new PlacementExamComposer();
+        $composer = new PlacementExamComposer(gateway: $this->mockComposerGateway());
         $queue = $composer->compose(
             [
                 'world_theme' => 'sci-fi',
@@ -218,5 +215,13 @@ final class PlacementComposeBatchesTest extends TestCase
             self::assertIsString($modelId);
             self::assertIsInt($n);
         }
+    }
+
+    private function mockComposerGateway(): AiGateway
+    {
+        return new AiGateway(
+            modelQueue: ['mock/local'],
+            chatFn: [MockAiGateway::class, 'complete'],
+        );
     }
 }

@@ -84,6 +84,42 @@ final class PlayDialogueController
         });
     }
 
+    public function dialogueHistory(?string $authorization, string $childId): JsonResponse
+    {
+        return $this->withParent($authorization, function (string $authUserId) use ($childId) {
+            $sessionId = isset($_GET['session_id']) && is_string($_GET['session_id'])
+                ? trim($_GET['session_id'])
+                : '';
+            $beforeRaw = $_GET['before_turn_id'] ?? null;
+            $beforeTurnId = is_string($beforeRaw) ? trim($beforeRaw) : '';
+            $limit = isset($_GET['limit']) && is_numeric($_GET['limit']) ? (int) $_GET['limit'] : null;
+            if ($sessionId === '' || $beforeTurnId === '') {
+                return JsonResponse::error('session_id and before_turn_id required', 422);
+            }
+            try {
+                return JsonResponse::ok(
+                    ($this->dialogue ?? new DialogueService())->loadHistory(
+                        $authUserId,
+                        $childId,
+                        $sessionId,
+                        $beforeTurnId,
+                        $limit,
+                    )
+                );
+            } catch (InvalidArgumentException $e) {
+                return JsonResponse::error($e->getMessage(), 422);
+            } catch (RuntimeException $e) {
+                if ($e->getMessage() === 'Crew member not found') {
+                    return JsonResponse::error($e->getMessage(), 404);
+                }
+                if ($e->getMessage() === 'Dialogue session not found or closed') {
+                    return JsonResponse::error($e->getMessage(), 404);
+                }
+                throw $e;
+            }
+        });
+    }
+
     public function journeySummary(?string $authorization, string $childId): JsonResponse
     {
         return $this->withParent($authorization, function (string $authUserId) use ($childId) {

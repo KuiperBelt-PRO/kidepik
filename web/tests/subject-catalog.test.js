@@ -11,10 +11,11 @@ import {
   SUBJECT_CATALOG,
 } from "../js/lib/subject-catalog.js";
 
-test("catalog has 14 subjects including reading separate from language", () => {
-  assert.equal(SUBJECT_CATALOG.length, 14);
+test("catalog has 15 subjects including history and reading separate from language", () => {
+  assert.equal(SUBJECT_CATALOG.length, 15);
   assert.ok(SUBJECT_CATALOG.some((s) => s.id === "reading"));
   assert.ok(SUBJECT_CATALOG.some((s) => s.id === "language"));
+  assert.ok(SUBJECT_CATALOG.some((s) => s.id === "history"));
   assert.ok(SUBJECT_CATALOG.some((s) => s.id === "mythology"));
   assert.ok(SUBJECT_CATALOG.some((s) => s.id === "finance"));
 });

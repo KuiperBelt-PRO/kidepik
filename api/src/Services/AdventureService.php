@@ -6,129 +6,29 @@ namespace Kidepik\Api\Services;
 
 use InvalidArgumentException;
 use Kidepik\Shared\Ai\AiGateway;
-use Kidepik\Shared\Ai\MentorCatalog;
-use Kidepik\Shared\Ai\ZoneNarrativeCatalog;
+use Kidepik\Shared\Ai\ZoneCatalog;
 use PDO;
 
 /**
- * Sesión de aventura post-placement (SPEC_APP_ADVENTURE_STORY_RICHNESS).
+ * Sesión de aventura post-placement — narrativa vía AdventureComposeService (LLM).
  */
 final class AdventureService
 {
     public const ZONE_INTRO_GATES = 3;
 
     /** @var list<string> */
-    public const ZONE_IDS = ['zone_math', 'zone_language', 'zone_logic', 'zone_science', 'zone_culture'];
+    public const ZONE_IDS = ZoneCatalog::ZONE_IDS;
 
     public function __construct(
         private readonly PDO $pdo,
         private readonly ?AiGateway $gateway = null,
+        private readonly ?AdventureComposeService $compose = null,
     ) {
     }
 
-    /**
-     * @param array<string, string> $subjectLevels map subject_id → L1..L5
-     * @return list<array{id:string,label:string,description:string,why_for_you:string}>
-     */
-    /**
-     * @param list<string> $excludeZoneIds
-     */
-    public static function zonePitches(string $theme, array $subjectLevels, int $limit = 3, array $excludeZoneIds = []): array
+    private function composer(): AdventureComposeService
     {
-        $catalog = [
-            'zone_math' => [
-                'subject' => 'math',
-                'label' => $theme === 'sci-fi' ? 'Nebulosa Matemática' : 'Bosque de los Números',
-                'description' => $theme === 'sci-fi'
-                    ? 'Un cúmulo de señales numéricas parpadea a medio apagar: hay que restaurar cálculos para que las naves no se pierdan.'
-                    : 'Entre árboles de runas, el conteo se ha vuelto niebla: el bosque pide recuperar fragmentos de número.',
-            ],
-            'zone_language' => [
-                'subject' => 'language',
-                'label' => $theme === 'sci-fi' ? 'Estación Léxico' : 'Montañas de la Gramática',
-                'description' => $theme === 'sci-fi'
-                    ? 'La estación traduce mundos, pero el Vacío ha borrado palabras clave del diccionario orbital.'
-                    : 'En las cumbres, los ecos de las palabras se rompen: hay que recomponer relatos y nombres.',
-            ],
-            'zone_logic' => [
-                'subject' => 'logic',
-                'label' => $theme === 'sci-fi' ? 'Laberinto de Circuitos' : 'Laberinto de Espejos',
-                'description' => $theme === 'sci-fi'
-                    ? 'Puertas lógicas se abren solo con patrones correctos; el Vacío ha mezclado las secuencias.'
-                    : 'Los espejos reflejan caminos falsos: solo la lógica clara revela la salida.',
-            ],
-            'zone_science' => [
-                'subject' => 'science',
-                'label' => $theme === 'sci-fi' ? 'Cinturón de Observatorios' : 'Jardines Alquímicos',
-                'description' => $theme === 'sci-fi'
-                    ? 'Telescopios mudos: hace falta observar y explicar para devolver la luz a los datos.'
-                    : 'Las plantas del saber han perdido color: la curiosidad científica puede despertarlas.',
-            ],
-            'zone_culture' => [
-                'subject' => 'culture',
-                'label' => $theme === 'sci-fi' ? 'Archivo Galáctico' : 'Biblioteca de los Reinos',
-                'description' => $theme === 'sci-fi'
-                    ? 'Crónicas de civilizaciones parpadean incompletas en el archivo.'
-                    : 'Los tomos antiguos han perdido páginas: la memoria de los reinos pide cuidadores.',
-            ],
-        ];
-
-        $scored = [];
-        foreach ($catalog as $zoneId => $meta) {
-            if (in_array($zoneId, $excludeZoneIds, true)) {
-                continue;
-            }
-            $sid = $meta['subject'];
-            $level = $subjectLevels[$sid] ?? 'L3';
-            $rank = self::levelRank($level);
-            $scored[] = [
-                'id' => $zoneId,
-                'label' => $meta['label'],
-                'description' => $meta['description'],
-                '_subject' => $sid,
-                '_weakness' => $rank,
-            ];
-        }
-        usort($scored, static fn (array $a, array $b): int => $a['_weakness'] <=> $b['_weakness']);
-        $picked = array_slice($scored, 0, max(2, min(3, $limit)));
-        $minWeak = min(array_column($picked, '_weakness'));
-        $pickCount = count($picked);
-
-        foreach ($picked as $index => &$zone) {
-            $zone['why_for_you'] = self::whyForYou(
-                $theme,
-                (string) $zone['_subject'],
-                (int) $zone['_weakness'],
-                $index,
-                $minWeak,
-                $pickCount,
-            );
-            unset($zone['_subject'], $zone['_weakness']);
-        }
-        unset($zone);
-
-        return $picked;
-    }
-
-    /**
-     * Prosa breve del mentor al presentar destinos (sin repetir description/why de las cartas).
-     *
-     * @param list<array{label:string}> $pitches
-     */
-    public static function zonePitchMapText(array $pitches): string
-    {
-        $labels = array_map(static fn (array $z): string => (string) $z['label'], $pitches);
-        $count = count($labels);
-        if ($count === 0) {
-            return 'Hay caminos abiertos. Elige el destino en las cartas.';
-        }
-        $list = self::spanishList($labels);
-        if ($count === 1) {
-            return "Un camino se abre ante ti: {$list}. Mira la carta y dime si vamos.";
-        }
-
-        return "Hay {$count} caminos abiertos: {$list}. "
-            . 'En cada carta verás qué ocurre allí y por qué conviene ir ahora. Elige tu primer destino.';
+        return $this->compose ?? new AdventureComposeService($this->pdo, $this->gateway);
     }
 
     /**
@@ -143,15 +43,16 @@ final class AdventureService
         string $flowId,
         int $sequence,
         string $mentorId,
+        string $chosenLabel = '',
     ): array {
-        unset($flowId, $sequence);
+        unset($flowId, $sequence, $mentorId);
         if (!in_array($zoneId, self::ZONE_IDS, true)) {
             throw new InvalidArgumentException('zone invalid');
         }
 
         $theme = (string) ($child['world_theme'] ?? 'fantasy');
-        $title = self::zoneTitle($theme, $zoneId);
-        $subject = str_replace('zone_', '', $zoneId);
+        $title = $chosenLabel !== '' ? $chosenLabel : self::zoneTitle($theme, $zoneId);
+        $subject = ZoneCatalog::subjectForZone($zoneId);
         $levelId = $this->subjectLevel($childId, $subject);
 
         $this->pdo->prepare(
@@ -185,8 +86,10 @@ final class AdventureService
         ]);
         $questId = (string) $q->fetchColumn();
 
-        $displayName = (string) ($child['display_name'] ?? 'explorador');
-        $arrival = ZoneNarrativeCatalog::arrivalText($theme, $zoneId, $displayName);
+        $scene = $this->composer()->composeArrival($childId, $child, $zoneId, $title, self::ZONE_INTRO_GATES);
+        $arrival = $scene['text'];
+        $npcMeta = $scene['meta'];
+
         $this->appendBeat($childId, $sessionId, $this->nextBeatSequence($childId), 'C1_first_zone', $zoneId, 'narration', $arrival, null, null);
 
         $this->pdo->prepare(
@@ -200,15 +103,14 @@ final class AdventureService
                     'text' => $arrival,
                     'input_mode' => 'continue',
                     'options' => [['id' => 'continue', 'label' => 'Afrontar el obstáculo']],
-                    'meta' => [
+                    'meta' => array_merge([
                         'phase' => 'zone_arrive',
                         'zone_id' => $zoneId,
                         'quest_id' => $questId,
                         'gate_index' => 0,
                         'subject_id' => $subject,
                         'level_id' => $levelId,
-                        'npc_ids' => ['zone_guardian'],
-                    ],
+                    ], $npcMeta),
                 ],
             ],
             'effects' => [
@@ -220,8 +122,6 @@ final class AdventureService
     }
 
     /**
-     * Tras los continues de llegada o entre retos: emitir el siguiente challenge.
-     *
      * @param array<string,mixed> $child
      * @param array<string,mixed> $meta
      * @return array{turns:list<array<string,mixed>>,effects:list<array<string,mixed>>}
@@ -236,48 +136,50 @@ final class AdventureService
         unset($mentorId);
         $zoneId = (string) ($meta['zone_id'] ?? 'zone_math');
         $questId = (string) ($meta['quest_id'] ?? '');
-        $subject = (string) ($meta['subject_id'] ?? str_replace('zone_', '', $zoneId));
+        $subject = (string) ($meta['subject_id'] ?? ZoneCatalog::subjectForZone($zoneId));
         $gateIndex = (int) ($meta['gate_index'] ?? 0);
-        $theme = (string) ($child['world_theme'] ?? 'fantasy');
         $levelId = (string) ($meta['level_id'] ?? $this->subjectLevel($childId, $subject));
 
-        $challenge = $this->challengeFor($theme, $subject, $levelId, $gateIndex);
-        $seqBeat = $this->nextBeatSequence($childId);
-        $framed = ZoneNarrativeCatalog::challengeIntroText(
-            $theme,
+        $item = AdventureComposeService::pickChallengeItem($child, $subject, $levelId, $gateIndex);
+        $npcDisplay = is_array($meta['npc_display'] ?? null) ? $meta['npc_display'] : [];
+        $dressed = $this->composer()->composeChallenge(
+            $childId,
+            $child,
             $zoneId,
+            $item,
             $gateIndex,
             self::ZONE_INTRO_GATES,
-            $challenge['prompt'],
+            $npcDisplay,
         );
+        $framed = $dressed['text'];
+
         $this->appendBeat(
             $childId,
             $sessionId,
-            $seqBeat,
+            $this->nextBeatSequence($childId),
             'C1_first_zone',
             $zoneId,
             'challenge_intro',
             $framed,
-            $challenge['options'],
-            null
+            $item['options'],
+            null,
         );
 
         return [
             'turns' => [
                 [
                     'text' => $framed,
-                    'input_mode' => $challenge['input_mode'],
-                    'options' => $challenge['options'],
-                    'meta' => [
+                    'input_mode' => $item['input_mode'],
+                    'options' => $item['options'],
+                    'meta' => array_merge([
                         'phase' => 'adventure_challenge',
                         'zone_id' => $zoneId,
                         'quest_id' => $questId,
                         'subject_id' => $subject,
                         'level_id' => $levelId,
                         'gate_index' => $gateIndex,
-                        'canonical_option' => $challenge['canonical_option'],
-                        'npc_ids' => ['zone_guardian'],
-                    ],
+                        'canonical_option' => $item['canonical_option'],
+                    ], $dressed['meta']),
                 ],
             ],
             'effects' => [
@@ -311,24 +213,19 @@ final class AdventureService
         $questId = (string) ($meta['quest_id'] ?? '');
         $subject = (string) ($meta['subject_id'] ?? 'math');
         $gateIndex = (int) ($meta['gate_index'] ?? 0);
-        $levelId = (string) ($meta['level_id'] ?? $this->subjectLevel($childId, $subject));
-        $theme = (string) ($child['world_theme'] ?? 'fantasy');
 
-        $seqBeat = $this->nextBeatSequence($childId);
-        $resultText = $ok
-            ? ZoneNarrativeCatalog::challengeSuccessText($theme, $zoneId)
-            : ZoneNarrativeCatalog::challengeNearMissText($theme, $zoneId);
+        $resultText = $this->composer()->composeChallengeResult($childId, $child, $zoneId, $ok);
 
         $this->appendBeat(
             $childId,
             $sessionId,
-            $seqBeat,
+            $this->nextBeatSequence($childId),
             'C1_first_zone',
             $zoneId,
             'challenge_result',
             $resultText,
             null,
-            ['ok' => $ok, 'reply' => $reply, 'gate_index' => $gateIndex]
+            ['ok' => $ok, 'reply' => $reply, 'gate_index' => $gateIndex],
         );
 
         $stepsDone = 0;
@@ -382,8 +279,8 @@ final class AdventureService
         $questComplete = $stepsDone >= $stepsTotal;
         if ($questComplete) {
             $this->markZoneCompleted($childId, $zoneId);
-            $wrap = ZoneNarrativeCatalog::questCompleteText($theme, $zoneId)
-                . ' ¿Seguimos explorando otra tierra o pausamos el viaje por hoy?';
+            $complete = $this->composer()->composeQuestComplete($childId, $child, $zoneId);
+            $wrap = $complete['text'];
             $this->appendBeat(
                 $childId,
                 $sessionId,
@@ -393,10 +290,10 @@ final class AdventureService
                 'quest_update',
                 $wrap,
                 [
-                    ['id' => 'continue_zone_lore', 'label' => 'Quedarnos un momento'],
-                    ['id' => 'pause_session', 'label' => 'Pausar el viaje'],
+                    ['id' => 'pause_session', 'label' => 'Pausar hasta otra visita'],
+                    ['id' => 'stay_a_while', 'label' => 'Mirar el lugar un momento'],
                 ],
-                null
+                null,
             );
 
             return [
@@ -406,7 +303,7 @@ final class AdventureService
                         'input_mode' => 'options_only',
                         'options' => [
                             ['id' => 'pause_session', 'label' => 'Pausar hasta otra visita'],
-                            ['id' => 'stay_a_while', 'label' => 'Mirar el claro un momento'],
+                            ['id' => 'stay_a_while', 'label' => 'Mirar el lugar un momento'],
                         ],
                         'meta' => [
                             'phase' => 'zone_quest_complete',
@@ -424,7 +321,8 @@ final class AdventureService
         }
 
         $nextGate = $gateIndex + 1;
-        $between = ZoneNarrativeCatalog::betweenText($theme, $zoneId, $nextGate, $stepsTotal);
+        $between = $this->composer()->composeBetween($childId, $child, $zoneId, $nextGate, $stepsTotal);
+        $betweenText = $between['text'];
 
         $this->appendBeat(
             $childId,
@@ -433,15 +331,15 @@ final class AdventureService
             'C1_first_zone',
             $zoneId,
             'narration',
-            $between,
+            $betweenText,
             null,
-            null
+            null,
         );
 
         return [
             'turns' => [
                 [
-                    'text' => $resultText . ' ' . $between,
+                    'text' => $resultText . ' ' . $betweenText,
                     'input_mode' => 'continue',
                     'options' => [['id' => 'continue', 'label' => 'Seguir explorando']],
                     'meta' => [
@@ -449,8 +347,9 @@ final class AdventureService
                         'zone_id' => $zoneId,
                         'quest_id' => $questId,
                         'subject_id' => $subject,
-                        'level_id' => $levelId,
+                        'level_id' => (string) ($meta['level_id'] ?? $this->subjectLevel($childId, $subject)),
                         'gate_index' => $nextGate,
+                        'npc_display' => $between['meta']['npc_display'] ?? ($meta['npc_display'] ?? null),
                     ],
                 ],
             ],
@@ -466,11 +365,9 @@ final class AdventureService
      */
     public function wrapSession(string $childId, array $child, array $meta, string $sessionId): array
     {
-        $theme = (string) ($child['world_theme'] ?? 'fantasy');
         $zoneId = (string) ($meta['zone_id'] ?? '');
-        $text = $theme === 'sci-fi'
-            ? 'Guardamos la bitácora. Cuando vuelvas, las estrellas de esta zona recordarán tu rastro. Hasta la próxima visita.'
-            : 'El mentor cierra el pergamino del día. El bosque queda en calma hasta tu próxima visita. Hasta pronto — y con motivo: el viaje necesita descanso.';
+        $scene = $this->composer()->composeSessionWrap($childId, $child, $zoneId);
+        $text = $scene['text'];
 
         $this->appendBeat(
             $childId,
@@ -481,7 +378,7 @@ final class AdventureService
             'narration',
             $text,
             null,
-            null
+            null,
         );
 
         return [
@@ -504,16 +401,14 @@ final class AdventureService
      */
     public function lingerAfterQuest(string $childId, array $child, array $meta, string $sessionId): array
     {
-        $theme = (string) ($child['world_theme'] ?? 'fantasy');
+        unset($sessionId);
         $zoneId = (string) ($meta['zone_id'] ?? '');
-        $text = $theme === 'sci-fi'
-            ? 'Observáis juntos el brillo de las balizas. Cuando quieras, podemos pausar el viaje con la bitácora al día.'
-            : 'Os sentáis un momento en el claro. El guardián asiente en silencio. Cuando quieras, pausamos el viaje hasta otra visita.';
+        $scene = $this->composer()->composeLinger($childId, $child, $zoneId);
 
         return [
             'turns' => [
                 [
-                    'text' => $text,
+                    'text' => $scene['text'],
                     'input_mode' => 'options_only',
                     'options' => [
                         ['id' => 'pause_session', 'label' => 'Pausar hasta otra visita'],
@@ -527,94 +422,26 @@ final class AdventureService
 
     public static function zoneTitle(string $theme, string $zoneId): string
     {
-        return match ($zoneId) {
-            'zone_math' => $theme === 'sci-fi' ? 'Nebulosa Matemática' : 'Bosque de los Números',
-            'zone_language' => $theme === 'sci-fi' ? 'Estación Léxico' : 'Montañas de la Gramática',
-            'zone_logic' => $theme === 'sci-fi' ? 'Laberinto de Circuitos' : 'Laberinto de Espejos',
-            'zone_science' => $theme === 'sci-fi' ? 'Cinturón de Observatorios' : 'Jardines Alquímicos',
-            default => $theme === 'sci-fi' ? 'Archivo Galáctico' : 'Biblioteca de los Reinos',
-        };
+        return ZoneCatalog::label($theme, $zoneId);
     }
 
-    private static function levelRank(string $levelId): int
+    /**
+     * @return array<string,mixed>
+     */
+    public static function composeFailedTurn(string $composeKind): array
     {
-        return match (strtoupper($levelId)) {
-            'L1' => 1,
-            'L2' => 2,
-            'L3' => 3,
-            'L4' => 4,
-            'L5' => 5,
-            default => 3,
-        };
-    }
-
-    private static function whyForYou(
-        string $theme,
-        string $subject,
-        int $rank,
-        int $index,
-        int $minRank,
-        int $pickCount,
-    ): string {
-        $spark = self::subjectSparkPhrase($subject);
-
-        if ($index === 0 && $rank === $minRank) {
-            if ($rank <= 2) {
-                return $theme === 'sci-fi'
-                    ? "Tu señal en {$spark} aún titila: buen sitio para reforzar sin prisa."
-                    : "Aquí {$spark} pueden crecer con calma — buen primer paso.";
-            }
-
-            return $theme === 'sci-fi'
-                ? "Buen arranque: {$spark} piden práctica constante."
-                : "Un primer paso sensato: reforzar {$spark} sin presión.";
-        }
-
-        if ($pickCount >= 3 && $index === 1) {
-            return $theme === 'sci-fi'
-                ? 'Un cruce equilibrado: practicar sin dejar atrás lo que ya dominas.'
-                : 'Un camino intermedio: afianzar lo aprendido desde otro ángulo.';
-        }
-
-        if ($rank >= 4) {
-            return $theme === 'sci-fi'
-                ? 'Podrías ayudar a otros cadetes con lo que ya manejas bien.'
-                : 'Podrías ayudar al reino compartiendo lo que ya dominas.';
-        }
-
-        return $theme === 'sci-fi'
-            ? 'Variedad en la ruta: explorar otro frente del saber.'
-            : 'Otra puerta abierta: sumar variedad a tu viaje.';
-    }
-
-    private static function subjectSparkPhrase(string $subject): string
-    {
-        return match ($subject) {
-            'math' => 'los números',
-            'language' => 'las palabras',
-            'logic' => 'el orden claro',
-            'science' => 'la observación',
-            'culture' => 'la memoria',
-            default => 'tu chispa',
-        };
-    }
-
-    /** @param list<string> $items */
-    private static function spanishList(array $items): string
-    {
-        $n = count($items);
-        if ($n === 0) {
-            return '';
-        }
-        if ($n === 1) {
-            return $items[0];
-        }
-        if ($n === 2) {
-            return $items[0] . ' y ' . $items[1];
-        }
-        $last = array_pop($items);
-
-        return implode(', ', $items) . ' y ' . $last;
+        return [
+            'text' => '',
+            'input_mode' => 'options_only',
+            'options' => [['id' => 'retry_compose', 'label' => 'Reintentar']],
+            'meta' => [
+                'phase' => 'compose_failed',
+                'error_code' => 'ADVENTURE_COMPOSE_FAILED',
+                'compose_kind' => $composeKind,
+                'compose_failed' => true,
+                'retry_allowed' => true,
+            ],
+        ];
     }
 
     private function subjectLevel(string $childId, string $subject): string
@@ -633,246 +460,6 @@ final class AdventureService
         }
 
         return 'L2';
-    }
-
-    /** @return array{prompt:string,input_mode:string,options:list<array{id:string,label:string}>,canonical_option:string} */
-    private function challengeFor(string $theme, string $subject, string $levelId, int $gateIndex): array
-    {
-        $rank = self::levelRank($levelId);
-        $pool = $this->challengePool($theme, $subject, $rank);
-        $pick = $pool[$gateIndex % count($pool)];
-
-        return $pick;
-    }
-
-    /**
-     * @return list<array{prompt:string,input_mode:string,options:list<array{id:string,label:string}>,canonical_option:string}>
-     */
-    private function challengePool(string $theme, string $subject, int $rank): array
-    {
-        if ($subject === 'language') {
-            return $rank <= 2
-                ? [[
-                    'prompt' => 'Un letrero pide la palabra correcta: «El ____ brilla». ¿Cuál encaja?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'sol'],
-                        ['id' => 'b', 'label' => 'correr'],
-                        ['id' => 'c', 'label' => 'mesa'],
-                    ],
-                    'canonical_option' => 'a',
-                ], [
-                    'prompt' => 'Elige el plural correcto de «luz».',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'luzs'],
-                        ['id' => 'b', 'label' => 'luces'],
-                        ['id' => 'c', 'label' => 'luzes'],
-                    ],
-                    'canonical_option' => 'b',
-                ], [
-                    'prompt' => '¿Qué palabra completa: «Nosotros ____ al claro»?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'vamos'],
-                        ['id' => 'b', 'label' => 'va'],
-                        ['id' => 'c', 'label' => 'voy'],
-                    ],
-                    'canonical_option' => 'a',
-                ]]
-                : [[
-                    'prompt' => 'Elige el sinónimo más cercano de «antiguo».',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'viejo'],
-                        ['id' => 'b', 'label' => 'rápido'],
-                        ['id' => 'c', 'label' => 'húmedo'],
-                    ],
-                    'canonical_option' => 'a',
-                ], [
-                    'prompt' => '¿Cuál es la forma correcta?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'Halla tu camino'],
-                        ['id' => 'b', 'label' => 'Haya tu camino'],
-                        ['id' => 'c', 'label' => 'Aya tu camino'],
-                    ],
-                    'canonical_option' => 'a',
-                ], [
-                    'prompt' => 'Completa: «Aunque ____ tarde, llegamos.»',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'llovía'],
-                        ['id' => 'b', 'label' => 'llover'],
-                        ['id' => 'c', 'label' => 'llovido'],
-                    ],
-                    'canonical_option' => 'a',
-                ]];
-        }
-
-        if ($subject === 'logic') {
-            return $rank <= 2
-                ? [[
-                    'prompt' => 'Secuencia: 1, 2, 4, 8, … ¿Siguiente?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '10'],
-                        ['id' => 'b', 'label' => '16'],
-                        ['id' => 'c', 'label' => '12'],
-                    ],
-                    'canonical_option' => 'b',
-                ], [
-                    'prompt' => 'Si todos los A son B, y este es A, entonces…',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'es B'],
-                        ['id' => 'b', 'label' => 'no es B'],
-                        ['id' => 'c', 'label' => 'es C'],
-                    ],
-                    'canonical_option' => 'a',
-                ], [
-                    'prompt' => '¿Qué no encaja: círculo, cuadrado, triángulo, manzana?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'manzana'],
-                        ['id' => 'b', 'label' => 'círculo'],
-                        ['id' => 'c', 'label' => 'triángulo'],
-                    ],
-                    'canonical_option' => 'a',
-                ]]
-                : [[
-                    'prompt' => 'Secuencia: 2, 6, 12, 20, … ¿Siguiente?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '30'],
-                        ['id' => 'b', 'label' => '28'],
-                        ['id' => 'c', 'label' => '24'],
-                    ],
-                    'canonical_option' => 'a',
-                ], [
-                    'prompt' => 'Si llueve ⇒ suelo mojado. El suelo está seco. ¿Qué sigue?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => 'No llueve'],
-                        ['id' => 'b', 'label' => 'Llueve seguro'],
-                        ['id' => 'c', 'label' => 'No se sabe'],
-                    ],
-                    'canonical_option' => 'a',
-                ], [
-                    'prompt' => 'Ordena de menor a mayor lógica: 3 pasos, 1 paso, 2 pasos. ¿Primero?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '1 paso'],
-                        ['id' => 'b', 'label' => '2 pasos'],
-                        ['id' => 'c', 'label' => '3 pasos'],
-                    ],
-                    'canonical_option' => 'a',
-                ]];
-        }
-
-        // math / default
-        if ($rank <= 2) {
-            return [
-                [
-                    'prompt' => $theme === 'sci-fi' ? 'La consola pide: 5 + 7 = ¿?' : 'Las runas muestran: 5 + 7 = ¿?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '11'],
-                        ['id' => 'b', 'label' => '12'],
-                        ['id' => 'c', 'label' => '13'],
-                    ],
-                    'canonical_option' => 'b',
-                ],
-                [
-                    'prompt' => $theme === 'sci-fi' ? 'Panel: 9 − 4 = ¿?' : 'Runa: 9 − 4 = ¿?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '5'],
-                        ['id' => 'b', 'label' => '6'],
-                        ['id' => 'c', 'label' => '4'],
-                    ],
-                    'canonical_option' => 'a',
-                ],
-                [
-                    'prompt' => $theme === 'sci-fi' ? 'Panel: 3 × 4 = ¿?' : 'Runa: 3 × 4 = ¿?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '7'],
-                        ['id' => 'b', 'label' => '12'],
-                        ['id' => 'c', 'label' => '9'],
-                    ],
-                    'canonical_option' => 'b',
-                ],
-            ];
-        }
-
-        if ($rank === 3) {
-            return [
-                [
-                    'prompt' => $theme === 'sci-fi' ? 'Consola: 47 + 28 = ¿?' : 'Runas: 47 + 28 = ¿?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '75'],
-                        ['id' => 'b', 'label' => '65'],
-                        ['id' => 'c', 'label' => '85'],
-                    ],
-                    'canonical_option' => 'a',
-                ],
-                [
-                    'prompt' => $theme === 'sci-fi' ? 'Panel: 15 × 4 = ¿?' : 'Runa: 15 × 4 = ¿?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '45'],
-                        ['id' => 'b', 'label' => '60'],
-                        ['id' => 'c', 'label' => '50'],
-                    ],
-                    'canonical_option' => 'b',
-                ],
-                [
-                    'prompt' => $theme === 'sci-fi' ? 'Panel: 96 ÷ 8 = ¿?' : 'Runa: 96 ÷ 8 = ¿?',
-                    'input_mode' => 'options_only',
-                    'options' => [
-                        ['id' => 'a', 'label' => '12'],
-                        ['id' => 'b', 'label' => '10'],
-                        ['id' => 'c', 'label' => '14'],
-                    ],
-                    'canonical_option' => 'a',
-                ],
-            ];
-        }
-
-        return [
-            [
-                'prompt' => $theme === 'sci-fi' ? 'Consola: 144 ÷ 12 = ¿?' : 'Runas: 144 ÷ 12 = ¿?',
-                'input_mode' => 'options_only',
-                'options' => [
-                    ['id' => 'a', 'label' => '11'],
-                    ['id' => 'b', 'label' => '12'],
-                    ['id' => 'c', 'label' => '14'],
-                ],
-                'canonical_option' => 'b',
-            ],
-            [
-                'prompt' => $theme === 'sci-fi' ? 'Panel: 17 × 6 = ¿?' : 'Runa: 17 × 6 = ¿?',
-                'input_mode' => 'options_only',
-                'options' => [
-                    ['id' => 'a', 'label' => '102'],
-                    ['id' => 'b', 'label' => '96'],
-                    ['id' => 'c', 'label' => '112'],
-                ],
-                'canonical_option' => 'a',
-            ],
-            [
-                'prompt' => $theme === 'sci-fi' ? 'Panel: 1/2 + 1/4 = ¿?' : 'Runa: 1/2 + 1/4 = ¿?',
-                'input_mode' => 'options_only',
-                'options' => [
-                    ['id' => 'a', 'label' => '3/4'],
-                    ['id' => 'b', 'label' => '2/6'],
-                    ['id' => 'c', 'label' => '1/6'],
-                ],
-                'canonical_option' => 'a',
-            ],
-        ];
     }
 
     private function nextBeatSequence(string $childId): int

@@ -1,7 +1,7 @@
 # Spec: Canon del viaje (espina narrativa dual)
 
-> Estado: **propuesta — pendiente de aprobación** (julio 2026); **delta §3.1 pitches de zona** (ago 2026) — ver [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md)  
-> Relacionado: [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [docs/kidepik.md](../../docs/kidepik.md) §5–7  
+> Estado: **propuesta — pendiente de aprobación** (julio 2026); **delta §3.1 pitches de zona** (ago 2026); **delta §3.1.1 variabilidad + LLM** (2 ago 2026) — ver [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md)  
+> Relacionado: [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [docs/kidepik.md](../../docs/kidepik.md) §5–7  
 > Precedencia: este documento es la **fuente de verdad del lore MVP**; el LLM **no inventa** una trama distinta — solo **instancia** escenas dentro de este marco.
 
 ## Por qué primero
@@ -91,14 +91,26 @@ Reglas:
 Al cerrar placement:
 
 1. Narrativa de admisión (escuadrón / círculo) + anuncio de varios destinos.
-2. Agente/motor propone **2–3 zonas** priorizando: materia con nivel más bajo (reto amable) **o** una “favorita” sugerida por rasgos del personaje.
-3. Cada opción lleva **pitch completo** (contrato normativo en [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md) §2):
-   - `label` — nombre del lugar en el mundo
+2. **`ZonePitchPlanner` (PHP)** elige **2–3** `zone_id` del pool elegible (materias activas, zonas no completadas), con **semilla de sesión** para que la terna y su orden **varíen** entre días/sesiones — ver [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) §2.1.1. Prioridad pedagógica: al menos una zona de la materia más débil; el resto del pool candidato (4 materias con nivel más bajo).
+3. **`zone_pitch_writer` (LLM)** redacta el pitch completo por cada `zone_id` fijado por PHP (no elige destinos):
+   - `label` — nombre del lugar en el mundo (canon o variante corta validada)
    - `description` — qué es y qué ocurre allí (1–2 frases)
    - `why_for_you` — por qué encaja **ahora** con el perfil (sin revelar `L1`–`L5`)
+   - `mentor_bridge` — puente del mentor antes de las cartas
 4. UI: cartas de elección (título + textos), no chips planos de solo nombre.
 5. El niño elige → `active_zone_id` + quest introductoria `Q_zone_intro_{zone}` con **≥3 learning gates**.
 6. Ledger: `choices_offered` completo + `choice_taken`; prosa puede recordar destinos no elegidos.
+
+**Sin plantillas:** si el LLM no compone tras reintentos → `compose_failed` (spec LLM §1.2), no pitches PHP.
+
+### 3.1.1 Variabilidad (anti-repetición)
+
+| Regla | Detalle |
+| --- | --- |
+| Semilla | `hash(child_id + session_id + date)` — shuffle ponderado del pool |
+| Misma terna idéntica | **No** debe ocurrir en ≥3 resets consecutivos con mismos niveles |
+| Copy de pitch | Generado por LLM; **prohibido** texto fijo de `AdventureService::zonePitches()` |
+| Re-encrucijada | Nueva semilla; excluir zona recién completada |
 
 ---
 

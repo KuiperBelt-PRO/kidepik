@@ -6,6 +6,8 @@ namespace Kidepik\Api\Services;
 
 use Kidepik\Shared\Ai\PlacementBank;
 use Kidepik\Shared\Ai\SubjectCatalog;
+use Kidepik\Shared\Ai\ZoneCatalog;
+use Kidepik\Shared\Ai\ZonePitchPlanner;
 use PDO;
 
 /**
@@ -118,7 +120,15 @@ final class CrewProgressService
                 $levelsForPitch[(string) $sid] = (string) $row['level_id'];
             }
         }
-        $pending = AdventureService::zonePitches($theme, $levelsForPitch, 3, $zonesCompleted);
+        $seed = ZonePitchPlanner::sessionSeed($childId, 'crew-progress');
+        $zoneIds = ZonePitchPlanner::planZoneIds($levelsForPitch, $zonesCompleted, $seed);
+        $pending = array_map(
+            static fn (string $zoneId): array => [
+                'id' => $zoneId,
+                'label' => ZoneCatalog::label($theme, $zoneId),
+            ],
+            $zoneIds,
+        );
 
         return [
             'progress' => [

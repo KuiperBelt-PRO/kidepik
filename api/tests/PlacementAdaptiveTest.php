@@ -249,11 +249,14 @@ final class PlacementAdaptiveTest extends TestCase
 
     public function testComposerGeneratesAgentExamWhenMockAi(): void
     {
-        putenv('AI_MOCK=true');
         putenv('AI_ENABLED=true');
-        $_ENV['AI_MOCK'] = 'true';
         $_ENV['AI_ENABLED'] = 'true';
-        $composer = new \Kidepik\Shared\Ai\PlacementExamComposer();
+
+        $gateway = new \Kidepik\Shared\Ai\AiGateway(
+            modelQueue: ['mock/local'],
+            chatFn: [\Kidepik\Shared\Ai\MockAiGateway::class, 'complete'],
+        );
+        $composer = new \Kidepik\Shared\Ai\PlacementExamComposer(gateway: $gateway);
         $child = [
             'world_theme' => 'fantasy',
             'age_band' => AgeBand::ADULT,

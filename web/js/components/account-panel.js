@@ -14,7 +14,7 @@ import {
   updateParentDisplayName,
 } from "../lib/parent-account.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
-import { GLASS_ICON_FILL, setGlassButton } from "./glass-controls.js";
+import { GLASS_ICON_FILL, runGlassButtonAction, setGlassButton } from "./glass-controls.js?v=225";
 import { closeGlassModal, showGlassConfirm } from "./glass-modal.js?v=2";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 
@@ -210,21 +210,24 @@ export function mountAccountPanel(container, { session, onDeleted }) {
           nameError.hidden = false;
           return;
         }
-        saveBtn.disabled = true;
-        const result = await updateParentDisplayName(session, check.value);
-        saveBtn.disabled = false;
-        if (!result.ok) {
-          nameError.textContent = result.error
-            ?? "No hemos podido guardar. Inténtalo de nuevo.";
-          nameError.hidden = false;
-          return;
-        }
-        nameInput.value = result.parent.display_name ?? "";
-        nameStatus.textContent = "Guardado";
-        nameStatus.hidden = false;
-        window.setTimeout(() => {
-          nameStatus.hidden = true;
-        }, 2000);
+        await runGlassButtonAction(
+          saveBtn,
+          async () => {
+            const result = await updateParentDisplayName(session, check.value);
+            if (!result.ok) {
+              nameError.textContent = result.error
+                ?? "No hemos podido guardar. Inténtalo de nuevo.";
+              nameError.hidden = false;
+              return {
+                ok: false,
+                error: result.error ?? "No hemos podido guardar. Inténtalo de nuevo.",
+              };
+            }
+            nameInput.value = result.parent.display_name ?? "";
+            return { ok: true };
+          },
+          { successMessage: "Nombre guardado" },
+        );
       })();
     });
 

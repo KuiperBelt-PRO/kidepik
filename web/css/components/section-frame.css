@@ -2,6 +2,14 @@
 
 .section-frame {
   --section-frame-pad-x: clamp(12px, 4vw, 20px);
+  /*
+   * §2.2c — tope continuo (sin salto):
+   * En ratio 4/5, el ancho útil ≈ 80vh. Usar ese valor como max hace
+   * que el paso de «completo» → «limitado» sea continuo.
+   * Retrato alto: 100%-pad < 80vh → gana el ancho completo.
+   * Paisaje / casi cuadrado: gana 80vh → centrado con tope.
+   */
+  --section-frame-column-max: calc(100vh * 4 / 5);
   --section-frame-fade-ramp: clamp(48px, 12dvh, 96px);
   --section-frame-radius: 18px;
   --section-frame-logo: clamp(56px, 14vw, 72px);
@@ -9,8 +17,13 @@
   --section-frame-scrollbar: 6px;
   position: absolute;
   z-index: 4;
-  left: var(--section-frame-pad-x);
-  right: var(--section-frame-pad-x);
+  left: 50%;
+  right: auto;
+  width: min(
+    calc(100% - 2 * var(--section-frame-pad-x)),
+    var(--section-frame-column-max)
+  );
+  transform: translateX(-50%);
   top: calc(var(--shell-chrome-band-h, 68px) + clamp(8px, 2vh, 16px));
   bottom: calc(18% + env(safe-area-inset-bottom, 0px));
   display: flex;
@@ -50,29 +63,45 @@
   display: grid;
   place-items: center;
   padding: var(--section-frame-header-pad-y, clamp(10px, 2.5vh, 14px)) 16px;
-  min-height: calc(var(--section-frame-logo) * 0.42 + 2.2rem + 24px);
+  min-height: calc(var(--section-frame-logo) * 0.42 + var(--section-frame-header-pad-y, 14px) * 2);
 }
 
 .section-frame__brand {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.3rem;
-  max-width: min(100%, 16rem);
+  justify-content: center;
+  gap: 0.45rem;
+  max-width: min(100%, calc(var(--section-frame-logo) + 12rem));
   pointer-events: none;
 }
 
 .section-frame__title {
   margin: 0;
   text-align: center;
-  font-size: calc(1.35rem * var(--font-scale-ui, 1));
-  line-height: 1.15;
+  font-size: calc(1.2rem * var(--font-scale-ui, 1));
+  line-height: 1.1;
   font-weight: 700;
   color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: min(9.5rem, 42vw);
   font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
 }
 
 html[data-shell-theme="sci-fi"] .section-frame__title {
+  font-family: var(--font-shell-sci, "Bruno Ace", "Orbitron", system-ui, sans-serif);
+}
+
+/* Mundo del niño (play / ficha tripulante) prevalece sobre tema UI del tutor */
+.section-frame[data-play-theme="fantasy"] .section-frame__title,
+.section-frame[data-crew-world-theme="fantasy"] .section-frame__title {
+  font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
+}
+
+.section-frame[data-play-theme="sci-fi"] .section-frame__title,
+.section-frame[data-crew-world-theme="sci-fi"] .section-frame__title {
   font-family: var(--font-shell-sci, "Bruno Ace", "Orbitron", system-ui, sans-serif);
 }
 

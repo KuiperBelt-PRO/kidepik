@@ -57,7 +57,7 @@ Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permis
 | Tema UI ≠ mundo juego | `ui_theme` tutor vs `world_theme` niño |
 | Permisos en ficha | Nunca en Ajustes |
 | Soft-delete | `status = 'deleted'` |
-| Guardado explícito | Botón Guardar por bloque perfil / permisos |
+| Guardado explícito | Botón Guardar por bloque perfil / permisos / materias; busy + toast (ver SPEC_APP_GLASS_TOAST) |
 | Extensible | Columnas tipadas + jsonb |
 
 ---
@@ -277,7 +277,7 @@ Sin cambios de catálogo respecto a la propuesta aprobada conceptualmente:
 | Clave | Label |
 | --- | --- |
 | `allow_solo_start` | Puede empezar solo |
-| `require_exit_pin` / PIN | Pedir PIN al salir |
+| `require_exit_pin` / PIN | Pedir PIN antes de continuar con la aventura |
 | `session_limit_per_day` | Sesiones al día |
 | `max_session_minutes` | Duración máxima (5–120 min, step 5; UI slider) |
 | `allowed_hours` | Horario (Fase B) |
@@ -285,7 +285,7 @@ Sin cambios de catálogo respecto a la propuesta aprobada conceptualmente:
 | `lock_world_theme` | Bloquear cambio de mundo |
 | `font_scale_play` | Texto en aventuras |
 
-Guardado explícito: «Guardar permisos».
+Guardado explícito: «Guardar permisos». Durante el PATCH el botón muestra icono `pending` y «Guardando…»; al terminar, toast de éxito o error ([SPEC_APP_GLASS_TOAST.md](SPEC_APP_GLASS_TOAST.md)).
 
 ---
 
@@ -303,7 +303,7 @@ Contrato detallado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) �
 | Dificultad en juego | Siempre según `age_band` del explorador, no según la materia |
 | Sugerencia | Al fijar edad en first-run, merge de materias base de banda + defaults del hogar |
 | Aviso | Si >10 materias activas: banner «examen largo, reanudable» |
-| Guardado | Botón «Guardar materias»; `PATCH` perfil |
+| Guardado | Botón «Guardar materias»; `PATCH` perfil; busy + toast al confirmar |
 | Placement en curso | Cambios aplican al siguiente examen o retake confirmado |
 
 **Copy helper en ficha:**

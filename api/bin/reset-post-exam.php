@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 require '/var/www/api/vendor/autoload.php';
 
+use Kidepik\Api\Services\AdventureComposeService;
 use Kidepik\Api\Services\AdventureService;
 use Kidepik\Shared\Ai\PlacementBank;
 use Kidepik\Shared\Ai\PlacementNarrator;
@@ -63,10 +64,7 @@ if ($subjectLevels === []) {
 }
 
 $exclude = AdventureService::completedZoneIds($child);
-$zoneOptions = AdventureService::zonePitches($theme, $subjectLevels, 3, $exclude);
 $closing = $narrator->closing($child, $mentorId, $rank);
-
-$mapText = AdventureService::zonePitchMapText($zoneOptions);
 
 $journey = json_encode([
     'chapter_id' => 'C1_first_zone',
@@ -117,6 +115,11 @@ try {
     );
     $sessionStmt->execute(['cid' => $childId, 'mentor' => $mentorId]);
     $sessionId = (string) $sessionStmt->fetchColumn();
+
+    $compose = AdventureComposeService::fromConfig($pdo);
+    $pitched = $compose->planAndComposePitches($childId, $child, $sessionId, $subjectLevels, $exclude);
+    $zoneOptions = $pitched['options'];
+    $mapText = $pitched['mentor_bridge'];
 
     $turnInsert = $pdo->prepare(
         "insert into dialogue_turns (

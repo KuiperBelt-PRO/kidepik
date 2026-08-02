@@ -29,16 +29,13 @@ final class AiGateway
         private ?AiUsageTracker $usageTracker = null,
         private ?AiCallAttemptStore $attemptStore = null,
         private ?AiModelCooldownStore $cooldownStore = null,
+        private ?FreeModelQueueSync $queueSync = null,
     ) {
     }
 
     public static function fromConfig(): self
     {
-        if (Config::aiMock()) {
-            return new self(modelQueue: ['mock/local'], chatFn: [MockAiGateway::class, 'complete']);
-        }
-
-        return new self(allowPaid: Config::aiAllowPaid());
+        return new self(allowPaid: false);
     }
 
     public function isEnabled(): bool
@@ -234,6 +231,13 @@ final class AiGateway
                         $e->status > 0 ? $e->status : null,
                         $classified['error_brief'],
                     );
+                    if ($classified['error_class'] === 'http' && $e->status === 404) {
+                        ($this->queueSync ?? new FreeModelQueueSync())->markModelUnavailable(
+                            $purpose,
+                            $modelId,
+                            'upstream HTTP 404',
+                        );
+                    }
                 }
                 $last = $e;
                 continue;
@@ -245,6 +249,19 @@ final class AiGateway
             $this->attemptStore->persistTrace($trace, $childId);
         }
         $this->lastTrace = $trace;
+
+        if (
+            $this->modelQueue === null
+            && !($opts['_queue_refreshed'] ?? false)
+            && Config::aiDiscoveryEnabled()
+        ) {
+            $sync = $this->queueSync ?? new FreeModelQueueSync();
+            if ($sync->refreshPurposeOnExhaustion($purpose)) {
+                PurposeModelQueueStore::resetCacheForTests();
+
+                return $this->complete($messages, array_merge($opts, ['_queue_refreshed' => true]));
+            }
+        }
 
         throw $last ?? new LLMException('all free models failed', 503);
     }

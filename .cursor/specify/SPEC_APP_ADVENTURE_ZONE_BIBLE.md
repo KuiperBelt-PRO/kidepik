@@ -1,8 +1,8 @@
 # Spec: Biblia narrativa por zona (coherencia diegética)
 
-> Estado: **propuesta — pendiente de aprobación** (1 ago 2026)  
-> Relacionado: [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md)  
-> Precedencia: corrige el vertical slice actual donde `AdventureService::chooseZone()` usa **copy de bosque** para **todas** las zonas fantasy.
+> Estado: **propuesta — pendiente de aprobación** (1 ago 2026); **ampliada** (2 ago 2026) por [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md)  
+> Relacionado: [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md)  
+> Precedencia: la **§1** es constraint del LLM y del validador; el copy jugable lo genera el agente (`zone_scene_writer`, `challenge_writer`). **Sin plantillas** — `ZoneNarrativeCatalog` y `zone_narratives/*.es.md` se **eliminan** en migración L5.
 
 ## Contexto / síntoma (sesión real)
 
@@ -81,13 +81,17 @@ Ejemplo normativo `zone_logic` fantasy:
 | Fantasía | Imágenes concretas (espejo roto, pasillo) antes que abstracciones («equilibrio del saber») |
 | Muletillas | «Equilibrio», «Vacío/Artefacto»: como seasoning, no en cada párrafo |
 
-Textos literales viven en `shared/Ai/zone_narratives/{world_theme}/{zone_id}.es.md` (versionables); PHP carga plantilla + sustituye `{display_name}`, `{steps_total}`, `{mentor_name}`.
+## 3. Plantillas de copy (obsoletas — a eliminar)
+
+> **Obsoleto** tras aprobación [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md): el copy servido al niño **no** vive en ficheros `.es.md` ni en `ZoneNarrativeCatalog`. Esta sección queda como referencia de **constraints** para prompts hasta borrar el código legacy.
+
+Textos que existían en `shared/Ai/zone_narratives/{world_theme}/{zone_id}.es.md` pasan a ser **solo** input del validador/biblia, no output al jugador.
 
 ---
 
 ## 4. Entre-retos y cierre de quest
 
-Misma biblia: `zone_between` y `zone_quest_complete` **usan plantilla de la zona activa**, no bosque genérico.
+Misma biblia como constraint: `zone_between` y `zone_quest_complete` los genera `zone_scene_writer` (LLM).
 
 | Fase | Contenido |
 | --- | --- |
@@ -96,14 +100,21 @@ Misma biblia: `zone_between` y `zone_quest_complete` **usan plantilla de la zona
 
 ---
 
-## 5. Relación con LLM
+## 5. Relación con LLM ([SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md))
 
-Cuando el LLM vista prosa (`zone_between`, reto vestido):
+**Camino feliz:** el LLM **genera** pitches, llegadas, NPCs, retos vestidos, entre-retos y cierres. Esta biblia es **constraint**, no texto a copiar.
 
-- Recibe `zone_bible_excerpt` (escenario + NPC + palabras permitidas/prohibidas) en el system prompt.
-- El validador de [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md) §6 amplía regla 4 con el firewall de §2.
+| Agente | Usa biblia como… |
+| --- | --- |
+| `zone_pitch_writer` | Escenario + tono por `zone_id` ofrecido |
+| `zone_scene_writer` | NPC arquetipo + vocabulario permitido/prohibido |
+| `challenge_writer` | Wrapper del reto en el lugar activo |
+| `waiting_copy_writer` | Solo mundo + edad (sin spoiler de zona no visitada) |
 
-Fallback sin LLM: plantillas de §3–4 siempre disponibles.
+- System prompt: `zone_bible_excerpt` (§1–2) + `_mentor_prose_rules.es.md`.
+- Validador: [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md) §6 + firewall §2 de esta spec.
+
+**Fallo compose:** `compose_failed` — sin sustituir por plantilla (spec LLM §1.2).
 
 ---
 
@@ -117,13 +128,15 @@ Fallback sin LLM: plantillas de §3–4 siempre disponibles.
 
 ---
 
-## 7. Implementación prevista (tras aprobación)
+## 7. Implementación prevista (tras aprobación LLM narrative)
 
 | Pieza | Ubicación |
 | --- | --- |
-| Cargador de plantillas | `shared/Ai/ZoneNarrativeCatalog.php` |
-| Refactor `chooseZone` | `AdventureService.php` — 1 turno, copy por `zone_id` |
-| Refactor between/complete | `AdventureService.php` |
+| Planificador pitches | `api/src/Services/ZonePitchPlanner.php` |
+| Compose aventura | `api/src/Services/AdventureComposeService.php` |
+| Prompts agentes | `shared/Ai/prompts/zone_pitch_writer.es.md`, `zone_scene_writer.es.md`, `challenge_writer.es.md`, `waiting_copy_writer.es.md` |
 | Guard de vocabulario | `shared/Ai/ZoneNarrativeGuard.php` |
-| Prompt LLM | `shared/Ai/prompts/_mentor_prose_rules.es.md` + excerpt zona |
-| Tests | `api/tests/ZoneNarrativeTest.php` |
+| Esperas servidor | `api/src/Services/WaitingCopyService.php` |
+| Tests | `api/tests/AdventureLlmNarrativeTest.php`, `ZoneNarrativeTest.php` |
+| L5 eliminar | `ZoneNarrativeCatalog.php`, `zone_narratives/*.es.md` servidos, wrappers narrativos `challengePool` |
+| Plan | [tasks/AI_ADVENTURE_LLM_NARRATIVE_PLAN.md](../tasks/AI_ADVENTURE_LLM_NARRATIVE_PLAN.md) |

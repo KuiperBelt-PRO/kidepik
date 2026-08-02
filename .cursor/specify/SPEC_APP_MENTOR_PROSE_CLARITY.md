@@ -1,7 +1,7 @@
 # Spec: Claridad de prosa del mentor (aventura y placement)
 
-> Estado: **propuesta — pendiente de aprobación** (1 ago 2026)  
-> Relacionado: [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_ADVENTURE_ZONE_BIBLE.md](SPEC_APP_ADVENTURE_ZONE_BIBLE.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md)  
+> Estado: **propuesta — pendiente de aprobación** (1 ago 2026); **ampliada** (2 ago 2026) por [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md)  
+> Relacionado: [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_ADVENTURE_ZONE_BIBLE.md](SPEC_APP_ADVENTURE_ZONE_BIBLE.md), [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md)  
 > Archivo operativo: `shared/Ai/prompts/_mentor_prose_rules.es.md`
 
 ## Problema
@@ -68,10 +68,14 @@ Regla existente del canon: no hiperespacio en fantasy ni hechizos en sci-fi salv
 
 | Fuente | Obligación |
 | --- | --- |
-| `ZoneNarrativeCatalog` | Cumple biblia de zona + §1–4 |
-| `PlacementNarrator` | Menos épica en instrucciones de examen; más directo |
-| `llmMentorTurn` | Inyectar `_mentor_prose_rules.es.md` + `zone_bible_excerpt` + cupos §2 |
+| Agentes LLM (`zone_pitch_writer`, `zone_scene_writer`, `challenge_writer`, `waiting_copy_writer`) | Inyectar `_mentor_prose_rules.es.md` + `zone_bible_excerpt` + cupos §2 |
+| `waiting_copy_writer` | §1–4 + líneas cortas (≤90 caracteres); 4–8 líneas por lote — ver [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) §2.5 |
+| `llmMentorTurn` (huecos anti-planificador) | Mismas reglas; no sustituye compose de aventura |
 | Validador post-LLM | Rechazar si supera cupo de muletillas o vocabulario de zona ajena |
+
+**Prohibido:** `ZoneNarrativeCatalog` y arrays estáticos de espera en cliente.
+
+**Cliente:** `play.js` consume `waiting_lines[]` del API; si falla compose → animación neutra (spec LLM §1.2).
 
 ---
 
@@ -91,6 +95,7 @@ Automatizable (MVP+): heurística de longitud de frase + lista negra de muletill
 ## 7. Criterios de aceptación
 
 1. `_mentor_prose_rules.es.md` actualizado con §1–4.
-2. Copy de `chooseZone` pasa checklist §6 para cada `zone_id`.
+2. Copy de llegada y retos (LLM) pasa checklist §6 para cada `zone_id`.
 3. Test PHPUnit: ningún turno de llegada supera 3 frases por párrafo ni 450 caracteres.
-4. Sesión de prueba: tutor reporta mejora en claridad (Vatardar → Laberinto).
+4. Lotes de espera: ninguna línea >90 caracteres; máximo 1 muletilla de §2 por lote.
+5. Sesión de prueba: tutor reporta mejora en claridad (Vatardar → Laberinto).

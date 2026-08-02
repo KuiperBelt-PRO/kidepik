@@ -41,6 +41,8 @@ final class ClientLogTest extends TestCase
             @unlink($file);
         }
         @rmdir($this->logDir);
+        putenv('APP_ENV=local');
+        $_ENV['APP_ENV'] = 'local';
     }
 
     public function testIngestWritesClientChannel(): void

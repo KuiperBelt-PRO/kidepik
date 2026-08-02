@@ -30,8 +30,7 @@ final class FreeModelCatalog
             if (!$this->isFree($row)) {
                 continue;
             }
-            // Solo texto de chat: excluir embeddings puros si el id lo indica.
-            if (str_contains($id, 'embed')) {
+            if (!$this->isChatCapable($row)) {
                 continue;
             }
 
@@ -52,16 +51,73 @@ final class FreeModelCatalog
     public function isFree(array $row): bool
     {
         $id = isset($row['id']) && is_string($row['id']) ? $row['id'] : '';
-        if ($id !== '' && str_ends_with($id, ':free')) {
+        if ($id === '' || !str_ends_with($id, ':free')) {
+            return false;
+        }
+
+        $pricing = is_array($row['pricing'] ?? null) ? $row['pricing'] : [];
+        if ($pricing === []) {
             return true;
         }
-        $pricing = is_array($row['pricing'] ?? null) ? $row['pricing'] : [];
+
         $prompt = $this->priceFloat($pricing['prompt'] ?? null);
         $completion = $this->priceFloat($pricing['completion'] ?? null);
 
-        return $prompt <= 0.0 && $completion <= 0.0
-            && array_key_exists('prompt', $pricing)
-            && array_key_exists('completion', $pricing);
+        return $prompt <= 0.0 && $completion <= 0.0;
+    }
+
+    /**
+     * Solo modelos de chat con salida texto (excluye audio, imagen, vídeo, embeddings).
+     *
+     * @param array<string,mixed> $row
+     */
+    public function isChatCapable(array $row): bool
+    {
+        $id = isset($row['id']) && is_string($row['id']) ? strtolower($row['id']) : '';
+        if ($id === '') {
+            return false;
+        }
+
+        $blockedFragments = [
+            'embed',
+            'lyria',
+            '/clip',
+            'clip-',
+            'tts',
+            'whisper',
+            'dall-e',
+            'dalle',
+            'stable-diffusion',
+            'flux',
+            'image',
+            'vision-only',
+            '/audio',
+            'music',
+            'suno',
+        ];
+        foreach ($blockedFragments as $fragment) {
+            if (str_contains($id, $fragment)) {
+                return false;
+            }
+        }
+
+        $architecture = is_array($row['architecture'] ?? null) ? $row['architecture'] : [];
+        $outputModalities = $architecture['output_modalities'] ?? null;
+        if (is_array($outputModalities)) {
+            $normalized = array_map(static fn (mixed $m): string => strtolower((string) $m), $outputModalities);
+            if ($normalized !== [] && !in_array('text', $normalized, true)) {
+                return false;
+            }
+        }
+
+        $modality = isset($architecture['modality']) && is_string($architecture['modality'])
+            ? strtolower($architecture['modality'])
+            : '';
+        if ($modality !== '' && !str_contains($modality, 'text') && $modality !== 'chat') {
+            return false;
+        }
+
+        return true;
     }
 
     private function priceFloat(mixed $value): float

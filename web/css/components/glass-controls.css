@@ -704,6 +704,41 @@
   --glass-skeleton-shimmer-delay: 0.32s;
 }
 
+.glass-skeleton--timeline {
+  gap: 0.65rem;
+  padding: 0;
+}
+
+.glass-skeleton-timeline-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.2rem 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: var(--glass-radius-field, 12px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  list-style: none;
+  pointer-events: none;
+}
+
+.glass-skeleton__line--timeline-kind {
+  grid-column: 1 / -1;
+  width: 42%;
+  height: 0.62rem;
+}
+
+.glass-skeleton__line--timeline-text {
+  width: 88%;
+  height: 0.88rem;
+}
+
+.glass-skeleton__line--timeline-at {
+  width: 4.5rem;
+  height: 0.62rem;
+  justify-self: end;
+  align-self: end;
+}
+
 @keyframes glass-skeleton-shimmer {
   0% {
     transform: translateX(-120%);

@@ -6,9 +6,11 @@ namespace Kidepik\Api\Tests;
 
 use Kidepik\Shared\Config;
 use Kidepik\Shared\Ai\AgeBand;
+use Kidepik\Shared\Ai\AiModelCooldownStore;
 use Kidepik\Shared\Ai\AiGateway;
 use Kidepik\Shared\Ai\FreeModelCatalog;
 use Kidepik\Shared\Ai\FreeModelDiscovery;
+use Kidepik\Shared\Ai\FreeModelQueueSync;
 use Kidepik\Shared\Ai\FreeModelRanker;
 use Kidepik\Shared\Ai\LLMException;
 use Kidepik\Shared\Ai\MentorCatalog;
@@ -18,19 +20,26 @@ use PHPUnit\Framework\TestCase;
 
 final class AiGatewayTest extends TestCase
 {
-    public function testCatalogKeepsOnlyFreeModels(): void
+    public function testCatalogKeepsOnlyFreeChatModels(): void
     {
         $catalog = new FreeModelCatalog();
         $free = $catalog->filterFree([
             ['id' => 'paid/model', 'pricing' => ['prompt' => '0.001', 'completion' => '0.002']],
             ['id' => 'acme/good:free', 'pricing' => ['prompt' => '0', 'completion' => '0'], 'name' => 'Good', 'context_length' => 8192],
             ['id' => 'acme/zero', 'pricing' => ['prompt' => 0, 'completion' => 0], 'context_length' => 4096],
+            ['id' => 'openrouter/auto', 'pricing' => ['prompt' => '0', 'completion' => '0'], 'context_length' => 8192],
             ['id' => 'acme/embed:free', 'pricing' => ['prompt' => '0', 'completion' => '0']],
+            ['id' => 'google/lyria-3-clip-preview', 'pricing' => ['prompt' => '0', 'completion' => '0'], 'architecture' => ['output_modalities' => ['audio']]],
             ['id' => 'deny/me:free', 'pricing' => ['prompt' => '0', 'completion' => '0']],
         ], ['deny/me:free']);
 
         $ids = array_column($free, 'id');
-        self::assertSame(['acme/good:free', 'acme/zero'], $ids);
+        self::assertSame(['acme/good:free'], $ids);
+    }
+
+    public function testCatalogKeepsOnlyFreeModels(): void
+    {
+        $this->testCatalogKeepsOnlyFreeChatModels();
     }
 
     public function testRankerOrdersByPreferenceThenScore(): void
@@ -116,6 +125,8 @@ final class AiGatewayTest extends TestCase
 
     public function testGatewayUsesDiscoveryRankingForDialogue(): void
     {
+        PurposeModelQueueStore::resetCacheForTests();
+
         $discovery = new class extends FreeModelDiscovery {
             /** @return list<string> */
             public function rankedIds(?array $rawOverride = null, string $purpose = 'dialogue'): array
@@ -142,10 +153,61 @@ final class AiGatewayTest extends TestCase
         );
 
         $gateway->complete([['role' => 'user', 'content' => 'hola']], ['purpose' => 'dialogue']);
-        self::assertSame('meta-llama/llama-3.3-70b-instruct:free', $calls[0]);
+        self::assertContains($calls[0], [
+            'meta-llama/llama-3.3-70b-instruct:free',
+            'google/gemma-3-27b-it:free',
+        ]);
     }
 
-    public function testMockEnvelope(): void
+    public function testGatewayRefreshesQueueOnceAfterAllModelsFail(): void
+    {
+        putenv('OPENROUTER_API_KEY=sk-test');
+        putenv('AI_DISCOVERY_SYNC=true');
+        putenv('AI_ENABLED=true');
+        $_ENV['OPENROUTER_API_KEY'] = 'sk-test';
+        $_ENV['AI_DISCOVERY_SYNC'] = 'true';
+        $_ENV['AI_ENABLED'] = 'true';
+
+        $calls = 0;
+        $sync = $this->createMock(FreeModelQueueSync::class);
+        $sync->expects(self::once())
+            ->method('refreshPurposeOnExhaustion')
+            ->with('dialogue')
+            ->willReturn(true);
+
+        $queueStore = $this->createStub(PurposeModelQueueStore::class);
+        $queueStore->method('idsForPurpose')->willReturn(['test-dead-only:free']);
+
+        $cooldown = $this->createStub(AiModelCooldownStore::class);
+        $cooldown->method('filterAvailable')->willReturnArgument(1);
+
+        $gateway = new AiGateway(
+            modelQueue: null,
+            chatFn: static function () use (&$calls): array {
+                $calls++;
+                if ($calls <= 1) {
+                    throw new LLMException('all dead', 503);
+                }
+
+                return ['content' => '{"agent_text":"ok"}', 'raw_model' => 'fresh/model:free'];
+            },
+            discovery: new class extends FreeModelDiscovery {
+                public function rankedIds(?array $rawOverride = null, string $purpose = 'dialogue'): array
+                {
+                    return [];
+                }
+            },
+            purposeQueues: $queueStore,
+            cooldownStore: $cooldown,
+            queueSync: $sync,
+        );
+
+        $result = $gateway->complete([['role' => 'user', 'content' => 'hola']], ['purpose' => 'dialogue']);
+        self::assertSame(2, $calls);
+        self::assertStringContainsString('ok', $result['content']);
+    }
+
+    public function testMockEnvelopeForInjectedTestsOnly(): void
     {
         $out = MockAiGateway::complete('mock/local', [
             ['role' => 'user', 'content' => 'quiero fantasía'],
@@ -154,6 +216,17 @@ final class AiGatewayTest extends TestCase
         self::assertIsArray($json);
         self::assertArrayHasKey('agent_text', $json);
         self::assertArrayHasKey('input_mode', $json);
+    }
+
+    public function testConfigNeverAllowsPaidOrMock(): void
+    {
+        putenv('AI_ALLOW_PAID=true');
+        putenv('AI_MOCK=true');
+        $_ENV['AI_ALLOW_PAID'] = 'true';
+        $_ENV['AI_MOCK'] = 'true';
+
+        self::assertFalse(Config::aiAllowPaid());
+        self::assertFalse(Config::aiMock());
     }
 
     public function testAgeBandMapping(): void

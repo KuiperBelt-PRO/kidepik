@@ -14,6 +14,7 @@ export const SUBJECT_CATALOG = [
   { id: "science", label: "Ciencias naturales", family: "sciences" },
   { id: "culture", label: "Cultura general", family: "humanities" },
   { id: "geography", label: "Geografía", family: "humanities" },
+  { id: "history", label: "Historia", family: "humanities" },
   { id: "mythology", label: "Mitología", family: "humanities" },
   { id: "ethics", label: "Ética y moral", family: "society" },
   { id: "communication", label: "Comunicación", family: "society" },

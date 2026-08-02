@@ -242,7 +242,7 @@ Objeto anidado en `settings`. Se copia al crear un `child` (ver Crew § alta). *
 | --- | --- | --- | --- | --- |
 | `crew_defaults.session_limit_per_day` | int \| null | `1`–`6` o `null` | `3` | `null` = sin límite |
 | `crew_defaults.max_session_minutes` | int | 5–120, múltiplos de 5 | `10` | Tope por sesión (UI: slider) |
-| `crew_defaults.require_exit_pin` | bool | | `false` | PIN para salir a gestión |
+| `crew_defaults.require_exit_pin` | bool | | `false` | Pedir PIN antes de continuar con la aventura |
 | `crew_defaults.allow_solo_start` | bool | | `true` | Iniciar aventura sin PIN de entrada |
 | `crew_defaults.lock_world_theme` | bool | | `true` | Bloquear cambio de mundo tras alta |
 | `crew_defaults.font_scale_play` | enum | md/lg/xl | hereda `font_scale_play` del hogar | Override inicial |

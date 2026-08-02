@@ -86,17 +86,14 @@ final class DialogueService
             $this->seedOpeningTurn($pdo, (string) $session['id'], $childId, $resolvedFlow, $mentorId, $child);
         }
 
-        $turns = $this->loadTurns($pdo, (string) $session['id']);
-        $pending = null;
-        for ($i = count($turns) - 1; $i >= 0; $i--) {
-            if (($turns[$i]['role'] ?? '') === 'mentor' || ($turns[$i]['role'] ?? '') === 'agent') {
-                $pending = $turns[$i];
-                break;
-            }
-        }
+        $pageSize = Config::playHistoryPageSize();
+        $turns = $this->loadRecentTurnsForChild($pdo, $childId, $pageSize);
+        $pending = $this->lastMentorTurn($pdo, (string) $session['id']);
+        $waitSvc = new WaitingCopyService($pdo);
+        $sid = (string) $session['id'];
 
         return [
-            'session_id' => (string) $session['id'],
+            'session_id' => $sid,
             'flow_id' => (string) $session['flow_id'],
             'onboarding_step' => (string) ($child['onboarding_step'] ?? 'pending_entry'),
             'world_theme' => $child['world_theme'] ?? null,
@@ -107,7 +104,64 @@ final class DialogueService
                 (string) ($session['mentor_id'] ?? MentorCatalog::idForWorldTheme($child['world_theme'] ?? null))
             ),
             'turns' => $turns,
+            'history' => $this->buildHistoryMetaForChild($pdo, $childId, $turns, $pageSize),
             'pending_agent_turn' => $pending,
+            'waiting_copy' => $waitSvc->waitingCopyFromCache($childId),
+        ];
+    }
+
+    /**
+     * @return array{turns:list<array<string,mixed>>,history:array<string,mixed>}
+     */
+    public function loadHistory(
+        string $authUserId,
+        string $childId,
+        string $sessionId,
+        string $beforeTurnId,
+        ?int $limit = null,
+    ): array {
+        if ($beforeTurnId === '') {
+            throw new InvalidArgumentException('before_turn_id required');
+        }
+
+        $crew = $this->crew();
+        $crew->getForAuthUser($authUserId, $childId);
+        $pdo = $this->pdo();
+
+        $sessionStmt = $pdo->prepare(
+            "select id from dialogue_sessions where id = :id and child_id = :cid and status = 'open' limit 1"
+        );
+        $sessionStmt->execute(['id' => $sessionId, 'cid' => $childId]);
+        if ($sessionStmt->fetchColumn() === false) {
+            throw new RuntimeException('Dialogue session not found or closed');
+        }
+
+        $anchorStmt = $pdo->prepare(
+            'select id, created_at from dialogue_turns where id = :tid and child_id = :cid limit 1'
+        );
+        $anchorStmt->execute(['tid' => $beforeTurnId, 'cid' => $childId]);
+        $anchor = $anchorStmt->fetch(PDO::FETCH_ASSOC);
+        if ($anchor === false) {
+            throw new InvalidArgumentException('before_turn_id not found');
+        }
+
+        $pageSize = $this->playHistoryPageSize($limit);
+        $stmt = $pdo->prepare(
+            'select * from dialogue_turns where child_id = :cid and (
+                created_at < :at or (created_at = :at and id < :id)
+             ) order by created_at desc, id desc limit :lim'
+        );
+        $stmt->bindValue('cid', $childId);
+        $stmt->bindValue('at', (string) $anchor['created_at']);
+        $stmt->bindValue('id', (string) $anchor['id']);
+        $stmt->bindValue('lim', $pageSize, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+        $turns = array_map(fn (array $r): array => $this->mapTurn($r), $rows);
+
+        return [
+            'turns' => $turns,
+            'history' => $this->buildHistoryMetaForChild($pdo, $childId, $turns, $pageSize),
         ];
     }
 
@@ -180,7 +234,18 @@ final class DialogueService
         $lastMentor = $this->lastMentorTurn($pdo, $sessionId);
         $phase = is_array($lastMentor['meta'] ?? null) ? (string) ($lastMentor['meta']['phase'] ?? '') : '';
 
-        if ($phase === 'choose_zone' || ($step === 'complete' && str_starts_with((string) ($reply['option_id'] ?? ''), 'zone_'))) {
+        if ($phase === 'compose_failed' && ($reply['option_id'] ?? '') === 'retry_compose') {
+            [$effects, $agentTurns] = $this->retryAdventureCompose(
+                $pdo,
+                $childId,
+                $child,
+                $sessionId,
+                $seq + 1,
+                $mentorId,
+                $lastMentor,
+                $attachDebug,
+            );
+        } elseif ($phase === 'choose_zone' || ($step === 'complete' && str_starts_with((string) ($reply['option_id'] ?? ''), 'zone_'))) {
             $zoneId = (string) ($reply['option_id'] ?? '');
             $offered = is_array($lastMentor['meta']['choices_offered'] ?? null)
                 ? $lastMentor['meta']['choices_offered']
@@ -203,161 +268,203 @@ final class DialogueService
                 }
             }
             $n = $seq + 1;
-            $agentTurns[] = $this->insertTurn($pdo, [
-                'session_id' => $sessionId,
-                'child_id' => $childId,
-                'flow_id' => 'adventure',
-                'sequence' => $n++,
-                'role' => 'mentor',
-                'text' => 'Muy bien. Vamos a ' . $chosenLabel . '.',
-                'input_mode' => 'continue',
-                'options' => [['id' => 'continue', 'label' => 'Continuar']],
-                'explorer_reply' => null,
-                'meta' => [
-                    'phase' => 'choice_resolved',
-                    'decision_key' => 'choose_zone',
-                    'choices_offered' => $offered,
-                    'choice_taken' => ['id' => $zoneId, 'label' => $chosenLabel],
-                    'choices_discarded' => $discarded,
-                ],
-                'model_used' => null,
-            ]);
-            $adv = new AdventureService($pdo, $this->gateway());
-            $result = $adv->chooseZone($childId, $child, $zoneId, $sessionId, 'adventure', $n, $mentorId);
-            $effects = $result['effects'];
-            foreach ($result['turns'] as $payload) {
+            if ($discarded !== [] || $offered !== []) {
                 $agentTurns[] = $this->insertTurn($pdo, [
                     'session_id' => $sessionId,
                     'child_id' => $childId,
                     'flow_id' => 'adventure',
                     'sequence' => $n++,
                     'role' => 'mentor',
-                    'text' => (string) ($payload['text'] ?? ''),
-                    'input_mode' => $payload['input_mode'] ?? 'continue',
-                    'options' => $payload['options'] ?? null,
+                    'text' => '',
+                    'input_mode' => 'continue',
+                    'options' => [['id' => 'continue', 'label' => 'Continuar']],
                     'explorer_reply' => null,
-                    'meta' => $payload['meta'] ?? [],
+                    'meta' => [
+                        'phase' => 'choice_resolved',
+                        'decision_key' => 'choose_zone',
+                        'choices_offered' => $offered,
+                        'choice_taken' => ['id' => $zoneId, 'label' => $chosenLabel],
+                        'choices_discarded' => $discarded,
+                    ],
                     'model_used' => null,
                 ]);
             }
-            $pdo->prepare("update dialogue_sessions set flow_id = 'adventure', updated_at = now() where id = :id")
-                ->execute(['id' => $sessionId]);
+            try {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->chooseZone(
+                    $childId,
+                    $child,
+                    $zoneId,
+                    $sessionId,
+                    'adventure',
+                    $n,
+                    $mentorId,
+                    $chosenLabel,
+                );
+                $effects = $result['effects'];
+                foreach ($result['turns'] as $payload) {
+                    $agentTurns[] = $this->insertTurn($pdo, [
+                        'session_id' => $sessionId,
+                        'child_id' => $childId,
+                        'flow_id' => 'adventure',
+                        'sequence' => $n++,
+                        'role' => 'mentor',
+                        'text' => (string) ($payload['text'] ?? ''),
+                        'input_mode' => $payload['input_mode'] ?? 'continue',
+                        'options' => $payload['options'] ?? null,
+                        'explorer_reply' => null,
+                        'meta' => $payload['meta'] ?? [],
+                        'model_used' => null,
+                    ]);
+                }
+                $pdo->prepare("update dialogue_sessions set flow_id = 'adventure', updated_at = now() where id = :id")
+                    ->execute(['id' => $sessionId]);
+            } catch (AdventureComposeFailedException $e) {
+                $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                    $pdo,
+                    $sessionId,
+                    $childId,
+                    $n,
+                    'scene',
+                    $e,
+                    $attachDebug,
+                    ['zone_id' => $zoneId, 'chosen_label' => $chosenLabel],
+                );
+            }
         } elseif ($phase === 'admission_map') {
-            // El closing ya se mostró; re-emitir pitches si el continue llega sin options en cliente
-            $levels = $this->subjectLevelsMap($pdo, $childId);
-            $theme = (string) ($child['world_theme'] ?? 'fantasy');
-            $exclude = AdventureService::completedZoneIds($child);
-            $zoneOptions = AdventureService::zonePitches($theme, $levels, 3, $exclude);
-            $agentTurns[] = $this->insertTurn($pdo, [
-                'session_id' => $sessionId,
-                'child_id' => $childId,
-                'flow_id' => $flowId,
-                'sequence' => $seq + 1,
-                'role' => 'mentor',
-                'text' => AdventureService::zonePitchMapText($zoneOptions),
-                'input_mode' => 'options_only',
-                'options' => $zoneOptions,
-                'explorer_reply' => null,
-                'meta' => ['phase' => 'choose_zone', 'choices_offered' => $zoneOptions],
-                'model_used' => null,
-            ]);
+            try {
+                $levels = $this->subjectLevelsMap($pdo, $childId);
+                $exclude = AdventureService::completedZoneIds($child);
+                $compose = AdventureComposeService::fromConfig($pdo);
+                $pitched = $compose->planAndComposePitches($childId, $child, $sessionId, $levels, $exclude);
+                $zoneOptions = $pitched['options'];
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => $flowId,
+                    'sequence' => $seq + 1,
+                    'role' => 'mentor',
+                    'text' => $pitched['mentor_bridge'],
+                    'input_mode' => 'options_only',
+                    'options' => $zoneOptions,
+                    'explorer_reply' => null,
+                    'meta' => ['phase' => 'choose_zone', 'choices_offered' => $zoneOptions],
+                    'model_used' => null,
+                ]);
+            } catch (AdventureComposeFailedException $e) {
+                $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                    $pdo,
+                    $sessionId,
+                    $childId,
+                    $seq + 1,
+                    'pitch',
+                    $e,
+                    $attachDebug,
+                );
+            }
         } elseif (in_array($phase, ['zone_arrive', 'zone_between'], true)) {
-            $adv = new AdventureService($pdo, $this->gateway());
             $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
             $meta['gate_index'] = (int) ($meta['gate_index'] ?? 0);
             $meta['subject_id'] = (string) ($meta['subject_id'] ?? str_replace('zone_', '', (string) ($meta['zone_id'] ?? 'zone_math')));
-            $result = $adv->presentChallenge($childId, $child, $meta, $sessionId, $mentorId);
-            $effects = $result['effects'];
-            $n = $seq + 1;
-            foreach ($result['turns'] as $payload) {
-                $agentTurns[] = $this->insertTurn($pdo, [
-                    'session_id' => $sessionId,
-                    'child_id' => $childId,
-                    'flow_id' => 'adventure',
-                    'sequence' => $n++,
-                    'role' => 'mentor',
-                    'text' => (string) ($payload['text'] ?? ''),
-                    'input_mode' => $payload['input_mode'] ?? 'options_only',
-                    'options' => $payload['options'] ?? null,
-                    'explorer_reply' => null,
-                    'meta' => $payload['meta'] ?? [],
-                    'model_used' => null,
-                ]);
+            try {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->presentChallenge($childId, $child, $meta, $sessionId, $mentorId);
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $seq + 1, $result),
+                );
+            } catch (AdventureComposeFailedException $e) {
+                $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                    $pdo,
+                    $sessionId,
+                    $childId,
+                    $seq + 1,
+                    'challenge',
+                    $e,
+                    $attachDebug,
+                    ['retry_context' => $meta],
+                );
             }
         } elseif ($phase === 'adventure_challenge') {
-            $adv = new AdventureService($pdo, $this->gateway());
-            $result = $adv->resolveChallenge(
-                $childId,
-                $child,
-                $reply,
-                is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [],
-                $sessionId,
-                $seq + 1,
-                $mentorId,
-            );
-            $effects = $result['effects'];
-            $n = $seq + 1;
-            foreach ($result['turns'] as $payload) {
-                $agentTurns[] = $this->insertTurn($pdo, [
-                    'session_id' => $sessionId,
-                    'child_id' => $childId,
-                    'flow_id' => 'adventure',
-                    'sequence' => $n++,
-                    'role' => 'mentor',
-                    'text' => (string) ($payload['text'] ?? ''),
-                    'input_mode' => $payload['input_mode'] ?? 'continue',
-                    'options' => $payload['options'] ?? null,
-                    'explorer_reply' => null,
-                    'meta' => $payload['meta'] ?? [],
-                    'model_used' => null,
-                ]);
+            $challengeMeta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
+            try {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->resolveChallenge(
+                    $childId,
+                    $child,
+                    $reply,
+                    $challengeMeta,
+                    $sessionId,
+                    $seq + 1,
+                    $mentorId,
+                );
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $seq + 1, $result),
+                );
+            } catch (AdventureComposeFailedException $e) {
+                $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                    $pdo,
+                    $sessionId,
+                    $childId,
+                    $seq + 1,
+                    'challenge_result',
+                    $e,
+                    $attachDebug,
+                    ['retry_context' => array_merge($challengeMeta, ['reply' => $reply])],
+                );
             }
         } elseif ($phase === 'zone_quest_complete') {
-            $adv = new AdventureService($pdo, $this->gateway());
             $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
             $opt = (string) ($reply['option_id'] ?? '');
-            if ($opt === 'stay_a_while' || $opt === 'continue_zone_lore') {
-                $result = $adv->lingerAfterQuest($childId, $child, $meta, $sessionId);
-            } else {
-                $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
-            }
-            $effects = $result['effects'];
-            $n = $seq + 1;
-            foreach ($result['turns'] as $payload) {
-                $agentTurns[] = $this->insertTurn($pdo, [
-                    'session_id' => $sessionId,
-                    'child_id' => $childId,
-                    'flow_id' => 'adventure',
-                    'sequence' => $n++,
-                    'role' => 'mentor',
-                    'text' => (string) ($payload['text'] ?? ''),
-                    'input_mode' => $payload['input_mode'] ?? 'continue',
-                    'options' => $payload['options'] ?? null,
-                    'explorer_reply' => null,
-                    'meta' => $payload['meta'] ?? [],
-                    'model_used' => null,
-                ]);
+            $composeKind = ($opt === 'stay_a_while' || $opt === 'continue_zone_lore') ? 'linger' : 'wrap';
+            try {
+                $adv = new AdventureService($pdo, $this->gateway());
+                if ($composeKind === 'linger') {
+                    $result = $adv->lingerAfterQuest($childId, $child, $meta, $sessionId);
+                } else {
+                    $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
+                }
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $seq + 1, $result),
+                );
+            } catch (AdventureComposeFailedException $e) {
+                $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                    $pdo,
+                    $sessionId,
+                    $childId,
+                    $seq + 1,
+                    $composeKind,
+                    $e,
+                    $attachDebug,
+                    ['retry_context' => array_merge($meta, ['option_id' => $opt])],
+                );
             }
         } elseif ($phase === 'session_wrap' || $phase === 'adventure_idle') {
-            $adv = new AdventureService($pdo, $this->gateway());
             $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
-            $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
-            $effects = $result['effects'];
-            $n = $seq + 1;
-            foreach ($result['turns'] as $payload) {
-                $agentTurns[] = $this->insertTurn($pdo, [
-                    'session_id' => $sessionId,
-                    'child_id' => $childId,
-                    'flow_id' => 'adventure',
-                    'sequence' => $n++,
-                    'role' => 'mentor',
-                    'text' => (string) ($payload['text'] ?? ''),
-                    'input_mode' => $payload['input_mode'] ?? 'continue',
-                    'options' => $payload['options'] ?? null,
-                    'explorer_reply' => null,
-                    'meta' => $payload['meta'] ?? [],
-                    'model_used' => null,
-                ]);
+            try {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $seq + 1, $result),
+                );
+            } catch (AdventureComposeFailedException $e) {
+                $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                    $pdo,
+                    $sessionId,
+                    $childId,
+                    $seq + 1,
+                    'wrap',
+                    $e,
+                    $attachDebug,
+                    ['retry_context' => $meta],
+                );
             }
         } elseif ($phase === 'placement_item' || ($step === 'placement' && $phase !== 'handoff_placement' && $this->hasOpenExam($pdo, $childId))) {
             $this->lastEffects = [];
@@ -446,25 +553,26 @@ final class DialogueService
             ]);
         } elseif ($flowId === 'adventure' || $step === 'complete') {
             // Anti-hueco: nunca LLM libre sin phase en adventure (SPEC_APP_ADVENTURE_STORY_RICHNESS §4.1)
-            $adv = new AdventureService($pdo, $this->gateway());
             $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
-            $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
-            $effects = $result['effects'];
-            $n = $seq + 1;
-            foreach ($result['turns'] as $payload) {
-                $agentTurns[] = $this->insertTurn($pdo, [
-                    'session_id' => $sessionId,
-                    'child_id' => $childId,
-                    'flow_id' => 'adventure',
-                    'sequence' => $n++,
-                    'role' => 'mentor',
-                    'text' => (string) ($payload['text'] ?? ''),
-                    'input_mode' => $payload['input_mode'] ?? 'continue',
-                    'options' => $payload['options'] ?? null,
-                    'explorer_reply' => null,
-                    'meta' => $payload['meta'] ?? [],
-                    'model_used' => null,
-                ]);
+            try {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->wrapSession($childId, $child, $meta, $sessionId);
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $seq + 1, $result),
+                );
+            } catch (AdventureComposeFailedException $e) {
+                $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                    $pdo,
+                    $sessionId,
+                    $childId,
+                    $seq + 1,
+                    'wrap',
+                    $e,
+                    $attachDebug,
+                    ['retry_context' => $meta],
+                );
             }
         } else {
             $agentTurns[] = $this->llmMentorTurn(
@@ -479,10 +587,12 @@ final class DialogueService
         }
 
         $fresh = $crew->getForAuthUser($authUserId, $childId);
+        $waitSvc = new WaitingCopyService($pdo);
 
         $response = [
             'agent_turns' => $agentTurns,
             'effects' => $effects,
+            'waiting_copy' => $waitSvc->waitingCopyFromCache($childId),
             'flow_complete' => ($fresh['onboarding_step'] ?? '') === 'complete'
                 && ($fresh['placement_status'] ?? '') === 'completed',
             'onboarding_step' => $fresh['onboarding_step'] ?? $step,
@@ -510,7 +620,7 @@ final class DialogueService
         $payload = [
             'ai' => [
                 'enabled' => Config::aiEnabled(),
-                'mock' => Config::aiMock(),
+                'mock' => false,
                 'key_present' => Config::openRouterKeyPresent(),
                 'max_attempts' => Config::aiMaxModelAttempts(),
                 'debug_allowed' => Config::aiDebugEnabled(),
@@ -940,10 +1050,8 @@ final class DialogueService
         $inputMode = 'continue';
         $options = [];
         try {
-            if ($gateway->isEnabled() || Config::aiMock()) {
-                // Forzar mock path cuando AI_MOCK
-                $gw = Config::aiMock() ? AiGateway::fromConfig() : $gateway;
-                $result = $gw->complete($messages, ['purpose' => 'dialogue', 'child_id' => $childId]);
+            if ($gateway->isEnabled()) {
+                $result = $gateway->complete($messages, ['purpose' => 'dialogue', 'child_id' => $childId]);
                 $modelUsed = $result['model'];
                 $parsed = json_decode($result['content'], true);
                 if (is_array($parsed)) {
@@ -1168,6 +1276,121 @@ final class DialogueService
         return array_map(fn (array $r): array => $this->mapTurn($r), $rows ?: []);
     }
 
+    /** @return list<array<string,mixed>> */
+    private function loadRecentTurnsForChild(PDO $pdo, string $childId, int $limit): array
+    {
+        $stmt = $pdo->prepare(
+            'select * from dialogue_turns where child_id = :cid
+             order by created_at desc, id desc limit :lim'
+        );
+        $stmt->bindValue('cid', $childId);
+        $stmt->bindValue('lim', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+
+        return array_map(fn (array $r): array => $this->mapTurn($r), $rows);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $turns
+     * @return array{
+     *   page_size:int,
+     *   has_older:bool,
+     *   oldest_turn_id:?string,
+     *   newest_turn_id:?string,
+     *   oldest_sequence:?int,
+     *   newest_sequence:?int
+     * }
+     */
+    private function buildHistoryMetaForChild(PDO $pdo, string $childId, array $turns, int $pageSize): array
+    {
+        if ($turns === []) {
+            return [
+                'page_size' => $pageSize,
+                'has_older' => false,
+                'oldest_turn_id' => null,
+                'newest_turn_id' => null,
+                'oldest_sequence' => null,
+                'newest_sequence' => null,
+            ];
+        }
+
+        $oldestTurn = $turns[0];
+        $newestTurn = $turns[count($turns) - 1];
+        $stmt = $pdo->prepare(
+            'select 1 from dialogue_turns where child_id = :cid and (
+                created_at < :at or (created_at = :at and id < :id)
+             ) limit 1'
+        );
+        $stmt->execute([
+            'cid' => $childId,
+            'at' => (string) $oldestTurn['created_at'],
+            'id' => (string) $oldestTurn['id'],
+        ]);
+
+        return [
+            'page_size' => $pageSize,
+            'has_older' => (bool) $stmt->fetchColumn(),
+            'oldest_turn_id' => (string) $oldestTurn['id'],
+            'newest_turn_id' => (string) $newestTurn['id'],
+            'oldest_sequence' => (int) $oldestTurn['sequence'],
+            'newest_sequence' => (int) $newestTurn['sequence'],
+        ];
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function loadRecentTurns(PDO $pdo, string $sessionId, int $limit): array
+    {
+        $stmt = $pdo->prepare(
+            'select * from dialogue_turns where session_id = :id order by sequence desc limit :lim'
+        );
+        $stmt->bindValue('id', $sessionId);
+        $stmt->bindValue('lim', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = array_reverse($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+
+        return array_map(fn (array $r): array => $this->mapTurn($r), $rows);
+    }
+
+    /**
+     * @param list<array<string,mixed>> $turns
+     * @return array{page_size:int,has_older:bool,oldest_sequence:?int,newest_sequence:?int}
+     */
+    private function buildHistoryMeta(PDO $pdo, string $sessionId, array $turns, int $pageSize): array
+    {
+        if ($turns === []) {
+            return [
+                'page_size' => $pageSize,
+                'has_older' => false,
+                'oldest_sequence' => null,
+                'newest_sequence' => null,
+            ];
+        }
+
+        $oldest = (int) $turns[0]['sequence'];
+        $newest = (int) $turns[count($turns) - 1]['sequence'];
+        $stmt = $pdo->prepare(
+            'select 1 from dialogue_turns where session_id = :id and sequence < :seq limit 1'
+        );
+        $stmt->execute(['id' => $sessionId, 'seq' => $oldest]);
+
+        return [
+            'page_size' => $pageSize,
+            'has_older' => (bool) $stmt->fetchColumn(),
+            'oldest_sequence' => $oldest,
+            'newest_sequence' => $newest,
+        ];
+    }
+
+    private function playHistoryPageSize(?int $limit): int
+    {
+        if ($limit !== null) {
+            return max(1, min(48, $limit));
+        }
+
+        return Config::playHistoryPageSize();
+    }
+
     /** @param array<string,mixed> $row */
     private function mapTurn(array $row): array
     {
@@ -1346,5 +1569,202 @@ final class DialogueService
     private function gateway(): AiGateway
     {
         return $this->gateway ?? AiGateway::fromConfig();
+    }
+
+    /**
+     * @param array{turns:list<array<string,mixed>>,effects:list<array<string,mixed>>} $result
+     * @return list<array<string,mixed>>
+     */
+    private function persistAdventureTurns(
+        PDO $pdo,
+        string $sessionId,
+        string $childId,
+        int $startSeq,
+        array $result,
+    ): array {
+        $agentTurns = [];
+        $n = $startSeq;
+        foreach ($result['turns'] as $payload) {
+            $agentTurns[] = $this->insertTurn($pdo, [
+                'session_id' => $sessionId,
+                'child_id' => $childId,
+                'flow_id' => 'adventure',
+                'sequence' => $n++,
+                'role' => 'mentor',
+                'text' => (string) ($payload['text'] ?? ''),
+                'input_mode' => $payload['input_mode'] ?? 'continue',
+                'options' => $payload['options'] ?? null,
+                'explorer_reply' => null,
+                'meta' => $payload['meta'] ?? [],
+                'model_used' => null,
+            ]);
+        }
+
+        return $agentTurns;
+    }
+
+    /**
+     * @param array<string,mixed> $extraMeta
+     * @return array<string,mixed>
+     */
+    private function insertAdventureComposeFailedTurn(
+        PDO $pdo,
+        string $sessionId,
+        string $childId,
+        int $sequence,
+        string $composeKind,
+        AdventureComposeFailedException $e,
+        bool $attachDebug,
+        array $extraMeta = [],
+    ): array {
+        $this->lastComposeDebug = $e->composeDebug;
+        AppLogger::channel('compose')->warning('adventure_compose_failed', [
+            'child_id' => $childId,
+            'session_id' => $sessionId,
+            'compose_kind' => $composeKind,
+            'compose_debug' => $e->composeDebug,
+        ]);
+        $failed = AdventureService::composeFailedTurn($composeKind);
+        $meta = array_merge($failed['meta'], $extraMeta);
+        if ($attachDebug) {
+            $meta['compose_debug'] = $e->composeDebug;
+        }
+
+        return $this->insertTurn($pdo, [
+            'session_id' => $sessionId,
+            'child_id' => $childId,
+            'flow_id' => 'adventure',
+            'sequence' => $sequence,
+            'role' => 'mentor',
+            'text' => (string) ($failed['text'] ?? ''),
+            'input_mode' => $failed['input_mode'] ?? 'options_only',
+            'options' => $failed['options'] ?? null,
+            'explorer_reply' => null,
+            'meta' => $meta,
+            'model_used' => null,
+        ]);
+    }
+
+    /**
+     * @param array<string,mixed>|null $lastMentor
+     * @return array{0:list<array<string,mixed>>,1:list<array<string,mixed>>}
+     */
+    private function retryAdventureCompose(
+        PDO $pdo,
+        string $childId,
+        array $child,
+        string $sessionId,
+        int $sequence,
+        string $mentorId,
+        ?array $lastMentor,
+        bool $attachDebug,
+    ): array {
+        $meta = is_array($lastMentor['meta'] ?? null) ? $lastMentor['meta'] : [];
+        $kind = (string) ($meta['compose_kind'] ?? 'pitch');
+        $retryContext = is_array($meta['retry_context'] ?? null) ? $meta['retry_context'] : [];
+        $effects = [];
+        $agentTurns = [];
+        $n = $sequence;
+
+        try {
+            if ($kind === 'pitch') {
+                $levels = $this->subjectLevelsMap($pdo, $childId);
+                $exclude = AdventureService::completedZoneIds($child);
+                $compose = AdventureComposeService::fromConfig($pdo);
+                $pitched = $compose->planAndComposePitches($childId, $child, $sessionId, $levels, $exclude);
+                $zoneOptions = $pitched['options'];
+                $agentTurns[] = $this->insertTurn($pdo, [
+                    'session_id' => $sessionId,
+                    'child_id' => $childId,
+                    'flow_id' => 'adventure',
+                    'sequence' => $n++,
+                    'role' => 'mentor',
+                    'text' => $pitched['mentor_bridge'],
+                    'input_mode' => 'options_only',
+                    'options' => $zoneOptions,
+                    'explorer_reply' => null,
+                    'meta' => ['phase' => 'choose_zone', 'choices_offered' => $zoneOptions],
+                    'model_used' => null,
+                ]);
+            } elseif ($kind === 'scene') {
+                $zoneId = (string) ($meta['zone_id'] ?? $retryContext['zone_id'] ?? '');
+                $chosenLabel = (string) (
+                    $meta['chosen_label']
+                    ?? $retryContext['chosen_label']
+                    ?? AdventureService::zoneTitle((string) ($child['world_theme'] ?? 'fantasy'), $zoneId)
+                );
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->chooseZone(
+                    $childId,
+                    $child,
+                    $zoneId,
+                    $sessionId,
+                    'adventure',
+                    $n,
+                    $mentorId,
+                    $chosenLabel,
+                );
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $n, $result),
+                );
+            } elseif ($kind === 'challenge') {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->presentChallenge($childId, $child, $retryContext, $sessionId, $mentorId);
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $n, $result),
+                );
+            } elseif ($kind === 'challenge_result') {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $savedReply = is_array($retryContext['reply'] ?? null) ? $retryContext['reply'] : ['kind' => 'continue'];
+                unset($retryContext['reply']);
+                $result = $adv->resolveChallenge(
+                    $childId,
+                    $child,
+                    $savedReply,
+                    $retryContext,
+                    $sessionId,
+                    $n,
+                    $mentorId,
+                );
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $n, $result),
+                );
+            } elseif ($kind === 'linger') {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->lingerAfterQuest($childId, $child, $retryContext, $sessionId);
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $n, $result),
+                );
+            } else {
+                $adv = new AdventureService($pdo, $this->gateway());
+                $result = $adv->wrapSession($childId, $child, $retryContext, $sessionId);
+                $effects = $result['effects'];
+                $agentTurns = array_merge(
+                    $agentTurns,
+                    $this->persistAdventureTurns($pdo, $sessionId, $childId, $n, $result),
+                );
+            }
+        } catch (AdventureComposeFailedException $e) {
+            $agentTurns[] = $this->insertAdventureComposeFailedTurn(
+                $pdo,
+                $sessionId,
+                $childId,
+                $n,
+                $kind,
+                $e,
+                $attachDebug,
+                ['retry_context' => $retryContext],
+            );
+        }
+
+        return [$effects, $agentTurns];
     }
 }

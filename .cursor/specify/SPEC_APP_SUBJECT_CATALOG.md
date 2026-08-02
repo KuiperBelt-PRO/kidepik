@@ -22,7 +22,7 @@ Principio rector (jul 2026):
 
 ---
 
-## 1. Catálogo completo (14 materias)
+## 1. Catálogo completo (15 materias)
 
 | `subject_id` | Label tutor (es-ES) | Familia UI | Peso default \(w\) | Zona canon MVP |
 | --- | --- | --- | --- | --- |
@@ -31,15 +31,16 @@ Principio rector (jul 2026):
 | `reading` | Comprensión lectora *(separada de lengua)* | Fundamentales | 0.09 | `zone_language` * |
 | `logic` | Lógica y razonamiento | Fundamentales | 0.09 | `zone_logic` |
 | `science` | Ciencias naturales | Ciencias | 0.09 | `zone_science` |
-| `culture` | Cultura general | Humanidades | 0.08 | `zone_culture` |
-| `geography` | Geografía | Humanidades | 0.07 | `zone_culture` * |
-| `mythology` | Mitología | Humanidades | 0.05 | — (territorio genérico) |
+| `culture` | Cultura general | Humanidades | 0.06 | `zone_culture` |
+| `geography` | Geografía | Humanidades | 0.06 | `zone_culture` * |
+| `history` | Historia | Humanidades | 0.08 | `zone_culture` * |
+| `mythology` | Mitología | Humanidades | 0.04 | — (territorio genérico) |
 | `ethics` | Ética y moral | Sociedad | 0.05 | — |
-| `communication` | Comunicación | Sociedad | 0.05 | — |
-| `politics` | Política y ciudadanía | Sociedad | 0.04 | — |
-| `arts` | Arte (plástica, música, cine…) | Expresión | 0.05 | — |
+| `communication` | Comunicación | Sociedad | 0.04 | — |
+| `politics` | Política y ciudadanía | Sociedad | 0.03 | — |
+| `arts` | Arte (plástica, música, cine…) | Expresión | 0.04 | — |
 | `sports` | Deporte y salud | Expresión | 0.03 | — |
-| `finance` | Finanzas y economía cotidiana | Vida práctica | 0.05 | — |
+| `finance` | Finanzas y economía cotidiana | Vida práctica | 0.04 | — |
 
 \* Comparten metáfora de zona en MVP; `zone_id` en retos puede ser el de la familia hasta que existan zonas dedicadas.
 
@@ -50,6 +51,7 @@ Principio rector (jul 2026):
 | `ethics` | Empatía, dilemas sencillos, convivencia, valores; sin doctrina religiosa |
 | `mythology` | Mitos clásicos y del mundo elegido (fantasy/sci-fi); no confundir con religión |
 | `geography` | Mapas, clima, paisajes, países, continentes |
+| `history` | Cronología, civilizaciones, hechos y personajes; relación causa-efecto; tono adaptado por banda |
 | `arts` | Pintura, música, teatro, **cine** (lenguaje audiovisual básico) |
 | `communication` | Escucha activa, mensaje claro, medios, debate respetuoso |
 | `sports` | Reglas, fair play, cuerpo, hábitos saludables |
@@ -87,9 +89,9 @@ Conjunto que el sistema **sugiere** al fijar `age_years` / `age_band`. No impide
 | --- | --- | --- |
 | `band_early` | 5–7 | math · language · logic · science · arts · communication |
 | `band_child` | 8–10 | math · language · reading · logic · science · arts · communication · sports |
-| `band_tween` | 11–13 | math · language · reading · logic · science · culture · geography · mythology · ethics · arts · communication · sports |
+| `band_tween` | 11–13 | math · language · reading · logic · science · culture · geography · **history** · mythology · ethics · arts · communication · sports |
 | `band_teen` | 14–17 | Todas las de tween + politics · finance |
-| `band_adult` | 18–64 | **Catálogo completo** (14) |
+| `band_adult` | 18–64 | **Catálogo completo** (15) |
 | `band_senior` | 65–99 | **Igual que adult** |
 
 **Regla:** la dificultad de cada reto sigue `age_band` aunque el tutor active `politics` para un niño de 8 años — el contenido se simplifica, no se bloquea por edad.
@@ -198,7 +200,7 @@ Solo 5 zonas MVP en [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CAN
 1. Catálogo PHP/BD expone los **14** `subject_id` con labels y pesos.
 2. Ficha tripulante: checklist agrupado; guardar `active_subjects`; ≥1 materia.
 3. Tutor activa `finance` para explorador de 9 años → placement incluye finanzas con dificultad `band_child`.
-4. `band_adult` sugiere las 14 materias al declarar edad.
+4. `band_adult` sugiere las 15 materias al declarar edad.
 5. Pesos renormalizados si solo 3 materias activas.
 6. Ajustes: defaults hogar con checklist ampliado.
 7. PHPUnit: `SubjectCatalog`, sugerencia base por banda, renormalización pesos.
@@ -207,7 +209,7 @@ Solo 5 zonas MVP en [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CAN
 
 ## Aprobación
 
-- [x] Catálogo 14 materias (§1) incl. ética, mitología, geografía, arte, comunicación, deporte, política, finanzas
+- [x] Catálogo 15 materias (§1) incl. **historia**, ética, mitología, geografía, arte, comunicación, deporte, política, finanzas
 - [x] `reading` (comprensión lectora) **separada** de `language` (lengua/gramática)
 - [x] Base por banda ampliada (§2); `band_tween` con 11 materias sugeridas; teen/adult/senior con catálogo completo
 - [x] Tutor activa materias por tripulante sin límite de edad (§3)

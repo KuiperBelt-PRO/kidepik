@@ -1,7 +1,7 @@
 # Spec: Riqueza narrativa del viaje (historia creíble post-examen)
 
 > Estado: **aprobada e implementada parcialmente** (1 ago 2026) — pitches, arco multi-reto (3 gates), planificador anti-hueco, dificultad por nivel, cajetín play §7 vía SECTION_FRAME §2.2b  
-> **Gaps conocidos (ago 2026):** copy de llegada a zona genérico (bosque en todas las zonas); 3 burbujas en lugar de 1; sin eco de descartadas; sin filtro de zonas superadas — ver [SPEC_APP_ADVENTURE_ZONE_BIBLE.md](SPEC_APP_ADVENTURE_ZONE_BIBLE.md), [SPEC_APP_ADVENTURE_TURN_PACKAGING.md](SPEC_APP_ADVENTURE_TURN_PACKAGING.md), [SPEC_APP_MENTOR_PROSE_CLARITY.md](SPEC_APP_MENTOR_PROSE_CLARITY.md)  
+> **Pivot narrativo (aprobado 2 ago 2026):** copy jugable post-examen **solo LLM** — [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md). **Sin plantillas** (`ZoneNarrativeCatalog`, `zonePitches`, `challengePool`, `thinkingLines`) en ningún camino; fallo → `compose_failed` + reintentar.  
 > Relacionado: [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md)  
 > Precedencia: este documento **eleva el vertical slice actual** (1 zona → 1 suma fija → «Hasta pronto») a un viaje que **parece una historia**. No sustituye el canon ni el ledger; los concreta.
 
@@ -34,7 +34,7 @@ Causa técnica actual: `PlacementService` cierra con labels planos; `AdventureSe
 
 | Principio | Decisión |
 | --- | --- |
-| El viaje manda | El planificador PHP elige beat/reto/quest; el LLM **viste** escenas, no inventa el plan |
+| El viaje manda | El planificador PHP elige beat, zona, materia, dificultad y fase; el LLM **redacta** toda la prosa jugable ([SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md)) |
 | Credibilidad | Cada turno avanza lugar, relación o problema; prohibido saltar de «entramos» → suma → adiós |
 | Aprendizaje = trama | El reto es un obstáculo diegético (runa, consola, puente, eco del Vacío) |
 | Memoria visible | Las opciones ofrecidas y la elegida quedan en ledger y, en prosa, se pueden recordar («dejamos las Montañas para otro día») |
@@ -63,13 +63,15 @@ Cada opción **debe** incluir:
 }
 ```
 
-Reglas de `why_for_you` (motor PHP, no inventar al azar):
+Reglas de `why_for_you` (motor PHP elige zonas; **LLM redacta** copy — [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) §2.1):
 
-| Rol en la terna | Copy (ejemplos; tono por mundo) |
+| Rol en la terna | Guía para el agente (ejemplos; tono por mundo) |
 | --- | --- |
-| Primera opción (materia más débil) | «Aquí los números pueden crecer con calma — buen primer paso.» (metáfora de **materia**, no repetir el nombre de la zona) |
-| Segunda opción | «Un camino intermedio: afianzar lo aprendido desde otro ángulo.» |
-| Tercera opción | «Otra puerta abierta: sumar variedad a tu viaje.» |
+| Primera opción (materia más débil) | Metáfora de **materia**, no repetir el nombre de la zona |
+| Segunda opción | Ángulo distinto: afianzar desde otro enfoque |
+| Tercera opción | Variedad / curiosidad del viaje |
+
+**Variabilidad:** el planificador debe evitar ofrecer **siempre** la misma terna ordenada para el mismo perfil (semilla sesión + shuffle entre candidatos débiles — spec LLM §2.1.1).
 
 **Anti-repetición (obligatorio):**
 
@@ -134,8 +136,8 @@ situación en el mundo
 
 | Fuente | Uso |
 | --- | --- |
-| `subject_levels[subject_id]` + `effective_age_band` + `difficulty_modifier` | Elige plantilla / genera ítem |
-| Banco o agente `challenge_writer` | Misma familia pedagógica que placement, **no** suma fija universal |
+| `subject_levels[subject_id]` + `effective_age_band` + `difficulty_modifier` | `ChallengePlanner` (PHP) elige ítem del banco determinista |
+| `challenge_writer` (LLM) | Vestido narrativo del ítem ya elegido |
 | Antagonista | Solo tono (`antagonist_pressure`), no unfair |
 
 Si el perfil ya superó sumas simples en placement, **prohibido** reutilizar `5+7` como primer gate de zona math.
@@ -162,23 +164,27 @@ Estados de fase tipados (ejemplos; nombres estables en `meta.phase`):
 
 **Regla anti-hueco:** tras cualquier `continue` / opción del niño en adventure, el servidor **debe** resolver con el planificador. **Prohibido** caer al `llmMentorTurn` genérico sin `phase` y sin `input_mode` válido (causa del «elige camino» sin chips).
 
-### 4.2 Rol del LLM
+### 4.2 Rol del LLM (normativo tras [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md))
 
-Permitido:
+**Genera (flujo feliz con IA activa):**
 
-- Prosa de Z0–Z2 y `zone_between` bajo envelope JSON (texto + options + phase + npc_ids).
-- Vestir el enunciado del reto (plantilla ya elegida por PHP).
+- Pitches de zona (`label` canon + `description` + `why_for_you` + puente del mentor).
+- Llegada unificada Z0–Z2 con NPC nombrado y problema de zona.
+- Vestido completo del reto (`narrative_wrapper` + `prompt_text`) y líneas de éxito/casi.
+- Beats `zone_between` y cierre de quest.
+- Lotes de copy de espera (thinking) por edad y mundo.
 
-No permitido:
+**No genera / no puede cambiar:**
 
-- Inventar fin de quest.
-- Cambiar `subject_id` / dificultad.
+- `zone_id`, `subject_id`, dificultad, `canonical_answer`, fin de quest arbitrario.
 - Pedir elección sin `options` cuando el planificador marcó `options_only`.
 - Ofrecer «Hasta pronto» salvo `phase=session_wrap` con motivo.
 
-### 4.3 Fallback sin LLM
+### 4.3 Sin plantillas narrativas
 
-Templates por mundo/zona/fase (como placement A1): siempre hay beats mínimos jugables offline.
+**Prohibido** servir copy de aventura desde `ZoneNarrativeCatalog`, `challengePool`, pitches PHP o arrays del cliente.
+
+Si el LLM no compone tras reintentos (gateway + validación): fase `compose_failed` — ver [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) §1.2. Tests PHPUnit inyectan `AiGateway` con `chatFn`; no catálogos legacy.
 
 ---
 
@@ -207,7 +213,7 @@ Extiende [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md) §1.1:
 | Seguir prosa | `continue` | Un CTA con label motivado («Seguir el sendero», «Escuchar al guardián») — no genérico opaco |
 | Esperando plan | `blocked` | Spinner; nunca chips vacíos |
 
-**Invariante de validación:** si `input_mode` ∈ {`options_only`, `options_or_text`} y `options` tiene &lt; 2 ítems → rechazar envelope / usar fallback.
+**Invariante de validación:** si `input_mode` ∈ {`options_only`, `options_or_text`} y `options` tiene &lt; 2 ítems → rechazar envelope → re-prompt o `compose_failed`.
 
 Si el mentor dice «elige» / «escoge» / «camino» en el texto, el envelope **debe** traer options o instrucción de texto libre en la misma burbuja.
 

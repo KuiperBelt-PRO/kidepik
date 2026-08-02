@@ -35,13 +35,12 @@ final class PlacementItemWriter
         $prepared = $narrator->decorateItems($queue, $child);
 
         $gateway = $this->gateway ?? AiGateway::fromConfig();
-        if (!Config::aiMock() && !$gateway->isEnabled()) {
+        if (!$gateway->isEnabled()) {
             return $prepared;
         }
 
         try {
-            $gw = Config::aiMock() ? AiGateway::fromConfig() : $gateway;
-            $rewritten = $this->rewriteQueueBatch($gw, $prepared, $child);
+            $rewritten = $this->rewriteQueueBatch($gateway, $prepared, $child);
             if ($rewritten !== null) {
                 return $rewritten;
             }

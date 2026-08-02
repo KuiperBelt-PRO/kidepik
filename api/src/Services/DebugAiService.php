@@ -17,7 +17,7 @@ final class DebugAiService
     {
         return [
             'enabled' => Config::aiEnabled(),
-            'mock' => Config::aiMock(),
+            'mock' => false,
             'key_present' => Config::openRouterKeyPresent(),
             'max_attempts' => Config::aiMaxModelAttempts(),
             'app_env' => Config::appEnv(),

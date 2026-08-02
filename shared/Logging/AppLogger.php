@@ -97,11 +97,8 @@ final class AppLogger
             return;
         }
 
+        // Solo fichero JSONL: no error_log()/STDOUT (rompe respuestas JSON con display_errors).
         file_put_contents($path, $line . "\n", FILE_APPEND | LOCK_EX);
-
-        if ($level === LogLevel::ERROR || $level === LogLevel::WARNING) {
-            error_log($line);
-        }
     }
 
     private function shouldLog(string $level): bool

@@ -42,7 +42,22 @@ Estilos: `web/css/components/glass-toast.css`.
 ## Integración actual
 
 - **Play / diálogo:** errores de turno (`display_name invalid`, sesión caducada, etc.) vía toast; el log de chat no muestra texto de error inline.
-- Futuro: tripulación, ajustes, cuenta (reutilizar el mismo módulo).
+- **Tripulación (ficha):** botones «Guardar perfil», «Guardar permisos» y «Guardar materias» — estado busy en el botón (`pending` + «Guardando…») y toast `success` / `error` / `warning` (validación cliente).
+- **Cuenta:** botón «Guardar» del nombre — mismo patrón busy + toast `success`; errores API también en texto inline del campo.
+- **Ajustes:** auto-guardado con debounce mantiene feedback inline breve; acciones puntuales (p. ej. limpiar caché) usan toast cuando aplique.
+
+### Acciones PATCH sin recarga de vista
+
+Para botones que **no** navegan ni reemplazan el panel:
+
+| Fase | Comportamiento |
+| --- | --- |
+| Durante request | Botón `disabled` + `aria-busy` + icono `pending` + label «Guardando…» (`runGlassButtonAction`) |
+| Éxito | Toast `success` ~2,4 s |
+| Error API | Toast `error` (persistente por defecto) |
+| Validación cliente | Toast `warning` sin entrar en estado busy |
+
+Helper: `runGlassButtonAction(btn, run, { successMessage, errorMessage, busyLabel })` en `glass-controls.js`.
 
 ## Criterios de aceptación
 
@@ -51,3 +66,4 @@ Estilos: `web/css/components/glass-toast.css`.
 - [x] Demo interactiva en `web/tmp/glass-controls-demo.html`
 - [x] Play no muestra `display_name invalid` como texto plano en el log
 - [x] CSS enlazado en `web/index.html`
+- [x] Guardados explícitos en ficha tripulante y cuenta muestran progreso en botón + toast final

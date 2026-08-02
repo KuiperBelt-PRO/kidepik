@@ -60,9 +60,8 @@ final class JourneyMemoryService
 
         $gateway = $this->gateway ?? AiGateway::fromConfig();
         try {
-            if (Config::aiMock() || $gateway->isEnabled()) {
-                $gw = Config::aiMock() ? AiGateway::fromConfig() : $gateway;
-                $result = $gw->complete([
+            if ($gateway->isEnabled()) {
+                $result = $gateway->complete([
                     [
                         'role' => 'system',
                         'content' => 'Resume el viaje del explorador en español de España, 2-4 frases. '

@@ -141,7 +141,7 @@ export function mountSettingsPanel(container, { session }) {
         </label>
         <label class="settings-panel__check">
           <input type="checkbox" data-cd="require_exit_pin" ${settings.crew_defaults.require_exit_pin ? "checked" : ""} />
-          Pedir PIN al salir
+          Pedir PIN antes de continuar con la aventura
         </label>
         <label class="settings-panel__check">
           <input type="checkbox" data-cd="lock_world_theme" ${settings.crew_defaults.lock_world_theme ? "checked" : ""} />

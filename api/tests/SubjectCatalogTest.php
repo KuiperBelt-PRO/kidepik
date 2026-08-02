@@ -11,12 +11,13 @@ use PHPUnit\Framework\TestCase;
 
 final class SubjectCatalogTest extends TestCase
 {
-    public function testCatalogHasFourteenSubjects(): void
+    public function testCatalogHasFifteenSubjects(): void
     {
         $ids = SubjectCatalog::ids();
-        self::assertCount(14, $ids);
+        self::assertCount(15, $ids);
         self::assertContains('math', $ids);
         self::assertContains('reading', $ids);
+        self::assertContains('history', $ids);
         self::assertContains('mythology', $ids);
         self::assertContains('ethics', $ids);
         self::assertContains('finance', $ids);
@@ -45,7 +46,8 @@ final class SubjectCatalogTest extends TestCase
         self::assertNotContains('politics', $child);
 
         $tween = SubjectCatalog::baseSubjectsForBand(AgeBand::TWEEN);
-        self::assertCount(12, $tween);
+        self::assertCount(13, $tween);
+        self::assertContains('history', $tween);
         self::assertContains('mythology', $tween);
         self::assertContains('ethics', $tween);
         self::assertNotContains('politics', $tween);
@@ -98,6 +100,7 @@ final class SubjectCatalogTest extends TestCase
         self::assertArrayHasKey('fundamentals', $families);
         self::assertContains('reading', $families['fundamentals']);
         self::assertContains('mythology', $families['humanities']);
+        self::assertContains('history', $families['humanities']);
         self::assertContains('finance', $families['life']);
     }
 

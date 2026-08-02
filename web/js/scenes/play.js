@@ -16,8 +16,10 @@ import { navigate } from "../lib/router.js";
 import { navigateShellRoute } from "../lib/shell-navigation.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
-import { openDialogueSession, submitDialogueTurn } from "../lib/play-api.js?v=243";
+import { openDialogueSession, submitDialogueTurn, loadDialogueHistory } from "../lib/play-api.js?v=244";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
+import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
+import { appLog } from "../lib/app-logger.js";
 import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
 import { isDebugAiClientActive } from "../lib/debug-ai.js?v=244";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=243";
@@ -95,6 +97,8 @@ export function renderPlay(params) {
     frameHandle.contentEl?.appendChild(root);
     fillGlassSkeleton(root, { preset: "panel", ariaLabel: "Cargando aventura" });
 
+    const sessionOpenPromise = openDialogueSession(session, childId, "first_run");
+
     await applySectionEnter({
       scene: sceneEl,
       logoMount: frameHandle.logoMountEl,
@@ -107,6 +111,7 @@ export function renderPlay(params) {
       session,
       childId,
       frameRoot: frameHandle.root,
+      sessionOpenPromise,
       onReady(handle) {
         cleanups.push(() => handle.destroy());
       },
@@ -141,6 +146,7 @@ export function renderPlay(params) {
  *   getSessionId: () => string | null;
  *   setSessionId: (id: string) => void;
  *   isCancelled: () => boolean;
+ *   sessionOpenPromise?: ReturnType<typeof openDialogueSession>;
  * }} ctx
  */
 async function mountPlayPanel(root, ctx) {
@@ -157,6 +163,21 @@ async function mountPlayPanel(root, ctx) {
   /** @type {object | null} */
   let lastPendingTurn = null;
   let sending = false;
+  /** @type {{ has_older: boolean, oldest_turn_id: string | null, page_size: number }} */
+  let historyMeta = { has_older: false, oldest_turn_id: null, page_size: 24 };
+  /** @type {Set<string>} */
+  const renderedTurnIds = new Set();
+  let historyLoading = false;
+  let historyControlVisible = false;
+  /** @type {HTMLElement | null} */
+  let historyLoadWrap = null;
+  /** @type {HTMLButtonElement | null} */
+  let historyLoadBtn = null;
+  /** @type {(() => void) | null} */
+  let clearHistorySkeleton = null;
+
+  const SCROLL_NEAR_BOTTOM_PX = 80;
+  const SCROLL_NEAR_TOP_PX = 72;
 
   /**
    * @returns {HTMLElement | null}
@@ -173,12 +194,85 @@ async function mountPlayPanel(root, ctx) {
     return null;
   }
 
-  function scrollLogToEnd() {
+  function isNearScrollBottom() {
+    const sc = scrollContainer();
+    if (!(sc instanceof HTMLElement)) return true;
+    return sc.scrollHeight - sc.scrollTop - sc.clientHeight <= SCROLL_NEAR_BOTTOM_PX;
+  }
+
+  /**
+   * @param {{ force?: boolean }} [opts]
+   */
+  function scrollLogToEnd(opts = {}) {
     const sc = scrollContainer();
     if (!(sc instanceof HTMLElement)) return;
+    if (!opts.force && !isNearScrollBottom()) return;
     requestAnimationFrame(() => {
       sc.scrollTop = sc.scrollHeight;
     });
+  }
+
+  function updateHistoryButtonLabel(kind = "idle") {
+    if (!(historyLoadBtn instanceof HTMLButtonElement)) return;
+    const label = resolveHistoryCopy(playWorldTheme, playAgeBand, kind);
+    historyLoadBtn.textContent = label;
+    historyLoadBtn.setAttribute(
+      "aria-label",
+      `${label}. Cargar mensajes anteriores de la aventura`,
+    );
+  }
+
+  function setHistoryControlVisible(visible) {
+    if (!(historyLoadWrap instanceof HTMLElement)) return;
+    const shouldShow = visible && historyMeta.has_older && !thinkingBubbleEl;
+    if (shouldShow && !historyControlVisible) {
+      updateHistoryButtonLabel("idle");
+    }
+    historyControlVisible = shouldShow;
+    historyLoadWrap.classList.toggle("play-history-load--hidden", !shouldShow);
+  }
+
+  function syncHistoryControlFromScroll() {
+    const sc = scrollContainer();
+    if (!(sc instanceof HTMLElement) || !historyMeta.has_older || historyLoading) {
+      setHistoryControlVisible(false);
+      return;
+    }
+    setHistoryControlVisible(sc.scrollTop <= SCROLL_NEAR_TOP_PX);
+  }
+
+  function hideHistoryLoadingSkeleton() {
+    clearHistorySkeleton?.();
+    clearHistorySkeleton = null;
+  }
+
+  /** Skeleton glass en el log mientras llegan mensajes anteriores (DESIGN.md §11). */
+  function showHistoryLoadingSkeleton() {
+    hideHistoryLoadingSkeleton();
+    if (!(logEl instanceof HTMLElement)) return;
+
+    const group = document.createElement("div");
+    group.className = "play-history-skeleton-group";
+    group.setAttribute("role", "status");
+    group.setAttribute("aria-live", "polite");
+    group.setAttribute("aria-label", "Cargando mensajes anteriores");
+
+    const anchor = historyLoadWrap?.nextSibling ?? null;
+    logEl.insertBefore(group, anchor);
+
+    for (let i = 0; i < 2; i += 1) {
+      const host = document.createElement("div");
+      host.className = `play-history-skeleton play-history-skeleton--${i % 2 === 0 ? "mentor" : "explorer"}`;
+      host.setAttribute("aria-hidden", "true");
+      fillGlassSkeleton(host, { preset: "lines", ariaLabel: "Cargando mensajes anteriores" });
+      host.querySelector(".glass-skeleton")?.removeAttribute("role");
+      group.appendChild(host);
+    }
+
+    clearHistorySkeleton = () => {
+      group.remove();
+      clearHistorySkeleton = null;
+    };
   }
 
   /**
@@ -217,10 +311,14 @@ async function mountPlayPanel(root, ctx) {
         playAgeBand = effect.value;
       }
     }
+    if (historyControlVisible) {
+      updateHistoryButtonLabel("idle");
+    }
+    applyWaitingCopy(data);
   }
 
   /**
-   * Agrupa bandas para tono de espera del mentor.
+   * Agrupa bandas para tono de espera del mentor (reservado; copy de espera viene del API).
    * @returns {'early' | 'child' | 'teen' | 'adult'}
    */
   function waitingToneBand() {
@@ -304,6 +402,27 @@ async function mountPlayPanel(root, ctx) {
   }
 
   const logEl = root.querySelector("[data-log]");
+  if (logEl instanceof HTMLElement) {
+    fillGlassSkeleton(logEl, { preset: "panel", ariaLabel: "Cargando aventura" });
+  }
+
+  /**
+   * Monta el control de historial en el log (tras quitar el skeleton).
+   */
+  function mountHistoryLoadControl() {
+    if (!(logEl instanceof HTMLElement)) return;
+    historyLoadWrap = document.createElement("div");
+    historyLoadWrap.className = "play-history-load play-history-load--hidden";
+    historyLoadBtn = document.createElement("button");
+    historyLoadBtn.type = "button";
+    historyLoadBtn.className = "play-history-load__btn";
+    historyLoadBtn.addEventListener("click", () => {
+      void loadOlderHistory();
+    });
+    historyLoadWrap.appendChild(historyLoadBtn);
+    logEl.appendChild(historyLoadWrap);
+    updateHistoryButtonLabel("idle");
+  }
   const optionsEl = footer.querySelector("[data-options]");
   const formEl = footer.querySelector("[data-form]");
   const statusEl = root.querySelector("[data-status]");
@@ -361,9 +480,36 @@ async function mountPlayPanel(root, ctx) {
   /** @type {HTMLElement | null} */
   let thinkingTextEl = null;
 
+  /** Copy de sistema (no narrativa) cuando falla el compose de aventura. */
+  const ADVENTURE_COMPOSE_FAILED_COPY =
+    "No he podido preparar este tramo ahora mismo. Cuando quieras, lo intentamos de nuevo.";
+
+  /** @type {Record<string, string[]>} */
+  let waitingCopy = {
+    preparing_exam: [],
+    evaluating_answer: [],
+    adventure_compose: [],
+    general: [],
+  };
+
+  /**
+   * @param {object | undefined} data
+   */
+  function applyWaitingCopy(data) {
+    if (!data || typeof data !== "object") return;
+    const bundle = data.waiting_copy;
+    if (!bundle || typeof bundle !== "object") return;
+    for (const key of ["preparing_exam", "evaluating_answer", "adventure_compose", "general"]) {
+      const lines = bundle[key];
+      if (Array.isArray(lines)) {
+        waitingCopy[key] = lines.filter((l) => typeof l === "string" && l.trim());
+      }
+    }
+  }
+
   /**
    * @param {{ kind: string, option_id?: string }} reply
-   * @returns {'preparing_exam' | 'evaluating_answer' | 'adventure' | 'general'}
+   * @returns {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'}
    */
   function resolveThinkingKind(reply) {
     const phase =
@@ -378,205 +524,33 @@ async function mountPlayPanel(root, ctx) {
     if (phase === "placement_item" || phase === "placement_feedback") {
       return "evaluating_answer";
     }
-    if (phase === "choose_zone" || phase === "adventure_challenge") {
-      return "adventure";
+    if (
+      phase === "choose_zone" ||
+      phase === "admission_map" ||
+      phase === "zone_arrive" ||
+      phase === "zone_between" ||
+      phase === "adventure_challenge" ||
+      phase === "compose_failed"
+    ) {
+      return "adventure_compose";
     }
     return "general";
   }
 
   /**
-   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure' | 'general'} kind
+   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'} kind
    * @returns {string[]}
    */
   function thinkingLines(kind) {
-    const name = mentorLabel;
-    const fantasy = playWorldTheme !== "sci-fi";
-    const tone = waitingToneBand();
-    if (kind === "preparing_exam") {
-      return preparingExamLines(name, fantasy, tone);
+    const fromApi = waitingCopy[kind];
+    if (Array.isArray(fromApi) && fromApi.length > 0) {
+      return fromApi;
     }
-    if (kind === "evaluating_answer") {
-      if (tone === "early") {
-        return fantasy
-          ? [
-              `${name} mira tu respuesta con cariño…`,
-              `${name} piensa un momentito y te dice cómo seguir…`,
-              `${name} escucha el eco suave de tu idea…`,
-            ]
-          : [
-              `${name} revisa tu señal con calma…`,
-              `${name} mira la pantallita y te responde…`,
-              `${name} comprueba que todo vaya bien…`,
-            ];
-      }
-      if (tone === "teen") {
-        return fantasy
-          ? [
-              `${name} contrapone tu respuesta a las runas del umbral…`,
-              `${name} anota el resultado y prepara el siguiente tramo…`,
-              `${name} escucha el eco de tu respuesta en las bóvedas…`,
-            ]
-          : [
-              `${name} coteja tu respuesta con el protocolo de la Academia…`,
-              `${name} registra el resultado y carga el siguiente nodo…`,
-              `${name} verifica la telemetría de tu respuesta…`,
-            ];
-      }
-      if (tone === "adult") {
-        return fantasy
-          ? [
-              `${name} contrasta tu respuesta con el criterio del umbral…`,
-              `${name} registra el matiz y abre el siguiente tramo…`,
-              `${name} sopesa el eco de tu respuesta en las bóvedas…`,
-            ]
-          : [
-              `${name} valida tu respuesta frente al protocolo de acceso…`,
-              `${name} registra el resultado y prepara el siguiente nodo…`,
-              `${name} revisa la telemetría antes de continuar…`,
-            ];
-      }
-      return fantasy
-        ? [
-            `${name} compara tu respuesta con las runas del umbral…`,
-            `${name} anota el resultado y prepara el siguiente tramo…`,
-            `${name} escucha el eco de tu respuesta en las bóvedas…`,
-          ]
-        : [
-            `${name} coteja tu respuesta con el protocolo de la Academia…`,
-            `${name} registra el resultado y carga el siguiente nodo…`,
-            `${name} verifica la telemetría de tu respuesta…`,
-          ];
-    }
-    if (kind === "adventure") {
-      if (tone === "early") {
-        return fantasy
-          ? [
-              `${name} mira el mapita del reino contigo…`,
-              `${name} busca el caminito más seguro…`,
-            ]
-          : [
-              `${name} mira las estrellitas del mapa…`,
-              `${name} elige la ruta más clara para ti…`,
-            ];
-      }
-      return fantasy
-        ? [
-            `${name} contempla el mapa del reino antes de responder…`,
-            `${name} consulta el camino y las señales del territorio…`,
-          ]
-        : [
-            `${name} traza la ruta en el mapa estelar…`,
-            `${name} consulta sensores y bitácora de la misión…`,
-          ];
-    }
-    if (tone === "early") {
-      return fantasy
-        ? [
-            `${name} piensa un momentito…`,
-            `${name} busca palabras suaves para ti…`,
-            `${name} escucha el viento del umbral…`,
-          ]
-        : [
-            `${name} espera un segundo…`,
-            `${name} ajusta la radio para hablarte…`,
-            `${name} mira la bitácora un momento…`,
-          ];
-    }
-    return fantasy
-      ? [
-          `${name} medita un instante antes de hablar…`,
-          `${name} busca las palabras justas…`,
-          `${name} escucha el viento del umbral…`,
-        ]
-      : [
-          `${name} procesa el enlace un momento…`,
-          `${name} ajusta la frecuencia de la respuesta…`,
-          `${name} consulta la bitácora breve…`,
-        ];
+    return [`${mentorLabel} está pensando…`];
   }
 
   /**
-   * Frases de espera al componer la prueba — mundo + edad; sin «armar» ni «examen».
-   * @param {string} name
-   * @param {boolean} fantasy
-   * @param {'early' | 'child' | 'teen' | 'adult'} tone
-   * @returns {string[]}
-   */
-  function preparingExamLines(name, fantasy, tone) {
-    if (fantasy) {
-      if (tone === "early") {
-        return [
-          `${name} prepara tu prueba de ingreso: busca retos divertidos en la biblioteca…`,
-          `${name} abre libritos mágicos para elegir preguntas a tu medida…`,
-          `${name} enciende farolitos suaves: cada reto se escribe ahora…`,
-          `${name} pide ayuda a los pergaminos amigos antes de abrir el umbral…`,
-          `${name} junta chispas de saber para tu camino de ingreso…`,
-        ];
-      }
-      if (tone === "teen") {
-        return [
-          `${name} prepara tu prueba de ingreso entre los anaqueles de la Escuela…`,
-          `${name} elige retos a tu nivel: ni demasiado fáciles ni imposibles…`,
-          `${name} consulta pergaminos y diseña una prueba distinta para ti…`,
-          `${name} sopesa materias y dificultad antes de abrir el umbral…`,
-          `${name} enciende los faroles: cada reto se escribe ahora mismo…`,
-        ];
-      }
-      if (tone === "adult") {
-        return [
-          `${name} compone tu prueba de ingreso con criterio en la biblioteca de la Escuela…`,
-          `${name} selecciona retos calibrados a tu recorrido entre los anaqueles…`,
-          `${name} consulta fuentes del saber y diseña una prueba singular…`,
-          `${name} equilibra materias y exigencia antes de franquear el umbral…`,
-          `${name} ilumina el scriptorium: cada reto toma forma ahora…`,
-        ];
-      }
-      return [
-        `${name} prepara tu prueba de ingreso: busca las mejores preguntas en la biblioteca…`,
-        `${name} recorre los anaqueles del saber para elegir retos a tu medida…`,
-        `${name} consulta pergaminos antiguos y diseña una prueba única para ti…`,
-        `${name} sopesa materias y dificultades antes de abrir el umbral…`,
-        `${name} enciende los faroles de la biblioteca: cada reto se escribe ahora mismo…`,
-      ];
-    }
-    if (tone === "early") {
-      return [
-        `${name} prepara tu prueba de acceso: busca retos guays en la Academia…`,
-        `${name} mira pantallas de estrellas para elegir desafíos a tu tamaño…`,
-        `${name} enciende luces suaves: cada reto se crea ahora…`,
-        `${name} pide datos a la biblioteca espacial antes de abrir la puerta…`,
-        `${name} junta piezas de saber para tu ingreso…`,
-      ];
-    }
-    if (tone === "teen") {
-      return [
-        `${name} prepara tu protocolo de acceso consultando los archivos de la Academia…`,
-        `${name} rastrea la biblioteca estelar en busca de retos a tu nivel…`,
-        `${name} sincroniza módulos de saber y diseña una prueba nueva para ti…`,
-        `${name} calcula dificultad y materias antes de abrir el protocolo de ingreso…`,
-        `${name} descarga nodos de conocimiento: cada desafío se genera ahora…`,
-      ];
-    }
-    if (tone === "adult") {
-      return [
-        `${name} compone tu protocolo de acceso a partir de los archivos de la Academia…`,
-        `${name} selecciona desafíos calibrados en la biblioteca estelar…`,
-        `${name} sincroniza módulos de conocimiento y diseña una prueba precisa…`,
-        `${name} equilibra carga cognitiva y materias antes del protocolo de ingreso…`,
-        `${name} despliega nodos de saber: cada desafío se materializa ahora…`,
-      ];
-    }
-    return [
-      `${name} prepara tu prueba de acceso: consulta los archivos de la Academia…`,
-      `${name} rastrea la biblioteca estelar en busca de retos a tu nivel…`,
-      `${name} sincroniza módulos de saber y diseña una prueba nueva para ti…`,
-      `${name} calcula dificultad y materias antes de abrir el protocolo de ingreso…`,
-      `${name} descarga nodos de conocimiento: cada desafío se genera ahora…`,
-    ];
-  }
-
-  /**
-   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure' | 'general'} [kind]
+   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'} [kind]
    */
   function showThinking(kind = "general") {
     if (!(logEl instanceof HTMLElement)) return;
@@ -665,14 +639,64 @@ async function mountPlayPanel(root, ctx) {
 
   localCleanups.push(bindGlassIconTheme(root));
   localCleanups.push(bindGlassIconTheme(footer));
+  const scrollEl = scrollContainer();
+  if (scrollEl instanceof HTMLElement) {
+    const onScroll = () => syncHistoryControlFromScroll();
+    scrollEl.addEventListener("scroll", onScroll, { passive: true });
+    localCleanups.push(() => scrollEl.removeEventListener("scroll", onScroll));
+  }
+
+  /**
+   * @param {object} meta
+   * @returns {HTMLElement | null}
+   */
+  function buildChoiceResolvedEcho(meta) {
+    if (!meta) return null;
+    const taken = meta.choice_taken;
+    const discarded = Array.isArray(meta.choices_discarded) ? meta.choices_discarded : [];
+    if (!taken && discarded.length === 0) return null;
+
+    const panel = document.createElement("div");
+    panel.className = "play-choice-echo";
+    panel.setAttribute("role", "region");
+    panel.setAttribute("aria-label", "Elección de destino");
+
+    if (taken && (taken.label || taken.id)) {
+      const chosen = document.createElement("div");
+      chosen.className = "play-choice-card play-choice-card--chosen";
+      const label = document.createElement("p");
+      label.className = "play-choice-card__label";
+      label.textContent = String(taken.label || taken.id);
+      const tag = document.createElement("p");
+      tag.className = "play-choice-card__tag";
+      tag.textContent = "Elegido";
+      chosen.append(label, tag);
+      panel.appendChild(chosen);
+    }
+
+    for (const opt of discarded) {
+      const ghost = document.createElement("div");
+      ghost.className = "play-choice-card play-choice-card--discarded";
+      const label = document.createElement("p");
+      label.className = "play-choice-card__label";
+      label.textContent = String(opt.label || opt.id);
+      const tag = document.createElement("p");
+      tag.className = "play-choice-card__tag";
+      tag.textContent = "Descartado";
+      ghost.append(label, tag);
+      panel.appendChild(ghost);
+    }
+
+    return panel;
+  }
 
   /**
    * @param {string} role
    * @param {string} text
    * @param {string} [who]
+   * @returns {HTMLElement}
    */
-  function appendBubble(role, text, who) {
-    if (!(logEl instanceof HTMLElement)) return;
+  function buildBubbleElement(role, text, who) {
     const bubble = document.createElement("div");
     bubble.className = `play-bubble play-bubble--${role}`;
 
@@ -713,63 +737,179 @@ async function mountPlayPanel(root, ctx) {
     const body = document.createElement("p");
     body.textContent = displayText;
     bubble.appendChild(body);
-    logEl.appendChild(bubble);
-    scrollLogToEnd();
+    return bubble;
+  }
+
+  /**
+   * @param {HTMLElement[]} nodes
+   * @param {{ prepend?: boolean, scrollToEnd?: boolean }} [opts]
+   */
+  function insertLogNodes(nodes, opts = {}) {
+    if (!(logEl instanceof HTMLElement) || nodes.length === 0) return;
+    const sc = scrollContainer();
+    const prepend = Boolean(opts.prepend);
+    const prevScrollHeight = sc instanceof HTMLElement ? sc.scrollHeight : 0;
+    const prevScrollTop = sc instanceof HTMLElement ? sc.scrollTop : 0;
+
+    if (prepend) {
+      const anchor = historyLoadWrap?.nextSibling ?? null;
+      for (const node of nodes) {
+        logEl.insertBefore(node, anchor);
+      }
+      if (sc instanceof HTMLElement) {
+        sc.scrollTop = prevScrollTop + (sc.scrollHeight - prevScrollHeight);
+      }
+      return;
+    }
+
+    for (const node of nodes) {
+      logEl.appendChild(node);
+    }
+    if (opts.scrollToEnd === true) {
+      scrollLogToEnd({ force: true });
+    } else if (opts.scrollToEnd !== false) {
+      scrollLogToEnd();
+    }
   }
 
   /**
    * @param {object} turn
    * @param {string} [who]
+   * @returns {HTMLElement[]}
    */
-  function appendMentorTurn(turn, who) {
-    appendBubble("mentor", turn.text || "", who);
-    if (turn?.meta?.phase === "choice_resolved") {
-      renderChoiceResolvedEcho(turn.meta);
+  function buildTurnNodes(turn, who) {
+    if (turn?.id) renderedTurnIds.add(String(turn.id));
+    const role =
+      turn.role === "explorer" || turn.role === "child"
+        ? "explorer"
+        : turn.role === "system"
+          ? "mentor"
+          : "mentor";
+    let text = turn.text || "";
+    if (!String(text).trim() && turn?.meta?.compose_failed) {
+      text = ADVENTURE_COMPOSE_FAILED_COPY;
     }
+    const nodes = [buildBubbleElement(role, text, role === "mentor" ? who : undefined)];
+    if (role === "mentor" && turn?.meta?.phase === "choice_resolved") {
+      const echo = buildChoiceResolvedEcho(turn.meta);
+      if (echo) nodes.push(echo);
+    }
+    return nodes;
+  }
+
+  /**
+   * @param {object} turn
+   * @param {string} [who]
+   * @param {{ prepend?: boolean, scrollToEnd?: boolean }} [opts]
+   */
+  function renderTurn(turn, who, opts = {}) {
+    if (turn?.id && renderedTurnIds.has(String(turn.id))) return;
+    insertLogNodes(buildTurnNodes(turn, who), opts);
+  }
+
+  /**
+   * @param {string} role
+   * @param {string} text
+   * @param {string} [who]
+   * @param {{ scrollToEnd?: boolean }} [opts]
+   */
+  function appendBubble(role, text, who, opts = {}) {
+    if (!(logEl instanceof HTMLElement)) return;
+    insertLogNodes([buildBubbleElement(role, text, who)], opts);
+  }
+
+  /**
+   * @param {object} turn
+   * @param {string} [who]
+   * @param {{ prepend?: boolean, scrollToEnd?: boolean }} [opts]
+   */
+  function appendMentorTurn(turn, who, opts = {}) {
+    renderTurn(turn, who, opts);
   }
 
   /**
    * @param {object} meta
    */
   function renderChoiceResolvedEcho(meta) {
-    if (!(logEl instanceof HTMLElement) || !meta) return;
-    const taken = meta.choice_taken;
-    const discarded = Array.isArray(meta.choices_discarded) ? meta.choices_discarded : [];
-    if (!taken && discarded.length === 0) return;
+    const echo = buildChoiceResolvedEcho(meta);
+    if (!echo) return;
+    insertLogNodes([echo]);
+  }
 
-    const panel = document.createElement("div");
-    panel.className = "play-choice-echo";
-    panel.setAttribute("role", "region");
-    panel.setAttribute("aria-label", "Elección de destino");
-
-    if (taken && (taken.label || taken.id)) {
-      const chosen = document.createElement("div");
-      chosen.className = "play-choice-card play-choice-card--chosen";
-      const label = document.createElement("p");
-      label.className = "play-choice-card__label";
-      label.textContent = String(taken.label || taken.id);
-      const tag = document.createElement("p");
-      tag.className = "play-choice-card__tag";
-      tag.textContent = "Elegido";
-      chosen.append(label, tag);
-      panel.appendChild(chosen);
+  async function loadOlderHistory() {
+    const sid = ctx.getSessionId();
+    if (
+      !sid ||
+      historyLoading ||
+      !historyMeta.has_older ||
+      historyMeta.oldest_turn_id == null ||
+      ctx.isCancelled()
+    ) {
+      return;
     }
 
-    for (const opt of discarded) {
-      const ghost = document.createElement("div");
-      ghost.className = "play-choice-card play-choice-card--discarded";
-      const label = document.createElement("p");
-      label.className = "play-choice-card__label";
-      label.textContent = String(opt.label || opt.id);
-      const tag = document.createElement("p");
-      tag.className = "play-choice-card__tag";
-      tag.textContent = "Descartado";
-      ghost.append(label, tag);
-      panel.appendChild(ghost);
+    historyLoading = true;
+    setHistoryControlVisible(false);
+    if (historyLoadBtn instanceof HTMLButtonElement) {
+      historyLoadBtn.disabled = true;
+      historyLoadBtn.setAttribute("aria-busy", "true");
     }
+    showHistoryLoadingSkeleton();
 
-    logEl.appendChild(panel);
-    scrollLogToEnd();
+    const beforeTurnId = historyMeta.oldest_turn_id;
+
+    try {
+      const result = await loadDialogueHistory(ctx.session, ctx.childId, sid, beforeTurnId);
+      if (ctx.isCancelled()) return;
+
+      if (!result.ok || !result.data) {
+        showGlassToast(historyErrorCopy(playWorldTheme), { variant: "error" });
+        appLog("warn", "play_history_load", {
+          child_id: ctx.childId,
+          before_turn_id: beforeTurnId,
+          ok: false,
+        });
+        return;
+      }
+
+      const turns = Array.isArray(result.data.turns) ? result.data.turns : [];
+      const nodes = [];
+      for (const turn of turns) {
+        if (turn?.id && renderedTurnIds.has(String(turn.id))) continue;
+        nodes.push(...buildTurnNodes(turn, mentorLabel));
+      }
+      insertLogNodes(nodes, { prepend: true });
+
+      if (result.data.history && typeof result.data.history === "object") {
+        historyMeta = {
+          has_older: Boolean(result.data.history.has_older),
+          oldest_turn_id:
+            typeof result.data.history.oldest_turn_id === "string"
+              ? result.data.history.oldest_turn_id
+              : null,
+          page_size:
+            typeof result.data.history.page_size === "number"
+              ? result.data.history.page_size
+              : historyMeta.page_size,
+        };
+      }
+
+      appLog("info", "play_history_load", {
+        child_id: ctx.childId,
+        before_turn_id: beforeTurnId,
+        count: turns.length,
+        ok: true,
+      });
+    } finally {
+      hideHistoryLoadingSkeleton();
+      historyLoading = false;
+      if (historyLoadBtn instanceof HTMLButtonElement) {
+        historyLoadBtn.disabled = false;
+        historyLoadBtn.removeAttribute("aria-busy");
+        updateHistoryButtonLabel("idle");
+      }
+      syncHistoryControlFromScroll();
+    }
   }
 
   /**
@@ -1004,6 +1144,50 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * Rehidrata el log y el pending desde openSession (resync tras fallo de transporte).
+   * @param {object} data
+   */
+  function hydrateFromSession(data) {
+    ctx.setSessionId(data.session_id);
+    if (logEl instanceof HTMLElement) {
+      logEl.innerHTML = "";
+    }
+    renderedTurnIds.clear();
+    mountHistoryLoadControl();
+    applyDialogueState(data);
+    applyWaitingCopy(data);
+    if (data.mentor?.display_name && mentorNameEl instanceof HTMLElement) {
+      mentorLabel = data.mentor.display_name;
+      mentorNameEl.textContent = mentorLabel;
+    }
+    if (data.history && typeof data.history === "object") {
+      historyMeta = {
+        has_older: Boolean(data.history.has_older),
+        oldest_turn_id:
+          typeof data.history.oldest_turn_id === "string" ? data.history.oldest_turn_id : null,
+        page_size: typeof data.history.page_size === "number" ? data.history.page_size : 24,
+      };
+    }
+    const turns = Array.isArray(data.turns) ? data.turns : [];
+    for (const t of turns) {
+      const role = t.role === "explorer" || t.role === "child" ? "explorer" : "mentor";
+      if (role === "mentor") {
+        renderTurn(t, mentorLabel, { scrollToEnd: false });
+      } else {
+        if (t?.id) renderedTurnIds.add(String(t.id));
+        insertLogNodes([buildBubbleElement(role, t.text || "", undefined)], { scrollToEnd: false });
+      }
+    }
+    scrollLogToEnd({ force: true });
+    syncHistoryControlFromScroll();
+    const pending =
+      data.pending_agent_turn ||
+      turns.filter((t) => t.role === "mentor" || t.role === "agent").at(-1);
+    if (pending) renderPending(pending);
+    if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+  }
+
+  /**
    * @param {{ kind: string, option_id?: string, text?: string, displayLabel?: string }} reply
    */
   async function sendReply(reply) {
@@ -1038,9 +1222,27 @@ async function mountPlayPanel(root, ctx) {
           ? reply.option_id || ""
           : "Continuar");
 
+    const prevPhase =
+      typeof lastPendingTurn?.meta?.phase === "string" ? lastPendingTurn.meta.phase : "";
     const result = await submitDialogueTurn(ctx.session, ctx.childId, sid, reply);
     if (ctx.isCancelled()) return;
     if (!result.ok || !result.data) {
+      // El servidor puede haber avanzado aunque el fetch falle (JSON corrupto / transporte).
+      if (result.transport || result.error === "invalid_json" || result.status === 0) {
+        const synced = await openDialogueSession(ctx.session, ctx.childId, "first_run");
+        if (!ctx.isCancelled() && synced.ok && synced.data) {
+          const pending = synced.data.pending_agent_turn;
+          const nextPhase =
+            typeof pending?.meta?.phase === "string" ? pending.meta.phase : "";
+          if (nextPhase && nextPhase !== prevPhase) {
+            hideThinking();
+            hydrateFromSession(synced.data);
+            sending = false;
+            if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
+            return;
+          }
+        }
+      }
       showGlassToast(mapPlayApiError(result.error || "turn"), {
         variant: "error",
         persist: true,
@@ -1100,8 +1302,7 @@ async function mountPlayPanel(root, ctx) {
     void sendReply({ kind: "text", text });
   });
 
-  if (statusEl instanceof HTMLElement) statusEl.textContent = "Abriendo diálogo…";
-  const opened = await openDialogueSession(ctx.session, ctx.childId, "first_run");
+  const opened = await (ctx.sessionOpenPromise ?? openDialogueSession(ctx.session, ctx.childId, "first_run"));
   if (ctx.isCancelled()) return;
   if (!opened.ok || !opened.data) {
     footer.remove();
@@ -1120,30 +1321,12 @@ async function mountPlayPanel(root, ctx) {
   }
 
   const data = opened.data;
-  ctx.setSessionId(data.session_id);
-  applyDialogueState(data);
-  if (data.mentor?.display_name && mentorNameEl instanceof HTMLElement) {
-    mentorLabel = data.mentor.display_name;
-    mentorNameEl.textContent = mentorLabel;
-  }
-  const turns = Array.isArray(data.turns) ? data.turns : [];
-  for (const t of turns) {
-    const role = t.role === "explorer" || t.role === "child" ? "explorer" : "mentor";
-    if (role === "mentor") {
-      appendMentorTurn(t, mentorLabel);
-    } else {
-      appendBubble(role, t.text || "", undefined);
-    }
-  }
-  const pending =
-    data.pending_agent_turn ||
-    turns.filter((t) => t.role === "mentor" || t.role === "agent").at(-1);
-  if (pending) renderPending(pending);
-  if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+  hydrateFromSession(data);
 
   ctx.onReady({
     destroy() {
       hideThinking();
+      hideHistoryLoadingSkeleton();
       applyPlayWorldTheme(null);
       footer.remove();
       localCleanups.forEach((fn) => fn());

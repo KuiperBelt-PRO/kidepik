@@ -18,6 +18,7 @@ final class SubjectCatalog
     public const SCIENCE = 'science';
     public const CULTURE = 'culture';
     public const GEOGRAPHY = 'geography';
+    public const HISTORY = 'history';
     public const MYTHOLOGY = 'mythology';
     public const ETHICS = 'ethics';
     public const COMMUNICATION = 'communication';
@@ -35,6 +36,7 @@ final class SubjectCatalog
         self::SCIENCE,
         self::CULTURE,
         self::GEOGRAPHY,
+        self::HISTORY,
         self::MYTHOLOGY,
         self::ETHICS,
         self::COMMUNICATION,
@@ -51,15 +53,16 @@ final class SubjectCatalog
         self::READING => 0.09,
         self::LOGIC => 0.09,
         self::SCIENCE => 0.09,
-        self::CULTURE => 0.08,
-        self::GEOGRAPHY => 0.07,
-        self::MYTHOLOGY => 0.05,
+        self::CULTURE => 0.06,
+        self::GEOGRAPHY => 0.06,
+        self::HISTORY => 0.08,
+        self::MYTHOLOGY => 0.04,
         self::ETHICS => 0.05,
-        self::COMMUNICATION => 0.05,
-        self::POLITICS => 0.04,
-        self::ARTS => 0.05,
+        self::COMMUNICATION => 0.04,
+        self::POLITICS => 0.03,
+        self::ARTS => 0.04,
         self::SPORTS => 0.03,
-        self::FINANCE => 0.05,
+        self::FINANCE => 0.04,
     ];
 
     /** @var array<string,array{label:string,family:string,zone_id:?string}> */
@@ -71,6 +74,7 @@ final class SubjectCatalog
         self::SCIENCE => ['label' => 'Ciencias naturales', 'family' => 'sciences', 'zone_id' => 'zone_science'],
         self::CULTURE => ['label' => 'Cultura general', 'family' => 'humanities', 'zone_id' => 'zone_culture'],
         self::GEOGRAPHY => ['label' => 'Geografía', 'family' => 'humanities', 'zone_id' => 'zone_culture'],
+        self::HISTORY => ['label' => 'Historia', 'family' => 'humanities', 'zone_id' => 'zone_culture'],
         self::MYTHOLOGY => ['label' => 'Mitología', 'family' => 'humanities', 'zone_id' => null],
         self::ETHICS => ['label' => 'Ética y moral', 'family' => 'society', 'zone_id' => null],
         self::COMMUNICATION => ['label' => 'Comunicación', 'family' => 'society', 'zone_id' => null],
@@ -91,12 +95,12 @@ final class SubjectCatalog
         ],
         AgeBand::TWEEN => [
             self::MATH, self::LANGUAGE, self::READING, self::LOGIC, self::SCIENCE,
-            self::CULTURE, self::GEOGRAPHY, self::MYTHOLOGY, self::ETHICS,
+            self::CULTURE, self::GEOGRAPHY, self::HISTORY, self::MYTHOLOGY, self::ETHICS,
             self::ARTS, self::COMMUNICATION, self::SPORTS,
         ],
         AgeBand::TEEN => [
             self::MATH, self::LANGUAGE, self::READING, self::LOGIC, self::SCIENCE,
-            self::CULTURE, self::GEOGRAPHY, self::MYTHOLOGY, self::ETHICS,
+            self::CULTURE, self::GEOGRAPHY, self::HISTORY, self::MYTHOLOGY, self::ETHICS,
             self::ARTS, self::COMMUNICATION, self::SPORTS, self::POLITICS, self::FINANCE,
         ],
         AgeBand::ADULT => self::ALL,
@@ -147,7 +151,7 @@ final class SubjectCatalog
         if ($out === []) {
             throw new InvalidArgumentException('learning.active_subjects must be non-empty');
         }
-        if (count($out) > 15) {
+        if (count($out) > 16) {
             throw new InvalidArgumentException('learning.active_subjects exceeds maximum');
         }
 

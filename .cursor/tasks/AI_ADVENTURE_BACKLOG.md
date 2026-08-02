@@ -20,7 +20,7 @@
 
 ### P0 — producto / pedagogía
 
-1. ~~**Riqueza narrativa del viaje**~~ — parcialmente hecho (ago 2026): pitches, 3 gates, anti-hueco, dificultad por nivel. Pendiente: LLM vestido rico, más NPCs/lugares por beat, C2 encrucijada completa.
+1. ~~**Riqueza narrativa del viaje**~~ — parcialmente hecho (ago 2026). **P0 en curso:** migración LLM aprobada — [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](../specify/SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) + [AI_ADVENTURE_LLM_NARRATIVE_PLAN.md](AI_ADVENTURE_LLM_NARRATIVE_PLAN.md) (solo LLM; sin plantillas; `compose_failed` si agota reintentos).
 2. ~~**Orden del diario**~~ — hecho (ago 2026): sort estable + segundos + dedupe ecos.
 3. ~~**Cajetín play más alto**~~ — hecho (ago 2026): `bottom: 6%` en play.
 4. **Capítulos** más allá de `C1_first_zone` (canon, ceremony, presión antagonista).

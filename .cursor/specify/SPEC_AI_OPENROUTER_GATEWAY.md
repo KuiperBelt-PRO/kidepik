@@ -8,7 +8,18 @@
 
 Toda la IA de producto sale del **servidor PHP** hacia OpenRouter (`POST /api/v1/chat/completions`). La clave **nunca** llega al navegador; local y prod usan claves distintas.
 
-**Decisión de producto:** no usar modelos de pago en el camino feliz. Solo variantes free (`pricing` a 0 / sufijo `:free`). El sistema **descubre** periódicamente qué free hay disponibles y los ordena con un **ranking interno** (mejores primero, fallback decreciente).
+**Decisión de producto:** no usar modelos de pago en el camino feliz. Solo variantes con sufijo `:free` en el id del modelo (tier gratuito explícito de OpenRouter). El sistema **descubre** periódicamente qué free hay disponibles y los ordena con un **ranking interno** (mejores primero, fallback decreciente).
+
+## Máximas de producto (inviolables — ago 2026)
+
+| Máxima | Regla |
+| --- | --- |
+| **Solo free** | Nunca modelos de pago en runtime. `AI_ALLOW_PAID` ignorado en código de producto; discovery y gateway solo aceptan ids con sufijo **obligatorio** `:free` (precio 0 si OpenRouter lo expone). |
+| **Siempre LLM real** | Prohibido `AI_MOCK` en app, Docker local y producción. Sin respuestas deterministas ni `MockAiGateway` en `AiGateway::fromConfig()`. Los tests PHPUnit inyectan `chatFn` explícito si necesitan simular red. |
+| **Sin fallback silencioso** | Si todos los modelos fallan → error visible (`compose_failed`, 503, logs `ai`/`compose`). No plantillas narrativas ni copy preescrito sustituto del LLM. |
+| **Colas vivas** | `ai_purpose_model_queues` se mantiene al día: discovery periódico **y** refresh reactivo al agotar la cola o recibir 404. |
+| **Solo chat texto** | Discovery excluye embeddings, audio (Lyria…), imagen, vídeo y cualquier modelo sin salida `text`. |
+| **Autoredescubrimiento** | Tras agotar intentos en un purpose, `FreeModelQueueSync::refreshPurposeOnExhaustion` re-rankea desde OpenRouter y **sustituye** el top de la cola en BD; un reintento inmediato usa la cola nueva. |
 
 ## Objetivo
 
@@ -22,12 +33,12 @@ Toda la IA de producto sale del **servidor PHP** hacia OpenRouter (`POST /api/v1
 
 | Principio | Decisión |
 | --- | --- |
-| Solo free | Rechazar cualquier modelo con precio &gt; 0 en prompt o completion |
+| Solo free | Solo ids con sufijo `:free`; rechazar agregadores (`openrouter/auto`…) y cualquier precio &gt; 0 |
 | OpenRouter primero y canónico | Sin depender de Groq/Gemini de pago; opcionales solo si exponen free y flag lo permite |
 | Descubrimiento continuo | No confiar solo en lista estática en env |
 | Ranking propio | Score interno → orden de intento |
-| Fallback decreciente | Mejor rankeado → siguiente → … → mensaje amable |
-| Testable | `AI_MOCK=true` sin red |
+| Fallback decreciente | Mejor rankeado → siguiente → … → error visible (sin mock ni plantilla) |
+| Testable | PHPUnit inyecta `AiGateway` con `chatFn`; **no** `AI_MOCK` en runtime |
 | Sin LangGraph en MVP | Orquestación PHP |
 
 ---
@@ -69,12 +80,12 @@ public function complete(array $messages, array $opts = []): array;
 Flujo:
 
 1. `AI_ENABLED` off → error configurado.
-2. `AI_MOCK` → mock.
-3. Cuota miembro agotada → `quota_exceeded`.
-4. Obtener lista ordenada de `FreeModelCatalog::rankedFor($purpose)`.
-5. Intentar en orden; 404/429/5xx/timeout → siguiente; registrar fallo en ranking (penalización temporal).
-6. Persistir `api_usage`.
-7. Si todos fallan → 503 «Tu mentor medita entre estrellas; vuelve en un rato.»
+2. Cuota miembro agotada → `quota_exceeded`.
+3. Obtener lista ordenada (cola BD + discovery, solo chat free).
+4. Intentar en orden; **404** → deshabilitar modelo en cola BD + cooldown; 429/5xx/timeout/empty → cooldown.
+5. Persistir `api_usage`.
+6. Si todos fallan → `FreeModelQueueSync::refreshPurposeOnExhaustion` (rate-limited) y **un** reintento con cola refrescada.
+7. Si sigue fallando → 503 / `compose_failed` (sin mock ni plantilla).
 
 **Prohibido:** llamar a `openrouter/free` como único mecanismo opaco **sin** registrar qué modelo se usó, si eso impide telemetría. Se puede usar como **último** fallback de emergencia si el catálogo está vacío, logueando la respuesta `model` real si OpenRouter la devuelve.
 
@@ -175,7 +186,7 @@ Tabla `ai_purpose_model_queues` (`purpose`, `model_id`, `position`, `enabled`).
 | Operación | `INSERT`/`UPDATE`/`DELETE` sin redeploy; caché PHP ~120 s |
 | Código | `PurposeModelQueueStore` + `AiGateway::resolveAttempts` |
 
-Purposes semilla: `placement_exam_composer`, `placement_exam_batch_writer`, `placement_item_writer`, `dialogue`, `journey_summarizer`.
+Purposes: `placement_exam_composer`, `placement_exam_batch_writer`, `placement_item_writer`, `dialogue`, `journey_summarizer`, `adventure_pitch`, `adventure_scene`, `adventure_challenge`, `adventure_waiting`.
 
 ### 4.4 Cooldown temporal de modelos (ago 2026)
 
@@ -194,6 +205,16 @@ Tabla `ai_model_cooldowns` (`purpose`, `model_id`, `error_class`, `expires_at`).
 `FreeModelQueueSync`: cada `AI_DISCOVERY_INTERVAL_HOURS` (default 6), `GET /models` → inserta hasta `AI_DISCOVERY_MAX_NEW_PER_PURPOSE` modelos free nuevos por purpose en `ai_purpose_model_queues` (`notes=auto-discovery`).
 
 Arranque contenedor PHP (`sync-ai-discovery.php`) + chequeo ligero en cada request API (`syncIfStale`). Estado en `ai_runtime_state`.
+
+### 4.5.1 Refresh reactivo al agotar cola (ago 2026)
+
+Cuando `AiGateway::complete` agota todos los modelos de un `purpose` **sin** cola inyectada (tests):
+
+1. `FreeModelQueueSync::refreshPurposeOnExhaustion($purpose)` si no hubo refresh en los últimos `AI_QUEUE_REFRESH_MIN_MINUTES` (default **5**).
+2. `GET /models` → ranking chat free → `replaceTopModels` en BD (top `AI_DISCOVERY_REBUILD_TOP`, default **15**).
+3. Modelos con **404** reciente se marcan `enabled=false` en cola.
+4. Un único reintento del request con caché de cola invalidada.
+5. Log `free_model_queue_refresh` en canal `ai`.
 
 ### 4.6 Prioridad por éxito reciente (delta A2 — implementada)
 
@@ -217,16 +238,16 @@ Uso en compose paralelo: ver [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_ME
 
 ---
 
-## 5. Política «nunca de pago»
+## 5. Política «nunca de pago» (inviolable)
 
 | Control | Comportamiento |
 | --- | --- |
-| `AI_ALLOW_PAID=false` (default) | Gateway aborta si alguien configura un modelo con precio &gt; 0 |
+| Código | `Config::aiAllowPaid()` siempre `false`; gateway ignora modelos sin `:free` |
 | Catálogo | Filtra precio &gt; 0 |
 | CI | Test: fixture con modelo de pago → no entra en ranked |
-| Prod | Misma flag; activar paid solo con decisión explícita de negocio (fuera de MVP) |
+| Prod / local | Igual; **no** existe flag para activar paid |
 
-No hay fallback a Groq/Gemini de pago en el camino por defecto. `AI_PROVIDERS=openrouter` únicamente salvo ampliación futura free-compatible.
+No hay fallback a Groq/Gemini de pago. `AI_PROVIDERS=openrouter` únicamente.
 
 ---
 
@@ -240,8 +261,11 @@ No hay fallback a Groq/Gemini de pago en el camino por defecto. `AI_PROVIDERS=op
 | `AI_MODEL_DENYLIST` | Excluir ids rotos |
 | `AI_MODEL_CATALOG_TTL_SECONDS` | Caché |
 | `AI_MAX_MODEL_ATTEMPTS` | Tope de fallback por request |
-| `AI_ALLOW_PAID` | `false` |
-| `AI_MOCK` / `AI_ENABLED` / cuotas | igual que antes |
+| `AI_ALLOW_PAID` | Ignorado (siempre free en código) |
+| `AI_DISCOVERY_REBUILD_TOP` | Modelos top al refresh reactivo (default 15) |
+| `AI_QUEUE_REFRESH_MIN_MINUTES` | Mínimo entre refresh reactivos por purpose (default 5) |
+| `AI_ENABLED` / cuotas | igual que antes |
+| `AI_MOCK` | **Prohibido** en runtime; solo tests con gateway inyectado |
 
 Secretos: `.secrets/openrouter.env` local; prod distinta.
 
@@ -260,8 +284,10 @@ Por `child_id` (miembro) / día: `AI_RATE_LIMIT_PER_CHILD_DAY` (nombre históric
 3. Ranking pone preferidos disponibles por delante de desconocidos.
 4. Tras 429 en modelo A, el mismo request prueba B.
 5. Caché TTL: segunda llamada no pega a `/models` si fresca.
-6. Mock no usa red; PHPUnit con fixture de catálogo.
+6. PHPUnit usa `chatFn` inyectado; runtime nunca `AI_MOCK`.
 7. Telemetría guarda `model` real usado.
+8. 404 deshabilita modelo en cola; agotar cola dispara refresh reactivo y un reintento.
+9. Discovery excluye modelos no-chat (Lyria, embed, imagen…).
 
 ---
 

@@ -1,6 +1,6 @@
 # Spec: Marco de sección autenticada (bandas + glass + scroll)
 
-> Estado: **aprobada** (julio 2026); **delta §2.2b marco play más alto** (ago 2026)  
+> Estado: **aprobada** (julio 2026); **delta §2.2b marco play más alto** (ago 2026); **§2.2c columna fluida viewports anchos implementada** (ago 2026)  
 > Relacionado: [SPEC_APP_SHELL_CHROME.md](SPEC_APP_SHELL_CHROME.md), [SPEC_LEGAL_AUTHENTICATED_SESSION.md](SPEC_LEGAL_AUTHENTICATED_SESSION.md), [SPEC_WORLD_LAYERS_PERSISTENCE.md](SPEC_WORLD_LAYERS_PERSISTENCE.md), [SPEC_APP_ACCOUNT_SECTION.md](SPEC_APP_ACCOUNT_SECTION.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md)
 
 ## Contexto
@@ -162,7 +162,40 @@ function shouldCompressWorldBands(path) {
 | Border-radius | `16px`–`20px` (coherente con glass; no pill) |
 | z-index | Por encima del mundo, **por debajo** del shell chrome/drawer |
 
-Responsive: en desktop el marco se limita al ancho de `#app` (mismo frame que el shell), no al viewport completo.
+Responsive: **solo** `.section-frame` puede acotarse (§2.2c); `#app`, mundo y shell siguen **full-bleed**.
+
+### 2.2c Ancho del cajetín por proporción (delta ago 2026)
+
+Contrato (sin breakpoints en `px`/`em` ni saltos de ancho):
+
+| Situación | Comportamiento |
+| --- | --- |
+| Retrato alto (`ancho` &lt; `4/5` del alto) | Cajetín a **ancho completo** (el tope `80vh` no aprieta) |
+| Paisaje / cuadrado / retrato casi cuadrado | Tope `80vh` + centrado |
+
+**Continuidad:** en el umbral `ancho/alto = 4/5`, el ancho útil ≈ `80vh`. Por eso el tope es exactamente `calc(100vh * 4 / 5)`: al cruzar el umbral **no hay salto**.
+
+```css
+.section-frame {
+  left: 50%;
+  width: min(
+    calc(100% - 2 * var(--section-frame-pad-x)),
+    calc(100vh * 4 / 5)
+  );
+  transform: translateX(-50%);
+}
+```
+
+Sin media queries de aspect-ratio: `min()` elige solo.
+
+**Prohibido:** tope fijo en `rem`/`px` que sea menor que el ancho justo antes del umbral (provoca salto).
+
+#### Criterios de aceptación (§2.2c)
+
+1. Retrato alto: cajetín ~92 %+ del hueco.
+2. Al redimensionar hacia paisaje: el ancho del cajetín **no salta**; se estabiliza en ~`80vh`.
+3. Paisaje: cajetín centrado, ancho ≤ `80vh`.
+4. `#app` y mundo siempre full-bleed.
 
 ### 2.2b Variante play — cajetín más alto (delta ago 2026)
 
@@ -211,7 +244,7 @@ La cabecera del logo es **fija** dentro del marco (fuera del scroll); el **scrol
 
 | Requisito | Valor |
 | --- | --- |
-| Elemento | `<h1 class="section-frame__title">` en `.section-frame__header` (debajo del logo) |
+| Elemento | `<h1 class="section-frame__title">` en `.section-frame__header` (misma línea que el logo, centrados) |
 | Scroll | **No** — el título no entra en `.section-frame__scroll` |
 | Tipografía | Misma matriz §2.5 (display según `data-shell-theme`) |
 | Tamaño | `calc(1.35rem * var(--font-scale-ui, 1))` |
@@ -264,6 +297,8 @@ Consumen `html[data-shell-theme]` / `getShellUiTheme()`:
 | Títulos / labels display | Bruno Ace / Orbitron | Uncial Antiqua / Cinzel |
 | Cuerpo / inputs | Nunito | Nunito |
 | Iconos UI | Variante procedural `sci-fi` | Variante `fantasy` |
+
+**Excepción — mundo del niño:** en `#/play/:childId` y ficha `#/crew/:id`, el título de cabecera (`.section-frame__title`) sigue `data-play-theme` / `data-crew-world-theme` del marco, **no** el `uiTheme` sticky del tutor.
 
 Al cambiar el toggle del shell, la sección reacciona **sin recargar** (CSS + regeneración de SVG si hay iconos).
 
@@ -385,6 +420,7 @@ export function mountSectionFrame(host, options = {})
 9. Toggle tema cambia tipografía (e iconos si hay) del título y contenido del marco al instante.
 10. Legal autenticado sigue compacto **sin** adoptar el marco glass.
 11. Playwright 390×844: capturas `tmp/playwright-output/section-header-title-scroll-v1.png`, `section-logo-skeleton-v1.png` (si viable).
+12. Viewport ancho con shell: `#app` y mundo a ancho completo; **solo** `.section-frame` centrado según §2.2c.
 
 ---
 

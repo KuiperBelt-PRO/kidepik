@@ -80,7 +80,7 @@ final class PlacementExamComposer
         $this->shuffle($slots);
 
         $gateway = $this->gateway ?? AiGateway::fromConfig();
-        if (!Config::aiMock() && !$gateway->isEnabled()) {
+        if (!$gateway->isEnabled()) {
             $this->lastComposeDebug['outcome'] = 'ai_disabled';
 
             return [];
@@ -196,7 +196,7 @@ final class PlacementExamComposer
         int $retries,
         bool $sticky,
     ): ?array {
-        if (count($wave) === 1 || Config::aiMock() || $preferredModels === []) {
+        if (count($wave) === 1 || $preferredModels === []) {
             $out = [];
             $prefs = $preferredModels;
             foreach ($wave as $job) {
@@ -363,15 +363,13 @@ final class PlacementExamComposer
             if ($winner !== null && $winner !== '') {
                 $excludeModels[] = $winner;
                 $prefs = [];
-                if (!Config::aiMock()) {
-                    (new AiModelCooldownStore())->recordFailure(
-                        'placement_exam_composer',
-                        $winner,
-                        'compose_parse',
-                        null,
-                        (string) $outcome,
-                    );
-                }
+                (new AiModelCooldownStore())->recordFailure(
+                    'placement_exam_composer',
+                    $winner,
+                    'compose_parse',
+                    null,
+                    (string) $outcome,
+                );
             }
         }
 
@@ -723,7 +721,7 @@ final class PlacementExamComposer
         $captureTrace = Config::aiDebugEnabled();
 
         try {
-            $gw = Config::aiMock() ? AiGateway::fromConfig() : $gateway;
+            $gw = $gateway;
             $opts = [
                 'purpose' => 'placement_exam_composer',
                 'temperature' => $req['opts']['temperature'],

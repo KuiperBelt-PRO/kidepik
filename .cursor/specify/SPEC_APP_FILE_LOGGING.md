@@ -70,9 +70,10 @@ Eventos típicos en `client-*.log`: `route_change`, `api_call`, `window_error`, 
 
 ## Implementación
 
-- `shared/Logging/AppLogger.php`, `LogLevel.php`
+- `shared/Logging\AppLogger.php`, `LogLevel.php`
 - Integración: `api/public/index.php`, `AiGateway`, `PlacementExamComposer`, `DialogueService`, `ClientLogController`, `web/js/lib/app-logger.js`
 - Docker: volumen `../web/logs:/var/www/html/logs`
+- **PHP local:** `display_errors=Off` en `docker/php/conf.d/99-dev.ini` (montado en compose). Con `On`/STDOUT, notices/warnings se mezclan en el body y el cliente de play interpreta fallo de transporte aunque el turno haya guardado bien.
 
 ## Consulta rápida
 

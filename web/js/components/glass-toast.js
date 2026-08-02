@@ -122,6 +122,10 @@ export function mapPlayApiError(code) {
       return "No se pudo verificar la sesión. Comprueba que Supabase local está activo y reintenta.";
     case "world_theme locked":
       return "El mundo ya está bloqueado y no se puede cambiar desde la aventura.";
+    case "invalid_json":
+      return "La respuesta del servidor no se pudo leer. Reintenta o recarga la aventura.";
+    case "transport":
+      return "No se pudo continuar. Reintenta.";
     default:
       return code && code !== "turn" ? code : "No se pudo continuar. Reintenta.";
   }

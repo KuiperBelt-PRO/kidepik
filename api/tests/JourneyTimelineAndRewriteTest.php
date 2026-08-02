@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Kidepik\Api\Tests;
 
 use Kidepik\Api\Services\JourneyTimelineService;
+use Kidepik\Shared\Ai\AiGateway;
 use Kidepik\Shared\Ai\MockAiGateway;
 use Kidepik\Shared\Ai\PlacementItemWriter;
 use PHPUnit\Framework\TestCase;
@@ -85,16 +86,21 @@ final class JourneyTimelineAndRewriteTest extends TestCase
         self::assertStringContainsString('.', (string) $page['events'][0]['at']);
     }
 
-    public function testPlacementItemWriterUsesMockRewrite(): void
+    public function testPlacementItemWriterUsesInjectedGatewayRewrite(): void
     {
-        putenv('AI_MOCK=true');
-        $_ENV['AI_MOCK'] = 'true';
-        $writer = new PlacementItemWriter();
+        putenv('AI_ENABLED=true');
+        $_ENV['AI_ENABLED'] = 'true';
+
+        $gateway = new AiGateway(
+            modelQueue: ['mock/local'],
+            chatFn: [MockAiGateway::class, 'complete'],
+        );
+        $writer = new PlacementItemWriter(gateway: $gateway);
         $out = $writer->rewrite(
-            ['prompt_text' => '¿Cuánto es 2 + 2?', 'item_type' => 'mcq', 'subject_id' => 'math'],
+            ['prompt_text' => '¿Cuánto es 2 + 2?', 'item_type' => 'mcq', 'subject_id' => 'math', 'item_key' => 'k1'],
             ['world_theme' => 'fantasy', 'display_name' => 'Aventurero'],
         );
-        self::assertStringContainsString('Escuela', (string) $out['prompt_text']);
+        self::assertStringContainsString('runas', (string) $out['prompt_text']);
         self::assertTrue((bool) ($out['narrative_rewritten'] ?? false));
 
         $mock = MockAiGateway::complete('mock/local', [

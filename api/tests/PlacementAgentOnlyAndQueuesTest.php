@@ -7,6 +7,7 @@ namespace Kidepik\Api\Tests;
 use Kidepik\Shared\Ai\AgeBand;
 use Kidepik\Shared\Ai\AiGateway;
 use Kidepik\Shared\Ai\LLMException;
+use Kidepik\Shared\Ai\MockAiGateway;
 use Kidepik\Shared\Ai\PlacementExamComposer;
 use Kidepik\Shared\Ai\PurposeModelQueueStore;
 use PHPUnit\Framework\TestCase;
@@ -51,14 +52,16 @@ final class PlacementAgentOnlyAndQueuesTest extends TestCase
         self::assertNotEmpty($debug['llm_traces']);
     }
 
-    public function testComposeMockNeverUsesBankSource(): void
+    public function testComposeWithInjectedGatewayNeverUsesBankSource(): void
     {
-        putenv('AI_MOCK=true');
         putenv('AI_ENABLED=true');
-        $_ENV['AI_MOCK'] = 'true';
         $_ENV['AI_ENABLED'] = 'true';
 
-        $composer = new PlacementExamComposer();
+        $gateway = new AiGateway(
+            modelQueue: ['mock/local'],
+            chatFn: [MockAiGateway::class, 'complete'],
+        );
+        $composer = new PlacementExamComposer(gateway: $gateway);
         $queue = $composer->compose(
             [
                 'world_theme' => 'fantasy',

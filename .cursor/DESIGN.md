@@ -156,9 +156,11 @@ Tras cerrar: **400 ms** sin reabrir el trigger (evita “ghost click” del popo
 
 ### 11. Skeleton de carga (`glass-skeleton`)
 
-Barras redondeadas con shimmer (Privacidad/Términos). Ver helpers `renderGlassSkeletonHtml`, `fillGlassSkeleton`, `mountGlassSkeleton`. Presets: `document` | `panel` | `lines`.
+Barras redondeadas con shimmer (Privacidad/Términos). Ver helpers `renderGlassSkeletonHtml`, `fillGlassSkeleton`, `mountGlassSkeleton`, `mountTimelineSkeletonItems`. Presets: `document` | `panel` | `lines` | `timeline`.
 
 También: skeleton del **wordmark** en el slot del marco (`.section-frame__logo-skeleton`) mientras el logo está `is-logo-pending` — ver `SPEC_APP_SECTION_FRAME` §2.4d y `logo-reveal.js`.
+
+**Carga incremental (listas):** al paginar («Ver más» en diario del viaje, historial en play, etc.) añadir filas skeleton al final con `mountTimelineSkeletonItems(host, { count: 3 })` y retirarlas al resolver el fetch. **Prohibido** texto «Cargando más…» bajo el botón.
 
 ### 12. Navegación del marco (`section-frame` + `shell-nav-stack`)
 
@@ -312,6 +314,8 @@ Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 | `createGlassIconSvg` | Iconos inline (chevron select, stepper) |
 | `normalizeSessionMinutes` / `formatDurationMinutes` | Duración sesión |
 | `renderGlassSkeletonHtml` / `fillGlassSkeleton` / `mountGlassSkeleton` | Placeholder de carga (barras + shimmer) |
+| `mountTimelineSkeletonItems` / `renderTimelineSkeletonItemsHtml` | Filas skeleton para timelines y paginación «Ver más» |
+| `runGlassButtonAction` | PATCH/guardado: busy en botón + toast éxito/error |
 | `shellNavBack` / `shellNavForward` / `navigateShellSubview` | Navegación pila en marco |
 | `subscribeShellNav` / `getShellNavState` | Estado atrás/adelante |
 | `GLASS_ICON_FILL` | `#FFFFFF` · danger `#FF6B63` |
@@ -327,9 +331,10 @@ Barras redondeadas con brillo deslizante (mismo patrón que Privacidad/Términos
 | --- | --- |
 | `document` | Texto largo (legal, artículos) |
 | `panel` | Lista tripulación, ficha miembro |
-| `lines` | Bloques cortos (ajustes, estados breves) |
+| `lines` | Bloques cortos (ajustes, resumen diario) |
+| `timeline` | Bloque completo de filas tipo cronología (contenedor) |
 
-Sustituir `<p>Cargando…</p>` por `fillGlassSkeleton(host, { preset, ariaLabel })`.
+Sustituir `<p>Cargando…</p>` por `fillGlassSkeleton(host, { preset, ariaLabel })`. Paginación en listas: `mountTimelineSkeletonItems`.
 
 ### Cache bust
 

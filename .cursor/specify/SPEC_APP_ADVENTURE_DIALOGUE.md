@@ -156,12 +156,24 @@ Auth: Bearer tutor; ownership check.
   "flow_id": "first_run",
   "onboarding_step": "choose_world",
   "world_theme": null,
-  "turns": [ /* últimos K o desde inicio del flow */ ],
+  "turns": [ /* últimos K (default 24) */ ],
+  "history": {
+    "page_size": 24,
+    "has_older": true,
+    "oldest_sequence": 17,
+    "newest_sequence": 40
+  },
   "pending_agent_turn": { /* si hay que mostrar pregunta actual */ }
 }
 ```
 
-Idempotente: si hay sesión abierta del mismo `flow_id`, reanuda.
+Idempotente: si hay sesión abierta del mismo `flow_id`, reanuda. Historial paginado: [SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md](SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md).
+
+### 3.4 Historial anterior (delta ago 2026)
+
+`GET /api/v1/play/{childId}/dialogue/history?session_id=…&before_sequence=N&limit=24`
+
+Devuelve bloque anterior de `dialogue_turns` + `history` (mismo shape que §3.1). Ver spec dedicada.
 
 ### 3.2 Enviar respuesta del niño
 

@@ -11,6 +11,7 @@ use Kidepik\Shared\Ai\PlacementBank;
 use Kidepik\Shared\Ai\PlacementExamComposer;
 use Kidepik\Shared\Ai\PlacementNarrator;
 use Kidepik\Shared\Ai\SubjectCatalog;
+use Kidepik\Shared\Logging\AppLogger;
 use PDO;
 
 /**
@@ -178,7 +179,7 @@ final class PlacementService
         $feedback = $this->narrator->feedbackForItem($item, $reply, $score, $child, $this->bank);
 
         if ($index >= count($queue)) {
-            $complete = $this->finalize($childId, $child, $exam['id'], $mentorId, $theme);
+            $complete = $this->finalize($childId, $child, $exam['id'], $mentorId, $theme, $sessionId);
 
             return [
                 'complete' => true,
@@ -209,6 +210,7 @@ final class PlacementService
         string $examId,
         string $mentorId,
         string $theme,
+        string $sessionId,
     ): array {
         $stmt = $this->pdo->prepare('select subject_id, score from placement_answers where exam_id = :id');
         $stmt->execute(['id' => $examId]);
@@ -280,33 +282,64 @@ final class PlacementService
         $closing = $this->narrator->closing($child, $mentorId, $rank);
 
         $exclude = AdventureService::completedZoneIds($child);
-        $zoneOptions = AdventureService::zonePitches($theme, $levels['subjects'], 3, $exclude);
-        $this->appendChoiceBeat($childId, $zoneOptions);
+        $compose = AdventureComposeService::fromConfig($this->pdo);
 
-        $mapText = AdventureService::zonePitchMapText($zoneOptions);
-
-        return [
-            'turns' => [
-                [
-                    'text' => $closing,
-                    'input_mode' => 'continue',
-                    'options' => [['id' => 'continue', 'label' => 'Ver los caminos']],
-                    'meta' => ['phase' => 'admission_map', 'rank' => $rank],
-                ],
-                [
-                    'text' => $mapText,
-                    'input_mode' => 'options_only',
-                    'options' => $zoneOptions,
-                    'meta' => ['phase' => 'choose_zone', 'rank' => $rank, 'choices_offered' => $zoneOptions],
-                ],
-            ],
-            'effects' => [
-                ['type' => 'set_general_level', 'value' => $levels['general']],
-                ['type' => 'set_effective_age_band', 'value' => $effective],
-                ['type' => 'grant_rank', 'value' => $rank],
-                ['type' => 'advance_onboarding', 'to' => 'complete'],
-            ],
+        $effects = [
+            ['type' => 'set_general_level', 'value' => $levels['general']],
+            ['type' => 'set_effective_age_band', 'value' => $effective],
+            ['type' => 'grant_rank', 'value' => $rank],
+            ['type' => 'advance_onboarding', 'to' => 'complete'],
         ];
+
+        try {
+            $pitched = $compose->planAndComposePitches($childId, $child, $sessionId, $levels['subjects'], $exclude);
+            $zoneOptions = $pitched['options'];
+            $this->appendChoiceBeat($childId, $zoneOptions);
+            $mapText = $pitched['mentor_bridge'];
+
+            return [
+                'turns' => [
+                    [
+                        'text' => $closing,
+                        'input_mode' => 'continue',
+                        'options' => [['id' => 'continue', 'label' => 'Ver los caminos']],
+                        'meta' => ['phase' => 'admission_map', 'rank' => $rank],
+                    ],
+                    [
+                        'text' => $mapText,
+                        'input_mode' => 'options_only',
+                        'options' => $zoneOptions,
+                        'meta' => ['phase' => 'choose_zone', 'rank' => $rank, 'choices_offered' => $zoneOptions],
+                    ],
+                ],
+                'effects' => $effects,
+            ];
+        } catch (AdventureComposeFailedException $e) {
+            AppLogger::channel('compose')->warning('placement_pitch_compose_failed', [
+                'child_id' => $childId,
+                'session_id' => $sessionId,
+                'compose_debug' => $e->composeDebug,
+            ]);
+            $failed = AdventureService::composeFailedTurn('pitch');
+
+            return [
+                'turns' => [
+                    [
+                        'text' => $closing,
+                        'input_mode' => 'continue',
+                        'options' => [['id' => 'continue', 'label' => 'Ver los caminos']],
+                        'meta' => ['phase' => 'admission_map', 'rank' => $rank],
+                    ],
+                    array_merge($failed, [
+                        'meta' => array_merge($failed['meta'], [
+                            'rank' => $rank,
+                            'compose_debug' => $e->composeDebug,
+                        ]),
+                    ]),
+                ],
+                'effects' => $effects,
+            ];
+        }
     }
 
     /**

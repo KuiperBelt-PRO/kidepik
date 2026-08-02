@@ -141,7 +141,7 @@ Orden vertical fijo (una sola columna). Scroll interno del marco si no cabe en 3
 | Longitud | 1–40 caracteres tras trim; vacío permitido (vuelve a fallback de saludo) |
 | Caracteres | Letras Unicode, números, espacios, guion `-`, apóstrofo `'`; sin URLs ni `@` de handle libre (evitar confusión con email) |
 | Guardado | Botón «Guardar» **a la derecha del input** en la misma fila (`flex` + `wrap`); icono `save` del generador |
-| Éxito | Toast/texto inline «Guardado» ~2 s |
+| Éxito | Toast `success` «Nombre guardado» + botón en estado busy durante el PATCH (`runGlassButtonAction`) |
 | Error validación | Inline bajo el campo |
 | Error red | «No hemos podido guardar. Inténtalo de nuevo.» |
 

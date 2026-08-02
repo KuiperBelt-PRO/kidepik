@@ -153,6 +153,18 @@ Mismo contrato que hoy ([SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md)
 - Segundos visibles en timestamps.
 - Eventos `decision` muestran label humano de zona.
 
+**Estados de carga (ago 2026):**
+
+| Momento | UI |
+| --- | --- |
+| Carga inicial | Skeleton `lines` en resumen + 3 filas skeleton tipo timeline en la lista |
+| «Ver más» | Añadir 3 filas skeleton al final de la lista; **sin** texto «Cargando más…» |
+| Error | Toast `error`; resumen con copy de vacío/error según contexto |
+
+Helpers: `fillGlassSkeleton`, `mountTimelineSkeletonItems` — [DESIGN.md](../DESIGN.md) §11.
+
+**Guardados en ficha (Viaje + Ajustes):** ver [SPEC_APP_GLASS_TOAST.md](SPEC_APP_GLASS_TOAST.md) — `runGlassButtonAction` + toast.
+
 ---
 
 ## 3. Pestaña Ajustes

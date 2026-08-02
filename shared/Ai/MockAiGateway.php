@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Kidepik\Shared\Ai;
 
 /**
- * Respuestas deterministas sin red (`AI_MOCK=true`).
+ * Respuestas deterministas para tests PHPUnit (gateway con chatFn inyectado).
  */
 final class MockAiGateway
 {
@@ -48,6 +48,10 @@ final class MockAiGateway
             ], JSON_UNESCAPED_UNICODE),
             'placement_exam_batch_writer' => self::mockBatchRewrite($lastUser),
             'placement_exam_composer' => self::mockExamComposer($lastUser),
+            'adventure_pitch' => self::mockAdventurePitch($lastUser),
+            'adventure_scene' => self::mockAdventureScene($lastUser),
+            'adventure_challenge' => self::mockAdventureChallenge($lastUser),
+            'adventure_waiting' => self::mockAdventureWaiting($lastUser),
             default => json_encode([
                 'agent_text' => self::defaultMentorLine($lastUser),
                 'input_mode' => 'continue',
@@ -191,6 +195,104 @@ final class MockAiGateway
         }
 
         return (string) json_encode(['items' => $items], JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function mockAdventurePitch(string $lastUser): string
+    {
+        $decoded = json_decode($lastUser, true);
+        $zones = is_array($decoded['zones'] ?? null) ? $decoded['zones'] : [];
+        $options = [];
+        $i = 0;
+        foreach ($zones as $z) {
+            if (!is_array($z)) {
+                continue;
+            }
+            $id = (string) ($z['zone_id'] ?? '');
+            if ($id === '') {
+                continue;
+            }
+            $label = (string) ($z['canonical_label'] ?? $id);
+            $options[] = [
+                'id' => $id,
+                'label' => $label,
+                'description' => "En {$label} hay un misterio fresco (eco {$i}).",
+                'why_for_you' => match ($i) {
+                    0 => 'Es un buen primer paso para ti ahora.',
+                    1 => 'Te ayudará a practicar desde otro ángulo.',
+                    default => 'Suma variedad a tu ruta de hoy.',
+                },
+            ];
+            $i++;
+        }
+
+        return json_encode([
+            'mentor_bridge' => 'Hay caminos abiertos. Mira las cartas y elige tu primer destino.',
+            'options' => $options,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function mockAdventureScene(string $lastUser): string
+    {
+        $decoded = json_decode($lastUser, true);
+        $zoneId = is_array($decoded) ? (string) ($decoded['zone_id'] ?? 'zone_logic') : 'zone_logic';
+        $name = is_array($decoded) ? (string) ($decoded['display_name'] ?? 'explorador') : 'explorador';
+        $label = match ($zoneId) {
+            'zone_logic' => 'Laberinto de Espejos',
+            'zone_math' => 'Bosque de los Números',
+            'zone_language' => 'Montañas de la Gramática',
+            'zone_science' => 'Jardines Alquímicos',
+            'zone_culture' => 'Biblioteca de los Reinos',
+            default => 'el lugar',
+        };
+
+        return json_encode([
+            'agent_text' => "Llegamos a {$label}. Los espejos —o las señales— piden orden.\n\n"
+                . "«{$name}, ayúdame a despejar el camino», dice el guardián local.\n\n"
+                . 'Cuando quieras, afrontamos el primer obstáculo.',
+            'npc_display' => [
+                'archetype' => 'zone_guardian',
+                'name' => $zoneId === 'zone_logic' ? 'Vigía de los Espejos' : 'Guardián del lugar',
+                'one_line_voice' => 'Hablo claro y sin rodeos.',
+            ],
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function mockAdventureChallenge(string $lastUser): string
+    {
+        $decoded = json_decode($lastUser, true);
+        if (is_array($decoded) && array_key_exists('success', $decoded)) {
+            return json_encode([
+                'success_text' => '¡Bien! El lugar recupera un poco de luz.',
+                'near_miss_text' => 'Casi. Respira y probamos otra vez.',
+            ], JSON_UNESCAPED_UNICODE);
+        }
+        $stem = is_array($decoded) ? (string) ($decoded['curriculum_stem'] ?? '¿Siguiente?') : '¿Siguiente?';
+        $gate = is_array($decoded) ? (int) ($decoded['gate_index'] ?? 0) : 0;
+        $total = is_array($decoded) ? (int) ($decoded['steps_total'] ?? 3) : 3;
+        $n = $gate + 1;
+
+        return json_encode([
+            'narrative_wrapper' => "El guardián enciende una prueba ({$n} de {$total}).",
+            'prompt_text' => $stem,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+
+    private static function mockAdventureWaiting(string $lastUser): string
+    {
+        $decoded = json_decode($lastUser, true);
+        $kind = is_array($decoded) ? (string) ($decoded['kind'] ?? 'general') : 'general';
+
+        return json_encode([
+            'kind' => $kind,
+            'generated_at' => gmdate('c'),
+            'lines' => [
+                'Un momento, preparo el siguiente paso…',
+                'Consulto el mapa del viaje…',
+                'Ajusto la ruta para ti…',
+                'Casi listo…',
+            ],
+            'ttl_hours' => 24,
+        ], JSON_UNESCAPED_UNICODE);
     }
 
     private static function defaultMentorLine(string $lastUser): string

@@ -33,6 +33,7 @@ services:
       - ../supabase/migrations:/var/www/supabase/migrations:ro
       - ../web/media:/var/www/html/media
       - ../web/logs:/var/www/html/logs
+      - ./php/conf.d/99-dev.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
     environment:
       APP_NAME: kidepik-api
       APP_ENV: ${APP_ENV:-local}

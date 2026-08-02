@@ -71,10 +71,12 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 Si el cambio toca `web/` visible en rutas con sesión (`#/crew`, `#/settings`, `#/account`, `#/play/…`, etc.):
 
-1. Leer [.cursor/DESIGN.md](../../DESIGN.md) § tokens + **«Nuevas superficies autenticadas»**.
+1. Leer [.cursor/DESIGN.md](../../DESIGN.md) § tokens + **«Nuevas superficies autenticadas»** + **§11 Skeleton de carga** (`fillGlassSkeleton` / `mountGlassSkeleton` / `mountTimelineSkeletonItems`; presets `document` | `panel` | `lines` | `timeline`).
 2. Leer [SPEC_APP_SECTION_FRAME.md](../../specify/SPEC_APP_SECTION_FRAME.md) (matriz de rutas).
 3. **No** inventar chrome: `mountLoaderChrome` + `mountSectionFrame` + controles `glass-*`.
-4. Validar con skill `web-mobile-preview` (mundo animado visible detrás del marco).
+4. **Estados de carga:** skeleton glass hasta datos listos; **no** `<p>Cargando…</p>` ni copy preescrito (p. ej. play: `SPEC_APP_ADVENTURE_LLM_NARRATIVE` §1). Paginación: filas skeleton, no texto bajo el botón.
+5. **Guardados PATCH sin navegación:** `runGlassButtonAction` + `showGlassToast` ([SPEC_APP_GLASS_TOAST.md](../../specify/SPEC_APP_GLASS_TOAST.md)); no solo texto inline «Guardado».
+6. Validar con skill `web-mobile-preview` (mundo animado visible detrás del marco).
 
 ---
 
