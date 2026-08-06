@@ -34,6 +34,10 @@ build/
 web/logs/*
 !web/logs/.gitkeep
 
+# Ledger de viaje agentic (JSONL + MD)
+data/journey/*
+!data/journey/.gitkeep
+
 # Supabase CLI (estado local; versionar config.toml + migrations/)
 supabase/.branches/
 supabase/.temp/

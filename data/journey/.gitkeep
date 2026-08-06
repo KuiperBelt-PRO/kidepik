@@ -1,0 +1,2 @@
+# Journey ledger (JSONL + MD) — bind-mounted into Docker as /data/journey
+# SPEC_AI_JOURNEY_FILE_LEDGER

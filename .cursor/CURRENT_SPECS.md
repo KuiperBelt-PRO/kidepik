@@ -9,13 +9,21 @@
 ## Producto
 
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
-- **Pivot POC PHP + DreamHost (jul 2026):**
+- **Pivot backend FastAPI (ago 2026 — cutover play hecho):** [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) — nginx `:8082`: **toda** `/api/v1/*` → FastAPI (incl. play + debug-ai). PHP sin rutas IA.
+- **IA agentic FastAPI (canónica):** Gemini free + Pydantic AI + skills + ledger `data/journey/` (`dialogue.jsonl`, `summary.md`, `traveler.md`). Plan: [tasks/AI_FASTAPI_AGENTIC_PLAN.md](tasks/AI_FASTAPI_AGENTIC_PLAN.md).
+  - Gateway: [specify/SPEC_AI_GEMINI_GATEWAY.md](specify/SPEC_AI_GEMINI_GATEWAY.md)
+  - Agentes / roles: [specify/SPEC_AI_PYDANTIC_AGENTS.md](specify/SPEC_AI_PYDANTIC_AGENTS.md)
+  - Skills: [specify/SPEC_AI_AGENT_SKILLS.md](specify/SPEC_AI_AGENT_SKILLS.md)
+  - Ledger: [specify/SPEC_AI_JOURNEY_FILE_LEDGER.md](specify/SPEC_AI_JOURNEY_FILE_LEDGER.md)
+  - **Retiro IA PHP:** [specify/SPEC_AI_PHP_STACK_RETIREMENT.md](specify/SPEC_AI_PHP_STACK_RETIREMENT.md)
+  - Semántica L1/L2/L3: [SPEC_APP_JOURNEY_MEMORY](specify/SPEC_APP_JOURNEY_MEMORY.md)
+- **Stack PHP vigente hasta cutover** (legado durante la migración):
   - Arquitectura POC: [specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) — PHP + Supabase + media local; hosting DreamHost.
   - Docker local (única vía dev): [specify/SPEC_POC_DOCKER_LOCAL_DEV.md](specify/SPEC_POC_DOCKER_LOCAL_DEV.md) — nginx + php-fpm, hot reload, puerto **8082**.
   - Backend PHP: [specify/SPEC_PHP_BACKEND_ARCHITECTURE.md](specify/SPEC_PHP_BACKEND_ARCHITECTURE.md) — estructura, contratos, hoja de ruta RAG.
   - **Media (filesystem local):** [specify/SPEC_MEDIA_STORAGE.md](specify/SPEC_MEDIA_STORAGE.md) — solo `web/media/` / `STORAGE_DRIVER=local`.
-  - MVP hosting: [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) — DreamHost + Supabase (sin R2/OCI/Cloud Run).
-- **POC FastAPI histórico (descartado):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md) — aviso; no implementar.
+  - MVP hosting: [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) — DreamHost + Supabase (sin R2/OCI/Cloud Run) — **revisar tras aprobar §7 de la migración FastAPI**.
+- **POC FastAPI histórico (descartado jul 2026; sustituido por la propuesta ago 2026):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md) — aviso; no implementar ese diseño MinIO/R2.
 - **Pivot frontend web-first (implementado jun 2026):** [specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md](specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md) — `web/` HTML/CSS/JS, puerto **8082**.
 - **Sistema visual v3 web premium (dirección de arte; galería/mockups = futuro post-MVP):** [specify/SPEC_APP_VISUAL_DESIGN_V3.md](specify/SPEC_APP_VISUAL_DESIGN_V3.md)
 - **Pantalla Loader (splash + world procedural):** [specify/SPEC_LOADER_SCREEN.md](specify/SPEC_LOADER_SCREEN.md) — runtime jul 2026; prompts IA (archivo histórico de assets): [specify/LOADER_SCREEN_AI_PROMPTS.md](specify/LOADER_SCREEN_AI_PROMPTS.md)

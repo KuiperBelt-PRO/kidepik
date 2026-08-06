@@ -1,0 +1,103 @@
+"""Envelopes de salida tipados (SPEC_AI_PYDANTIC_AGENTS)."""
+from __future__ import annotations
+
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class DialogueOption(BaseModel):
+    id: str
+    label: str
+    description: str | None = None
+
+
+class DialogueEnvelope(BaseModel):
+    agent_text: str
+    input_mode: Literal[
+        "options_only",
+        "text_only",
+        "options_or_text",
+        "continue",
+        "blocked",
+    ] = "continue"
+    options: list[DialogueOption] = Field(default_factory=list)
+    effects: list[dict[str, Any]] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class ScoreEnvelope(BaseModel):
+    score: float = 0.0
+    rationale: str = ""
+
+
+class PlacementItemEnvelope(BaseModel):
+    subject_id: str
+    item_key: str
+    item_type: Literal["mcq", "short_text", "true_false"] = "mcq"
+    prompt_text: str
+    presentation_text: str | None = None
+    options: list[DialogueOption] = Field(default_factory=list)
+    correct_option_id: str | None = None
+    expected_answer: str | None = None
+
+
+class PlacementQueueEnvelope(BaseModel):
+    items: list[PlacementItemEnvelope] = Field(default_factory=list)
+
+
+class ZonePitch(BaseModel):
+    zone_id: str
+    title: str
+    pitch: str
+
+
+class ZonePitchBundle(BaseModel):
+    pitches: list[ZonePitch] = Field(default_factory=list)
+    agent_text: str = ""
+
+
+class ChallengeEnvelope(BaseModel):
+    agent_text: str
+    subject_id: str | None = None
+    input_mode: Literal["options_only", "text_only", "options_or_text", "continue"] = "text_only"
+    options: list[DialogueOption] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class ChallengeResultEnvelope(BaseModel):
+    success_text: str
+    near_miss_text: str = ""
+
+
+class WaitingCopyBundle(BaseModel):
+    lines: list[str] = Field(default_factory=list)
+
+
+class SessionSummaryEnvelope(BaseModel):
+    summary_markdown: str
+    structured: dict[str, Any] = Field(default_factory=dict)
+
+
+class TravelerProfileEnvelope(BaseModel):
+    """Salida de character_coach: burbuja + ficha del viajero."""
+
+    agent_text: str
+    input_mode: Literal[
+        "options_only",
+        "text_only",
+        "options_or_text",
+        "continue",
+        "blocked",
+    ] = "continue"
+    options: list[DialogueOption] = Field(default_factory=list)
+    species: str
+    palette: str
+    features: list[str] = Field(default_factory=list)
+    abilities: list[str] = Field(default_factory=list)
+    vibe: str = ""
+    description_md: str = ""
+    outfit_md: str = ""
+    personality_md: str = ""
+    abilities_md: str = ""
+    meta: dict[str, Any] = Field(default_factory=dict)

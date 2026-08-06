@@ -45,27 +45,12 @@ final class RouterRoutesTest extends TestCase
         self::assertSame(422, $router->dispatch('POST', '/api/v1/storage/upload')->status);
     }
 
-    public function testPlayDialogueRoutesRequireAuth(): void
+    public function testPlayAndDebugAiRoutesReturn404(): void
     {
         $router = new Router();
 
-        self::assertSame(401, $router->dispatch('POST', '/api/v1/play/abc/dialogue/session')->status);
-        self::assertSame(401, $router->dispatch('POST', '/api/v1/play/abc/dialogue/turn')->status);
-        self::assertSame(401, $router->dispatch('GET', '/api/v1/play/abc/dialogue/history')->status);
-        self::assertSame(401, $router->dispatch('GET', '/api/v1/play/abc/journey/summary')->status);
-        self::assertSame(401, $router->dispatch('GET', '/api/v1/play/abc/journey/timeline')->status);
-    }
-
-    public function testDebugAiRoutesRequireAuthWhenEnabled(): void
-    {
-        putenv('APP_ENV=local');
-        putenv('APP_DEBUG_AI=true');
-        $_ENV['APP_ENV'] = 'local';
-        $_ENV['APP_DEBUG_AI'] = 'true';
-
-        $router = new Router();
-        self::assertSame(401, $router->dispatch('GET', '/api/v1/debug/ai/status')->status);
-        self::assertSame(401, $router->dispatch('POST', '/api/v1/debug/ai/ping')->status);
+        self::assertSame(404, $router->dispatch('POST', '/api/v1/play/abc/dialogue/session')->status);
+        self::assertSame(404, $router->dispatch('GET', '/api/v1/debug/ai/status')->status);
     }
 
     public function testArchitectureConfigRoute(): void

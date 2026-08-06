@@ -5,7 +5,6 @@ declare(strict_types=1);
 use Kidepik\Api\Http\JsonResponse;
 use Kidepik\Api\Router;
 use Kidepik\Shared\Config;
-use Kidepik\Shared\Ai\FreeModelQueueSync;
 use Kidepik\Shared\Database\MigrationException;
 use Kidepik\Shared\Database\MigrationRunner;
 use Kidepik\Shared\Logging\AppLogger;
@@ -47,12 +46,6 @@ try {
     }
     echo $response->body;
     exit;
-}
-
-try {
-    (new FreeModelQueueSync())->syncIfStale();
-} catch (\Throwable) {
-    // Discovery no debe tumbar requests API.
 }
 
 $response = (new Router())->dispatch($requestMethod, $requestUri);

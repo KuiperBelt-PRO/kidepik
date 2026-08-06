@@ -4,16 +4,16 @@ Repositorio **kidepik** — producto en fase de arranque bajo la org GitHub `Kui
 
 ## Estado actual
 
-- Ramas: `master` (release), `develop` (integración).
-- **Stack canónico:** PHP + DreamHost (prod) + Docker local (dev) + Supabase + media en `web/media/` — [specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md).
-- **Cliente producto:** `web/` (HTML/CSS/JS). Capacitor para tiendas en fase posterior.
-- **Backend:** `api/` + `shared/` (PHP). Sin FastAPI, R2, MinIO, OCI ni Cloud Run como parte del producto.
+- Ramas: `master` (release), `develop` (integración), epic `epic/agentic_approach`, feature `fast_api_backend`.
+- **Stack canónico (POC local):** FastAPI (`backend/`) + nginx Docker `:8082` + Supabase + media en `web/media/` + cliente `web/` HTML/CSS/JS.
+- **Legado PHP:** `api/` + `shared/` se conservan en el repo pero **no** reciben tráfico HTTP (perfil compose opcional `php-legacy`).
+- Spec migración: [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md).
 
 ## URLs locales (POC Docker)
 
 | Servicio | Host (PC) | Notas |
 | --- | --- | --- |
-| **App (web + API PHP)** | `http://localhost:8082` | nginx Docker — **única URL de producto** |
+| **App (web + API FastAPI)** | `http://localhost:8082` | nginx → estáticos + proxy `/api` → uvicorn |
 | Media | `http://localhost:8082/media/...` | Ficheros en `web/media/` |
 | Supabase API | `http://localhost:54321` | Contenedores vía `supabase start` |
 

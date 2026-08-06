@@ -1,7 +1,8 @@
 # Spec: POC local — arquitectura histórica (DESCARTADA)
 
 > Estado: **descartada** (julio 2026)  
-> **No implementar.** Conservada solo como aviso para agentes.
+> **No implementar este diseño** (MinIO/R2/`backend/` histórico en `:8080`).  
+> Pivot vigente (ago 2026): [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md) — FastAPI + Supabase + media local + `web/` sin cambio.
 
 ## Decisión
 

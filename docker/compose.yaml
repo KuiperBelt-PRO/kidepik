@@ -1,4 +1,4 @@
-# POC local — nginx + PHP (DreamHost-like) + Supabase CLI
+# POC local — nginx + FastAPI (API producto) + PHP (Play / IA / debug AI)
 # Supabase: `supabase start` (ver scripts/poc-up.ps1)
 
 name: kidepik-poc
@@ -13,10 +13,57 @@ services:
       - ../web/media:/var/www/html/media:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
+      api:
+        condition: service_started
       php:
         condition: service_started
     restart: unless-stopped
 
+  api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ../backend/app:/app/app
+      - ../backend/tests:/app/tests
+      - ../backend/skills:/app/skills:ro
+      - ../backend/pyproject.toml:/app/pyproject.toml:ro
+      - ../supabase/migrations:/var/www/supabase/migrations:ro
+      - ../web/media:/var/www/html/media
+      - ../web/logs:/var/www/html/logs
+      - ../data/journey:/data/journey
+    environment:
+      APP_NAME: kidepik-api
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG_AI: ${APP_DEBUG_AI:-true}
+      LOG_DIR: /var/www/html/logs
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      LOG_TO_FILES: ${LOG_TO_FILES:-true}
+      LOG_CLIENT_INGEST: ${LOG_CLIENT_INGEST:-true}
+      CLIENT_LOG_LEVEL: ${CLIENT_LOG_LEVEL:-info}
+      MIGRATIONS_DIR: /var/www/supabase/migrations
+      RUN_MIGRATIONS_ON_STARTUP: ${RUN_MIGRATIONS_ON_STARTUP:-true}
+      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
+      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
+      MEDIA_ROOT: /var/www/html/media
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-/media}
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-/api/v1}
+      PUBLIC_SUPABASE_URL: ${PUBLIC_SUPABASE_URL:-http://localhost:54321}
+      UPLOAD_TOKEN_TTL: ${UPLOAD_TOKEN_TTL:-900}
+      JOURNEY_DATA_DIR: /data/journey
+      AI_ENABLED: ${AI_ENABLED:-true}
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      AI_GEMINI_MODEL_LIST: ${AI_GEMINI_MODEL_LIST:-gemini-3-flash-preview,gemini-2.5-flash,gemini-2.0-flash}
+      AI_GEMINI_MODEL_LIST_LITE: ${AI_GEMINI_MODEL_LIST_LITE:-gemini-2.5-flash-lite,gemini-3.1-flash-lite,gemini-2.0-flash}
+    restart: unless-stopped
+
+  # Play / IA / debug AI — PHP hasta completar el port FastAPI
   php:
     build:
       context: ..
@@ -35,7 +82,7 @@ services:
       - ../web/logs:/var/www/html/logs
       - ./php/conf.d/99-dev.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
     environment:
-      APP_NAME: kidepik-api
+      APP_NAME: kidepik-api-php
       APP_ENV: ${APP_ENV:-local}
       APP_DEBUG_AI: ${APP_DEBUG_AI:-true}
       LOG_DIR: /var/www/html/logs

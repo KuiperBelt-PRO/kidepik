@@ -17,6 +17,9 @@ final class CrewProgressService
 {
     private const THRESHOLD_UP = 0.80;
 
+    /** Gates de introducción por zona (legado adventure; valor canónico post-retiro PHP AI). */
+    private const ZONE_INTRO_GATES = 3;
+
     public function __construct(
         private readonly PDO $pdo,
         private readonly PlacementBank $bank = new PlacementBank(),
@@ -42,7 +45,7 @@ final class CrewProgressService
 
         $subjectLevels = $this->fetchSubjectLevels($childId);
         $journeySettings = is_array($settings['journey'] ?? null) ? $settings['journey'] : [];
-        $zonesCompleted = AdventureService::completedZoneIds(['settings' => $settings]);
+        $zonesCompleted = $this->completedZoneIds($settings);
         $activeZoneId = $this->nullableString($journeySettings['active_zone_id'] ?? null);
         $activeQuest = $this->fetchActiveQuest($childId);
 
@@ -64,7 +67,7 @@ final class CrewProgressService
             $rolling = is_array($row) && isset($row['accuracy_rolling']) ? (float) $row['accuracy_rolling'] : null;
             $recentAttempts = is_array($row) ? 1 : 0;
             $zoneId = $meta['zone_id'] ?? null;
-            $zoneLabel = is_string($zoneId) ? AdventureService::zoneTitle($theme, $zoneId) : null;
+            $zoneLabel = is_string($zoneId) ? ZoneCatalog::label($theme, $zoneId) : null;
 
             $levelProgress = $levelId !== null
                 ? $this->levelProgress($levelId, $rolling, $recentAttempts, (string) $meta['label'])
@@ -144,11 +147,11 @@ final class CrewProgressService
                 'chapter_id' => (string) ($journeySettings['chapter_id'] ?? 'C1_first_zone'),
                 'chapter_label' => 'Primer destino',
                 'active_zone_id' => $activeZoneId,
-                'active_zone_label' => $activeZoneId !== null ? AdventureService::zoneTitle($theme, $activeZoneId) : null,
+                'active_zone_label' => $activeZoneId !== null ? ZoneCatalog::label($theme, $activeZoneId) : null,
                 'fragments_restored' => (int) ($journeySettings['fragments_restored'] ?? 0),
                 'zones_completed' => $zonesCompleted,
                 'zones_completed_labels' => array_map(
-                    static fn (string $z): string => AdventureService::zoneTitle($theme, $z),
+                    static fn (string $z): string => ZoneCatalog::label($theme, $z),
                     $zonesCompleted,
                 ),
                 'pending_destinations' => array_map(
@@ -208,8 +211,26 @@ final class CrewProgressService
             'zone_id' => (string) ($row['zone_id'] ?? ''),
             'title_child' => (string) ($row['title_child'] ?? ''),
             'steps_done' => (int) ($row['steps_done'] ?? 0),
-            'steps_total' => (int) ($row['steps_total'] ?? AdventureService::ZONE_INTRO_GATES),
+            'steps_total' => (int) ($row['steps_total'] ?? self::ZONE_INTRO_GATES),
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $settings
+     * @return list<string>
+     */
+    private function completedZoneIds(array $settings): array
+    {
+        $journey = $settings['journey'] ?? [];
+        if (!is_array($journey)) {
+            return [];
+        }
+        $raw = $journey['zones_completed'] ?? [];
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return array_values(array_filter($raw, static fn ($z): bool => is_string($z) && $z !== ''));
     }
 
     private function placementCompletedAt(string $childId): ?string

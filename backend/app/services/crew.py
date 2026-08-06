@@ -1,0 +1,203 @@
+from __future__ import annotations
+
+import re
+from typing import Any
+
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import JSONB
+
+from app.catalogs import AgeBand, SubjectCatalog
+from app.db import session_scope
+from app.services.parents import ParentAccountService
+from app.services.settings import ParentSettingsRepository
+from app.text_utils import CharacterSummaryBuilder
+
+
+class CrewService:
+    MEMBER_LIMIT = 10
+    def __init__(self, parents: ParentAccountService | None = None, settings_repo: ParentSettingsRepository | None = None) -> None:
+        self.parents, self.settings_repo = parents or ParentAccountService(), settings_repo or ParentSettingsRepository()
+
+    async def list_for_auth_user(self, auth_user_id: str) -> dict[str, Any]:
+        await self.ensure_tutor_profile_for_auth_user(auth_user_id)
+        parent_id = await self._parent_id(auth_user_id)
+        async with session_scope() as session:
+            rows = (await session.execute(text("""select id, display_name, age_years, age_band, world_theme, status, onboarding_step, placement_status, settings, is_tutor_profile, updated_at from public.children where parent_id = :parent_id and status <> 'deleted' order by is_tutor_profile desc, created_at asc"""), {"parent_id": parent_id})).mappings().all()
+        members = [self._list_item(row) for row in rows]
+        return {"members": members, "member_count": sum(not x["is_tutor_profile"] for x in members), "member_limit": self.MEMBER_LIMIT, "has_tutor_profile": any(x["is_tutor_profile"] for x in members)}
+
+    async def ensure_tutor_profile_for_auth_user(self, auth_user_id: str) -> None:
+        parent = await self.parents.find_by_auth_user_id(auth_user_id)
+        if not parent: return
+        parent_id, label = parent["parent_id"], self._tutor_name(parent)
+        async with session_scope() as session:
+            existing = (await session.execute(text("select id from public.children where parent_id = :parent_id and is_tutor_profile = true and status <> 'deleted' limit 1"), {"parent_id": parent_id})).mappings().first()
+            if existing:
+                await session.execute(text("update public.children set display_name = :display_name, updated_at = now() where id = :id and display_name is distinct from :display_name"), {"id": existing["id"], "display_name": label})
+                return
+            defaults = await self.settings_repo.get_merged_settings_for_parent_id(parent_id)
+            crew = defaults.get("crew_defaults", {})
+            statement = text("""insert into public.children (parent_id, display_name, status, onboarding_step, placement_status, is_tutor_profile, settings) values (:parent_id, :display_name, 'active', 'complete', 'completed', true, :settings) returning id""").bindparams(bindparam("settings", type_=JSONB))
+            child_id = (await session.execute(statement, {"parent_id": parent_id, "display_name": label, "settings": {"tutor_label": "Tu perfil de tutor"}})).scalar_one()
+            await self._insert_permissions(session, str(child_id), crew)
+
+    async def create_for_auth_user(self, auth_user_id: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        parent_id = await self._parent_id(auth_user_id)
+        if (await self.list_for_auth_user(auth_user_id))["member_count"] >= self.MEMBER_LIMIT: raise ValueError("Crew member limit reached")
+        payload = payload or {}
+        tutor_label = self._tutor_label(payload["tutor_label"]) if "tutor_label" in payload else None
+        defaults = (await self.settings_repo.get_merged_settings_for_parent_id(parent_id)).get("crew_defaults", {})
+        async with session_scope() as session:
+            statement = text("insert into public.children (parent_id, settings) values (:parent_id, :settings) returning id").bindparams(bindparam("settings", type_=JSONB))
+            child_id = (await session.execute(statement, {"parent_id": parent_id, "settings": {"tutor_label": tutor_label}})).scalar_one()
+            await self._insert_permissions(session, str(child_id), defaults)
+        return await self.get_for_auth_user(auth_user_id, str(child_id))
+
+    async def get_for_auth_user(self, auth_user_id: str, child_id: str) -> dict[str, Any]:
+        parent_id = await self._parent_id(auth_user_id)
+        async with session_scope() as session:
+            row = (await session.execute(text("""select c.*, p.allow_solo_start, p.require_exit_pin, p.exit_pin_hash, p.session_limit_per_day, p.max_session_minutes, p.allowed_hours, p.can_choose_story_branch, p.lock_world_theme, p.font_scale_play, p.learning_overrides from public.children c join public.child_permissions p on p.child_id = c.id where c.id = :id and c.parent_id = :parent_id and c.status <> 'deleted' limit 1"""), {"id": child_id, "parent_id": parent_id})).mappings().first()
+            if not row: raise RuntimeError("Crew member not found")
+            detail = self._detail(row)
+            traits = (await session.execute(text("select species, palette, features, vibe, achievements, character_summary, updated_at from public.child_traits where child_id = :id limit 1"), {"id": child_id})).mappings().first()
+        if traits: detail["traits"] = self._traits(traits)
+        if not detail["is_tutor_profile"]:
+            from app.services.crew_progress import CrewProgressService
+            built = await CrewProgressService().build_for_child(dict(row, settings=detail["settings"]))
+            detail.update({"progress": built["progress"], "journey": built["journey"], "general_level": built["progress"].get("general_level"), "rank_id": self._string(row.get("rank_id")), "rank": built["progress"].get("rank")})
+        return detail
+
+    async def update_profile_for_auth_user(self, auth_user_id: str, child_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        detail = await self.get_for_auth_user(auth_user_id, child_id)
+        fields, params = [], {"id": child_id}
+        if "display_name" in payload: fields.append("display_name = :display_name"); params["display_name"] = self._display_name(payload["display_name"])
+        if "age_years" in payload:
+            age = payload["age_years"]
+            if age is not None and (type(age) is not int): raise ValueError("age_years invalid")
+            if age is not None: AgeBand.assert_age_years(age)
+            fields.append("age_years = :age_years"); params["age_years"] = age
+            if age is not None: fields.extend(("age_band = :age_band", "effective_age_band = :effective_age_band")); params.update(age_band=AgeBand.from_age_years(age), effective_age_band=AgeBand.from_age_years(age))
+        if "status" in payload:
+            if detail["is_tutor_profile"]: raise ValueError("Cannot change tutor profile status")
+            if payload["status"] not in ("active", "paused"): raise ValueError("status invalid")
+            fields.append("status = :status"); params["status"] = payload["status"]
+        if "world_theme" in payload:
+            theme = payload["world_theme"]
+            if theme is not None and theme not in ("fantasy", "sci-fi"): raise ValueError("world_theme invalid")
+            if detail["permissions"]["lock_world_theme"] and payload.get("unlock_world") is not True and theme != detail["world_theme"]: raise ValueError("world_theme locked")
+            fields.append("world_theme = :world_theme"); params["world_theme"] = theme
+        settings = dict(detail["settings"])
+        if "tutor_label" in payload: settings["tutor_label"] = self._tutor_label(payload["tutor_label"])
+        if "learning" in payload:
+            if detail["is_tutor_profile"]: raise ValueError("Cannot set learning on tutor profile")
+            incoming = payload["learning"]
+            if not isinstance(incoming, dict): raise ValueError("learning invalid")
+            learning = dict(settings.get("learning") or {})
+            if "active_subjects" in incoming:
+                if not isinstance(incoming["active_subjects"], list): raise ValueError("learning.active_subjects invalid")
+                learning["active_subjects"] = SubjectCatalog.normalize_active_subjects(incoming["active_subjects"]); learning["subjects_locked_by_tutor"] = True
+            for key in ("adaptation_policy", "show_levels_to_child", "pause_adaptation"):
+                if key in incoming: learning[key] = incoming[key]
+            settings["learning"] = learning
+        if "tutor_label" in payload or "learning" in payload: fields.append("settings = CAST(:settings AS jsonb)"); params["settings"] = settings
+        traits_changed = "character_summary" in payload
+        if traits_changed:
+            if detail["is_tutor_profile"]: raise ValueError("Cannot set character_summary on tutor profile")
+            await self._upsert_summary(child_id, self._summary(payload["character_summary"]))
+        if not fields and not traits_changed: raise ValueError("No updatable fields")
+        async with session_scope() as session:
+            if fields:
+                statement = text(f"update public.children set {', '.join(fields)}, updated_at = now() where id = :id and status <> 'deleted'")
+                if "settings" in params: statement = statement.bindparams(bindparam("settings", type_=JSONB))
+                await session.execute(statement, params)
+            elif traits_changed: await session.execute(text("update public.children set updated_at = now() where id = :id and status <> 'deleted'"), {"id": child_id})
+        return await self.get_for_auth_user(auth_user_id, child_id)
+
+    async def update_permissions_for_auth_user(self, auth_user_id: str, child_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        await self.get_for_auth_user(auth_user_id, child_id)
+        fields, params = [], {"child_id": child_id}
+        for key in ("allow_solo_start", "require_exit_pin", "can_choose_story_branch", "lock_world_theme"):
+            if key in payload:
+                if type(payload[key]) is not bool: raise ValueError(f"{key} invalid")
+                fields.append(f"{key} = :{key}"); params[key] = payload[key]
+        if "session_limit_per_day" in payload:
+            value = payload["session_limit_per_day"]
+            if value is not None and (type(value) is not int or not 1 <= value <= 12): raise ValueError("session_limit_per_day invalid")
+            fields.append("session_limit_per_day = :session_limit_per_day"); params["session_limit_per_day"] = value
+        if "max_session_minutes" in payload:
+            value = payload["max_session_minutes"]
+            if type(value) is not int or not 5 <= value <= 120 or value % 5: raise ValueError("max_session_minutes invalid")
+            fields.append("max_session_minutes = :max_session_minutes"); params["max_session_minutes"] = value
+        if "font_scale_play" in payload:
+            if payload["font_scale_play"] not in ("md", "lg", "xl"): raise ValueError("font_scale_play invalid")
+            fields.append("font_scale_play = :font_scale_play"); params["font_scale_play"] = payload["font_scale_play"]
+        if "exit_pin" in payload:
+            pin = payload["exit_pin"]
+            if pin is None: fields.append("exit_pin_hash = null")
+            elif not isinstance(pin, str) or not re.fullmatch(r"\d{4}", pin): raise ValueError("exit_pin invalid")
+            else: fields.append("exit_pin_hash = crypt(:exit_pin, gen_salt('bf'))"); params["exit_pin"] = pin
+        if not fields: raise ValueError("No updatable fields")
+        async with session_scope() as session: await session.execute(text(f"update public.child_permissions set {', '.join(fields)}, updated_at = now() where child_id = :child_id"), params)
+        return await self.get_for_auth_user(auth_user_id, child_id)
+
+    async def soft_delete_for_auth_user(self, auth_user_id: str, child_id: str, confirm: bool) -> dict[str, bool]:
+        if not confirm: raise ValueError("confirm required")
+        if (await self.get_for_auth_user(auth_user_id, child_id))["is_tutor_profile"]: raise ValueError("Cannot delete tutor profile")
+        async with session_scope() as session: await session.execute(text("update public.children set status = 'deleted', deleted_at = now(), updated_at = now() where id = :id"), {"id": child_id})
+        return {"deleted": True}
+
+    async def _parent_id(self, auth_user_id: str) -> str:
+        parent = await self.parents.find_by_auth_user_id(auth_user_id)
+        if not parent: raise RuntimeError("Parent account not found")
+        return parent["parent_id"]
+    async def _insert_permissions(self, session: Any, child_id: str, defaults: dict[str, Any]) -> None:
+        await session.execute(text("""insert into public.child_permissions (child_id, allow_solo_start, require_exit_pin, session_limit_per_day, max_session_minutes, can_choose_story_branch, lock_world_theme, font_scale_play) values (:child_id, :allow_solo_start, :require_exit_pin, :session_limit_per_day, :max_session_minutes, true, :lock_world_theme, :font_scale_play)"""), {"child_id": child_id, "allow_solo_start": defaults.get("allow_solo_start", True), "require_exit_pin": defaults.get("require_exit_pin", False), "session_limit_per_day": defaults.get("session_limit_per_day", 3), "max_session_minutes": defaults.get("max_session_minutes", 10), "lock_world_theme": defaults.get("lock_world_theme", True), "font_scale_play": defaults.get("font_scale_play", "md")})
+    @staticmethod
+    def _json(value: object) -> dict[str, Any]: return value if isinstance(value, dict) else {}
+    @staticmethod
+    def _string(value: object) -> str | None: return value if isinstance(value, str) and value else None
+    def _list_item(self, row: Any) -> dict[str, Any]:
+        settings = self._json(row["settings"]); return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "world_theme": self._string(row["world_theme"]), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "tutor_label": self._string(settings.get("tutor_label")), "is_tutor_profile": bool(row["is_tutor_profile"]), "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
+    def _detail(self, row: Any) -> dict[str, Any]:
+        settings, learning, hours = self._json(row["settings"]), self._json(row["learning_overrides"]), row["allowed_hours"]
+        band = AgeBand.from_legacy(row["age_band"], int(row["age_years"]) if row["age_years"] is not None else None) or AgeBand.CHILD
+        active = settings.get("learning", {}).get("active_subjects") if isinstance(settings.get("learning"), dict) else None
+        return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "effective_age_band": self._string(row["effective_age_band"]), "birth_year": int(row["birth_year"]) if row["birth_year"] is not None else None, "world_theme": self._string(row["world_theme"]), "locale": str(row["locale"] or "es-ES"), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "is_tutor_profile": bool(row["is_tutor_profile"]), "settings": settings, "subject_catalog": SubjectCatalog.list_for_ui(), "active_subjects": active if isinstance(active, list) else SubjectCatalog.base_subjects_for_band(band), "permissions": {"allow_solo_start": bool(row["allow_solo_start"]), "require_exit_pin": bool(row["require_exit_pin"]), "exit_pin_set": bool(row["exit_pin_hash"]), "session_limit_per_day": row["session_limit_per_day"], "max_session_minutes": int(row["max_session_minutes"] or 10), "allowed_hours": hours, "can_choose_story_branch": bool(row["can_choose_story_branch"]), "lock_world_theme": bool(row["lock_world_theme"]), "font_scale_play": str(row["font_scale_play"] or "md"), "learning_overrides": learning}, "traits": None, "created_at": str(row["created_at"]) if row["created_at"] else None, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
+    def _traits(self, row: Any) -> dict[str, Any]:
+        species, palette = str(row["species"] or ""), str(row["palette"] or ""); features = [x for x in row["features"] or [] if isinstance(x, str) and x.strip()]; achievements = [x for x in row["achievements"] or [] if isinstance(x, str) and x.strip()]; summary = self._string(row["character_summary"]) or (CharacterSummaryBuilder.build(species, palette, features, self._string(row["vibe"])) if species else None)
+        return {"species": species, "palette": palette, "features": features, "vibe": self._string(row["vibe"]), "achievements": achievements, "character_summary": summary, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
+    async def _upsert_summary(self, child_id: str, summary: str | None) -> None:
+        async with session_scope() as session:
+            row = (await session.execute(text("select species, palette from public.child_traits where child_id = :id"), {"id": child_id})).mappings().first()
+            if row:
+                await session.execute(text("update public.child_traits set character_summary = :summary, updated_at = now() where child_id = :id"), {"id": child_id, "summary": summary})
+                if summary is None and str(row["species"]).strip() == "Por definir" and str(row["palette"]).strip() == "Por definir": await session.execute(text("delete from public.child_traits where child_id = :id"), {"id": child_id})
+            elif summary is not None: await session.execute(text("insert into public.child_traits (child_id, species, palette, features, vibe, achievements, character_summary, updated_at) values (:id, 'Por definir', 'Por definir', '[]'::jsonb, null, '[]'::jsonb, :summary, now())"), {"id": child_id, "summary": summary})
+    @staticmethod
+    def _summary(value: object) -> str | None:
+        if value is None: return None
+        if not isinstance(value, str): raise ValueError("character_summary invalid")
+        value = re.sub(r"<[^>]*>", "", value).strip()
+        if len(value) > 600: raise ValueError("character_summary too long")
+        return value or None
+    @staticmethod
+    def _tutor_label(value: object) -> str | None:
+        if value is None: return None
+        if not isinstance(value, str): raise ValueError("tutor_label invalid")
+        value = value.strip()
+        if len(value) > 40: raise ValueError("tutor_label too long")
+        return value or None
+    @staticmethod
+    def _display_name(value: object) -> str | None:
+        if value is None: return None
+        if not isinstance(value, str): raise ValueError("display_name invalid")
+        value = value.strip()
+        if len(value) > 24: raise ValueError("display_name too long")
+        if value and not re.fullmatch(r"[\w\d '\-]+", value, re.UNICODE): raise ValueError("display_name invalid characters")
+        return value or None
+    @staticmethod
+    def _tutor_name(parent: dict[str, Any]) -> str:
+        if isinstance(parent.get("display_name"), str) and parent["display_name"].strip(): return parent["display_name"].strip()
+        email = parent.get("email", "")
+        if isinstance(email, str) and "@" in email: return email.split("@", 1)[0].replace(".", " ").replace("_", " ").replace("-", " ").title().strip() or "Tutor"
+        return "Tutor"

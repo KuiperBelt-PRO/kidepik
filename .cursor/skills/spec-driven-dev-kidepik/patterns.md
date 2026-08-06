@@ -6,21 +6,20 @@ Patrones Python genéricos (herramientas, scripts): `Vibe-Coding/.cursor/skills/
 
 ---
 
-## Backend de producto (PHP)
+## Backend de producto (FastAPI POC)
 
 ```
-api/
-  public/index.php
-  src/                # dominio HTTP
-  tests/              # PHPUnit
-shared/               # Storage local, DB, Config
-docker/compose.yaml   # nginx + php-fpm
+backend/
+  app/                # FastAPI routers + services + ai
+  tests/              # pytest
+docker/compose.yaml   # nginx + api (uvicorn); php-legacy opcional
 web/media/            # media filesystem
+api/ + shared/        # legado PHP (sin tráfico HTTP)
 ```
 
-Nuevos módulos: bajo `api/src/` + `shared/`; tests en `api/tests/`. Spec: [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md).
+Spec: [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md).
 
-**Descartado:** FastAPI, R2/S3, MinIO, OCI — ver [SPEC_POC_LOCAL_ARCHITECTURE.md](../../specify/SPEC_POC_LOCAL_ARCHITECTURE.md) (aviso).
+**Legado:** PHP DreamHost specs siguen documentando el stack anterior.
 
 ---
 

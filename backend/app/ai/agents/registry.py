@@ -1,0 +1,70 @@
+"""Registry purpose → Agent Pydantic AI."""
+from __future__ import annotations
+
+from typing import Any
+
+from pydantic_ai import Agent
+
+from app.ai.agents.envelopes import (
+    ChallengeEnvelope,
+    ChallengeResultEnvelope,
+    DialogueEnvelope,
+    PlacementQueueEnvelope,
+    ScoreEnvelope,
+    SessionSummaryEnvelope,
+    TravelerProfileEnvelope,
+    WaitingCopyBundle,
+    ZonePitchBundle,
+)
+from app.ai.skills.loader import PURPOSE_SKILL_IDS, load_skills_for_purpose
+from app.config import Settings, get_settings
+
+BASE_SYSTEM = (
+    "Eres un agente de KidepiK. Responde siempre en castellano de España. "
+    "Cumple el schema de salida. No inventes datos del tutor. "
+    "Adapta el lenguaje según audience/age_band vía skills. "
+    "Adapta el tono al world_theme (fantasy vs sci-fi) y a la fase del viaje."
+)
+
+_OUTPUT_BY_PURPOSE: dict[str, type] = {
+    "onboarding_host": DialogueEnvelope,
+    "mentor_guide": DialogueEnvelope,
+    "character_coach": TravelerProfileEnvelope,
+    "zone_scene_writer": DialogueEnvelope,
+    "adventure_narrator": DialogueEnvelope,
+    "placement_item_writer": PlacementQueueEnvelope,
+    "placement_text_scorer": ScoreEnvelope,
+    "zone_pitch_writer": ZonePitchBundle,
+    "challenge_writer": ChallengeEnvelope,
+    "challenge_result_writer": ChallengeResultEnvelope,
+    "waiting_copy_writer": WaitingCopyBundle,
+    "journey_summarizer": SessionSummaryEnvelope,
+    "safety_rewriter": DialogueEnvelope,
+}
+
+
+def known_purposes() -> list[str]:
+    return sorted(PURPOSE_SKILL_IDS.keys())
+
+
+def resolve_output_type(purpose: str) -> type:
+    return _OUTPUT_BY_PURPOSE.get(purpose, DialogueEnvelope)
+
+
+def build_agent(
+    purpose: str,
+    *,
+    model: str,
+    settings: Settings | None = None,
+    load_skills: bool = True,
+) -> Agent[Any, Any]:
+    _ = settings or get_settings()
+    if purpose not in PURPOSE_SKILL_IDS:
+        raise KeyError(f"unknown purpose: {purpose}")
+    capabilities = load_skills_for_purpose(purpose) if load_skills else []
+    return Agent(
+        model,
+        output_type=resolve_output_type(purpose),
+        instructions=f"{BASE_SYSTEM}\nPurpose: {purpose}.",
+        capabilities=capabilities,
+    )
