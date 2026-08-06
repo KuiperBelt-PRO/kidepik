@@ -29,11 +29,14 @@ services:
       - ../backend/app:/app/app
       - ../backend/tests:/app/tests
       - ../backend/skills:/app/skills:ro
+      - ../backend/agents:/app/agents:ro
       - ../backend/pyproject.toml:/app/pyproject.toml:ro
       - ../supabase/migrations:/var/www/supabase/migrations:ro
       - ../web/media:/var/www/html/media
       - ../web/logs:/var/www/html/logs
       - ../data/journey:/data/journey
+      - ../data/glossary:/data/glossary:ro
+      - ../data/waiting:/data/waiting:ro
     environment:
       APP_NAME: kidepik-api
       APP_ENV: ${APP_ENV:-local}
@@ -55,6 +58,8 @@ services:
       PUBLIC_SUPABASE_URL: ${PUBLIC_SUPABASE_URL:-http://localhost:54321}
       UPLOAD_TOKEN_TTL: ${UPLOAD_TOKEN_TTL:-900}
       JOURNEY_DATA_DIR: /data/journey
+      GLOSSARY_DATA_DIR: ${GLOSSARY_DATA_DIR:-/data/glossary}
+      WAITING_DATA_DIR: ${WAITING_DATA_DIR:-/data/waiting}
       AI_ENABLED: ${AI_ENABLED:-true}
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}

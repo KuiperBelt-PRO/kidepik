@@ -1,8 +1,8 @@
 # Spec: Ledger de viaje en ficheros (JSONL + Markdown)
 
-> Estado: **aprobada** (ago 2026) — reset niveles/ranks incluido  
+> Estado: **aprobada** (ago 2026) — **delta propuesta** mundos paralelos + examen en archivos  
 > Hilo: IA agentic FastAPI  
-> Relacionado: [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md) (semántica L1/L2/L3), [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS.md](SPEC_AI_AGENT_SKILLS.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md)
+> Relacionado: [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md) (semántica L1/L2/L3), [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PARALLEL_WORLDS.md](SPEC_APP_PARALLEL_WORLDS.md), [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS.md](SPEC_AI_AGENT_SKILLS.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md)
 
 ## Contexto
 
@@ -18,14 +18,17 @@ La semántica de memoria (L1 ledger, L2 condensado, L3 ventana reciente) sigue [
 
 ### Qué queda en Postgres vs qué va a ficheros (aclaración)
 
+Contrato canónico ampliado: [SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md).
+
 | En **Postgres** (estado de producto) | En **ficheros** (hilo de aventura) |
 | --- | --- |
-| Cuenta tutor, auth, `children` (nombre, edad, mundo, traits, niveles, flags) | Cada frase del mentor y del explorador |
-| `onboarding_step`, `placement_status`, permisos | Elecciones de camino, intros/resultados de reto narrados |
-| Puntero opcional `active_adventure_session_id` | Resúmenes MD y condensed del viaje |
-| Catálogos / colas no agentic | Timeline «diario» rico para tutores (vía API que lee disco) |
+| Cuenta tutor, auth, `children` (nombre, edad, flags, permisos) | Cada frase del mentor y del explorador |
+| Niveles/rango **oficiales** (por mundo si paralelo) | Cola/índice/scores de **examen y retos en curso** |
+| `onboarding_step` / mundo activo (punteros) | Elecciones de camino, intros/resultados narrados |
+| `waiting_phrases` | `traveler.md` (**sustituye `child_traits`**) |
+| — | Resúmenes MD, condensed, informes tutor |
 
-No significa «sin base de datos». Significa: **la novela del viaje** (conversación y hechos narrativos) se guarda como JSONL/MD en un volumen; la BD guarda **quién eres y en qué punto de la máquina de estados estás**.
+No significa «sin base de datos». Significa: **la novela del viaje** (conversación, examen/retos, hechos) se guarda como JSONL/MD; la BD guarda **quién eres, niveles oficiales y flags**. DuckDB consulta los ficheros ([SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md)).
 
 ## Objetivo
 
@@ -74,18 +77,38 @@ data/journey/                    # HOST — navegable
   .gitkeep
   {parent_id}/
     {child_id}/
-      index.json
-      dialogue.jsonl             # diálogo completo del viaje
-      traveler.md                # ficha del viajero (perfil narrativo)
-      journey-condensed.md
-      sessions/
-        {session_id}/
-          events.jsonl
-          summary.md
-          meta.json
+      index.json                 # active_world, etc.
+      traveler.md                # núcleo compartido (sustituye child_traits)
+      worlds/                    # SPEC_APP_PARALLEL_WORLDS
+        fantasy/
+          dialogue.jsonl
+          traveler-world.md      # opcional
+          journey-condensed.md
+          sessions/
+            {session_id}/
+              events.jsonl       # diálogo eco + estado examen/caminos
+              summary.md
+              meta.json
+        sci-fi/
+          …igual…
 ```
 
-Paths solo con UUIDs; anti path traversal.
+**Compatibilidad:** el layout plano previo (`dialogue.jsonl` + `sessions/` en la raíz del child) es legado; nuevo código escribe bajo `worlds/{theme}/`. Paths solo con UUIDs; anti path traversal.
+
+### 2.2 Estado de examen / caminos en `events.jsonl`
+
+Kinds adicionales (normativos):
+
+| `kind` | Uso |
+| --- | --- |
+| `placement_queue` | Cola generada (N ítems) al iniciar prueba |
+| `placement_answer` | Respuesta + score de un ítem |
+| `placement_result` | Aprobado/no + niveles calculados (antes de escribir PG) |
+| `path_pack` | Pack de 3 caminos generados |
+| `path_progress` | Índice de reto / aciertos del camino activo |
+| `traveler_update` | Eco de cambios de ficha |
+
+No hay tablas `placement_exams` / `narrative_quests` como fuente de verdad.
 
 ### 2.1 Seguridad
 

@@ -65,7 +65,7 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 **Specs POC:** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](../../specify/SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md), [SPEC_MEDIA_STORAGE.md](../../specify/SPEC_MEDIA_STORAGE.md).  
 **Logs en disco:** [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md) — canales `api`, `ai`, `compose`, `client`; más detalle con `APP_DEBUG_AI=true`.  
 **URLs:** [.cursor/plan/PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md) — `http://localhost:8082`.  
-**Diagramas:** [.cursor/diagrams/README.md](../../diagrams/README.md) — matriz tarea→spec→diagrama en [14-agent-decision-tree.md](../../diagrams/14-agent-decision-tree.md).
+**Diagramas:** [.cursor/diagrams/README.md](../../diagrams/README.md) — matriz tarea→spec→diagrama en [14-cursor-doc-routing.md](../../diagrams/14-cursor-doc-routing.md).
 
 ### UI autenticada (puerta obligatoria)
 
@@ -123,7 +123,7 @@ Variables relevantes en `.env.poc`: `LOG_TO_FILES`, `LOG_LEVEL`, `APP_DEBUG_AI`,
 Ejecutar en este orden (paralelizar lecturas cuando sea posible):
 
 1. **[CURRENT_SPECS.md](../../CURRENT_SPECS.md)** — qué existe, estado (aprobada / implementada / contrato / descartada) y enlaces.
-2. **[diagrams/14-agent-decision-tree.md](../../diagrams/14-agent-decision-tree.md)** — matriz rápida pedido → spec → diagrama.
+2. **[diagrams/14-cursor-doc-routing.md](../../diagrams/14-cursor-doc-routing.md)** — matriz rápida pedido → spec → diagrama.
 3. **Búsqueda en `.cursor/specify/`** — por prefijo o palabra clave del área (`SPEC_LOADER_*`, `SPEC_APP_*`, `SPEC_PHP_*`, …). Ver taxonomía abajo.
 4. **Diagrama(s) del área** — según inventario § Diagramas; leer el Mermaid y las specs enlazadas en el propio fichero.
 5. **`.cursor/tasks/`** — si hay plan de ejecución abierto para la misma iniciativa.
@@ -166,7 +166,11 @@ Los diagramas **orientan**; el contrato vive en `.cursor/specify/`. Actualizar e
 | 11 | `11-child-adventure-pipeline.md` | Play, examen, diálogo (contrato) |
 | 12 | `12-media-storage.md` | `web/media/`, drivers, uploads |
 | 13 | `13-dev-test-validate.md` | PHPUnit, Playwright, flujos de validación |
-| 14 | `14-agent-decision-tree.md` | Nueva familia de specs o cambio de precedencia documental |
+| 14 | `14-cursor-doc-routing.md` | Enrutado documental Cursor (specs/skills) de specs o cambio de precedencia documental |
+| 15 | `15-ai-orchestrator-agents.md` | Orquestador, mapa de agentes play, decisión de rol por turno |
+| 16 | `16-journey-mechanics-flows.md` | Flujos first-run / prueba / caminos / rangos / espera |
+| 17 | `17-storage-decision-tree.md` | Criterio PG vs archivos vs DuckDB vs código |
+| 18 | `18-parallel-worlds.md` | Mundos fantasy/sci-fi en paralelo y cambio de tema |
 
 Orden de lectura sugerido para onboarding: [diagrams/README.md](../../diagrams/README.md) § Orden de lectura.
 
@@ -204,7 +208,7 @@ Las specs y los diagramas **no son estáticos**: se crean, amplían y actualizan
 ### Cuándo actualizar diagrama vs crear fichero nuevo
 
 - **Por defecto:** actualizar uno de los `01`–`14` existentes.
-- **Nuevo fichero** solo si aparece un **aspecto arquitectónico nuevo** que no encaja en el inventario (caso raro); entonces numerar `15-…`, documentar en [diagrams/README.md](../../diagrams/README.md) y en [14-agent-decision-tree.md](../../diagrams/14-agent-decision-tree.md).
+- **Nuevo fichero** solo si aparece un **aspecto arquitectónico nuevo** que no encaja en el inventario (caso raro); entonces numerar `15-…`, documentar en [diagrams/README.md](../../diagrams/README.md) y en [14-cursor-doc-routing.md](../../diagrams/14-cursor-doc-routing.md).
 - **No** duplicar en diagrama lo que ya es contrato detallado en spec (enlazar, no copiar párrafos largos).
 
 ---

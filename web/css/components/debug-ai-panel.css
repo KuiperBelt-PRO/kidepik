@@ -1,17 +1,68 @@
-.debug-ai-fab {
-  position: fixed;
-  right: 12px;
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
-  z-index: 120;
-  padding: 6px 10px;
+.shell-fab-wrap--account {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.shell-fab-wrap--account:has(.debug-ai-account-badge) .shell-fab--account {
+  pointer-events: none;
+}
+
+.shell-fab-wrap--account:has(.debug-ai-account-badge) .shell-fab__icon {
+  pointer-events: auto;
+}
+
+.debug-ai-account-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  z-index: 5;
+  pointer-events: auto;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(12, 16, 28, 0.72);
-  color: #e8f0ff;
-  font-family: "Orbitron", system-ui, sans-serif;
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  backdrop-filter: blur(10px);
+  border: 1.5px solid rgba(255, 196, 92, 0.92);
+  background: rgba(18, 22, 36, 0.92);
+  color: #ffe8b8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.debug-ai-account-badge::before {
+  content: "";
+  position: absolute;
+  inset: -6px;
+}
+
+.debug-ai-account-badge:hover {
+  background: rgba(28, 34, 52, 0.96);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.34);
+}
+
+.debug-ai-account-badge:active {
+  transform: scale(0.92);
+}
+
+.debug-ai-account-badge:focus-visible {
+  outline: 2px solid rgba(255, 196, 92, 0.95);
+  outline-offset: 2px;
+}
+
+.debug-ai-account-badge__glyph {
+  font-family: "Orbitron", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.52rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  pointer-events: none;
 }
 
 .debug-ai-panel__line {

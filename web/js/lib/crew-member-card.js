@@ -16,6 +16,16 @@ export function memberTitle(m) {
 }
 
 /**
+ * Título de cabecera en ficha (#/crew/:id). Sin nombre → genérico, no placeholder de carta.
+ * @param {CrewListItem} m
+ */
+export function memberSectionTitle(m) {
+  if (m.is_tutor_profile) return m.display_name || "Tú";
+  const name = m.display_name?.trim();
+  return name || "Tripulante";
+}
+
+/**
  * @param {CrewListItem} m
  */
 export function memberTutorLabel(m) {

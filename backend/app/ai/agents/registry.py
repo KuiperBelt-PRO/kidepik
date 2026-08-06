@@ -9,6 +9,7 @@ from app.ai.agents.envelopes import (
     ChallengeEnvelope,
     ChallengeResultEnvelope,
     DialogueEnvelope,
+    PathPackEnvelope,
     PlacementQueueEnvelope,
     ScoreEnvelope,
     SessionSummaryEnvelope,
@@ -35,6 +36,7 @@ _OUTPUT_BY_PURPOSE: dict[str, type] = {
     "placement_item_writer": PlacementQueueEnvelope,
     "placement_text_scorer": ScoreEnvelope,
     "zone_pitch_writer": ZonePitchBundle,
+    "path_composer": PathPackEnvelope,
     "challenge_writer": ChallengeEnvelope,
     "challenge_result_writer": ChallengeResultEnvelope,
     "waiting_copy_writer": WaitingCopyBundle,
@@ -62,9 +64,13 @@ def build_agent(
     if purpose not in PURPOSE_SKILL_IDS:
         raise KeyError(f"unknown purpose: {purpose}")
     capabilities = load_skills_for_purpose(purpose) if load_skills else []
+    from app.ai.agents.md_loader import get_agent_spec
+
+    spec = get_agent_spec(purpose)
+    extra = f"\n\n{spec.instructions}" if spec and spec.instructions else ""
     return Agent(
         model,
         output_type=resolve_output_type(purpose),
-        instructions=f"{BASE_SYSTEM}\nPurpose: {purpose}.",
+        instructions=f"{BASE_SYSTEM}\nPurpose: {purpose}.{extra}",
         capabilities=capabilities,
     )

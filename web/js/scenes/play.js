@@ -11,7 +11,7 @@ import {
   fillGlassSkeleton,
   setGlassButton,
 } from "../components/glass-controls.js?v=221";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=185";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
 import { navigate } from "../lib/router.js";
 import { navigateShellRoute } from "../lib/shell-navigation.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
@@ -22,7 +22,7 @@ import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.j
 import { appLog } from "../lib/app-logger.js";
 import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
 import { isDebugAiClientActive } from "../lib/debug-ai.js?v=244";
-import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=243";
+import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=244";
 
 /** Copy canónico de elección de mundo (fallback si el turno no trae description). */
 const WORLD_THEME_HINTS = Object.freeze({
@@ -96,6 +96,29 @@ export function renderPlay(params) {
     root.className = "play-panel crew-panel";
     frameHandle.contentEl?.appendChild(root);
     fillGlassSkeleton(root, { preset: "panel", ariaLabel: "Cargando aventura" });
+
+    // PIN gate (B9): verificar antes de abrir sesión de diálogo
+    try {
+      const { fetchCrewMember, verifyCrewExitPin } = await import("../lib/crew-api.js");
+      const { showPinPadModal } = await import("../components/pin-pad-modal.js?v=1");
+      const detail = await fetchCrewMember(session, childId);
+      const perms = detail.ok ? detail.member?.permissions : null;
+      if (perms?.require_exit_pin && perms?.exit_pin_set) {
+        const ok = await showPinPadModal({
+          title: "Introduce el PIN",
+          verify: async (pin) => {
+            const res = await verifyCrewExitPin(session, childId, pin);
+            return { ok: Boolean(res.ok), error: res.error || "PIN incorrecto" };
+          },
+        });
+        if (!ok || cancelled) {
+          navigateShellRoute(`/crew/${childId}`);
+          return;
+        }
+      }
+    } catch {
+      /* si falla el gate, seguimos (permisos no bloquean por error de red) */
+    }
 
     const sessionOpenPromise = openDialogueSession(session, childId, "first_run");
 
@@ -507,6 +530,20 @@ async function mountPlayPanel(root, ctx) {
     }
   }
 
+  /** @type {string[]} */
+  let sessionWaitingHints = [];
+
+  /**
+   * Prefer waiting_hints from last turn meta (JSONL waiting phrases) when present.
+   * @param {object | undefined} turn
+   */
+  function captureWaitingHints(turn) {
+    const hints = turn?.meta?.waiting_hints;
+    if (Array.isArray(hints) && hints.length > 0) {
+      sessionWaitingHints = hints.filter((l) => typeof l === "string" && l.trim());
+    }
+  }
+
   /**
    * @param {{ kind: string, option_id?: string }} reply
    * @returns {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'}
@@ -542,6 +579,12 @@ async function mountPlayPanel(root, ctx) {
    * @returns {string[]}
    */
   function thinkingLines(kind) {
+    if (
+      (kind === "preparing_exam" || kind === "adventure_compose") &&
+      sessionWaitingHints.length > 0
+    ) {
+      return sessionWaitingHints;
+    }
     const fromApi = waitingCopy[kind];
     if (Array.isArray(fromApi) && fromApi.length > 0) {
       return fromApi;
@@ -611,7 +654,7 @@ async function mountPlayPanel(root, ctx) {
         thinkingTextEl.textContent = next;
         bubble.setAttribute("aria-label", next);
         scrollLogToEnd();
-      }, kind === "preparing_exam" ? 9000 : 4500);
+      }, 8000);
     }
   }
 
@@ -1134,6 +1177,7 @@ async function mountPlayPanel(root, ctx) {
     }
     syncFooterChrome();
     lastPendingTurn = turn;
+    captureWaitingHints(turn);
     if (turn?.meta?.compose_failed) {
       lastComposeDebug = turn.meta.compose_debug ?? lastComposeDebug;
       showComposeDebugChip(lastComposeDebug);
@@ -1172,6 +1216,7 @@ async function mountPlayPanel(root, ctx) {
     for (const t of turns) {
       const role = t.role === "explorer" || t.role === "child" ? "explorer" : "mentor";
       if (role === "mentor") {
+        captureWaitingHints(t);
         renderTurn(t, mentorLabel, { scrollToEnd: false });
       } else {
         if (t?.id) renderedTurnIds.add(String(t.id));
@@ -1273,6 +1318,7 @@ async function mountPlayPanel(root, ctx) {
 
     const turns = Array.isArray(data.agent_turns) ? data.agent_turns : [];
     for (const t of turns) {
+      captureWaitingHints(t);
       appendMentorTurn(t, mentorLabel);
     }
     const last = turns[turns.length - 1];

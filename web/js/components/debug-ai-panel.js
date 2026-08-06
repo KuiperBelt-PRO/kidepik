@@ -1,5 +1,5 @@
 /**
- * Panel modal de diagnóstico IA.
+ * Panel modal de diagnóstico IA (Gemini / FastAPI).
  * @module debug-ai-panel
  */
 
@@ -10,7 +10,7 @@ import {
   fetchDebugAiResolve,
   fetchDebugAiStatus,
   postDebugAiPing,
-} from "../lib/debug-ai-api.js";
+} from "../lib/debug-ai-api.js?v=244";
 
 /**
  * @typedef {Object} DebugAiPanelOptions
@@ -24,7 +24,7 @@ import {
  * @param {DebugAiPanelOptions} options
  */
 export async function openDebugAiPanel(options) {
-  const { session, childId, composeDebug, purpose = "placement_exam_composer" } = options;
+  const { session, childId, composeDebug, purpose = "mentor_guide" } = options;
 
   const statusRes = await fetchDebugAiStatus(session);
   const status = statusRes.ok ? statusRes.data : null;
@@ -35,13 +35,17 @@ export async function openDebugAiPanel(options) {
   const body = document.createElement("div");
   body.className = "debug-ai-panel";
 
+  const provider = status?.provider || resolveRes.data?.provider || "gemini";
   const statusLine = status
-    ? `enabled=${status.enabled} · mock=${status.mock} · key=${status.key_present} · max=${status.max_attempts}`
+    ? `provider=${provider} · enabled=${status.enabled} · key=${status.key_present} · max=${status.max_attempts}`
     : "Estado no disponible";
+
+  const resolvedPurpose =
+    (resolveRes.ok && resolveRes.data?.purpose) || purpose;
 
   body.innerHTML = `
     <p class="debug-ai-panel__line"><strong>Estado:</strong> ${escapeHtml(statusLine)}</p>
-    <p class="debug-ai-panel__line"><strong>Purpose:</strong> ${escapeHtml(purpose)}</p>
+    <p class="debug-ai-panel__line"><strong>Purpose:</strong> ${escapeHtml(String(resolvedPurpose))}</p>
   `;
 
   if (composeDebug) {
@@ -56,10 +60,13 @@ export async function openDebugAiPanel(options) {
   }
 
   if (resolveRes.ok && resolveRes.data) {
-    const resolved = resolveRes.data.resolved_models || [];
+    const resolved =
+      resolveRes.data.resolved_models || resolveRes.data.models || [];
+    const source = resolveRes.data.queue_source || provider;
+    const tier = resolveRes.data.tier ? ` · tier=${resolveRes.data.tier}` : "";
     const list = document.createElement("div");
     list.className = "debug-ai-panel__list";
-    list.innerHTML = `<p class="debug-ai-panel__line"><strong>Cola resuelta (${resolved.length}, ${escapeHtml(resolveRes.data.queue_source || "")}):</strong></p>`;
+    list.innerHTML = `<p class="debug-ai-panel__line"><strong>Cola Gemini (${resolved.length}, ${escapeHtml(String(source))}${escapeHtml(tier)}):</strong></p>`;
     const ul = document.createElement("ol");
     ul.className = "debug-ai-panel__mono";
     resolved.forEach((id, i) => {
@@ -72,10 +79,10 @@ export async function openDebugAiPanel(options) {
   }
 
   if (queuesRes.ok && Array.isArray(queuesRes.data?.rows)) {
-    const count = queuesRes.data.rows.filter((r) => r.enabled).length;
+    const count = queuesRes.data.rows.filter((r) => r.enabled !== false).length;
     const p = document.createElement("p");
     p.className = "debug-ai-panel__line";
-    p.innerHTML = `<strong>BD enabled:</strong> ${count} modelos`;
+    p.innerHTML = `<strong>Modelos en cola:</strong> ${count} (env Gemini, no BD OpenRouter)`;
     body.appendChild(p);
   }
 
@@ -84,9 +91,10 @@ export async function openDebugAiPanel(options) {
     recent.className = "debug-ai-panel__mono debug-ai-panel__mono--short";
     const lines = attemptsRes.data.attempts.slice(0, 8).map((a) => {
       const mark = a.ok ? "✓" : "✗";
-      return `${mark} ${a.purpose} · ${a.model_id} · ${a.http_status ?? "-"} · ${a.latency_ms ?? 0}ms`;
+      const prov = a.provider ? ` · ${a.provider}` : "";
+      return `${mark} ${a.purpose} · ${a.model_id}${prov} · ${a.http_status ?? "-"} · ${a.latency_ms ?? 0}ms`;
     });
-    recent.textContent = lines.join("\n") || "Sin intentos recientes";
+    recent.textContent = lines.join("\n") || "Sin intentos recientes (logs Gemini vacíos)";
     const h = document.createElement("p");
     h.className = "debug-ai-panel__line";
     h.innerHTML = "<strong>Últimos intentos:</strong>";
@@ -103,7 +111,7 @@ export async function openDebugAiPanel(options) {
   copyBtn.addEventListener("click", () => {
     const payload = {
       status,
-      purpose,
+      purpose: resolvedPurpose,
       compose: composeDebug ?? null,
       resolve: resolveRes.ok ? resolveRes.data : null,
       queues: queuesRes.ok ? queuesRes.data : null,
@@ -119,8 +127,8 @@ export async function openDebugAiPanel(options) {
     pingBtn.disabled = true;
     void postDebugAiPing(session, childId).then((res) => {
       pingBtn.disabled = false;
-      if (res.ok) {
-        pingBtn.textContent = `Ping OK (${res.data?.model ?? "mock"})`;
+      if (res.ok && res.data?.ok) {
+        pingBtn.textContent = `Ping OK (${res.data?.model ?? "gemini"})`;
       } else {
         pingBtn.textContent = "Ping falló";
       }
@@ -174,16 +182,36 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+const DEBUG_BADGE_CLASS = "debug-ai-account-badge";
+
 /**
- * FAB pequeño «DBG» cuando debug activo en cliente.
+ * Badge «<>» superpuesto al FAB de cuenta (solo tutor / debug activo).
+ * @param {HTMLElement} hostEl — `.shell-fab-wrap--account`
+ * @param {() => void} onOpen
+ * @returns {() => void}
  */
-export function mountDebugAiFab(onOpen) {
-  const fab = document.createElement("button");
-  fab.type = "button";
-  fab.className = "debug-ai-fab";
-  fab.textContent = "DBG";
-  fab.setAttribute("aria-label", "Abrir diagnóstico IA");
-  fab.addEventListener("click", () => onOpen());
-  document.body.appendChild(fab);
-  return () => fab.remove();
+export function mountDebugAiAccountBadge(hostEl, onOpen) {
+  if (!(hostEl instanceof HTMLElement)) return () => {};
+  unmountDebugAiAccountBadge(hostEl);
+
+  const badge = document.createElement("button");
+  badge.type = "button";
+  badge.className = DEBUG_BADGE_CLASS;
+  badge.innerHTML =
+    '<span class="debug-ai-account-badge__glyph" aria-hidden="true">&lt;&gt;</span>';
+  badge.setAttribute("aria-label", "Abrir diagnóstico IA");
+  badge.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    onOpen();
+  });
+  hostEl.appendChild(badge);
+  return () => unmountDebugAiAccountBadge(hostEl);
+}
+
+/**
+ * @param {HTMLElement | null | undefined} hostEl
+ */
+export function unmountDebugAiAccountBadge(hostEl) {
+  if (!(hostEl instanceof HTMLElement)) return;
+  hostEl.querySelector(`.${DEBUG_BADGE_CLASS}`)?.remove();
 }

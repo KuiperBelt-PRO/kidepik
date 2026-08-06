@@ -17,6 +17,13 @@ PURPOSE_SKILL_IDS: dict[str, list[str]] = {
     ],
     "placement_text_scorer": ["evaluation-rubric"],
     "zone_pitch_writer": ["world-canon", "zone-pitches", "audience-language"],
+    "path_composer": [
+        "challenge-design",
+        "subject-pedagogy",
+        "world-canon",
+        "zone-pitches",
+        "audience-language",
+    ],
     "zone_scene_writer": [
         "world-canon",
         "zone-bible",

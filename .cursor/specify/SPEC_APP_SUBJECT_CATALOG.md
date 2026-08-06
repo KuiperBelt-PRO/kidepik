@@ -176,7 +176,7 @@ Para cada `subject_id` en `active_subjects` del tripulante:
 2. Agente genera o viste **1 reto** por materia (camino nominal).
 3. **math** y **language**: opcional **2.º reto** si `age_band` ∈ {`band_teen`, `band_adult`, `band_senior`} y la sesión no supera ~15 min estimados.
 
-**Reanudación:** si el examen tiene muchas materias, `placement_exams` conserva `item_queue` parcial — el explorador puede continuar otro día ([SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md) §2).
+**Reanudación:** el estado del examen vive en el **ledger JSONL** de sesión (`placement_queue` / respuestas); no en `placement_exams`. Ver [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) y [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md).
 
 **Techo operativo:** máximo **15 materias** en un mismo `placement_exam` (validación al guardar ficha); el catálogo tiene 14 — cabe completo.
 

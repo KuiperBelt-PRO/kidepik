@@ -24,8 +24,12 @@ import {
   setDebugAiClientActive,
   setDebugAiServerAllowed,
 } from "../lib/debug-ai.js?v=243";
-import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=243";
-import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=243";
+import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=244";
+import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=245";
+import {
+  hideDebugAiShellBadge,
+  showDebugAiShellBadge,
+} from "../lib/debug-ai-shell.js?v=1";
 
 /**
  * @param {HTMLElement} root
@@ -297,8 +301,13 @@ export function mountSettingsPanel(container, { session }) {
       setDebugAiClientActive(input.checked);
       if (input.checked) {
         void fetchDebugAiStatus(session).then((res) => {
-          if (res.ok && res.data?.debug_allowed) setDebugAiServerAllowed(true);
+          if (res.ok && res.data?.debug_allowed) {
+            setDebugAiServerAllowed(true);
+            showDebugAiShellBadge(session);
+          }
         });
+      } else {
+        hideDebugAiShellBadge();
       }
     });
     root.querySelector("[data-open-debug]")?.addEventListener("click", () => {
@@ -307,6 +316,7 @@ export function mountSettingsPanel(container, { session }) {
         void fetchDebugAiStatus(session).then((res) => {
           if (res.ok && res.data?.debug_allowed) {
             setDebugAiServerAllowed(true);
+            showDebugAiShellBadge(session);
             void openDebugAiPanel({ session });
           }
         });
@@ -319,6 +329,7 @@ export function mountSettingsPanel(container, { session }) {
         setDebugAiServerAllowed(true);
         const section = root.querySelector("[data-debug-section]");
         if (section instanceof HTMLElement) section.hidden = false;
+        showDebugAiShellBadge(session);
       }
     });
   }

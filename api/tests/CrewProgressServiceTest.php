@@ -52,8 +52,12 @@ final class CrewProgressServiceTest extends TestCase
             id text, child_id text, zone_id text, title_child text, status text,
             steps_done int, steps_total int, updated_at text
         )');
-        $pdo->exec('create table placement_exams (
-            child_id text, status text, completed_at text
+        $pdo->exec('create table children (
+            id text primary key, placement_status text, updated_at text,
+            world_theme text, active_world_theme text
+        )');
+        $pdo->exec('create table child_world_progress (
+            child_id text, world_theme text, placement_status text, updated_at text
         )');
 
         return $pdo;

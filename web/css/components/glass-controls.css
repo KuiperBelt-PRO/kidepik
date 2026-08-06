@@ -757,6 +757,63 @@
   }
 }
 
+/* —— Switch / toggle —— */
+.glass-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.glass-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  pointer-events: none;
+}
+
+.glass-switch__track {
+  display: inline-flex;
+  align-items: center;
+  width: 48px;
+  height: 28px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.12);
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.glass-switch__knob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transform: translateX(0);
+  transition: transform 0.15s ease;
+}
+
+.glass-switch input:checked + .glass-switch__track {
+  background: rgba(255, 255, 255, 0.35);
+  border-color: var(--glass-border-strong);
+}
+
+.glass-switch input:checked + .glass-switch__track .glass-switch__knob {
+  transform: translateX(20px);
+}
+
+.glass-switch input:focus-visible + .glass-switch__track {
+  outline: 2px solid var(--glass-focus);
+  outline-offset: 2px;
+}
+
 /* Scroll con fade superior/inferior (sub-áreas dentro del marco) */
 .glass-scroll-fade {
   --glass-scroll-fade-ramp: clamp(28px, 7dvh, 48px);

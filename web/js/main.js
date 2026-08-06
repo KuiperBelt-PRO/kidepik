@@ -5,21 +5,16 @@ import { initShellUiTheme } from "./lib/shell-theme.js";
 import { initAppLogger } from "./lib/app-logger.js";
 import { renderLoader } from "./scenes/loader.js?v=236";
 import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
-import { renderHome } from "./scenes/home.js?v=236";
+import { renderHome } from "./scenes/home.js?v=253";
 import { renderAccount } from "./scenes/account.js?v=237";
-import { renderSettings } from "./scenes/settings.js?v=236";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=237";
-import { renderPlay } from "./scenes/play.js?v=249";
+import { renderSettings } from "./scenes/settings.js?v=244";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=255";
+import { renderPlay } from "./scenes/play.js?v=255";
 import { renderLegal } from "./scenes/legal.js?v=184";
 import {
   initDebugAiFromUrl,
-  isDebugAiClientActive,
-  setDebugAiClientActive,
-  setDebugAiServerAllowed,
 } from "./lib/debug-ai.js?v=243";
-import { fetchDebugAiStatus } from "./lib/debug-ai-api.js?v=243";
-import { mountDebugAiFab, openDebugAiPanel } from "./components/debug-ai-panel.js?v=243";
-import { getValidSession } from "./lib/supabase.js";
+import { ensureDebugAiShellBadge } from "./lib/debug-ai-shell.js?v=1";
 
 function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");
@@ -46,7 +41,7 @@ function boot() {
   if (!window.location.hash || window.location.hash === "#") {
     window.location.replace(`${window.location.pathname}${window.location.search}#/loader`);
   }
-  void bootstrapDebugAiFab();
+  void ensureDebugAiShellBadge();
 
   registerRoute("loader", () => renderLoader());
   // Deep-link / fallback OAuth: auth embebido vive en el loader (no escena standalone).
@@ -69,21 +64,6 @@ function boot() {
   updateOfflineBanner();
 
   void registerServiceWorker();
-}
-
-async function bootstrapDebugAiFab() {
-  if (!isDebugAiClientActive()) return;
-  const session = await getValidSession();
-  if (!session) return;
-  const res = await fetchDebugAiStatus(session);
-  if (!res.ok || !res.data?.debug_allowed) {
-    setDebugAiClientActive(false);
-    return;
-  }
-  setDebugAiServerAllowed(true);
-  mountDebugAiFab(() => {
-    void openDebugAiPanel({ session });
-  });
 }
 
 if (document.readyState === "loading") {

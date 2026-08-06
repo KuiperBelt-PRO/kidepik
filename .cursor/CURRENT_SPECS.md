@@ -4,12 +4,22 @@
 
 - Estructura `.cursor/` alineada con el resto del workspace KuiperbeltPRO (2026-06).
 - Spec de arranque: [specify/REPO_BOOTSTRAP_SPEC.md](specify/REPO_BOOTSTRAP_SPEC.md).
-- **Diagramas Mermaid para agentes (jul 2026):** [diagrams/README.md](diagrams/README.md) — mapa de sistema, repo, runtime, API, datos, front, rutas, mundo, loader/auth, tutor, aventura (contrato), media, validación y árbol de decisión.
+- **Diagramas Mermaid para agentes (jul 2026 + ago 2026):** [diagrams/README.md](diagrams/README.md) — mapa de sistema, repo, runtime, API, datos, front, rutas, mundo, loader/auth, tutor, aventura, media, validación, árbol Cursor, **orquestador IA (15)**, **mecánicas viaje (16)**, **storage (17)**, **mundos paralelos (18)**.
 
 ## Producto
 
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
 - **Pivot backend FastAPI (ago 2026 — cutover play hecho):** [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) — nginx `:8082`: **toda** `/api/v1/*` → FastAPI (incl. play + debug-ai). PHP sin rutas IA.
+- **Capas de datos (aprobada ago 2026):** [specify/SPEC_DATA_STORAGE_LAYERS.md](specify/SPEC_DATA_STORAGE_LAYERS.md) — Supabase = producto; archivos = viaje/examen; DuckDB = tools; sin PlacementBank; `traveler.md` sustituye `child_traits`.
+- **Mecánicas de viaje (aprobada ago 2026):** [specify/SPEC_APP_JOURNEY_MECHANICS.md](specify/SPEC_APP_JOURNEY_MECHANICS.md) — flujos espera / first-run / prueba / caminos / rangos.
+- **Orquestador central (aprobada ago 2026 — cableado en play):** [specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md](specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md) — subagentes desde `.md` + tools.
+- **Glosarios mundo (aprobada — seed + tool):** [specify/SPEC_APP_WORLD_GLOSSARY.md](specify/SPEC_APP_WORLD_GLOSSARY.md) — JSONL + DuckDB `glossary_search`.
+- **Frases de espera (JSONL — implementado):** [specify/SPEC_APP_WAITING_PHRASES.md](specify/SPEC_APP_WAITING_PHRASES.md) — `data/waiting/*.jsonl`; rotación 8 s; **no** PG.
+- **Backlog UI/mecánicas (aprobado — en curso):** [specify/SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](specify/SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) — ficha 3 tabs, PIN, informes, play polish; **sin** Parquet/ETL.
+- Plan: [tasks/PRODUCT_BACKLOG_AGO2026_PLAN.md](tasks/PRODUCT_BACKLOG_AGO2026_PLAN.md)
+- **Mundos en paralelo (aprobada — ledger worlds/ + child_world_progress):** [specify/SPEC_APP_PARALLEL_WORLDS.md](specify/SPEC_APP_PARALLEL_WORLDS.md) — fantasy + sci-fi por viajero.
+- **Vocabulario canónico (aprobada — PlacementBank eliminado):** [specify/SPEC_APP_CANONICAL_VOCABULARY.md](specify/SPEC_APP_CANONICAL_VOCABULARY.md) — AgeBand + SubjectCatalog; `ProgressionRanks`.
+- Plan corte (**sprint cerrado**): [tasks/DATA_ORCHESTRATOR_IMPLEMENTATION_PLAN.md](tasks/DATA_ORCHESTRATOR_IMPLEMENTATION_PLAN.md)
 - **IA agentic FastAPI (canónica):** Gemini free + Pydantic AI + skills + ledger `data/journey/` (`dialogue.jsonl`, `summary.md`, `traveler.md`). Plan: [tasks/AI_FASTAPI_AGENTIC_PLAN.md](tasks/AI_FASTAPI_AGENTIC_PLAN.md).
   - Gateway: [specify/SPEC_AI_GEMINI_GATEWAY.md](specify/SPEC_AI_GEMINI_GATEWAY.md)
   - Agentes / roles: [specify/SPEC_AI_PYDANTIC_AGENTS.md](specify/SPEC_AI_PYDANTIC_AGENTS.md)
@@ -45,7 +55,7 @@
   - Gateway OpenRouter **solo free** + discovery/ranking + refresh reactivo de colas (máximas inviolables ago 2026): [specify/SPEC_AI_OPENROUTER_GATEWAY.md](specify/SPEC_AI_OPENROUTER_GATEWAY.md) — **Fase A** (`shared/Ai/`, discovery en `AiGateway`, `FreeModelQueueSync`)
   - Orquestación / mentor / age bands / memoria: [SPEC_AI_PLAY_ORCHESTRATION](specify/SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_MENTOR](specify/SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS](specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_JOURNEY_MEMORY](specify/SPEC_APP_JOURNEY_MEMORY.md) — **parcial** (context pack L2/L3 + summarizer + summary + timeline tutor); **§1.4 orden diario implementada** (ago 2026)
   - Diálogo API + UI `#/play/:childId`: **section-frame + mundo animado + glass** ([DESIGN.md](DESIGN.md)); **cajetín más alto** ([SPEC_APP_SECTION_FRAME](specify/SPEC_APP_SECTION_FRAME.md) §2.2b) + claridad de input
-  - Placement: [SPEC_APP_PLACEMENT_EXAM](specify/SPEC_APP_PLACEMENT_EXAM.md) — banco + rewrite opcional
+  - Placement: [SPEC_APP_PLACEMENT_EXAM](specify/SPEC_APP_PLACEMENT_EXAM.md) — **deprecada** (persistencia JSONL; ver JOURNEY_MECHANICS + DATA_STORAGE_LAYERS)
   - Adventure: [SPEC_APP_ADVENTURE_SESSION](specify/SPEC_APP_ADVENTURE_SESSION.md) — vertical slice zona/reto
   - **Riqueza narrativa del viaje (implementada parcialmente ago 2026):** [specify/SPEC_APP_ADVENTURE_STORY_RICHNESS.md](specify/SPEC_APP_ADVENTURE_STORY_RICHNESS.md) — pitches de zona, arco multi-reto (3), planificador anti-hueco, dificultad alineada, cierres motivados
   - **Narrativa aventura por LLM (aprobada 2 ago 2026 — P0):** [specify/SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](specify/SPEC_APP_ADVENTURE_LLM_NARRATIVE.md) — pitches variados, escenas/NPCs, retos vestidos, esperas servidor; **cero plantillas**; fallo → `compose_failed`; plan [tasks/AI_ADVENTURE_LLM_NARRATIVE_PLAN.md](tasks/AI_ADVENTURE_LLM_NARRATIVE_PLAN.md)

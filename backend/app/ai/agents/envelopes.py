@@ -57,6 +57,36 @@ class ZonePitchBundle(BaseModel):
     agent_text: str = ""
 
 
+class PathOption(BaseModel):
+    path_id: str
+    subject_id: str
+    title: str
+    intro: str
+    learning_blurb: str = ""
+
+
+class PathChallengeSeed(BaseModel):
+    prompt_text: str
+    item_type: Literal["mcq", "short_text", "true_false"] = "mcq"
+    options: list[DialogueOption] = Field(default_factory=list)
+    correct_option_id: str | None = None
+    expected_answer: str | None = None
+    explanation: str = ""
+
+
+class PathDetail(BaseModel):
+    path: PathOption
+    challenges: list[PathChallengeSeed] = Field(default_factory=list)
+
+
+class PathPackEnvelope(BaseModel):
+    """Tres caminos sobre materias flojas (SPEC_APP_JOURNEY_MECHANICS)."""
+
+    agent_text: str
+    paths: list[PathDetail] = Field(default_factory=list)
+    meta: dict[str, Any] = Field(default_factory=dict)
+
+
 class ChallengeEnvelope(BaseModel):
     agent_text: str
     subject_id: str | None = None

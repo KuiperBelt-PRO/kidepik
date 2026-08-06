@@ -72,12 +72,15 @@
   align-items: center;
   justify-content: center;
   gap: 0.45rem;
-  max-width: min(100%, calc(var(--section-frame-logo) + 12rem));
+  max-width: min(100%, calc(var(--section-frame-logo) + 14rem));
+  min-width: 0;
   pointer-events: none;
 }
 
 .section-frame__title {
   margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
   text-align: center;
   font-size: calc(1.2rem * var(--font-scale-ui, 1));
   line-height: 1.1;
@@ -86,7 +89,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: min(9.5rem, 42vw);
   font-family: var(--font-shell-fantasy, "Uncial Antiqua", "Cinzel", Georgia, serif);
 }
 
@@ -159,6 +161,7 @@ html[data-shell-theme="sci-fi"] .section-frame__title {
 
 .section-frame__logo-mount {
   position: relative;
+  flex: 0 0 auto;
   width: var(--section-frame-logo);
   min-height: calc(var(--section-frame-logo) * 0.42);
   display: grid;

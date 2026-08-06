@@ -40,7 +40,7 @@ import {
 import {
   renderWorldArrowFabSvgInner,
 } from "../components/loader-world-arrows.js";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=175";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { resolveLegalBackNavigation, shouldAnimateLegalEntry, prepareLegalNavigation, registerLegalExitHandler, prepareAuthenticatedLegalExit } from "../lib/legal-navigation.js";
 import { normalizeShellPath, shouldCompressWorldBands } from "../lib/world-band-layout.js";

@@ -19,6 +19,10 @@ import {
 } from "../lib/shell-theme.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 import { bindShellFrame, unbindShellFrame, scheduleShellFrameSync } from "../lib/shell-frame.js";
+import {
+  mountDebugAiAccountBadge,
+  unmountDebugAiAccountBadge,
+} from "./debug-ai-panel.js?v=245";
 
 /** @typedef {import('./shell-ui-icons.js').UiIconId} UiIconId */
 /** @typedef {import('./shell-ui-icons.js').UiIconTheme} UiIconTheme */
@@ -32,6 +36,34 @@ import { bindShellFrame, unbindShellFrame, scheduleShellFrameSync } from "../lib
 
 /** @type {{ root: HTMLElement; destroy: () => void } | null} */
 let shellHandle = null;
+
+/** @type {(() => void) | null} */
+let debugAiBadgeOpen = null;
+
+/** @type {(() => void) | null} */
+let debugAiBadgeUnmount = null;
+
+function syncDebugAiAccountBadge() {
+  debugAiBadgeUnmount?.();
+  debugAiBadgeUnmount = null;
+
+  const wrap = shellHandle?.root.querySelector(".shell-fab-wrap--account");
+  if (!(wrap instanceof HTMLElement) || !debugAiBadgeOpen) {
+    if (wrap instanceof HTMLElement) unmountDebugAiAccountBadge(wrap);
+    return;
+  }
+
+  debugAiBadgeUnmount = mountDebugAiAccountBadge(wrap, debugAiBadgeOpen);
+}
+
+/**
+ * Muestra u oculta el badge de diagnóstico IA sobre el FAB de cuenta.
+ * @param {(() => void) | null} onOpen
+ */
+export function setAppShellDebugAiBadge(onOpen) {
+  debugAiBadgeOpen = onOpen;
+  syncDebugAiAccountBadge();
+}
 
 /**
  * @param {string} [path]
@@ -112,6 +144,9 @@ export function mountAppShell(options) {
   themeIconSlot.className = "shell-fab__icon";
   themeBtn.appendChild(themeIconSlot);
 
+  const accountWrap = document.createElement("div");
+  accountWrap.className = "shell-fab-wrap shell-fab-wrap--account";
+
   const accountBtn = document.createElement("button");
   accountBtn.type = "button";
   accountBtn.className = "shell-fab shell-fab--account";
@@ -120,8 +155,9 @@ export function mountAppShell(options) {
   const accountIconSlot = document.createElement("span");
   accountIconSlot.className = "shell-fab__icon";
   accountBtn.appendChild(accountIconSlot);
+  accountWrap.appendChild(accountBtn);
 
-  rightCluster.append(themeBtn, accountBtn);
+  rightCluster.append(themeBtn, accountWrap);
   chrome.append(menuBtn, rightCluster);
 
   const scrim = document.createElement("button");
@@ -403,6 +439,8 @@ export function mountAppShell(options) {
     root,
     destroy() {
       window.clearTimeout(toastTimer);
+      debugAiBadgeUnmount?.();
+      debugAiBadgeUnmount = null;
       unbindShellFrame();
       menuBtn.removeEventListener("click", onMenuClick);
       themeBtn.removeEventListener("click", onThemeClick);
@@ -418,6 +456,7 @@ export function mountAppShell(options) {
   // @ts-expect-error attach root for identity
   handle.root = root;
   shellHandle = handle;
+  syncDebugAiAccountBadge();
   return handle;
 }
 
@@ -434,7 +473,11 @@ export function ensureAppShell(options) {
     scheduleShellFrameSync();
     return shellHandle;
   }
-  return mountAppShell(options);
+  const handle = mountAppShell(options);
+  void import("../lib/debug-ai-shell.js?v=1").then(({ ensureDebugAiShellBadge }) => {
+    void ensureDebugAiShellBadge();
+  });
+  return handle;
 }
 
 export function destroyAppShell() {

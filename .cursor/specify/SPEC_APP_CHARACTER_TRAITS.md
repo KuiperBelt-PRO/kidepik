@@ -1,18 +1,19 @@
 # Spec: Definición de personaje (rasgos textuales + ayuda IA)
 
-> Estado: **propuesta — pendiente de aprobación** (julio 2026)  
-> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [docs/kidepik.md](../../docs/kidepik.md) §4  
+> Estado: **supersedida en parte** (ago 2026) — persistencia canónica = `traveler.md` ([SPEC_AI_JOURNEY_FILE_LEDGER](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md)); tabla `child_traits` deprecada  
+> Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_CENTRAL_ORCHESTRATOR.md](SPEC_AI_CENTRAL_ORCHESTRATOR.md)  
 > MVP: **solo texto** (sin avatar 3D). Post-MVP: visual.
 
 ## Contexto
 
 Tras elegir **mundo**, **nombre** y **edad**, y **antes del examen**, el explorador define **quién es** en el viaje: especie/criatura, colores y rasgos narrativos. Un agente IA **ayuda** (sugiere, pregunta, confirma); no impone un personaje cerrado de golpe.
 
+**Persistencia (ago 2026):** la ficha vive en **`traveler.md`** (y overlay por mundo si aplica). No escribir nuevos campos en `public.child_traits`.
+
 Esto alimenta:
 
-- Prompts de toda la aventura (`PlayerState.traits`).
-- Sugerencias de zona tras el examen.
-- Logros narrativos posteriores (se añaden a la ficha).
+- Prompts de toda la aventura (`PlayerState` / ledger).
+- Logros narrativos posteriores (se añaden a la ficha MD).
 
 ## Objetivo
 

@@ -169,17 +169,22 @@ Copy al niño: **sin cambio** («no he podido preparar tu prueba…»).
 
 ## 4. API de inspección (debug)
 
+> **Delta ago 2026 (Gemini):** el panel y `/debug/ai/*` ya no usan colas OpenRouter / `ai_purpose_model_queues`.  
+> Provider canónico: **Gemini** (`provider=gemini`, cola desde env `AI_GEMINI_MODEL_LIST`).  
+> Purpose por defecto: `mentor_guide` (alias: `placement_exam_composer` → `placement_item_writer`).  
+> Intentos recientes: logs `ai-*.log` (`llm_attempt`); `ai_call_attempts` solo como fallback legado.
+
 Base: `/api/v1/debug/ai/…`  
 Auth: JWT tutor.  
-Guard: `Config::aiDebugEnabled()` → si false, **404** (no 403 para no filtrar existencia en prod).
+Guard: `ai_debug_enabled()` → si false, **404**.
 
 | Método | Ruta | Respuesta |
 | --- | --- | --- |
-| `GET` | `/debug/ai/status` | `{ enabled, mock, key_present, max_attempts, app_env, debug_allowed }` |
-| `GET` | `/debug/ai/queues?purpose=` | Filas BD enabled ordenadas; si purpose omitido, todas |
-| `GET` | `/debug/ai/resolve?purpose=placement_exam_composer` | Cola que `resolveAttempts` devolvería ahora (BD ⊕ discovery) |
-| `GET` | `/debug/ai/attempts?limit=20` | Últimas trazas / filas `ai_call_attempts` |
-| `POST` | `/debug/ai/ping` | Un `complete` mínimo JSON (`{"ok":true}`) con purpose `dialogue`; devuelve traza completa |
+| `GET` | `/debug/ai/status` | `{ enabled, provider, mock, key_present, models, max_attempts, … }` |
+| `GET` | `/debug/ai/queues?purpose=` | Filas env Gemini (`enabled`, `model_id`, `tier`) |
+| `GET` | `/debug/ai/resolve?purpose=mentor_guide` | `{ models, resolved_models, queue_source=gemini_env, tier }` |
+| `GET` | `/debug/ai/attempts?limit=20` | Últimos `llm_attempt` (log) o filas legacy |
+| `POST` | `/debug/ai/ping` | Ping `mentor_guide` vía Gemini; `{ ok, model, provider }` |
 
 **Prohibido:** devolver la API key, headers Authorization, o system prompts íntegros en ping (truncar a 200 chars si se incluye).
 
@@ -193,20 +198,17 @@ En play / tras fallo de compose, o desde Ajustes → Diagnóstico:
 
 ```
 ┌─────────────────────────────────┐
-│ Diagnóstico IA            [×]   │  ← glass modal o drawer inferior
+│ Diagnóstico IA            [×]   │
 │─────────────────────────────────│
-│ Estado: enabled · mock=off      │
-│ Purpose: placement_exam_composer│
-│ Cola BD (12):                   │
-│  1. nemotron-3-ultra…           │
-│  2. nemotron-3-super…           │
+│ Estado: provider=gemini · key=… │
+│ Purpose: mentor_guide           │
+│ Cola Gemini (N, gemini_env):    │
+│  1. gemini-3-flash-preview      │
+│  2. gemini-2.5-flash            │
 │  …                              │
-│ Intentos de esta acción:        │
-│  ✗ ultra  429  812ms            │
-│  ✗ super  503  2100ms           │
-│  ✗ llama  empty content         │
-│ Outcome: slots_incomplete (9/16)│
-│ [Copiar JSON] [Reintentar]      │
+│ Últimos intentos (logs):        │
+│  ✓ mentor_guide · gemini-…      │
+│ [Copiar JSON] [Ping IA]         │
 └─────────────────────────────────┘
 ```
 

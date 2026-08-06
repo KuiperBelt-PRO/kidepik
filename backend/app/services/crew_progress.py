@@ -57,7 +57,18 @@ class CrewProgressService:
         async with session_scope() as session:
             level_rows = (await session.execute(text("select subject_id, level_id, accuracy_rolling from user_subject_levels where child_id = :id"), {"id": child_id})).mappings().all()
             quest = (await session.execute(text("select id, zone_id, title_child, steps_done, steps_total from narrative_quests where child_id = :id and status = 'active' order by updated_at desc nulls last limit 1"), {"id": child_id})).mappings().first()
-            completed = (await session.execute(text("select completed_at from placement_exams where child_id = :id and status = 'completed' order by completed_at desc nulls last limit 1"), {"id": child_id})).scalar_one_or_none()
+            completed = (await session.execute(text(
+                """
+                select coalesce(cwp.updated_at, c.updated_at)
+                from children c
+                left join child_world_progress cwp
+                  on cwp.child_id = c.id
+                 and cwp.world_theme = coalesce(c.active_world_theme, c.world_theme, 'fantasy')
+                where c.id = :id
+                  and (c.placement_status = 'completed' or cwp.placement_status = 'completed')
+                limit 1
+                """
+            ), {"id": child_id})).scalar_one_or_none()
         levels = {str(row["subject_id"]): {"level_id": str(row["level_id"] or "L1"), "accuracy_rolling": float(row["accuracy_rolling"]) if row["accuracy_rolling"] is not None else None} for row in level_rows}
         return levels, (dict(quest) if quest else None), (str(completed) if completed else None)
     def _level_progress(self, level: str, accuracy: float | None, attempts: int, label: str) -> dict[str, Any]:

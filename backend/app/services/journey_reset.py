@@ -83,6 +83,7 @@ async def reset_travelers(
                       onboarding_step = 'pending_entry',
                       placement_status = 'not_started',
                       world_theme = null,
+                      active_world_theme = null,
                       mentor_id = null,
                       display_name = null,
                       age_years = null,
@@ -105,6 +106,11 @@ async def reset_travelers(
                 text("delete from public.user_subject_levels where child_id = :id"),
                 {"id": child_id},
             )
+            await session.execute(
+                text("delete from public.child_world_progress where child_id = :id"),
+                {"id": child_id},
+            )
+            # Residuos de tablas deprecadas (ya no son fuente de verdad del examen)
             await session.execute(
                 text("delete from public.placement_exams where child_id = :id"),
                 {"id": child_id},

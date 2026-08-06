@@ -28,6 +28,11 @@ Kind = Literal[
     "system",
     "amendment",
     "traveler_update",
+    "placement_queue",
+    "placement_answer",
+    "placement_result",
+    "path_pack",
+    "path_progress",
 ]
 
 
@@ -65,7 +70,11 @@ class JourneyFileEvent:
 
 
 class JourneyLedger:
-    """Escritura/lectura bajo ``JOURNEY_DATA_DIR/{parent}/{child}/``."""
+    """Escritura/lectura bajo ``JOURNEY_DATA_DIR/{parent}/{child}/``.
+
+    Con ``world_theme``, usa ``worlds/{theme}/`` (SPEC_APP_PARALLEL_WORLDS).
+    Lectura con fallback al layout plano legado.
+    """
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
@@ -75,39 +84,89 @@ class JourneyLedger:
         child = require_uuid(child_id, label="child_id")
         return self.root / parent / child
 
-    def session_dir(self, parent_id: str, child_id: str, session_id: str) -> Path:
-        session = require_uuid(session_id, label="session_id")
-        return self.child_dir(parent_id, child_id) / "sessions" / session
+    def world_dir(
+        self, parent_id: str, child_id: str, world_theme: str | None
+    ) -> Path:
+        base = self.child_dir(parent_id, child_id)
+        if world_theme in {"fantasy", "sci-fi"}:
+            return base / "worlds" / world_theme
+        return base
 
-    def ensure_session(self, parent_id: str, child_id: str, session_id: str) -> Path:
-        path = self.session_dir(parent_id, child_id, session_id)
+    def session_dir(
+        self,
+        parent_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        world_theme: str | None = None,
+    ) -> Path:
+        session = require_uuid(session_id, label="session_id")
+        return self.world_dir(parent_id, child_id, world_theme) / "sessions" / session
+
+    def ensure_session(
+        self,
+        parent_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        world_theme: str | None = None,
+    ) -> Path:
+        path = self.session_dir(
+            parent_id, child_id, session_id, world_theme=world_theme
+        )
         path.mkdir(parents=True, exist_ok=True)
         index = self.child_dir(parent_id, child_id) / "index.json"
         index.parent.mkdir(parents=True, exist_ok=True)
+        payload: dict[str, Any] = {
+            "active_session_id": require_uuid(session_id, label="session_id"),
+            "updated_at": _utc_now(),
+        }
+        if world_theme in {"fantasy", "sci-fi"}:
+            payload["active_world_theme"] = world_theme
         index.write_text(
-            json.dumps(
-                {
-                    "active_session_id": require_uuid(session_id, label="session_id"),
-                    "updated_at": _utc_now(),
-                },
-                ensure_ascii=False,
-                indent=2,
-            ),
+            json.dumps(payload, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         return path
 
-    def dialogue_path(self, parent_id: str, child_id: str) -> Path:
-        return self.child_dir(parent_id, child_id) / "dialogue.jsonl"
+    def dialogue_path(
+        self,
+        parent_id: str,
+        child_id: str,
+        *,
+        world_theme: str | None = None,
+    ) -> Path:
+        return self.world_dir(parent_id, child_id, world_theme) / "dialogue.jsonl"
 
     def traveler_path(self, parent_id: str, child_id: str) -> Path:
         return self.child_dir(parent_id, child_id) / "traveler.md"
 
-    def events_path(self, parent_id: str, child_id: str, session_id: str) -> Path:
-        return self.session_dir(parent_id, child_id, session_id) / "events.jsonl"
+    def events_path(
+        self,
+        parent_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        world_theme: str | None = None,
+    ) -> Path:
+        return (
+            self.session_dir(
+                parent_id, child_id, session_id, world_theme=world_theme
+            )
+            / "events.jsonl"
+        )
 
-    def next_dialogue_seq(self, parent_id: str, child_id: str) -> int:
-        path = self.dialogue_path(parent_id, child_id)
+    def next_dialogue_seq(
+        self,
+        parent_id: str,
+        child_id: str,
+        *,
+        world_theme: str | None = None,
+    ) -> int:
+        path = self.dialogue_path(parent_id, child_id, world_theme=world_theme)
+        if not path.exists() and world_theme:
+            # fallback legado plano
+            path = self.dialogue_path(parent_id, child_id, world_theme=None)
         if not path.exists():
             return 1
         last = 0
@@ -136,14 +195,19 @@ class JourneyLedger:
         model: str | None = None,
         payload: dict[str, Any] | None = None,
         source: Literal["primary", "echo"] | None = "primary",
+        world_theme: str | None = None,
     ) -> JourneyFileEvent:
         """Append to journey-wide dialogue.jsonl AND session events.jsonl."""
         session = require_uuid(session_id, label="session_id")
-        self.ensure_session(parent_id, child_id, session)
+        self.ensure_session(
+            parent_id, child_id, session, world_theme=world_theme
+        )
         event = JourneyFileEvent(
             id=str(uuid.uuid4()),
             at=_utc_now(),
-            seq=self.next_dialogue_seq(parent_id, child_id),
+            seq=self.next_dialogue_seq(
+                parent_id, child_id, world_theme=world_theme
+            ),
             kind=kind,
             session_id=session,
             flow_id=flow_id,
@@ -154,11 +218,10 @@ class JourneyLedger:
             payload=payload or {},
             source=source,
         )
-        dpath = self.dialogue_path(parent_id, child_id)
+        dpath = self.dialogue_path(parent_id, child_id, world_theme=world_theme)
         dpath.parent.mkdir(parents=True, exist_ok=True)
         with dpath.open("a", encoding="utf-8") as handle:
             handle.write(event.to_json() + "\n")
-        # Eco en sesión con seq local de sesión
         self.append_event(
             parent_id,
             child_id,
@@ -171,6 +234,7 @@ class JourneyLedger:
             model=model,
             payload={**(payload or {}), "journey_seq": event.seq},
             source="echo" if source == "primary" else source,
+            world_theme=world_theme,
         )
         return event
 
@@ -182,8 +246,11 @@ class JourneyLedger:
         limit: int | None = None,
         after_seq: int = 0,
         session_id: str | None = None,
+        world_theme: str | None = None,
     ) -> list[dict[str, Any]]:
-        path = self.dialogue_path(parent_id, child_id)
+        path = self.dialogue_path(parent_id, child_id, world_theme=world_theme)
+        if not path.exists() and world_theme:
+            path = self.dialogue_path(parent_id, child_id, world_theme=None)
         if not path.exists():
             return []
         rows: list[dict[str, Any]] = []
@@ -229,8 +296,17 @@ class JourneyLedger:
     ) -> tuple[dict[str, Any], str]:
         return self.read_markdown_document(self.traveler_path(parent_id, child_id))
 
-    def next_seq(self, parent_id: str, child_id: str, session_id: str) -> int:
-        path = self.events_path(parent_id, child_id, session_id)
+    def next_seq(
+        self,
+        parent_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        world_theme: str | None = None,
+    ) -> int:
+        path = self.events_path(
+            parent_id, child_id, session_id, world_theme=world_theme
+        )
         if not path.exists():
             return 1
         last = 0
@@ -259,12 +335,17 @@ class JourneyLedger:
         model: str | None = None,
         payload: dict[str, Any] | None = None,
         source: Literal["primary", "echo"] | None = "primary",
+        world_theme: str | None = None,
     ) -> JourneyFileEvent:
-        self.ensure_session(parent_id, child_id, session_id)
+        self.ensure_session(
+            parent_id, child_id, session_id, world_theme=world_theme
+        )
         event = JourneyFileEvent(
             id=str(uuid.uuid4()),
             at=_utc_now(),
-            seq=self.next_seq(parent_id, child_id, session_id),
+            seq=self.next_seq(
+                parent_id, child_id, session_id, world_theme=world_theme
+            ),
             kind=kind,
             session_id=require_uuid(session_id, label="session_id"),
             flow_id=flow_id,
@@ -275,7 +356,9 @@ class JourneyLedger:
             payload=payload or {},
             source=source,
         )
-        path = self.events_path(parent_id, child_id, session_id)
+        path = self.events_path(
+            parent_id, child_id, session_id, world_theme=world_theme
+        )
         with path.open("a", encoding="utf-8") as handle:
             handle.write(event.to_json() + "\n")
         return event
@@ -288,8 +371,13 @@ class JourneyLedger:
         *,
         limit: int | None = None,
         after_seq: int = 0,
+        world_theme: str | None = None,
     ) -> list[dict[str, Any]]:
-        path = self.events_path(parent_id, child_id, session_id)
+        path = self.events_path(
+            parent_id, child_id, session_id, world_theme=world_theme
+        )
+        if not path.exists() and world_theme:
+            path = self.events_path(parent_id, child_id, session_id, world_theme=None)
         if not path.exists():
             return []
         rows: list[dict[str, Any]] = []

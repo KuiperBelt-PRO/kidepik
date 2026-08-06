@@ -8,15 +8,22 @@ from uuid import UUID
 from sqlalchemy import text
 
 from app.ai.agents.deps import AudienceContext, RunDeps
-from app.ai.agents.envelopes import DialogueEnvelope, PlacementQueueEnvelope, TravelerProfileEnvelope
-from app.ai.agents.runner import build_mentor_prompt, run_dialogue_purpose, run_purpose
+from app.ai.agents.envelopes import (
+    DialogueEnvelope,
+    PathPackEnvelope,
+    PlacementQueueEnvelope,
+    TravelerProfileEnvelope,
+)
+from app.ai.agents.runner import run_purpose
 from app.ai.errors import AiProductError
 from app.ai.gemini_gateway import GeminiGateway
 from app.ai.journey.ledger import JourneyLedger
+from app.ai.orchestrator import Orchestrator, TurnContext
 from app.catalogs import AgeBand, SubjectCatalog
 from app.config import get_settings
 from app.services.placement import PlacementService
 from app.services.waiting_copy import WaitingCopyService
+from app.services.waiting_phrases import pick_waiting_batch
 
 
 class DialogueService:
@@ -27,6 +34,12 @@ class DialogueService:
         self.gateway = gateway or GeminiGateway()
         self.settings = get_settings()
         self.ledger = JourneyLedger(self.settings.journey_data_dir)
+        self.orchestrator = Orchestrator(settings=self.settings, gateway=self.gateway)
+
+    @staticmethod
+    def _world(child: dict[str, Any]) -> str | None:
+        theme = child.get("active_world_theme") or child.get("world_theme")
+        return theme if theme in {"fantasy", "sci-fi"} else None
 
     async def open_session(
         self, auth_user_id: str, child_id: str, flow_id: str = "first_run"
@@ -213,6 +226,28 @@ class DialogueService:
                 effects, turns = await self._placement_answer(
                     child_id, session_id, session, sequence, value, reply, last or {}
                 )
+            elif phase == "choose_path":
+                effects, turns = await self._choose_path(
+                    child_id, session_id, session, sequence, reply, value, child
+                )
+            elif phase == "path_intro":
+                effects, turns = await self._path_next_challenge(
+                    child_id, session_id, session, sequence, child
+                )
+            elif phase == "path_challenge":
+                effects, turns = await self._path_challenge_answer(
+                    child_id, session_id, session, sequence, value, reply, last or {}, child
+                )
+            elif phase == "compose_failed":
+                retry = str((last or {}).get("meta", {}).get("retry_action") or "placement")
+                if retry == "path_pack":
+                    effects, turns = await self._start_path_choice(
+                        child, session_id, session, sequence
+                    )
+                else:
+                    effects, turns = await self._start_placement(
+                        auth_user_id, child_id, session_id, session, sequence
+                    )
             else:
                 turns = [
                     await self._agent_mentor_turn(
@@ -226,19 +261,25 @@ class DialogueService:
                     )
                 ]
         except AiProductError as exc:
+            retry_action = "placement"
+            if phase in {"choose_path", "adventure_ready", "path_intro"}:
+                retry_action = "path_pack"
             turns = [
                 await self._mentor_turn(
                     session_id,
                     child_id,
                     str(session["flow_id"]),
                     sequence + 1,
-                    exc.detail,
+                    f"{exc.detail} Pulsa continuar para reintentar.",
                     "continue",
-                    None,
+                    [{"id": "continue", "label": "Reintentar"}],
                     {
                         "phase": "compose_failed",
                         "error_code": exc.error_code,
                         "models_tried": exc.models_tried,
+                        "retry": True,
+                        "retry_action": retry_action,
+                        "compose_failed": True,
                     },
                 )
             ]
@@ -459,21 +500,7 @@ class DialogueService:
             model = None
             profile = None
 
-        await self.session.execute(
-            text(
-                "insert into child_traits (child_id, species, palette, features, vibe, achievements, updated_at) "
-                "values (:id, :species, :palette, cast(:features as jsonb), :vibe, '[]'::jsonb, now()) "
-                "on conflict (child_id) do update set species=excluded.species, palette=excluded.palette, "
-                "features=excluded.features, vibe=excluded.vibe, updated_at=now()"
-            ),
-            {
-                "id": child_id,
-                "species": species,
-                "palette": palette,
-                "features": json.dumps(features, ensure_ascii=False),
-                "vibe": vibe,
-            },
-        )
+        # Persistencia canónica: traveler.md (no child_traits PG)
         await self.session.execute(
             text(
                 "update children set onboarding_step='placement',updated_at=now() where id=:id"
@@ -531,6 +558,7 @@ class DialogueService:
                         "features": features,
                         "abilities": abilities,
                     },
+                    world_theme=self._world(child),
                 )
             except Exception:
                 pass
@@ -575,7 +603,28 @@ class DialogueService:
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         child = await self._child(auth_user_id, child_id)
         subjects = PlacementService.active_subjects_for_child(child)[:4]
+        # Hints de espera (JSONL data/waiting) — el cliente puede rotarlos cada 8s
+        waiting_hints = await pick_waiting_batch(
+            self.session,
+            world_theme=str(self._world(child) or "neutral"),
+            age_band=child.get("age_band") or child.get("effective_age_band"),
+            phase="placement_compose",
+        )
         queue = await self._compose_placement_queue(child, session_id, subjects)
+        parent_id = child.get("parent_id")
+        if parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="placement_queue",
+                    purpose="placement_item_writer",
+                    payload={"queue": queue, "waiting_hints": waiting_hints},
+                    world_theme=self._world(child),
+                )
+            except Exception:
+                pass
         mentor_id = str(session.get("mentor_id") or "guardian")
         started = await PlacementService(self.session).start_exam(
             child_id,
@@ -587,6 +636,8 @@ class DialogueService:
             queue,
         )
         turn_row = started["turn"]
+        meta = dict(turn_row.get("meta") or {})
+        meta["waiting_hints"] = waiting_hints
         turn = await self._insert(
             {
                 **{k: turn_row[k] for k in (
@@ -600,6 +651,7 @@ class DialogueService:
                     "options",
                     "meta",
                 )},
+                "meta": meta,
                 "explorer_reply": None,
                 "model_used": turn_row.get("model_used"),
             }
@@ -672,16 +724,13 @@ class DialogueService:
         reply: dict[str, Any],
         last: dict[str, Any],
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        exam = (
-            await self.session.execute(
-                text(
-                    "select * from placement_exams where child_id=:id and status='in_progress' "
-                    "order by started_at desc limit 1"
-                ),
-                {"id": child_id},
-            )
-        ).mappings().first()
-        if not exam:
+        child = await self._child_by_id(child_id)
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        state = self._read_placement_state(
+            str(parent_id) if parent_id else None, child_id, session_id, world
+        )
+        if not state or not state.get("queue"):
             return [], [
                 await self._mentor_turn(
                     session_id,
@@ -694,118 +743,583 @@ class DialogueService:
                     {"phase": "handoff_placement"},
                 )
             ]
-        queue = exam.get("item_queue") or []
-        if isinstance(queue, str):
-            queue = json.loads(queue)
-        index = int(exam.get("current_index") or 0)
+        queue = state["queue"]
+        index = int(state.get("index") or 0)
         item = queue[index] if index < len(queue) else None
         score = 0.5
         if item:
             if item.get("correct_option_id") and reply.get("option_id"):
-                score = 1.0 if reply.get("option_id") == item.get("correct_option_id") else 0.0
-            await self.session.execute(
-                text(
-                    "insert into placement_answers(exam_id,subject_id,item_key,item_type,prompt_text,response,score) "
-                    "values(:exam,:subject,:key,:typ,:prompt,cast(:response as jsonb),:score)"
-                ),
-                {
-                    "exam": exam["id"],
-                    "subject": item.get("subject_id") or "math",
-                    "key": item.get("item_key") or f"i{index}",
-                    "typ": item.get("item_type") or "mcq",
-                    "prompt": item.get("prompt_text") or "",
-                    "response": json.dumps(reply, ensure_ascii=False),
-                    "score": score,
-                },
-            )
+                score = (
+                    1.0
+                    if reply.get("option_id") == item.get("correct_option_id")
+                    else 0.0
+                )
+            if parent_id:
+                try:
+                    self.ledger.append_event(
+                        str(parent_id),
+                        child_id,
+                        session_id,
+                        kind="placement_answer",
+                        payload={
+                            "index": index,
+                            "item_key": item.get("item_key"),
+                            "subject_id": item.get("subject_id"),
+                            "score": score,
+                            "response": reply,
+                        },
+                        world_theme=world,
+                    )
+                except Exception:
+                    pass
         next_index = index + 1
         if next_index >= len(queue):
-            await self._finish_placement(child_id, exam["id"], queue)
-            turn = await self._mentor_turn(
-                session_id,
-                child_id,
-                session["flow_id"],
-                sequence + 1,
-                "¡Prueba superada! El camino del viaje queda abierto. Cuando quieras, seguimos explorando.",
-                "continue",
-                None,
-                {"phase": "adventure_ready"},
+            await self._finish_placement(child, session_id, queue)
+            return await self._start_path_choice(
+                child, session_id, session, sequence
             )
-            await self._maybe_write_session_summary(child_id, session_id)
-            return [
-                {"type": "advance_onboarding", "to": "complete"},
-                {"type": "placement_completed", "value": True},
-            ], [turn]
 
-        await self.session.execute(
-            text(
-                "update placement_exams set current_index=:idx,updated_at=now() where id=:id"
-            ),
-            {"idx": next_index, "id": exam["id"]},
-        )
+        if parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="placement_result",
+                    payload={"current_index": next_index, "status": "in_progress"},
+                    world_theme=world,
+                )
+            except Exception:
+                pass
         nxt = queue[next_index]
         mentor_id = str(session.get("mentor_id") or "guardian")
-        child_theme = (
-            await self.session.execute(
-                text("select world_theme from children where id=:id"),
-                {"id": child_id},
-            )
-        ).scalar()
         turn_payload = PlacementService(self.session).item_to_turn(
             session_id,
             child_id,
             str(session["flow_id"]),
             sequence + 1,
             mentor_id,
-            str(child_theme or "fantasy"),
+            str(world or "fantasy"),
             nxt,
             next_index,
             len(queue),
+            child,
         )
         turn = await self._insert(
             {
-                **{k: turn_payload[k] for k in (
-                    "session_id",
-                    "child_id",
-                    "flow_id",
-                    "sequence",
-                    "role",
-                    "text",
-                    "input_mode",
-                    "options",
-                    "meta",
-                )},
+                **{
+                    k: turn_payload[k]
+                    for k in (
+                        "session_id",
+                        "child_id",
+                        "flow_id",
+                        "sequence",
+                        "role",
+                        "text",
+                        "input_mode",
+                        "options",
+                        "meta",
+                    )
+                },
                 "explorer_reply": None,
                 "model_used": None,
             }
         )
         return [], [turn]
 
+    def _read_placement_state(
+        self,
+        parent_id: str | None,
+        child_id: str,
+        session_id: str,
+        world: str | None,
+    ) -> dict[str, Any] | None:
+        if not parent_id:
+            return None
+        try:
+            rows = self.ledger.read_events(
+                parent_id, child_id, session_id, world_theme=world
+            )
+        except TypeError:
+            rows = self.ledger.read_events(parent_id, child_id, session_id)
+        queue: list[dict[str, Any]] | None = None
+        index = 0
+        for row in rows:
+            kind = row.get("kind")
+            payload = row.get("payload") or {}
+            if kind == "placement_queue":
+                queue = payload.get("queue") or []
+                index = 0
+            elif kind == "placement_answer":
+                index = int(payload.get("index") or index) + 1
+            elif kind == "placement_result" and "current_index" in payload:
+                index = int(payload.get("current_index") or index)
+        if queue is None:
+            return None
+        return {"queue": queue, "index": index}
+
     async def _finish_placement(
-        self, child_id: str, exam_id: Any, queue: list[dict[str, Any]]
+        self, child: dict[str, Any], session_id: str, queue: list[dict[str, Any]]
     ) -> None:
+        child_id = str(child["id"])
+        world = self._world(child) or "fantasy"
         subjects = {str(i.get("subject_id") or "math") for i in queue}
         for subject in subjects:
             await self.session.execute(
                 text(
-                    "insert into user_subject_levels(child_id,subject_id,level_id,source,updated_at) "
-                    "values(:cid,:sid,'L1','placement',now()) "
-                    "on conflict (child_id,subject_id) do update set level_id='L1', source='placement', updated_at=now()"
+                    "insert into user_subject_levels(child_id,world_theme,subject_id,level_id,source,updated_at) "
+                    "values(:cid,:theme,:sid,'L1','placement',now()) "
+                    "on conflict (child_id, world_theme, subject_id) do update set "
+                    "level_id='L1', source='placement', updated_at=now()"
                 ),
-                {"cid": child_id, "sid": subject},
+                {"cid": child_id, "theme": world, "sid": subject},
             )
-        await self.session.execute(
-            text(
-                "update placement_exams set status='completed',completed_at=now(),general_level='L1' where id=:id"
-            ),
-            {"id": exam_id},
-        )
         await self.session.execute(
             text(
                 "update children set placement_status='completed',onboarding_step='complete',"
                 "general_level='L1',updated_at=now() where id=:id"
             ),
             {"id": child_id},
+        )
+        await self.session.execute(
+            text(
+                """
+                insert into child_world_progress(
+                  child_id, world_theme, general_level, placement_status, onboarding_step, updated_at
+                ) values (:id, :theme, 'L1', 'completed', 'complete', now())
+                on conflict (child_id, world_theme) do update set
+                  general_level='L1',
+                  placement_status='completed',
+                  onboarding_step='complete',
+                  updated_at=now()
+                """
+            ),
+            {"id": child_id, "theme": world},
+        )
+        parent_id = child.get("parent_id")
+        if parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="placement_result",
+                    payload={
+                        "status": "completed",
+                        "general_level": "L1",
+                        "subjects": sorted(subjects),
+                    },
+                    world_theme=world,
+                )
+            except Exception:
+                pass
+
+    async def _start_path_choice(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        session: Any,
+        sequence: int,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        child_id = str(child["id"])
+        world = self._world(child) or "fantasy"
+        waiting_hints = await pick_waiting_batch(
+            self.session,
+            world_theme=world,
+            age_band=child.get("age_band") or child.get("effective_age_band"),
+            phase="path_compose",
+        )
+        pack = await self._compose_path_pack(child, session_id)
+        parent_id = child.get("parent_id")
+        if parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="path_pack",
+                    purpose="path_composer",
+                    payload={"pack": pack, "waiting_hints": waiting_hints},
+                    world_theme=world,
+                )
+            except Exception:
+                pass
+        options = [
+            {
+                "id": p["path_id"],
+                "label": p["title"],
+                "description": p.get("intro") or p.get("subject_id"),
+            }
+            for p in pack
+        ]
+        text = (
+            "¡Prueba superada! Elige el siguiente camino. "
+            "Hay tres rutas pensadas para lo que más te conviene practicar."
+        )
+        turn = await self._mentor_turn(
+            session_id,
+            child_id,
+            session["flow_id"],
+            sequence + 1,
+            text,
+            "options_only",
+            options,
+            {
+                "phase": "choose_path",
+                "waiting_hints": waiting_hints,
+                "path_ids": [p["path_id"] for p in pack],
+            },
+        )
+        return [
+            {"type": "advance_onboarding", "to": "complete"},
+            {"type": "placement_completed", "value": True},
+        ], [turn]
+
+    async def _compose_path_pack(
+        self, child: dict[str, Any], session_id: str
+    ) -> list[dict[str, Any]]:
+        subjects = PlacementService.active_subjects_for_child(child)[:5]
+        learning = (child.get("settings") or {}).get("learning") or {}
+        weak_spots = learning.get("weak_spots") if isinstance(learning.get("weak_spots"), list) else []
+        weak = subjects[:3] or ["math", "language", "logic"]
+        spot_notes = []
+        for spot in weak_spots[:6]:
+            if isinstance(spot, dict) and spot.get("note"):
+                sid = spot.get("subject_id") or ""
+                spot_notes.append(f"{sid}: {spot['note']}".strip(": "))
+            elif isinstance(spot, str) and spot.strip():
+                spot_notes.append(spot.strip())
+        deps = self._deps(child, session_id, "path_composer")
+        spot_line = (
+            f" Puntos flojos del tutor: {'; '.join(spot_notes)}."
+            if spot_notes
+            else ""
+        )
+        # Compone caminos de uno en uno: si falla el N, reutiliza los ya OK.
+        out: list[dict[str, Any]] = []
+        for i in range(3):
+            subject = weak[i % len(weak)]
+            prompt = (
+                "Genera PathPackEnvelope con exactamente 1 camino (paths length 1). "
+                f"Materia prioritaria: {subject}.{spot_line} "
+                f"Mundo: {child.get('world_theme')}. Edad/banda: "
+                f"{child.get('age_years')}/{child.get('age_band')}. "
+                "Camino: path_id, subject_id, title, intro, learning_blurb y 3 challenges "
+                "con prompt, tipo, opciones/respuesta y explanation. Castellano de España. "
+                "Intros y blurbs breves (1–2 frases)."
+            )
+            try:
+                bundle, model = await run_purpose(
+                    "path_composer",
+                    prompt,
+                    deps,
+                    settings=self.settings,
+                    gateway=self.gateway,
+                    expect_type=PathPackEnvelope,
+                )
+                assert isinstance(bundle, PathPackEnvelope)
+                detail = bundle.paths[0] if bundle.paths else None
+                if detail is None:
+                    raise RuntimeError("empty path")
+                p = detail.path
+                challenges = []
+                for ch in detail.challenges[:3]:
+                    challenges.append(
+                        {
+                            "prompt_text": ch.prompt_text,
+                            "item_type": ch.item_type,
+                            "options": [o.model_dump() for o in ch.options],
+                            "correct_option_id": ch.correct_option_id,
+                            "expected_answer": ch.expected_answer,
+                            "explanation": ch.explanation,
+                        }
+                    )
+                if not challenges:
+                    raise RuntimeError("empty challenges")
+                out.append(
+                    {
+                        "path_id": p.path_id or f"path_{i+1}",
+                        "subject_id": p.subject_id if p.subject_id in subjects else subject,
+                        "title": p.title or f"Camino {i+1}",
+                        "intro": p.intro,
+                        "learning_blurb": p.learning_blurb,
+                        "challenges": challenges,
+                        "model_used": model,
+                    }
+                )
+            except Exception:
+                out.append(
+                    {
+                        "path_id": f"path_{i+1}",
+                        "subject_id": subject,
+                        "title": f"Ruta de {subject}",
+                        "intro": f"Un tramo corto para practicar {subject}.",
+                        "learning_blurb": "Repasamos lo esencial con calma.",
+                        "challenges": [
+                            {
+                                "prompt_text": "¿Seguimos con el reto?",
+                                "item_type": "mcq",
+                                "options": [
+                                    {"id": "a", "label": "Sí"},
+                                    {"id": "b", "label": "Un momento"},
+                                ],
+                                "correct_option_id": "a",
+                                "explanation": "Cuando quieras, lo intentamos otra vez.",
+                            }
+                        ],
+                    }
+                )
+        return out
+
+    def _read_path_pack(
+        self,
+        parent_id: str | None,
+        child_id: str,
+        session_id: str,
+        world: str | None,
+    ) -> list[dict[str, Any]]:
+        if not parent_id:
+            return []
+        try:
+            rows = self.ledger.read_events(
+                parent_id, child_id, session_id, world_theme=world
+            )
+        except TypeError:
+            rows = self.ledger.read_events(parent_id, child_id, session_id)
+        for row in reversed(rows):
+            if row.get("kind") == "path_pack":
+                return list((row.get("payload") or {}).get("pack") or [])
+        return []
+
+    def _read_path_progress(
+        self,
+        parent_id: str | None,
+        child_id: str,
+        session_id: str,
+        world: str | None,
+    ) -> dict[str, Any]:
+        if not parent_id:
+            return {}
+        try:
+            rows = self.ledger.read_events(
+                parent_id, child_id, session_id, world_theme=world
+            )
+        except TypeError:
+            rows = self.ledger.read_events(parent_id, child_id, session_id)
+        progress: dict[str, Any] = {}
+        for row in rows:
+            if row.get("kind") == "path_progress":
+                progress = dict(row.get("payload") or {})
+        return progress
+
+    async def _choose_path(
+        self,
+        child_id: str,
+        session_id: str,
+        session: Any,
+        sequence: int,
+        reply: dict[str, Any],
+        value: str,
+        child: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        pack = self._read_path_pack(
+            str(parent_id) if parent_id else None, child_id, session_id, world
+        )
+        path_id = str(reply.get("option_id") or value or "")
+        chosen = next((p for p in pack if p.get("path_id") == path_id), None)
+        if not chosen and pack:
+            chosen = pack[0]
+            path_id = str(chosen.get("path_id"))
+        if not chosen:
+            return [], [
+                await self._mentor_turn(
+                    session_id,
+                    child_id,
+                    session["flow_id"],
+                    sequence + 1,
+                    "No encontré ese camino. Elige una de las rutas.",
+                    "options_only",
+                    [
+                        {"id": p["path_id"], "label": p["title"]}
+                        for p in pack
+                    ],
+                    {"phase": "choose_path"},
+                )
+            ]
+        if parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="path_progress",
+                    payload={
+                        "path_id": path_id,
+                        "challenge_index": 0,
+                        "status": "intro",
+                        "path": chosen,
+                    },
+                    world_theme=world,
+                )
+            except Exception:
+                pass
+        intro = str(chosen.get("intro") or chosen.get("title") or "Adelante.")
+        blurb = str(chosen.get("learning_blurb") or "")
+        text = intro if not blurb else f"{intro}\n\n{blurb}"
+        turn = await self._mentor_turn(
+            session_id,
+            child_id,
+            session["flow_id"],
+            sequence + 1,
+            text,
+            "continue",
+            None,
+            {"phase": "path_intro", "path_id": path_id},
+        )
+        return [{"type": "path_chosen", "value": path_id}], [turn]
+
+    async def _path_next_challenge(
+        self,
+        child_id: str,
+        session_id: str,
+        session: Any,
+        sequence: int,
+        child: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        progress = self._read_path_progress(
+            str(parent_id) if parent_id else None, child_id, session_id, world
+        )
+        path = progress.get("path") or {}
+        challenges = list(path.get("challenges") or [])
+        idx = int(progress.get("challenge_index") or 0)
+        if idx >= len(challenges):
+            congrats = "¡Camino superado! Has avanzado con buen ritmo."
+            parent_id = child.get("parent_id")
+            if parent_id:
+                try:
+                    from app.services.tutor_reports import TutorReportService
+
+                    learning = (child.get("settings") or {}).get("learning") or {}
+                    TutorReportService(self.ledger).write_evaluation_report(
+                        parent_id=str(parent_id),
+                        child_id=child_id,
+                        world_theme=world,
+                        display_name=child.get("display_name"),
+                        progress={
+                            "general_level": child.get("general_level"),
+                            "rank": {"label_tutor": child.get("rank_id")},
+                            "subjects": [],
+                        },
+                        weak_spots=learning.get("weak_spots")
+                        if isinstance(learning.get("weak_spots"), list)
+                        else [],
+                        reason="path_completed",
+                    )
+                    congrats = (
+                        "¡Camino superado! He dejado un informe breve para tu tutor. "
+                        "Cuando quieras, elegimos otra ruta."
+                    )
+                except Exception:
+                    congrats = (
+                        "¡Camino superado! Cuando quieras, elegimos otra ruta."
+                    )
+            turn = await self._mentor_turn(
+                session_id,
+                child_id,
+                session["flow_id"],
+                sequence + 1,
+                congrats,
+                "continue",
+                None,
+                {"phase": "adventure_ready", "path_completed": True},
+            )
+            return [{"type": "path_completed", "value": path.get("path_id")}], [turn]
+        ch = challenges[idx]
+        typ = str(ch.get("item_type") or "mcq")
+        turn = await self._mentor_turn(
+            session_id,
+            child_id,
+            session["flow_id"],
+            sequence + 1,
+            str(ch.get("prompt_text") or "Reto"),
+            "options_only" if typ == "mcq" else "text_only",
+            ch.get("options"),
+            {
+                "phase": "path_challenge",
+                "path_id": path.get("path_id"),
+                "challenge_index": idx,
+                "total": len(challenges),
+            },
+        )
+        return [], [turn]
+
+    async def _path_challenge_answer(
+        self,
+        child_id: str,
+        session_id: str,
+        session: Any,
+        sequence: int,
+        value: str,
+        reply: dict[str, Any],
+        last: dict[str, Any],
+        child: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        progress = self._read_path_progress(
+            str(parent_id) if parent_id else None, child_id, session_id, world
+        )
+        path = progress.get("path") or {}
+        challenges = list(path.get("challenges") or [])
+        idx = int(last.get("meta", {}).get("challenge_index") or progress.get("challenge_index") or 0)
+        ch = challenges[idx] if idx < len(challenges) else {}
+        ok = True
+        if ch.get("correct_option_id") and reply.get("option_id"):
+            ok = reply.get("option_id") == ch.get("correct_option_id")
+        next_idx = idx + 1 if ok else idx
+        if parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="path_progress",
+                    payload={
+                        "path_id": path.get("path_id"),
+                        "challenge_index": next_idx,
+                        "status": "active",
+                        "last_ok": ok,
+                        "path": path,
+                    },
+                    world_theme=world,
+                )
+            except Exception:
+                pass
+        if not ok:
+            expl = str(ch.get("explanation") or "Casi. Probamos otra vez.")
+            turn = await self._mentor_turn(
+                session_id,
+                child_id,
+                session["flow_id"],
+                sequence + 1,
+                expl,
+                "continue",
+                None,
+                {
+                    "phase": "path_intro",
+                    "path_id": path.get("path_id"),
+                    "retry": True,
+                },
+            )
+            return [], [turn]
+        # Advance: reuse path_intro handler semantics via continue turn
+        child2 = await self._child_by_id(child_id)
+        return await self._path_next_challenge(
+            child_id, session_id, session, sequence, child2
         )
 
     async def _agent_mentor_turn(
@@ -821,18 +1335,25 @@ class DialogueService:
         force_options: list[dict[str, Any]] | None = None,
         force_input_mode: str | None = None,
     ) -> dict[str, Any]:
-        deps = self._deps(child, session_id, purpose)
-        prompt = build_mentor_prompt(deps, explorer_reply=value)
-        prompt += f"\nphase={phase}. Responde como mentor en DialogueEnvelope."
-        if force_input_mode:
-            prompt += f" input_mode debe ser {force_input_mode}."
-        envelope, model = await run_dialogue_purpose(
-            purpose if purpose != "character_coach" else "mentor_guide",
-            prompt,
-            deps,
+        purpose_run = purpose if purpose != "character_coach" else "mentor_guide"
+        deps = self._deps(child, session_id, purpose_run)
+        ctx = TurnContext(
+            child=child,
+            session_id=session_id,
+            flow_id=flow,
+            sequence=sequence,
+            phase=str(phase or "dialogue"),
+            purpose=purpose_run,
+            explorer_reply=value,
+            force_options=force_options,
+            force_input_mode=force_input_mode,
+            deps=deps,
             settings=self.settings,
             gateway=self.gateway,
+            ledger=self.ledger,
         )
+        result = await self.orchestrator.run(ctx)
+        envelope = result.output
         assert isinstance(envelope, DialogueEnvelope)
         options = force_options or [o.model_dump() for o in envelope.options] or None
         input_mode = force_input_mode or envelope.input_mode
@@ -848,8 +1369,9 @@ class DialogueService:
                 **(envelope.meta or {}),
                 "phase": phase or "dialogue",
                 "mentor_id": deps.mentor and deps.mentor.get("id"),
+                "tool_notes": result.tool_notes,
             },
-            model,
+            result.model_used,
         )
 
     async def _child_by_id(self, child_id: str) -> dict[str, Any]:
@@ -1026,6 +1548,24 @@ class DialogueService:
                     ),
                     {"id": cid},
                 )
+            return
+        if child.get("onboarding_step") == "placement":
+            await self._insert(
+                {
+                    "session_id": sid,
+                    "child_id": cid,
+                    "flow_id": flow,
+                    "sequence": 1,
+                    "role": "mentor",
+                    "text": (
+                        "Cuando quieras, abrimos la prueba de ingreso. "
+                        "No es un trámite: es el mapa de tu viaje."
+                    ),
+                    "input_mode": "continue",
+                    "options": None,
+                    "meta": {"phase": "handoff_placement"},
+                }
+            )
 
     async def _mentor_turn(
         self,

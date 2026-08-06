@@ -259,8 +259,11 @@ subject_levels           -- catálogo de niveles por materia (M1..M5, descripci�
 user_subject_levels      -- nivel actual del niño por materia (se actualiza tras cada sesión)
   child_id, subject_id, level_id, accuracy_rolling, difficulty_modifier, updated_at
 
-placement_exams          -- resultado del examen de acceso
+placement_exams          -- LEGADO (deprecado): examen en curso → ledger JSONL; flags en children / child_world_progress
   child_id, world, narrative_variant, completed_at, raw_scores (jsonb)
+
+child_world_progress     -- progreso canónico por mundo (fantasy | sci-fi)
+  child_id, world_theme, general_level, placement_status, onboarding_step
 
 learning_sessions        -- cada sesión de juego/aprendizaje
   id, child_id, subject_id, topic, started_at, ended_at, accuracy, frustration_score

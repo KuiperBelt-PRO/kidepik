@@ -1,4 +1,8 @@
 <?php
+/**
+ * Reset one-off de un viajero a handoff_placement (POC).
+ * Ya no usa placement_exams como fuente; limpia child_world_progress + flags en children.
+ */
 require '/var/www/api/vendor/autoload.php';
 \Kidepik\Shared\Config::load('/var/www/.env.poc');
 $pdo = \Kidepik\Shared\Database\PdoFactory::fromConfig();
@@ -21,16 +25,17 @@ $pdo->prepare(
 )->execute(['id' => $cid]);
 
 $pdo->prepare(
-    "UPDATE placement_exams SET status = 'abandoned', completed_at = now()
-     WHERE child_id = :id AND status = 'in_progress'"
+    "DELETE FROM child_world_progress WHERE child_id = :id"
 )->execute(['id' => $cid]);
 
-$pdo->exec(
-    "DELETE FROM placement_answers WHERE exam_id IN (
-       SELECT id FROM placement_exams
-       WHERE child_id = '{$cid}' AND status = 'abandoned'
-     )"
-);
+$pdo->prepare(
+    "DELETE FROM user_subject_levels WHERE child_id = :id"
+)->execute(['id' => $cid]);
+
+// Residuo legacy (tabla deprecada; no es fuente de verdad)
+$pdo->prepare(
+    "DELETE FROM placement_exams WHERE child_id = :id"
+)->execute(['id' => $cid]);
 
 $stmt = $pdo->prepare(
     "SELECT id FROM dialogue_sessions
@@ -46,18 +51,17 @@ if (is_string($sid) && $sid !== '') {
         "INSERT INTO dialogue_turns (
            session_id, child_id, flow_id, sequence, role, text, options, input_mode, explorer_reply, meta, model_used
          ) VALUES (
-           :sid, :cid, 'first_run', 1, 'mentor', :text,
-           :options::jsonb, 'options_only', NULL, :meta::jsonb, NULL
+           :sid, :cid, 'placement', 1, 'mentor', :text,
+           NULL, 'continue', NULL, :meta::jsonb, NULL
          )"
     )->execute([
         'sid' => $sid,
         'cid' => $cid,
         'text' => $intro,
-        'options' => json_encode([['id' => 'start_placement', 'label' => 'Comenzar prueba']], JSON_UNESCAPED_UNICODE),
         'meta' => json_encode(['phase' => 'handoff_placement'], JSON_UNESCAPED_UNICODE),
     ]);
     $pdo->prepare(
-        "UPDATE dialogue_sessions SET flow_id = 'first_run', updated_at = now() WHERE id = :sid"
+        "UPDATE dialogue_sessions SET flow_id = 'placement', updated_at = now() WHERE id = :sid"
     )->execute(['sid' => $sid]);
 }
 $pdo->commit();

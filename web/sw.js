@@ -1,4 +1,4 @@
-const CACHE = "kidepik-web-v187";
+const CACHE = "kidepik-web-v189";
 const PRECACHE = [
   "/",
   "/index.html",

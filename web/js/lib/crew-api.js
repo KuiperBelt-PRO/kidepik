@@ -182,3 +182,71 @@ export async function deleteCrewMember(session, id) {
     return { ok: false };
   }
 }
+
+/**
+ * @param {import('@supabase/supabase-js').Session} session
+ * @param {string} id
+ * @param {string} pin
+ */
+export async function verifyCrewExitPin(session, id, pin) {
+  try {
+    const { config } = await import("../config.js");
+    const res = await fetch(
+      `${config.apiUrl}/crew/${encodeURIComponent(id)}/verify-exit-pin`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ pin }),
+      },
+    );
+    if (res.status === 403) return { ok: false, status: 403, error: "PIN incorrecto" };
+    if (!res.ok) {
+      let error = "verify";
+      try {
+        const data = await res.json();
+        error = data.detail || error;
+      } catch {
+        /* ignore */
+      }
+      return { ok: false, status: res.status, error };
+    }
+    return { ok: true, ...(await res.json()) };
+  } catch (err) {
+    console.warn("crew verify pin error", err);
+    return { ok: false };
+  }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').Session} session
+ * @param {string} id
+ */
+export async function requestTutorReport(session, id) {
+  try {
+    const { config } = await import("../config.js");
+    const res = await fetch(
+      `${config.apiUrl}/crew/${encodeURIComponent(id)}/tutor-report`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      },
+    );
+    if (!res.ok) {
+      let error = "report";
+      try {
+        const data = await res.json();
+        error = data.detail || error;
+      } catch {
+        /* ignore */
+      }
+      return { ok: false, status: res.status, error };
+    }
+    return { ok: true, ...(await res.json()) };
+  } catch (err) {
+    console.warn("tutor report error", err);
+    return { ok: false };
+  }
+}

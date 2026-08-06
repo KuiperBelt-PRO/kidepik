@@ -155,6 +155,13 @@ Fuente: DTO de [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md) §4.
 | `is_tutor_profile` | Variante tutor; arte icono `account` |
 | `rank_id` (futuro) | Esquina rango — oculta en Fase A |
 
+### 3.0 Delta ago 2026 — CTA Continuar
+
+> Ver [SPEC_APP_PRODUCT_BACKLOG_AGO2026](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) B8–B9.
+
+- En carta de explorador (no tutor): control **Continuar aventura** (botón o zona primaria) → play, con modal PIN si aplica.
+- El resto de la carta sigue abriendo la ficha `#/crew/:id`.
+
 ### 3.1 Estado en carta
 
 Un solo control visible: el **gemelo** (`crew-card__status-gem`) en la cabecera. No repetir el estado en el pie (la esquina inferior queda reservada para **rango**, Fase B).

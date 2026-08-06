@@ -1,0 +1,7 @@
+{"id":"wait_scifi_placement_01","world_theme":"sci-fi","age_band":null,"phase":"placement_compose","locale":"es","body":"El Arquitecto alinea las balizas de la Academia…","weight":2,"active":true}
+{"id":"wait_scifi_placement_02","world_theme":"sci-fi","age_band":null,"phase":"placement_compose","locale":"es","body":"Sincronizando módulos de evaluación. Un momento.","weight":1,"active":true}
+{"id":"wait_scifi_placement_03","world_theme":"sci-fi","age_band":"band_early","phase":"placement_compose","locale":"es","body":"Las luces del casco parpadean: casi listo.","weight":2,"active":true}
+{"id":"wait_scifi_path_01","world_theme":"sci-fi","age_band":null,"phase":"path_compose","locale":"es","body":"Tres rutas aparecen en el mapa holográfico…","weight":2,"active":true}
+{"id":"wait_scifi_challenge_01","world_theme":"sci-fi","age_band":null,"phase":"challenge_compose","locale":"es","body":"Calibrando el desafío orbital…","weight":1,"active":true}
+{"id":"wait_scifi_generic_01","world_theme":"sci-fi","age_band":null,"phase":"generic","locale":"es","body":"Procesando el siguiente salto de la misión.","weight":1,"active":true}
+{"id":"wait_scifi_generic_02","world_theme":"sci-fi","age_band":null,"phase":"generic","locale":"es","body":"La consola parpadea en espera…","weight":1,"active":true}

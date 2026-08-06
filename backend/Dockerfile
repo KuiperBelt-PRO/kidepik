@@ -9,6 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/pyproject.toml /app/pyproject.toml
 COPY backend/app /app/app
 COPY backend/skills /app/skills
+COPY backend/agents /app/agents
+COPY data/glossary /data/glossary
+COPY data/waiting /data/waiting
 
 RUN pip install --no-cache-dir -e ".[dev]"
 
@@ -17,6 +20,8 @@ ENV MEDIA_ROOT=/var/www/html/media
 ENV LOG_DIR=/var/www/html/logs
 ENV MIGRATIONS_DIR=/var/www/supabase/migrations
 ENV JOURNEY_DATA_DIR=/data/journey
+ENV GLOSSARY_DATA_DIR=/data/glossary
+ENV WAITING_DATA_DIR=/data/waiting
 
 EXPOSE 8000
 

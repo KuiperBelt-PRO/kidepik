@@ -5,7 +5,7 @@
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
 import { resolveDisplayName } from "../components/home-welcome-panel.js";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=183";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { fetchParentMe } from "../lib/parent-account.js?v=183";

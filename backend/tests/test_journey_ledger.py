@@ -46,6 +46,25 @@ def test_append_and_read_events(tmp_path) -> None:
     assert (tmp_path / parent / child / "index.json").is_file()
 
 
+def test_dialogue_jsonl_world_theme(tmp_path) -> None:
+    ledger = JourneyLedger(tmp_path)
+    parent = str(uuid.uuid4())
+    child = str(uuid.uuid4())
+    session = str(uuid.uuid4())
+    ledger.append_dialogue(
+        parent,
+        child,
+        session,
+        kind="mentor_utterance",
+        text="En fantasy",
+        world_theme="fantasy",
+    )
+    path = tmp_path / parent / child / "worlds" / "fantasy" / "dialogue.jsonl"
+    assert path.is_file()
+    rows = ledger.read_dialogue(parent, child, world_theme="fantasy")
+    assert rows[0]["text"] == "En fantasy"
+
+
 def test_dialogue_jsonl_and_traveler_md(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())
@@ -97,6 +116,34 @@ def test_dialogue_jsonl_and_traveler_md(tmp_path) -> None:
     assert meta["schema"] == "kidepik.traveler_profile/v1"
     assert meta["species"] == "Mago humano"
     assert "mago metódico" in body.lower()
+
+
+def test_events_world_theme_and_placement_kinds(tmp_path) -> None:
+    ledger = JourneyLedger(tmp_path)
+    parent = str(uuid.uuid4())
+    child = str(uuid.uuid4())
+    session = str(uuid.uuid4())
+    ledger.append_event(
+        parent,
+        child,
+        session,
+        kind="placement_queue",
+        payload={"queue": [{"item_key": "a"}]},
+        world_theme="fantasy",
+    )
+    ledger.append_event(
+        parent,
+        child,
+        session,
+        kind="placement_answer",
+        payload={"index": 0, "score": 1.0},
+        world_theme="fantasy",
+    )
+    rows = ledger.read_events(parent, child, session, world_theme="fantasy")
+    assert [r["kind"] for r in rows] == ["placement_queue", "placement_answer"]
+    assert (tmp_path / parent / child / "worlds" / "fantasy" / "sessions" / session / "events.jsonl").is_file() or (
+        tmp_path / parent / child / "worlds" / "fantasy"
+    ).exists()
 
 
 def test_summary_md_roundtrip(tmp_path) -> None:

@@ -44,7 +44,7 @@ export async function fetchDebugAiQueues(session, purpose) {
  * @param {import('@supabase/supabase-js').Session} session
  * @param {string} [purpose]
  */
-export async function fetchDebugAiResolve(session, purpose = "placement_exam_composer") {
+export async function fetchDebugAiResolve(session, purpose = "mentor_guide") {
   return debugFetch(session, `/debug/ai/resolve?purpose=${encodeURIComponent(purpose)}`);
 }
 

@@ -1,65 +1,45 @@
 # 11 — Pipeline de aventura infantil (contrato)
 
-**Specs:** [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](../specify/SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_AGE_BANDS.md](../specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_SUBJECT_CATALOG.md](../specify/SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](../specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_MENTOR.md](../specify/SPEC_APP_MENTOR.md), [SPEC_APP_JOURNEY_MEMORY.md](../specify/SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_PLACEMENT_EXAM.md](../specify/SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](../specify/SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md](../specify/SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md), [SPEC_APP_ADVENTURE_SESSION.md](../specify/SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](../specify/SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](../specify/SPEC_APP_ADVENTURE_LLM_NARRATIVE.md), [SPEC_APP_ADVENTURE_ZONE_BIBLE.md](../specify/SPEC_APP_ADVENTURE_ZONE_BIBLE.md), [SPEC_APP_PROGRESSION_RANKS.md](../specify/SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](../specify/SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_AI_OPENROUTER_GATEWAY.md](../specify/SPEC_AI_OPENROUTER_GATEWAY.md), [SPEC_AI_PLAY_ORCHESTRATION.md](../specify/SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_DEBUG_MODE.md](../specify/SPEC_APP_DEBUG_MODE.md)
+**Specs canónicas (ago 2026):** [SPEC_APP_JOURNEY_MECHANICS.md](../specify/SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_DATA_STORAGE_LAYERS.md](../specify/SPEC_DATA_STORAGE_LAYERS.md), [SPEC_AI_CENTRAL_ORCHESTRATOR.md](../specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md), [SPEC_AI_GEMINI_GATEWAY.md](../specify/SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_PYDANTIC_AGENTS.md](../specify/SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS.md](../specify/SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](../specify/SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_APP_PARALLEL_WORLDS.md](../specify/SPEC_APP_PARALLEL_WORLDS.md), [SPEC_APP_WORLD_GLOSSARY.md](../specify/SPEC_APP_WORLD_GLOSSARY.md), [SPEC_APP_WAITING_PHRASES.md](../specify/SPEC_APP_WAITING_PHRASES.md), [SPEC_APP_CANONICAL_VOCABULARY.md](../specify/SPEC_APP_CANONICAL_VOCABULARY.md), [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_SUBJECT_CATALOG.md](../specify/SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_AGE_BANDS.md](../specify/SPEC_APP_AGE_BANDS.md)
 
-> **Hilo agentic FastAPI (cutover ago 2026):** [SPEC_AI_GEMINI_GATEWAY](../specify/SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_PYDANTIC_AGENTS](../specify/SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS](../specify/SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_JOURNEY_FILE_LEDGER](../specify/SPEC_AI_JOURNEY_FILE_LEDGER.md) — Gemini free + Pydantic AI + skills + JSONL/MD; plan [AI_FASTAPI_AGENTIC_PLAN](../tasks/AI_FASTAPI_AGENTIC_PLAN.md). nginx `/api/v1/play/*` y `/api/v1/debug/ai/*` → FastAPI. El Mermaid legacy abajo aún nombra componentes PHP/OpenRouter; el runtime canónico es `DialogueService` + agentes Gemini.
-
-> **Estado:** contratos + **LLM narrative aprobado** (2 ago 2026) — solo LLM, sin plantillas; fallo → `compose_failed`. Plan: [tasks/AI_ADVENTURE_LLM_NARRATIVE_PLAN.md](../tasks/AI_ADVENTURE_LLM_NARRATIVE_PLAN.md).
+> Runtime: FastAPI + orquestador + Gemini. **Sin** PlacementBank / OpenRouter. Detalle de flujos Mermaid en [SPEC_APP_JOURNEY_MECHANICS](../specify/SPEC_APP_JOURNEY_MECHANICS.md).
 
 ```mermaid
 flowchart TB
-  Crew["Tripulación: plaza\npending_entry"]
+  Crew["Tripulación"]
   Play["#/play/:id"]
-  Host[Host neutro pre-mundo]
-  World[elige mundo]
-  Mentor[Mentor canónico\nGuardián / Arquitecto]
-  Name[nombre]
-  Age[edad → age_band]
-  Char[traits]
-  Exam["placement\n(active_subjects tutor)"]
-  Batches["A2 compose\nlotes ≤4 en paralelo"]
-  PitchPlan["ZonePitchPlanner\nPHP + semilla"]
-  PitchLLM["zone_pitch_writer\nLLM"]
-  ZonePlan["ChallengePlanner\nPHP"]
-  SceneLLM["zone_scene_writer\nchallenge_writer"]
-  Zone[zona multi-reto]
-  WaitLLM["waiting_copy_writer\nlotes caché 24h"]
-  Sess[adventure planificador]
-  Mem["Memoria L1 ledger\norden §1.4 + L2/L3"]
-  Free[OpenRouter free\ndiscovery+rank+cooldown+éxito]
-  ComposeFail["compose_failed\nreintentar"]
-  Debug[Debug AI\ntrazas + panel tutor]
+  Orch[Orquestador central]
+  Host[Host neutro / mentor]
+  World[elige mundo activo]
+  Char[traveler.md]
+  Exam["Prueba acceso<br/>cola en JSONL"]
+  Paths["3 caminos<br/>materias flojas"]
+  Wait["waiting_phrases<br/>rotación 8s"]
+  Gloss["glossary JSONL<br/>DuckDB tool"]
+  Mem["Ledger worlds/theme"]
+  PG[(Supabase niveles/flags)]
+  Gemini[Gemini quality/lite]
 
-  Crew --> Play --> Host --> World --> Mentor
-  Mentor --> Name --> Age --> Char --> Exam --> Batches --> PitchPlan --> PitchLLM --> Zone --> ZonePlan --> SceneLLM --> Sess
-  WaitLLM -.-> Play
-  Free -.-> PitchLLM
-  Free -.-> SceneLLM
-  Free -.-> WaitLLM
-  Free -.-> Batches
-  PitchLLM -.->|agotado| ComposeFail
-  SceneLLM -.->|agotado| ComposeFail
-  ComposeFail -.-> PitchLLM
-  Debug -.-> Exam
-  Debug -.-> Free
-  Mem --- Sess
-  Mem --- Mentor
+  Crew --> Play --> Orch
+  Orch --> Host --> World --> Char --> Exam --> Paths
+  Wait -.-> Orch
+  Gloss -.-> Orch
+  Gemini -.-> Orch
+  Orch --> Mem
+  Orch --> PG
 ```
-
 
 ## Persistencia
 
 | Capa | Qué |
 | --- | --- |
-| Perfil | mundo, nombre, edad/banda, traits, niveles, mentor_id |
-| L1 | dialogue_turns + story_beats + decisions (trazable) |
-| L2 | story_summaries condensed_full |
-| L3 | últimos beats/turns al retomar |
-| Debug (no-prod) | `ai_call_attempts` / traza en response — [SPEC_APP_DEBUG_MODE.md](../specify/SPEC_APP_DEBUG_MODE.md) |
+| Supabase | auth, children, progreso por mundo, waiting_phrases |
+| Archivos | dialogue/events/summary/traveler por mundo; estado examen/caminos |
+| DuckDB | tools sobre JSONL (glosario + ledger) |
 
 ## Anti-errores
 
-- No implementar sin aprobación P0 del plan.
-- No modelos de pago (`AI_ALLOW_PAID=false`).
-- No segunda voz de chat: solo mentor.
-- No versionar `OPENROUTER_API_KEY`.
+- No PlacementBank / `default.json` de ítems.
+- No escribir transcript ni cola de examen en Postgres.
+- No modelos de pago.
+- No segunda voz de chat: solo mentor del mundo activo.

@@ -150,6 +150,137 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   opacity: 0.88;
 }
 
+.crew-panel__subjects-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.crew-subject-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.crew-subject-card.is-on {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.crew-subject-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.crew-subject-card__label {
+  font-size: calc(0.92rem * var(--font-scale-ui, 1));
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.crew-subject-card__level {
+  margin: 0;
+  font-size: calc(0.78rem * var(--font-scale-ui, 1));
+  opacity: 0.82;
+}
+
+.crew-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.crew-card-wrap .crew-card {
+  flex: 0 0 auto;
+}
+
+.crew-card__continue {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0.45rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  font: inherit;
+  font-size: calc(0.88rem * var(--font-scale-ui, 1));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.crew-card__continue:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.85);
+  outline-offset: 2px;
+}
+
+.pin-pad {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.pin-pad__dots {
+  display: flex;
+  gap: 12px;
+}
+
+.pin-pad__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  background: transparent;
+}
+
+.pin-pad__dot.is-filled {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.pin-pad__status {
+  min-height: 1.2rem;
+  margin: 0;
+  font-size: 0.85rem;
+  opacity: 0.9;
+  text-align: center;
+}
+
+.pin-pad__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  width: min(100%, 240px);
+}
+
+.pin-pad__key {
+  min-height: 48px;
+  min-width: 48px;
+  aspect-ratio: 1;
+  justify-self: center;
+  width: 100%;
+  max-width: 64px;
+}
+
+.pin-pad__key--ghost {
+  aspect-ratio: auto;
+  max-width: none;
+  background: transparent;
+  border: 0;
+  color: #fff;
+  font: inherit;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
 .settings-panel__btn,
 .crew-panel__btn {
   display: inline-flex;

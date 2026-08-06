@@ -1,7 +1,7 @@
 # Spec: Ficha del tripulante — Viaje y progreso (panel tutor)
 
-> Estado: **propuesta — pendiente de aprobación** (2 ago 2026)  
-> Relacionado: [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md), [SPEC_APP_CREW_MEMBER_SETTINGS.md](SPEC_APP_CREW_MEMBER_SETTINGS.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md)
+> Estado: **propuesta — pendiente de aprobación** (delta ago 2026)  
+> Relacionado: [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md), [SPEC_APP_CREW_MEMBER_SETTINGS.md](SPEC_APP_CREW_MEMBER_SETTINGS.md), [SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md)
 
 ## Contexto
 
@@ -17,19 +17,19 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 
 | Gap | Detalle |
 | --- | --- |
-| Sin niveles en API crew | `GET /crew/:id` no expone `general_level`, `rank_id`, `user_subject_levels` |
-| Sin progreso hacia siguiente nivel | `accuracy_rolling` existe en BD pero no llega al tutor |
-| Identidad y ajustes mezclados | Difícil encontrar «cómo va el viaje» vs «límites del dispositivo» |
-| Hero sin rango | `rank_id` no cableado en carta (Fase B pendiente) |
-| Descripción del personaje estática | `character_summary` editable pero poco enlazada al resumen L2 del viaje |
-| Viaje = solo timeline | Falta mapa de capítulo/zona, misiones activas, destinos pendientes |
+| Tabs insuficientes | Hace falta **Detalles / Viaje / Ajustes** (diario = tab Viaje) |
+| Materias densas | Pasar a **grid de tarjetas** + switch + barra progreso |
+| Niveles `L*` | Poco claros en castellano; leyenda + «Nivel N → N+1» en barra |
+| Descripción editable | Bug cursor / caracteres al escribir |
+| Sin niveles en API crew (histórico) | Progreso ya parcialmente expuesto; completar UX |
+| Viaje = solo timeline embebido | Mover diario a tab propia |
 
 ## Objetivo
 
-1. Reorganizar la ficha en **dos pestañas**: **Viaje** (identidad + progreso + diario) y **Ajustes** (permisos, materias, peligro).
-2. Exponer **progresión pedagógica y narrativa** al tutor: rango + `L*` general + barra hacia siguiente nivel + desglose por materia activa.
-3. Sincronizar **descripciones** (personaje, resumen del viaje, logros) con datos de aventura.
-4. Mantener contratos existentes de guardado explícito en Ajustes; Viaje mayormente lectura + edición de perfil.
+1. Reorganizar la ficha en **tres pestañas**: **Detalles** · **Viaje** (diario) · **Ajustes**.
+2. Grid de materias con progreso + activación.
+3. Fix descripción editable; switches glass para booleanos de ajustes.
+4. Exponer progresión legible al tutor (rango + nivel + %).
 
 ---
 
@@ -39,16 +39,23 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 
 ```
 ┌─────────────────────────────────┐
-│  [←]  Tripulación · Vatardar     │  ← section-frame título
+│  [←]  Tripulación · Nombre       │
 ├─────────────────────────────────┤
-│      [ Hero crew-card ]         │  ← siempre visible (ambas pestañas)
+│      [ Hero crew-card ]         │
 ├─────────────────────────────────┤
-│   [ Viaje ]    [ Ajustes ]      │  ← segment control glass
+│ [Detalles] [Viaje] [Ajustes]    │
 ├─────────────────────────────────┤
 │  (contenido de pestaña activa)   │
-│                                 │
 └─────────────────────────────────┘
 ```
+
+| Tab | Contenido |
+| --- | --- |
+| **Detalles** | Perfil editable, progreso general, **grid materias** (switch + barra) |
+| **Viaje** | Diario / timeline / summaries (antes en scroll largo) |
+| **Ajustes** | Permisos, PIN, límites, materias peligrosas / zona peligrosa |
+
+> Delta ago 2026: sustituye el modelo de 2 tabs Viaje|Ajustes. Ver [SPEC_APP_PRODUCT_BACKLOG_AGO2026](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md).
 
 | Pestaña | `data-crew-tab` | Contenido |
 | --- | --- | --- |

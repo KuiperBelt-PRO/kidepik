@@ -5,7 +5,7 @@ Coloca aquí las especificaciones en markdown de features que deban seguir el fl
 ## Antes de crear una spec nueva
 
 1. Consultar [CURRENT_SPECS.md](../CURRENT_SPECS.md) y buscar en esta carpeta por prefijo (`SPEC_LOADER_*`, `SPEC_APP_*`, …).
-2. Leer el diagrama del área en [diagrams/](../diagrams/README.md) y [14-agent-decision-tree.md](../diagrams/14-agent-decision-tree.md).
+2. Leer el diagrama del área en [diagrams/](../diagrams/README.md) y [14-cursor-doc-routing.md](../diagrams/14-cursor-doc-routing.md).
 3. Seguir la **puerta de descubrimiento** en [skills/spec-driven-dev-kidepik/SKILL.md](../skills/spec-driven-dev-kidepik/SKILL.md).
 
 Si el contrato ya existe, **ampliar** la spec existente en lugar de duplicar.

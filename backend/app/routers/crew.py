@@ -63,3 +63,46 @@ async def destroy(child_id: str, payload: dict[str, Any] | None = None, authoriz
     try: return await CrewService().soft_delete_for_auth_user(auth_id, child_id, bool(payload and payload.get("confirm") is True))
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
     except Exception as exc: raise _crew_error(exc) from exc
+
+@router.post("/crew/{child_id}/verify-exit-pin")
+async def verify_exit_pin(child_id: str, payload: dict[str, Any] | None = None, authorization: str | None = Header(default=None)) -> dict[str, bool]:
+    auth_id = await _parent(authorization)
+    if not isinstance(payload, dict): raise HTTPException(422, "Body required")
+    pin = payload.get("pin")
+    try:
+        result = await CrewService().verify_exit_pin_for_auth_user(auth_id, child_id, str(pin) if pin is not None else "")
+        if not result.get("ok"):
+            raise HTTPException(403, "PIN incorrecto")
+        return result
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    except HTTPException: raise
+    except Exception as exc: raise _crew_error(exc) from exc
+
+@router.post("/crew/{child_id}/tutor-report")
+async def tutor_report(child_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+    auth_id = await _parent(authorization)
+    try:
+        member = await CrewService().get_for_auth_user(auth_id, child_id)
+        if member.get("is_tutor_profile"):
+            raise HTTPException(422, "No hay informe para el perfil de tutor")
+        from app.services.parents import ParentAccountService
+        from app.services.tutor_reports import TutorReportService
+
+        parent = await ParentAccountService().find_by_auth_user_id(auth_id)
+        if not parent:
+            raise HTTPException(404, "Parent not found")
+        learning = (member.get("settings") or {}).get("learning") or {}
+        report = TutorReportService().write_evaluation_report(
+            parent_id=str(parent["parent_id"]),
+            child_id=child_id,
+            world_theme=member.get("world_theme"),
+            display_name=member.get("display_name"),
+            progress=member.get("progress"),
+            weak_spots=learning.get("weak_spots") if isinstance(learning.get("weak_spots"), list) else [],
+            reason="tutor_request",
+        )
+        return {"ok": True, "filename": report["filename"], "body": report["body"]}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _crew_error(exc) from exc

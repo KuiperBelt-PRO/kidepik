@@ -18,8 +18,11 @@ flowchart TB
 | Loader / gate / auth Google | SPEC_LOADER_APP_GATE, SPEC_APP_AUTH* | 08, 09 |
 | Shell / drawer / FABs | SPEC_APP_SHELL_CHROME | 07, 10 |
 | Cuenta / ajustes / crew | SPEC_APP_*_SECTION | 10, 05 |
-| Play / examen / diálogo / IA / mentor / memoria / materias / **riqueza narrativa** / **LLM aventura** / **historial paginado** | SPEC_APP_SUBJECT_CATALOG / MENTOR_PLACEMENT_ADAPTIVE / PLAY_* / MENTOR / JOURNEY_MEMORY / **ADVENTURE_DIALOGUE_HISTORY** / **ADVENTURE_STORY_RICHNESS** / **ADVENTURE_LLM_NARRATIVE** / ZONE_BIBLE / MENTOR_PROSE_CLARITY / AGE_BANDS / SPEC_AI_* (OpenRouter legado) | 11 |
-| **IA agentic FastAPI** (Gemini lista free, Pydantic AI, skills Capability, `data/journey/` + reset cutover) | **SPEC_AI_GEMINI_GATEWAY** / **SPEC_AI_PYDANTIC_AGENTS** / **SPEC_AI_AGENT_SKILLS** / **SPEC_AI_JOURNEY_FILE_LEDGER** (+ plan AI_FASTAPI_AGENTIC) | 11 (+04 al cutover) |
+| Play / examen / diálogo / IA / mentor / memoria / materias / **riqueza narrativa** / **LLM aventura** / **historial paginado** | SPEC_APP_JOURNEY_MECHANICS + SUBJECT_CATALOG / PLAY_* / MENTOR / JOURNEY_MEMORY / ADVENTURE_* / AGE_BANDS / SPEC_AI_* (OpenRouter legado) | 11 |
+| **IA agentic FastAPI** (Gemini, orquestador, skills, ledger, DuckDB/glosario, mundos paralelos) | **SPEC_DATA_STORAGE_LAYERS** / **SPEC_AI_CENTRAL_ORCHESTRATOR** / **SPEC_AI_GEMINI_GATEWAY** / **SPEC_AI_PYDANTIC_AGENTS** / **SPEC_AI_AGENT_SKILLS** / **SPEC_AI_JOURNEY_FILE_LEDGER** / **SPEC_APP_PARALLEL_WORLDS** / **SPEC_APP_WORLD_GLOSSARY** / **SPEC_APP_WAITING_PHRASES** / **SPEC_APP_CANONICAL_VOCABULARY** | **15**, 11, 05 |
+| Mecánicas de viaje (flujos de decisión jugables) | **SPEC_APP_JOURNEY_MECHANICS** | **16**, 11 |
+| Dónde guardar datos (PG vs archivos vs DuckDB) | **SPEC_DATA_STORAGE_LAYERS** | **17**, 05 |
+| Mundos en paralelo / cambio fantasy↔sci-fi | **SPEC_APP_PARALLEL_WORLDS** | **18**, 08 |
 | Ruta API nueva | SPEC_FASTAPI_BACKEND_MIGRATION + `backend/app/routers` | 04 |
 | Migración SQL | supabase/migrations + MigrationRunner (Python) | 05, 03 |
 | Media / upload | SPEC_MEDIA_STORAGE | 12 |

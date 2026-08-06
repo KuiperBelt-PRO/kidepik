@@ -1,8 +1,8 @@
 # Spec: Agentes de play con Pydantic AI (FastAPI)
 
-> Estado: **aprobada** (ago 2026) — **canónica**: todo diálogo play vía agentes Gemini; sin guion fijo PHP  
+> Estado: **aprobada** (ago 2026) — **delta propuesta**: orquestador central  
 > Hilo: IA agentic FastAPI  
-> Relacionado: [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_AGENT_SKILLS.md](SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md)
+> Relacionado: [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_AGENT_SKILLS.md](SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_AI_CENTRAL_ORCHESTRATOR.md](SPEC_AI_CENTRAL_ORCHESTRATOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_ADVENTURE_LLM_NARRATIVE.md](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md)
 
 ## Contexto
 
@@ -28,12 +28,14 @@ Esta spec **define el mapa de agentes y roles por fase de la app** (onboarding �
 | A3 | Modelo | Lista Gemini ([SPEC_AI_GEMINI_GATEWAY](SPEC_AI_GEMINI_GATEWAY.md)) |
 | A4 | Salida | `output_type` = envelopes Pydantic |
 | A5 | Skills | Capability nativa + `backend/skills/` ([SPEC_AI_AGENT_SKILLS](SPEC_AI_AGENT_SKILLS.md)) |
-| A6 | Orquestación | Services FastAPI eligen `purpose` e invocan un Agent; sin grafo global |
+| A6 | Orquestación | **Orquestador central** + subagentes ([SPEC_AI_CENTRAL_ORCHESTRATOR](SPEC_AI_CENTRAL_ORCHESTRATOR.md)); services no llaman `run_purpose` sueltos en el camino feliz |
 | A7 | Voz dialogada | Mentor canónico cuando ya hay mundo; host neutro solo pre-mundo ([SPEC_APP_MENTOR](SPEC_APP_MENTOR.md)) |
 | A8 | Audiencia | `age_band` (y adulto) vía skill `audience-language`; no tono infantil fijo |
 | A9 | First_run | **Sin plantillas hardcodeadas** de mentor: `onboarding_host` / `mentor_guide` / `character_coach` generan cada burbuja |
-| A10 | Persistencia | Cada turno → `dialogue.jsonl` + eco sesión; traits → `traveler.md` ([SPEC_AI_JOURNEY_FILE_LEDGER](SPEC_AI_JOURNEY_FILE_LEDGER.md)) |
+| A10 | Persistencia | Cada turno → ledger; traits → `traveler.md` (no `child_traits`); examen/retos → events JSONL ([SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md)) |
 | A11 | PHP IA | Retirado ([SPEC_AI_PHP_STACK_RETIREMENT](SPEC_AI_PHP_STACK_RETIREMENT.md)) |
+| A12 | Defs de agente | Un `.md` por rol con frontmatter ([SPEC_AI_CENTRAL_ORCHESTRATOR](SPEC_AI_CENTRAL_ORCHESTRATOR.md) §3) |
+| A13 | Tools | Glosario DuckDB + consultas ledger según rol |
 
 ---
 
@@ -42,25 +44,21 @@ Esta spec **define el mapa de agentes y roles por fase de la app** (onboarding �
 ```
 backend/app/ai/
   gemini_gateway.py
+  orchestrator/          # SPEC_AI_CENTRAL_ORCHESTRATOR
   agents/
     deps.py
-    registry.py          # PURPOSE_REGISTRY
+    registry.py
     envelopes.py
-    onboarding.py        # host + mentor first_run steps
-    placement.py
-    adventure.py
-    summarizer.py
-    waiting.py
-    safety.py
+    loader.py            # carga defs .md
+    runner.py
+backend/agents/          # un .md por rol
 backend/skills/          # SPEC_AI_AGENT_SKILLS
 backend/app/services/
-  dialogue.py            # turn loop
-  adventure.py
-  placement.py
-  journey_reset.py       # cutover / tutor reset (ledger + flags)
+  dialogue.py            # HTTP → Orchestrator
+  …
 ```
 
-Flujo: **router → service (purpose + pedagogía) → agent.run → validar → Postgres (estado) + ledger (transcript)**.
+Flujo: **router → service → Orchestrator → subagente(s)/tools → validar → Postgres (flags/niveles) + ledger (transcript + examen/retos)**.
 
 ---
 

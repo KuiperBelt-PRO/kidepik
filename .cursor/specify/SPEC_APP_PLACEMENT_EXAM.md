@@ -1,6 +1,13 @@
 # Spec: Examen de conocimientos (placement) y niveles
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — catálogo ampliado y placement adaptativo: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) + [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) (**aprobadas** 31 jul 2026, implementación bloqueada hasta OK); §8 ampliación IA; fórmulas refinables en Plan  
+> **DEPRECADA como contrato de persistencia (ago 2026).**  
+> Fuente de verdad del examen en curso: **ledger JSONL** (`placement_queue` / `placement_answer` / `placement_result`).  
+> Niveles oficiales: `user_subject_levels` + `child_world_progress`.  
+> Sin PlacementBank. Ver canónicos:  
+> [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) · [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md) · [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md) · [SPEC_APP_CANONICAL_VOCABULARY.md](SPEC_APP_CANONICAL_VOCABULARY.md).  
+> Las secciones §4.1 `placement_exams` / banco estático abajo son **legado histórico**; no implementar nuevas dependencias.
+
+> Estado histórico: aprobada como contrato de producto (julio 2026) — supersedida parcialmente por capas de datos + mecánicas (ago 2026).  
 > Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §3, §6
 
 ## Contexto
@@ -20,8 +27,8 @@ Al niño **no** se le muestra puntuación numérica; solo feedback narrativo. El
 1. Definir flow `placement` sobre el diálogo.
 2. Modelo de materias, niveles y fórmula general.
 3. Reglas de promoción de banda efectiva.
-4. Persistencia (`placement_exams`, `user_subject_levels`).
-5. Handoff a aventura y enlace a rangos ([SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md)).
+4. Persistencia (**legado:** `placement_exams`; **actual:** JSONL + `user_subject_levels` / `child_world_progress`).
+5. Handoff a aventura / caminos y enlace a rangos ([SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md)).
 
 ---
 
@@ -30,9 +37,9 @@ Al niño **no** se le muestra puntuación numérica; solo feedback narrativo. El
 | Principio | Decisión |
 | --- | --- |
 | Narrativo, no “examen escolar” | Envoltorio de historia |
-| Micro por materia | **1 reto por materia activa** del tripulante (catálogo hasta 14); reanudable si el examen es largo — ver [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §4 |
+| Micro por materia | Retos generados por agente (sin banco estático); cola en JSONL — ver [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) |
 | Multi-modal | Opciones, texto, (futuro: otros tipos) |
-| Por materia + general | Ambos persistidos |
+| Por materia + general | Ambos persistidos en PG al cerrar |
 | Edad cronológica ≠ techo | `effective_age_band` puede superar la banda por edad declarada |
 | Tutor transparente | Niveles visibles en gestión; ocultos en UI niño |
 
@@ -152,7 +159,9 @@ Narrativa: círculos/rutas avanzadas; **nunca** «tienes nivel de N años».
 
 ## 4. Modelo de datos
 
-### 4.1 `placement_exams`
+### 4.1 `placement_exams` (LEGADO — no usar como fuente de verdad)
+
+> **Ago 2026:** el examen en curso vive en JSONL; al completar se escriben `user_subject_levels` y `child_world_progress`. Esta DDL queda solo como referencia histórica.
 
 ```sql
 create table public.placement_exams (

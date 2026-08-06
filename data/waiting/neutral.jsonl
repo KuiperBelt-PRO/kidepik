@@ -1,0 +1,5 @@
+{"id":"wait_neutral_generic_01","world_theme":"neutral","age_band":null,"phase":"generic","locale":"es","body":"Un momento, por favor…","weight":1,"active":true}
+{"id":"wait_neutral_generic_02","world_theme":"neutral","age_band":null,"phase":"generic","locale":"es","body":"Estamos preparando lo siguiente…","weight":1,"active":true}
+{"id":"wait_neutral_placement_01","world_theme":"neutral","age_band":null,"phase":"placement_compose","locale":"es","body":"Preparando la prueba con calma…","weight":1,"active":true}
+{"id":"wait_neutral_path_01","world_theme":"neutral","age_band":null,"phase":"path_compose","locale":"es","body":"Elaborando las rutas posibles…","weight":1,"active":true}
+{"id":"wait_neutral_challenge_01","world_theme":"neutral","age_band":null,"phase":"challenge_compose","locale":"es","body":"Montando el siguiente reto…","weight":1,"active":true}

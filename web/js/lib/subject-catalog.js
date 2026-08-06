@@ -47,6 +47,17 @@ export const DEFAULT_ACTIVE_SUBJECTS = [
 ];
 
 /**
+ * @param {unknown} level
+ * @returns {string}
+ */
+export function formatLevelLabel(level) {
+  if (level == null || level === "") return "";
+  const raw = String(level);
+  const m = raw.match(/^L(\d+)$/i);
+  return m ? `Nivel ${m[1]}` : raw;
+}
+
+/**
  * @param {SubjectMeta[]} [catalog]
  * @returns {Record<string, SubjectMeta[]>}
  */
@@ -76,12 +87,36 @@ export function normalizeActiveSubjects(raw) {
 }
 
 /**
+ * @param {string} s
+ */
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+/**
  * @param {SubjectMeta[]} catalog
  * @param {string[]} active
+ * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }> }} [opts]
  * @returns {string}
  */
-export function renderSubjectsChecklistHtml(catalog, active) {
+export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
   const activeSet = new Set(active);
+  /** @type {Map<string, { current?: string, next?: string, percent?: number }>} */
+  const progressById = new Map();
+  for (const row of opts.progressSubjects || []) {
+    const id = String(row.id || row.subject_id || "");
+    if (!id) continue;
+    const lp = row.level_progress || {};
+    progressById.set(id, {
+      current: lp.current,
+      next: lp.next,
+      percent: Number(lp.percent_to_next) || 0,
+    });
+  }
   const groups = groupSubjectsByFamily(catalog);
   const order = Object.keys(SUBJECT_FAMILY_LABELS);
   let html = "";
@@ -89,11 +124,31 @@ export function renderSubjectsChecklistHtml(catalog, active) {
     const items = groups[fam];
     if (!items?.length) continue;
     html += `<fieldset class="crew-panel__subjects-family"><legend class="crew-panel__subjects-legend">${SUBJECT_FAMILY_LABELS[fam]}</legend>`;
+    html += `<div class="crew-panel__subjects-grid">`;
     for (const s of items) {
-      const checked = activeSet.has(s.id) ? "checked" : "";
-      html += `<label class="crew-panel__check"><input type="checkbox" data-subject="${s.id}" ${checked}/> ${s.label}</label>`;
+      const on = activeSet.has(s.id);
+      const prog = progressById.get(s.id);
+      const percent = Math.max(0, Math.min(100, prog?.percent ?? 0));
+      const cur = formatLevelLabel(prog?.current);
+      const next = formatLevelLabel(prog?.next);
+      let levelLine = "Sin nivel aún";
+      if (cur && next) levelLine = `${cur} → ${next}`;
+      else if (cur) levelLine = cur;
+      html += `<div class="crew-subject-card${on ? " is-on" : ""}">
+        <div class="crew-subject-card__head">
+          <span class="crew-subject-card__label">${escapeHtml(s.label)}</span>
+          <label class="glass-switch">
+            <input type="checkbox" role="switch" data-subject="${escapeHtml(s.id)}" ${on ? "checked" : ""} aria-label="Activar ${escapeHtml(s.label)}" />
+            <span class="glass-switch__track" aria-hidden="true"><span class="glass-switch__knob"></span></span>
+          </label>
+        </div>
+        <p class="crew-subject-card__level">${escapeHtml(levelLine)}</p>
+        <div class="crew-progress__bar" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
+          <div class="crew-progress__bar-fill" style="width:${percent}%"></div>
+        </div>
+      </div>`;
     }
-    html += `</fieldset>`;
+    html += `</div></fieldset>`;
   }
   return html;
 }

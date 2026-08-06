@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Kidepik\Api\Services;
 
-use Kidepik\Shared\Ai\PlacementBank;
 use Kidepik\Shared\Ai\SubjectCatalog;
 use Kidepik\Shared\Ai\ZoneCatalog;
 use Kidepik\Shared\Ai\ZonePitchPlanner;
+use Kidepik\Shared\Catalogs\ProgressionRanks;
 use PDO;
 
 /**
@@ -22,7 +22,6 @@ final class CrewProgressService
 
     public function __construct(
         private readonly PDO $pdo,
-        private readonly PlacementBank $bank = new PlacementBank(),
     ) {
     }
 
@@ -98,7 +97,7 @@ final class CrewProgressService
         $rankNext = $rank !== null ? $this->rankNextDto($track, (int) ($rank['tier'] ?? 1), $theme) : null;
         $rankEligible = $rankNext !== null
             && $generalLevel !== null
-            && $this->bank->levelIndex($generalLevel) >= $this->bank->levelIndex((string) ($rankNext['min_general_level'] ?? 'L5'));
+            && ProgressionRanks::levelIndex($generalLevel) >= ProgressionRanks::levelIndex((string) ($rankNext['min_general_level'] ?? 'L5'));
 
         $generalProgress = null;
         if ($placementStatus === 'completed' && $generalLevel !== null) {
@@ -236,9 +235,17 @@ final class CrewProgressService
     private function placementCompletedAt(string $childId): ?string
     {
         $stmt = $this->pdo->prepare(
-            "select completed_at from placement_exams
-             where child_id = :id and status = 'completed'
-             order by completed_at desc nulls last limit 1",
+            "select coalesce(cwp.updated_at, c.updated_at)
+             from public.children c
+             left join public.child_world_progress cwp
+               on cwp.child_id = c.id
+              and cwp.world_theme = coalesce(c.active_world_theme, c.world_theme, 'fantasy')
+             where c.id = :id
+               and (
+                 c.placement_status = 'completed'
+                 or cwp.placement_status = 'completed'
+               )
+             limit 1",
         );
         $stmt->execute(['id' => $childId]);
         $val = $stmt->fetchColumn();
@@ -252,7 +259,7 @@ final class CrewProgressService
     private function levelProgress(string $levelId, ?float $rolling, int $recentAttempts, string $subjectLabel): array
     {
         $accuracy = $rolling ?? 0.5;
-        $idx = $this->bank->levelIndex($levelId);
+        $idx = ProgressionRanks::levelIndex($levelId);
         if ($idx >= 5) {
             return [
                 'current' => 'L5',
@@ -314,7 +321,7 @@ final class CrewProgressService
         if ($generalLevel === null) {
             return null;
         }
-        $base = $this->bank->rankForGeneral($theme, $generalLevel);
+        $base = ProgressionRanks::rankForGeneral($theme, $generalLevel);
         if ($rankId !== null && $rankId !== '') {
             $fromId = $this->rankById($track, $rankId, $theme);
             if ($fromId !== null) {
@@ -341,7 +348,7 @@ final class CrewProgressService
         }
         $nextTier = $currentTier + 1;
         $level = 'L' . $nextTier;
-        $rank = $this->bank->rankForGeneral($theme, $level);
+        $rank = ProgressionRanks::rankForGeneral($theme, $level);
 
         return [
             'id' => (string) ($rank['id'] ?? ''),
@@ -359,7 +366,7 @@ final class CrewProgressService
     private function rankById(string $track, string $rankId, string $theme): ?array
     {
         for ($tier = 1; $tier <= 5; $tier++) {
-            $rank = $this->bank->rankForGeneral($theme, 'L' . $tier);
+            $rank = ProgressionRanks::rankForGeneral($theme, 'L' . $tier);
             if (($rank['id'] ?? '') === $rankId) {
                 return $rank;
             }
@@ -371,7 +378,7 @@ final class CrewProgressService
 
     private function nextLevel(string $levelId): ?string
     {
-        $idx = $this->bank->levelIndex($levelId);
+        $idx = ProgressionRanks::levelIndex($levelId);
 
         return $idx >= 5 ? null : 'L' . ($idx + 1);
     }

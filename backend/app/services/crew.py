@@ -98,6 +98,8 @@ class CrewService:
                 learning["active_subjects"] = SubjectCatalog.normalize_active_subjects(incoming["active_subjects"]); learning["subjects_locked_by_tutor"] = True
             for key in ("adaptation_policy", "show_levels_to_child", "pause_adaptation"):
                 if key in incoming: learning[key] = incoming[key]
+            if "weak_spots" in incoming:
+                learning["weak_spots"] = self._normalize_weak_spots(incoming["weak_spots"])
             settings["learning"] = learning
         if "tutor_label" in payload or "learning" in payload: fields.append("settings = CAST(:settings AS jsonb)"); params["settings"] = settings
         traits_changed = "character_summary" in payload
@@ -146,6 +148,33 @@ class CrewService:
         async with session_scope() as session: await session.execute(text("update public.children set status = 'deleted', deleted_at = now(), updated_at = now() where id = :id"), {"id": child_id})
         return {"deleted": True}
 
+    async def verify_exit_pin_for_auth_user(self, auth_user_id: str, child_id: str, pin: str) -> dict[str, bool]:
+        detail = await self.get_for_auth_user(auth_user_id, child_id)
+        perms = detail.get("permissions") or {}
+        if not perms.get("require_exit_pin"):
+            return {"ok": True, "required": False}
+        if not perms.get("exit_pin_set"):
+            return {"ok": True, "required": False}
+        if not isinstance(pin, str) or not re.fullmatch(r"\d{4}", pin):
+            raise ValueError("exit_pin invalid")
+        parent_id = await self._parent_id(auth_user_id)
+        async with session_scope() as session:
+            row = (
+                await session.execute(
+                    text(
+                        """select (exit_pin_hash = crypt(:pin, exit_pin_hash)) as matched
+                           from public.child_permissions p
+                           join public.children c on c.id = p.child_id
+                           where p.child_id = :id and c.parent_id = :parent_id
+                           limit 1"""
+                    ),
+                    {"id": child_id, "parent_id": parent_id, "pin": pin},
+                )
+            ).mappings().first()
+        if not row or not row.get("matched"):
+            return {"ok": False, "required": True}
+        return {"ok": True, "required": True}
+
     async def _parent_id(self, auth_user_id: str) -> str:
         parent = await self.parents.find_by_auth_user_id(auth_user_id)
         if not parent: raise RuntimeError("Parent account not found")
@@ -173,6 +202,32 @@ class CrewService:
                 await session.execute(text("update public.child_traits set character_summary = :summary, updated_at = now() where child_id = :id"), {"id": child_id, "summary": summary})
                 if summary is None and str(row["species"]).strip() == "Por definir" and str(row["palette"]).strip() == "Por definir": await session.execute(text("delete from public.child_traits where child_id = :id"), {"id": child_id})
             elif summary is not None: await session.execute(text("insert into public.child_traits (child_id, species, palette, features, vibe, achievements, character_summary, updated_at) values (:id, 'Por definir', 'Por definir', '[]'::jsonb, null, '[]'::jsonb, :summary, now())"), {"id": child_id, "summary": summary})
+    @staticmethod
+    def _normalize_weak_spots(raw: object) -> list[dict[str, str | None]]:
+        if raw is None:
+            return []
+        if isinstance(raw, str):
+            note = raw.strip()
+            return [{"subject_id": None, "note": note}] if note else []
+        if not isinstance(raw, list):
+            raise ValueError("learning.weak_spots invalid")
+        out: list[dict[str, str | None]] = []
+        for item in raw[:12]:
+            if isinstance(item, str):
+                note = item.strip()
+                if note:
+                    out.append({"subject_id": None, "note": note[:200]})
+                continue
+            if not isinstance(item, dict):
+                continue
+            note = str(item.get("note") or "").strip()[:200]
+            if not note:
+                continue
+            sid = item.get("subject_id")
+            subject_id = str(sid).strip() if isinstance(sid, str) and sid.strip() else None
+            out.append({"subject_id": subject_id, "note": note})
+        return out
+
     @staticmethod
     def _summary(value: object) -> str | None:
         if value is None: return None
