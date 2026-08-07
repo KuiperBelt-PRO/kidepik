@@ -1,4 +1,4 @@
-# POC local — nginx + FastAPI (API producto) + PHP (Play / IA / debug AI)
+# POC local — nginx + FastAPI (API producto)
 # Supabase: `supabase start` (ver scripts/poc-up.ps1)
 
 name: kidepik-poc
@@ -64,52 +64,4 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       AI_GEMINI_MODEL_LIST: ${AI_GEMINI_MODEL_LIST:-gemini-3-flash-preview,gemini-2.5-flash,gemini-2.0-flash}
       AI_GEMINI_MODEL_LIST_LITE: ${AI_GEMINI_MODEL_LIST_LITE:-gemini-2.5-flash-lite,gemini-3.1-flash-lite,gemini-2.0-flash}
-    restart: unless-stopped
-
-  # Legado PHPUnit / scripts PHP — no recibe tráfico HTTP (perfil php-legacy).
-  php:
-    profiles: ["php-legacy"]
-    build:
-      context: ..
-      dockerfile: docker/php/Dockerfile
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - ../api/src:/var/www/api/src
-      - ../api/public:/var/www/api/public
-      - ../api/tests:/var/www/api/tests
-      - ../api/phpunit.xml:/var/www/api/phpunit.xml:ro
-      - ../api/bin:/var/www/api/bin:ro
-      - ../shared:/var/www/shared
-      - ../supabase/migrations:/var/www/supabase/migrations:ro
-      - ../web/media:/var/www/html/media
-      - ../web/logs:/var/www/html/logs
-      - ./php/conf.d/99-dev.ini:/usr/local/etc/php/conf.d/99-dev.ini:ro
-    environment:
-      APP_NAME: kidepik-api-php
-      APP_ENV: ${APP_ENV:-local}
-      APP_DEBUG_AI: ${APP_DEBUG_AI:-true}
-      LOG_DIR: /var/www/html/logs
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      LOG_TO_FILES: ${LOG_TO_FILES:-true}
-      SUPABASE_URL: ${SUPABASE_URL:-http://host.docker.internal:54321}
-      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH}
-      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@host.docker.internal:54322/postgres}
-      STORAGE_DRIVER: ${STORAGE_DRIVER:-local}
-      MEDIA_ROOT: /var/www/html/media
-      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:-/media}
-      PUBLIC_API_URL: ${PUBLIC_API_URL:-/api/v1}
-      PUBLIC_SUPABASE_URL: ${PUBLIC_SUPABASE_URL:-http://localhost:54321}
-      UPLOAD_TOKEN_TTL: ${UPLOAD_TOKEN_TTL:-900}
-      AI_ENABLED: ${AI_ENABLED:-true}
-      AI_MOCK: ${AI_MOCK:-false}
-      AI_ALLOW_PAID: ${AI_ALLOW_PAID:-false}
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
-      OPENROUTER_MODELS: ${OPENROUTER_MODELS:-}
-      AI_MODEL_PREFERENCE: ${AI_MODEL_PREFERENCE:-}
-      AI_HTTP_REFERER: ${AI_HTTP_REFERER:-http://localhost:8082}
-      AI_APP_TITLE: ${AI_APP_TITLE:-KidepiK Local}
-      AI_MAX_MODEL_ATTEMPTS: ${AI_MAX_MODEL_ATTEMPTS:-12}
-      AI_RATE_LIMIT_PER_CHILD_DAY: ${AI_RATE_LIMIT_PER_CHILD_DAY:-80}
     restart: unless-stopped

@@ -33,7 +33,7 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 - Fases del repo documentadas en [.cursor/SDD.md](../../SDD.md) (Specify → Plan → Task → Implement → Validate).
 - Respeta versiones en `api/composer.json`, `web/package.json` y manifiestos del stack POC.
 - **Stack canónico (POC local):** FastAPI (`backend/`) + nginx Docker + Supabase + `web/media/`. Sin R2, MinIO, OCI ni Cloud Run.
-- **Legado:** `api/` + `shared/` PHP (referencia / PHPUnit con perfil `php-legacy`). **No** implementar rutas de producto nuevas en PHP — ver `.cursor/rules/fastapi-backend-canonical.mdc`.
+- **Regla:** `.cursor/rules/fastapi-backend-canonical.mdc` — no reintroducir PHP API.
 
 ---
 
@@ -55,7 +55,6 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 | Capa | Tecnología | Código típico |
 | --- | --- | --- |
 | API (POC local) | **FastAPI** (Python 3.11+), pytest | `backend/app/`, `backend/tests/` |
-| API legado | PHP 8.2 (sin HTTP) | `api/src/`, `api/tests/` — solo perfil `php-legacy` |
 | Datos / auth | Supabase (Postgres, Auth) | `supabase/migrations/`, `supabase/config.toml` |
 | Media | Filesystem `web/media/` | `backend/app/services/storage` + nginx |
 | Cliente producto | **HTML + CSS + JS** (ES modules) | `web/` |
@@ -102,7 +101,7 @@ En POC Docker, la app escribe **JSONL** bajo `web/logs/` (accesible desde Cursor
 | Fallo en play / prueba placement | `client` → `api` → `ai` → `compose` (correlacionar timestamp y `child_id` / `session_id`) |
 | Timeout 504 en turno | `client` (`api_call` 504) + `api` (¿llegó el request?) + `ai` (¿sigue el fallback?) |
 | Compose / mentor amable sin JSON | `compose` + `ai` (todos `llm_attempt` fallan vs fallo post-LLM) |
-| Cambio en gateway, colas, cooldown | `ai` + CLI `api/bin/inspect-ai-queues.php` (colas BD + cooldowns activos) |
+| Cambio en gateway, colas, cooldown | `ai` + panel debug AI / logs `web/logs/ai-*.log` |
 
 ### Cómo leer (agente)
 
@@ -241,8 +240,6 @@ Las specs y los diagramas **no son estáticos**: se crean, amplían y actualizan
 ```powershell
 docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q
 ```
-
-PHPUnit legado (opcional): `docker compose --profile php-legacy up -d php` y `exec php vendor/bin/phpunit`.
 
 **Web:** `./scripts/poc-up.ps1` + MCP browser según [web-mobile-preview](../web-mobile-preview/SKILL.md).
 

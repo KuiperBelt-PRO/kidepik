@@ -60,6 +60,5 @@ Write-Host "  API health:       http://localhost:8082/api/v1/health  (FastAPI)"
 Write-Host "  Play / IA:        /api/v1/play/*  /api/v1/debug/ai/*  (FastAPI)"
 Write-Host "  Media:            http://localhost:8082/media/"
 Write-Host "  Supabase:         http://localhost:54321"
-Write-Host "  PHPUnit legado:   docker compose --profile php-legacy up -d php"
 Write-Host ""
 Write-Host "Preview movil: ./scripts/poc-web-preview.ps1" -ForegroundColor Green

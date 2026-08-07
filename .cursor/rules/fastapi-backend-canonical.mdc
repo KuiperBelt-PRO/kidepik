@@ -1,14 +1,14 @@
 ---
-description: API de producto kidepik = FastAPI (backend/). No implementar rutas nuevas en PHP.
+description: API de producto kidepik = FastAPI (backend/). No implementar rutas en PHP.
 alwaysApply: true
 ---
 
-# Backend canónico: FastAPI (no PHP API)
+# Backend canónico: FastAPI (no PHP)
 
 ## Runtime local (`:8082`)
 
 - nginx proxya **toda** `/api/` → contenedor `api` (uvicorn, `backend/`).
-- El servicio Docker `php` es **legado** (perfil `php-legacy`); no recibe tráfico HTTP del POC.
+- **No** existe servicio PHP en Docker Compose.
 
 ## Dónde implementar
 
@@ -16,21 +16,16 @@ alwaysApply: true
 | --- | --- |
 | Ruta REST `/api/v1/*` | `backend/app/routers/` + `backend/app/services/` |
 | Tests API | `backend/tests/` (pytest) |
+| Scripts CLI dev | `backend/app/scripts/` (`python -m app.scripts.*`) |
 | Migraciones SQL | `supabase/migrations/` |
 | Cliente | `web/js/lib/*-api.js` → mismo origen `/api/v1` |
 
-## No hacer (sin decisión explícita del usuario)
+## No hacer
 
-- Añadir rutas o lógica de producto en `api/src/` (PHP) o `shared/` PHP.
-- Asumir que `api/src/Router.php` define el contrato HTTP vigente.
-- Ejecutar `php -S` o php-fpm como backend de producto en Windows.
-
-## Legado PHP (`api/`, `shared/`)
-
-- Conservado solo para referencia, PHPUnit histórico y retiro gradual.
-- Specs: `SPEC_FASTAPI_BACKEND_MIGRATION.md`, `SPEC_AI_PHP_STACK_RETIREMENT.md`.
-- Arranque PHPUnit opcional: `docker compose --profile php-legacy up -d php`.
+- Reintroducir `api/`, `shared/` PHP o `docker/php/`.
+- Asumir que queda código PHP de producto en el repo.
+- Ejecutar `php -S` o php-fpm como backend en Windows.
 
 ## Anti-patrón
 
-Diagnosticar un bug de API leyendo solo PHP cuando nginx ya enruta a FastAPI.
+Diagnosticar bugs de API buscando en carpetas PHP eliminadas; el contrato HTTP vive en `backend/`.

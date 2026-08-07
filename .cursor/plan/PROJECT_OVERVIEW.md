@@ -6,7 +6,6 @@ Repositorio **kidepik** — producto en fase de arranque bajo la org GitHub `Kui
 
 - Ramas: `master` (release), `develop` (integración), epic `epic/agentic_approach`, feature `fast_api_backend`.
 - **Stack canónico (POC local):** FastAPI (`backend/`) + nginx Docker `:8082` + Supabase + media en `web/media/` + cliente `web/` HTML/CSS/JS.
-- **Legado PHP:** `api/` + `shared/` se conservan en el repo pero **no** reciben tráfico HTTP (perfil compose opcional `php-legacy`).
 - Spec migración: [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md).
 
 ## URLs locales (POC Docker)
@@ -33,7 +32,7 @@ Reglas Cursor, SDD y specs viven bajo `.cursor/`. Enlazar features maduras desde
 codegraph init .          # solo la primera vez
 codegraph index .         # reindex completo (usar tras gaps grandes)
 codegraph sync .          # incremental
-codegraph status .        # debe listar web/, api/, shared/ (PHP+JS)
+codegraph status .        # debe listar web/, backend/
 ```
 
 El MCP `codegraph` del hub `Vibe-Coding` puede estar anclado a otro root del workspace multi-root; no asumir que refleja kidepik. Confirmar con `codegraph status .` en este directorio.

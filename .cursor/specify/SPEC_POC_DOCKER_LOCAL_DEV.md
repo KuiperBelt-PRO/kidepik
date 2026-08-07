@@ -25,8 +25,8 @@ Desarrollador / agente edita ficheros en el repo
 
 | Servicio | Imagen / build | Puerto host | Rol |
 | --- | --- | --- | --- |
-| `web` | `nginx:alpine` + config repo | **8082:80** | Sirve `web/` (estáticos + `/media/`) + proxy PHP |
-| `php` | `docker/php/Dockerfile` (php-fpm 8.2+) | interno 9000 | Ejecuta `api/` y `shared/`; escribe en `web/media/` |
+| `web` | `nginx:alpine` + config repo | **8082:80** | Sirve `web/` (estáticos + `/media/`) + proxy `/api/` → FastAPI |
+| `api` | `backend/Dockerfile` (uvicorn) | interno 8000 | Backend FastAPI; escribe en `web/media/` y `web/logs/` |
 
 **Sin MinIO** en MVP — media local bajo `web/media/` ([SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md)).
 

@@ -21,7 +21,7 @@ flowchart TB
 | --- | --- |
 | Stack | `./scripts/poc-up.ps1` |
 | **Suite completa** | `./scripts/test-all.ps1` (PHPUnit + JS + Playwright) |
-| PHPUnit | `docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/phpunit --coverage-text` |
+| Pytest | `docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q` |
 | JS unit + cobertura | `cd web && npm run test:coverage` |
 | Playwright E2E | `cd web && npm run test:e2e` |
 | Health | `GET http://localhost:8082/api/v1/health` |

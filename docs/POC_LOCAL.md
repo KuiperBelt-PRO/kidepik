@@ -1,6 +1,6 @@
 # POC local — arranque, URLs y cliente web
 
-> **Estado:** julio 2026 — PHP + Docker nginx (`:8082`) + Supabase CLI.
+> **Estado:** ago 2026 — FastAPI + Docker nginx (`:8082`) + Supabase CLI.
 
 Ver specs: [.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md)
 
@@ -18,7 +18,7 @@ cd kidepik
 
 | Servicio | URL |
 | --- | --- |
-| **App (web + API PHP)** | `http://localhost:8082` |
+| **App (web + API FastAPI)** | `http://localhost:8082` |
 | API health | `http://localhost:8082/api/v1/health` |
 | Media | `http://localhost:8082/media/` |
 | Supabase API | `http://localhost:54321` |
@@ -33,10 +33,10 @@ Preview móvil PC (Electron 390×844):
 
 `scripts/poc-up.ps1` genera `web/js/config.js` con rutas relativas (`apiUrl: "/api/v1"`).
 
-## Tests API (PHPUnit en contenedor)
+## Tests API (pytest en contenedor)
 
 ```powershell
-docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/phpunit
+docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q
 ```
 
 ## Parar

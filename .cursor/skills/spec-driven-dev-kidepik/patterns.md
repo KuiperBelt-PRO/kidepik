@@ -12,9 +12,8 @@ Patrones Python genéricos (herramientas, scripts): `Vibe-Coding/.cursor/skills/
 backend/
   app/                # FastAPI routers + services + ai
   tests/              # pytest
-docker/compose.yaml   # nginx + api (uvicorn); php-legacy opcional
+docker/compose.yaml   # nginx + api (uvicorn)
 web/media/            # media filesystem
-api/ + shared/        # legado PHP (sin tráfico HTTP)
 ```
 
 Spec: [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md).
@@ -51,7 +50,7 @@ Spec: [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIG
 - **Spec:** [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md).
 - **Activación local:** `LOG_TO_FILES=true` (default en POC); cliente vía `LOG_CLIENT_INGEST`.
 - **Depuración IA / placement:** correlacionar `client` (504, clics) → `api` (duración) → `ai` (`llm_attempt`) → `compose` (`placement_compose_failed`).
-- **CLI colas + cooldowns:** `docker compose … exec php php /var/www/api/bin/inspect-ai-queues.php`.
+- **CLI colas + cooldowns:** revisar logs `web/logs/ai-*.log` y panel debug AI.
 - **No** commitear `*.log`; el agente debe **leer** estos ficheros (o los que adjunte el usuario) antes de diagnosticar fallos de producto.
 
 ---
