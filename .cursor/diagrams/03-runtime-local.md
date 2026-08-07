@@ -9,7 +9,7 @@ flowchart TB
 
   subgraph docker [Docker Compose kidepik-poc]
     Nginx["nginx :8082→80\nweb/ RO + /media"]
-    Php["php-fpm\napi + shared + MEDIA_ROOT"]
+    Api["api uvicorn\nbackend/ + MEDIA_ROOT"]
   end
 
   subgraph sb [Supabase CLI containers]
@@ -20,9 +20,9 @@ flowchart TB
   Host --> Up
   Up --> docker
   Up --> sb
-  Nginx -->|fastcgi /api| Php
-  Php -->|host.docker.internal| AuthAPI
-  Php --> DB
+  Nginx -->|proxy /api| Api
+  Api -->|host.docker.internal| AuthAPI
+  Api --> DB
   Browser["Navegador / Playwright\nhttp://localhost:8082"] --> Nginx
   Electron["poc-web-preview.ps1\n390×844"] --> Browser
 ```
@@ -47,6 +47,6 @@ flowchart TB
 
 ## Anti-errores
 
-- Sin PHP en el host Windows: tests API en contenedor `php`.
+- Sin PHP en el host Windows: tests API en contenedor `api` (pytest).
 - Viewport UI móvil: **390×844**.
 - Única URL de producto: `:8082`.

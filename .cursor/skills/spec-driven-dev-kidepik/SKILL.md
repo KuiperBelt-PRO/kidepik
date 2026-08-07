@@ -26,12 +26,12 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 ## Ámbito del repositorio
 
-- Código bajo **kidepik**: `api/` + `shared/` (PHP), `web/` (cliente HTML/CSS/JS), `supabase/`, `docker/`, scripts `scripts/poc-*.ps1`.
+- Código bajo **kidepik**: `backend/` (FastAPI), `web/` (cliente HTML/CSS/JS), `data/`, `supabase/`, `docker/`, scripts `scripts/poc-*.ps1`.
 - Specs formales en [.cursor/specify/](../../specify/) — **índice vivo** en [CURRENT_SPECS.md](../../CURRENT_SPECS.md).
 - Diagramas de orientación en [.cursor/diagrams/](../../diagrams/) — **índice** en [diagrams/README.md](../../diagrams/README.md); no sustituyen specs.
 - Planes de ejecución en [.cursor/tasks/](../../tasks/) cuando una feature sea multi-fase.
 - Fases del repo documentadas en [.cursor/SDD.md](../../SDD.md) (Specify → Plan → Task → Implement → Validate).
-- Respeta versiones en `api/composer.json`, `web/package.json` y manifiestos del stack POC.
+- Respeta versiones en `backend/pyproject.toml`, `web/package.json` y manifiestos del stack POC.
 - **Stack canónico (POC local):** FastAPI (`backend/`) + nginx Docker + Supabase + `web/media/`. Sin R2, MinIO, OCI ni Cloud Run.
 - **Regla:** `.cursor/rules/fastapi-backend-canonical.mdc` — no reintroducir PHP API.
 
@@ -39,7 +39,7 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 ## Cuándo usar (además de los criterios del hub)
 
-- Implementar o extender el **POC** (PHP + Docker nginx/php-fpm + Supabase + media `web/media/` + cliente `web/`).
+- Implementar o extender el **POC** (FastAPI + Docker nginx + Supabase + media `web/media/` + cliente `web/`).
 - Añadir rutas API, auth JWT Supabase, storage filesystem local, migraciones SQL o pantallas móvil con contrato en spec.
 - El usuario pide SDD/TDD y el cambio vive claramente en este repo.
 
@@ -63,7 +63,7 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 | Hosting prod | Pendiente decisión (DreamHost PHP legado en specs antiguas) | `SPEC_FASTAPI_BACKEND_MIGRATION.md` §7 |
 | **Logs local (depuración)** | JSONL en `web/logs/` | `backend/app/logging_.py`, `web/js/lib/app-logger.js` |
 
-**Specs POC:** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](../../specify/SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md), [SPEC_MEDIA_STORAGE.md](../../specify/SPEC_MEDIA_STORAGE.md).  
+**Specs POC:** [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](../../specify/SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_MEDIA_STORAGE.md](../../specify/SPEC_MEDIA_STORAGE.md).  
 **Logs en disco:** [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md) — canales `api`, `ai`, `compose`, `client`; más detalle con `APP_DEBUG_AI=true`.  
 **URLs:** [.cursor/plan/PROJECT_OVERVIEW.md](../../plan/PROJECT_OVERVIEW.md) — `http://localhost:8082`.  
 **Diagramas:** [.cursor/diagrams/README.md](../../diagrams/README.md) — matriz tarea→spec→diagrama en [14-cursor-doc-routing.md](../../diagrams/14-cursor-doc-routing.md).
@@ -108,7 +108,7 @@ En POC Docker, la app escribe **JSONL** bajo `web/logs/` (accesible desde Cursor
 1. Reproducir el fallo en navegador (o pedir al usuario que lo haya hecho).
 2. **Leer** los `.log` del día en `web/logs/` (herramienta Read o el usuario los adjunta).
 3. `Get-Content web\logs\ai-2026-08-01.log -Tail 30` (PowerShell) si hace falta desde shell.
-4. No sustituir logs por `docker logs` del contenedor PHP salvo migraciones/arranque; el detalle de producto está en `web/logs/`.
+4. No sustituir logs por `docker logs` del contenedor `api` salvo migraciones/arranque; el detalle de producto está en `web/logs/`.
 5. En el informe al usuario: citar **message** + campos clave del JSONL (modelo, status, `error_class`), no secretos.
 
 Variables relevantes en `.env.poc`: `LOG_TO_FILES`, `LOG_LEVEL`, `APP_DEBUG_AI`, `LOG_CLIENT_INGEST` (ver `.env.poc.sample`).
@@ -125,7 +125,7 @@ Ejecutar en este orden (paralelizar lecturas cuando sea posible):
 
 1. **[CURRENT_SPECS.md](../../CURRENT_SPECS.md)** — qué existe, estado (aprobada / implementada / contrato / descartada) y enlaces.
 2. **[diagrams/14-cursor-doc-routing.md](../../diagrams/14-cursor-doc-routing.md)** — matriz rápida pedido → spec → diagrama.
-3. **Búsqueda en `.cursor/specify/`** — por prefijo o palabra clave del área (`SPEC_LOADER_*`, `SPEC_APP_*`, `SPEC_PHP_*`, …). Ver taxonomía abajo.
+3. **Búsqueda en `.cursor/specify/`** — por prefijo o palabra clave del área (`SPEC_LOADER_*`, `SPEC_APP_*`, `SPEC_FASTAPI_*`, …). Ver taxonomía abajo.
 4. **Diagrama(s) del área** — según inventario § Diagramas; leer el Mermaid y las specs enlazadas en el propio fichero.
 5. **`.cursor/tasks/`** — si hay plan de ejecución abierto para la misma iniciativa.
 6. **Código** — `codegraph explore` / lectura dirigida si la spec dice «implementada».
@@ -138,7 +138,7 @@ Si tras esto **ya cubre** el cambio una spec existente → **ampliar o actualiza
 
 | Familia / prefijo | Ámbito | Ejemplos |
 | --- | --- | --- |
-| `SPEC_POC_*`, `SPEC_PHP_*`, `SPEC_HOSTING_*`, `SPEC_MEDIA_*` | Stack, API, hosting, media | POC Docker, backend PHP, migrations, storage |
+| `SPEC_POC_*`, `SPEC_FASTAPI_*`, `SPEC_HOSTING_*`, `SPEC_MEDIA_*` | Stack, API, hosting, media | POC Docker, backend FastAPI, storage |
 | `SPEC_WEB_*` | Cliente `web/`, preview dev | Frontend architecture, dev preview |
 | `SPEC_LOADER_*`, `LOADER_*`, `ELEMENTS_ENGINE_*` | Loader procedural (fantasía, FX, terreno, cielo…) | Gate, screen, fantasy engine, crystals |
 | `SPEC_APP_*` | Producto post-login y aventura | Auth, shell, secciones tutor, play, examen, diálogo |
@@ -157,7 +157,7 @@ Los diagramas **orientan**; el contrato vive en `.cursor/specify/`. Actualizar e
 | 01 | `01-system-context.md` | Actores, hosting, límites MVP, integraciones externas |
 | 02 | `02-repo-layout.md` | Carpetas nuevas, responsabilidades de directorio |
 | 03 | `03-runtime-local.md` | Docker, puertos, scripts `poc-*`, env |
-| 04 | `04-backend-php.md` | Router, controllers, contratos API |
+| 04 | `04-backend-fastapi.md` | Routers, services, contratos API |
 | 05 | `05-data-auth-model.md` | Tablas, auth JWT, `parent_accounts`, migraciones |
 | 06 | `06-frontend-architecture.md` | Módulos JS, capas UI, build del cliente |
 | 07 | `07-routing-navigation.md` | Hash routes, shell, navegación |
@@ -166,7 +166,7 @@ Los diagramas **orientan**; el contrato vive en `.cursor/specify/`. Actualizar e
 | 10 | `10-parent-surfaces.md` | Cuenta, Ajustes, Tripulación, Legal tutor |
 | 11 | `11-child-adventure-pipeline.md` | Play, examen, diálogo (contrato) |
 | 12 | `12-media-storage.md` | `web/media/`, drivers, uploads |
-| 13 | `13-dev-test-validate.md` | PHPUnit, Playwright, flujos de validación |
+| 13 | `13-dev-test-validate.md` | pytest, Playwright, flujos de validación |
 | 14 | `14-cursor-doc-routing.md` | Enrutado documental Cursor (specs/skills) de specs o cambio de precedencia documental |
 | 15 | `15-ai-orchestrator-agents.md` | Orquestador, mapa de agentes play, decisión de rol por turno |
 | 16 | `16-journey-mechanics-flows.md` | Flujos first-run / prueba / caminos / rangos / espera |
@@ -257,7 +257,7 @@ docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q
 - **Índice:** actualizar [CURRENT_SPECS.md](../../CURRENT_SPECS.md) si cambió comportamiento, contrato o estado.
 - **Diagrama(s):** sincronizar el/los de la tabla § Inventario de diagramas si el flujo, ruta o modelo cambió.
 - **Tasks:** marcar o archivar plan en `.cursor/tasks/` si existía.
-- Suite PHPUnit del módulo tocado (+ validación UI según fase 4).
+- Suite pytest del módulo tocado (+ validación UI según fase 4).
 - Resumen al usuario según la skill del hub (incluir qué docs se crearon o actualizaron).
 
 ---

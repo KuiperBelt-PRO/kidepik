@@ -9,7 +9,7 @@ flowchart TB
   Spec -->|trivial| Code[Código]
   WriteSpec --> TDD[Tests primero]
   TDD --> Code
-  Code --> PHPUnit[PHPUnit en contenedor php]
+  Code --> Pytest[pytest en contenedor api]
   Code --> WebTest[web/tests node si aplica]
   Code --> UI[Playwright MCP 390×844 :8082]
   UI --> Shot[tmp/playwright-output/]
@@ -20,7 +20,7 @@ flowchart TB
 | Qué | Cómo |
 | --- | --- |
 | Stack | `./scripts/poc-up.ps1` |
-| **Suite completa** | `./scripts/test-all.ps1` (PHPUnit + JS + Playwright) |
+| **Suite completa** | `./scripts/test-all.ps1` (pytest + JS + Playwright) |
 | Pytest | `docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q` |
 | JS unit + cobertura | `cd web && npm run test:coverage` |
 | Playwright E2E | `cd web && npm run test:e2e` |

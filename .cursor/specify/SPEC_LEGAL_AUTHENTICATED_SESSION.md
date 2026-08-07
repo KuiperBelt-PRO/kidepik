@@ -1,7 +1,7 @@
 # Spec: Legal autenticado + shell post-login
 
 > Estado: **aprobada** (julio 2026); **delta ago 2026:** legal autenticado usa `mountSectionFrame` (cajetín glass homogéneo)  
-> Relacionado: [SPEC_APP_SHELL_CHROME.md](SPEC_APP_SHELL_CHROME.md), [SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md), [SPEC_APP_AUTH.md](SPEC_APP_AUTH.md), [SPEC_WORLD_LAYERS_PERSISTENCE.md](SPEC_WORLD_LAYERS_PERSISTENCE.md)
+> Relacionado: [SPEC_APP_SHELL_CHROME.md](SPEC_APP_SHELL_CHROME.md), `supabase/migrations/` (documentos legales), [SPEC_APP_AUTH.md](SPEC_APP_AUTH.md), [SPEC_WORLD_LAYERS_PERSISTENCE.md](SPEC_WORLD_LAYERS_PERSISTENCE.md)
 
 ## Contexto
 

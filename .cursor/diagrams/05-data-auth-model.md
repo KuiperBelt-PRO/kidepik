@@ -83,4 +83,4 @@ erDiagram
 
 ## Migraciones (orden)
 
-Ver `supabase/migrations/` y [SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](../specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md). Nuevas tablas de producto (`waiting_phrases`, `child_world_progress`) se añaden al implementar las specs propuesta.
+Ver `supabase/migrations/` y [SPEC_FASTAPI_BACKEND_MIGRATION.md](../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md). Nuevas tablas de producto (`waiting_phrases`, `child_world_progress`) se añaden al implementar las specs propuesta.

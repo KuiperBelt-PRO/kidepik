@@ -18,13 +18,13 @@ web/media/            # media filesystem
 
 Spec: [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md).
 
-**Legado:** PHP DreamHost specs siguen documentando el stack anterior.
+**Legado:** specs PHP retiradas del repo (ago 2026). Ver [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md).
 
 ---
 
 ## Spec como contrato
 
-- Contratos HTTP y storage: specs en `.cursor/specify/` + tests PHPUnit / Playwright.
+- Contratos HTTP y storage: specs en `.cursor/specify/` + tests pytest / Playwright.
 - Índice vivo: [CURRENT_SPECS.md](../../CURRENT_SPECS.md).
 - Antes de proponer: puerta de descubrimiento en [SKILL.md § Inventario documental](SKILL.md#inventario-documental--consultar-antes-de-proponer).
 - Orientación rápida: [.cursor/diagrams/](../../diagrams/README.md) — actualizar al cerrar si cambió el flujo representado.
@@ -60,8 +60,8 @@ Spec: [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIG
 | Área de trabajo | Specs típicas | Diagrama(s) |
 | --- | --- | --- |
 | Stack / Docker / puerto | `SPEC_POC_*`, `SPEC_POC_DOCKER_*` | 01, 02, 03 |
-| API PHP / Router | `SPEC_PHP_BACKEND_*` | 04 |
-| Auth / tablas / migraciones | `SPEC_APP_AUTH*`, `SPEC_PHP_DB_*` | 05 |
+| API FastAPI | `SPEC_FASTAPI_*` | 04 |
+| Auth / tablas / migraciones | `SPEC_APP_AUTH*`, `supabase/migrations/` | 05 |
 | Cliente `web/` / módulos | `SPEC_WEB_FRONTEND_*` | 06 |
 | Rutas hash / shell | `SPEC_APP_SHELL_*`, `SPEC_APP_SECTION_*` | 07 |
 | Mundo dual / temas | `SPEC_WORLD_*` | 08 |

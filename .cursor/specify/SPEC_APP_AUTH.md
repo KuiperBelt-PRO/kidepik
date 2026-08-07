@@ -1,7 +1,7 @@
 # Spec: Autenticación de cuenta padre/tutor (Supabase Auth)
 
 > Estado: **aprobada** (julio 2026)  
-> Relacionado: [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md), [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](SPEC_PHP_BACKEND_ARCHITECTURE.md), [docs/kidepik.md](../../docs/kidepik.md) §9–10.8
+> Relacionado: [SPEC_LOADER_APP_GATE.md](SPEC_LOADER_APP_GATE.md), [SPEC_WEB_FRONTEND_ARCHITECTURE.md](SPEC_WEB_FRONTEND_ARCHITECTURE.md), [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md), [docs/kidepik.md](../../docs/kidepik.md) §9–10.8
 
 ## Contexto
 

@@ -1,6 +1,6 @@
 # Spec: Sistema de diálogo de aventura (IA)
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos en [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md) / gateway en [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md); **deltas §1.1b / §1.4** (ago 2026)  
+> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos en [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md) / gateway en [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md); **deltas §1.1b / §1.4** (ago 2026)  
 > Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §10.6
 
 ## Contexto
@@ -240,7 +240,7 @@ Validación estructurada obligatoria (JSON schema / DTO PHP) — el LLM no escri
 | `placement` | `record_answer`, `set_subject_level`, `set_general_level`, `set_effective_age_band`, `grant_rank`, `advance_onboarding` |
 | `adventure` | `append_story_beat`, `set_choice`, `update_quest`, `update_journey`, `record_learning_result`, `update_subject_level`, `append_achievement`, `grant_rank` |
 
-Orquestación detallada (roles, PlayerState, envelopes JSON): [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md). Transporte OpenRouter: [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md).
+Orquestación detallada (roles, PlayerState, envelopes JSON): [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md). Transporte Gemini: [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md).
 
 ---
 

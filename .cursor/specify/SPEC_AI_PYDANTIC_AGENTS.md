@@ -33,7 +33,7 @@ Esta spec **define el mapa de agentes y roles por fase de la app** (onboarding �
 | A8 | Audiencia | `age_band` (y adulto) vía skill `audience-language`; no tono infantil fijo |
 | A9 | First_run | **Sin plantillas hardcodeadas** de mentor: `onboarding_host` / `mentor_guide` / `character_coach` generan cada burbuja |
 | A10 | Persistencia | Cada turno → ledger; traits → `traveler.md` (no `child_traits`); examen/retos → events JSONL ([SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md)) |
-| A11 | PHP IA | Retirado ([SPEC_AI_PHP_STACK_RETIREMENT](SPEC_AI_PHP_STACK_RETIREMENT.md)) |
+| A11 | PHP IA | Retirado (ago 2026) |
 | A12 | Defs de agente | Un `.md` por rol con frontmatter ([SPEC_AI_CENTRAL_ORCHESTRATOR](SPEC_AI_CENTRAL_ORCHESTRATOR.md) §3) |
 | A13 | Tools | Glosario DuckDB + consultas ledger según rol |
 

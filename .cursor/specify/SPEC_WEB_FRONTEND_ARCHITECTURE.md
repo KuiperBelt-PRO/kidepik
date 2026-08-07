@@ -2,8 +2,7 @@
 
 > Estado: **aprobada** (junio 2026)  
 > Cliente de producto: **HTML/CSS/JS** en `web/`.  
-> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_DEV_PREVIEW.md](SPEC_WEB_DEV_PREVIEW.md), [SPEC_CAPACITOR_MOBILE_SHELL.md](SPEC_CAPACITOR_MOBILE_SHELL.md), [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [docs/kidepik.md](../../docs/kidepik.md)  
-> Histórico POC FastAPI: [SPEC_POC_LOCAL_ARCHITECTURE.md](SPEC_POC_LOCAL_ARCHITECTURE.md) (supersedida).
+> Relacionado: [SPEC_APP_VISUAL_DESIGN_V3.md](SPEC_APP_VISUAL_DESIGN_V3.md), [SPEC_WEB_DEV_PREVIEW.md](SPEC_WEB_DEV_PREVIEW.md), [SPEC_CAPACITOR_MOBILE_SHELL.md](SPEC_CAPACITOR_MOBILE_SHELL.md), [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md), [docs/kidepik.md](../../docs/kidepik.md)
 
 ## Objetivo
 
@@ -11,7 +10,7 @@ Migrar el **cliente de producto** a una **aplicación web** en **HTML + CSS + Ja
 
 1. **Desarrollo y pruebas** en navegador y shell Electron (viewport móvil fijo).
 2. **Distribución móvil** vía **Capacitor** (Android/iOS) cuando corresponda — empaqueta los mismos ficheros estáticos.
-3. **Backend (jul 2026):** API **PHP** en el mismo origen que `web/`; Supabase Auth/DB + **media local** (`web/media/`). Ver [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) y [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md). R2/S3 = evolución futura, no MVP.
+3. **Backend (ago 2026):** API **FastAPI** en el mismo origen que `web/`; Supabase Auth/DB + **media local** (`web/media/`). Ver [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md) y [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md). R2/S3 = evolución futura, no MVP.
 
 ## ¿Hace falta Vite (u otro bundler)?
 

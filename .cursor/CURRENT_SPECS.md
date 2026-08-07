@@ -9,7 +9,7 @@
 ## Producto
 
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
-- **Pivot backend FastAPI (ago 2026 — cutover play hecho):** [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) — nginx `:8082`: **toda** `/api/v1/*` → FastAPI (incl. play + debug-ai). PHP sin rutas IA.
+- **Backend FastAPI (ago 2026 — migración cerrada):** [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) — nginx `:8082`: **toda** `/api/v1/*` → FastAPI; `api/` y `shared/` PHP retirados del repo.
 - **Capas de datos (aprobada ago 2026):** [specify/SPEC_DATA_STORAGE_LAYERS.md](specify/SPEC_DATA_STORAGE_LAYERS.md) — Supabase = producto; archivos = viaje/examen; DuckDB = tools; sin PlacementBank; `traveler.md` sustituye `child_traits`.
 - **Mecánicas de viaje (aprobada ago 2026):** [specify/SPEC_APP_JOURNEY_MECHANICS.md](specify/SPEC_APP_JOURNEY_MECHANICS.md) — flujos espera / first-run / prueba / caminos / rangos.
 - **Orquestador central (aprobada ago 2026 — cableado en play):** [specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md](specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md) — subagentes desde `.md` + tools.
@@ -25,15 +25,11 @@
   - Agentes / roles: [specify/SPEC_AI_PYDANTIC_AGENTS.md](specify/SPEC_AI_PYDANTIC_AGENTS.md)
   - Skills: [specify/SPEC_AI_AGENT_SKILLS.md](specify/SPEC_AI_AGENT_SKILLS.md)
   - Ledger: [specify/SPEC_AI_JOURNEY_FILE_LEDGER.md](specify/SPEC_AI_JOURNEY_FILE_LEDGER.md)
-  - **Retiro IA PHP:** [specify/SPEC_AI_PHP_STACK_RETIREMENT.md](specify/SPEC_AI_PHP_STACK_RETIREMENT.md)
   - Semántica L1/L2/L3: [SPEC_APP_JOURNEY_MEMORY](specify/SPEC_APP_JOURNEY_MEMORY.md)
-- **Stack PHP vigente hasta cutover** (legado durante la migración):
-  - Arquitectura POC: [specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) — PHP + Supabase + media local; hosting DreamHost.
-  - Docker local (única vía dev): [specify/SPEC_POC_DOCKER_LOCAL_DEV.md](specify/SPEC_POC_DOCKER_LOCAL_DEV.md) — nginx + php-fpm, hot reload, puerto **8082**.
-  - Backend PHP: [specify/SPEC_PHP_BACKEND_ARCHITECTURE.md](specify/SPEC_PHP_BACKEND_ARCHITECTURE.md) — estructura, contratos, hoja de ruta RAG.
+- **Stack POC local (canónico):**
+  - Docker local (única vía dev): [specify/SPEC_POC_DOCKER_LOCAL_DEV.md](specify/SPEC_POC_DOCKER_LOCAL_DEV.md) — nginx + FastAPI (`api`), hot reload, puerto **8082**.
   - **Media (filesystem local):** [specify/SPEC_MEDIA_STORAGE.md](specify/SPEC_MEDIA_STORAGE.md) — solo `web/media/` / `STORAGE_DRIVER=local`.
-  - MVP hosting: [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) — DreamHost + Supabase (sin R2/OCI/Cloud Run) — **revisar tras aprobar §7 de la migración FastAPI**.
-- **POC FastAPI histórico (descartado jul 2026; sustituido por la propuesta ago 2026):** [specify/SPEC_POC_LOCAL_ARCHITECTURE.md](specify/SPEC_POC_LOCAL_ARCHITECTURE.md) — aviso; no implementar ese diseño MinIO/R2.
+  - MVP hosting prod: [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) — **pendiente revisión** (DreamHost PHP vs FastAPI en VPS/PaaS).
 - **Pivot frontend web-first (implementado jun 2026):** [specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md](specify/SPEC_WEB_FRONTEND_ARCHITECTURE.md) — `web/` HTML/CSS/JS, puerto **8082**.
 - **Sistema visual v3 web premium (dirección de arte; galería/mockups = futuro post-MVP):** [specify/SPEC_APP_VISUAL_DESIGN_V3.md](specify/SPEC_APP_VISUAL_DESIGN_V3.md)
 - **Pantalla Loader (splash + world procedural):** [specify/SPEC_LOADER_SCREEN.md](specify/SPEC_LOADER_SCREEN.md) — runtime jul 2026; prompts IA (archivo histórico de assets): [specify/LOADER_SCREEN_AI_PROMPTS.md](specify/LOADER_SCREEN_AI_PROMPTS.md)
@@ -52,7 +48,7 @@
 - **Ficha tripulante v2 (propuesta ago 2026):** [specify/SPEC_APP_CREW_MEMBER_DETAIL.md](specify/SPEC_APP_CREW_MEMBER_DETAIL.md) (pestañas Viaje/Ajustes), [specify/SPEC_APP_CREW_PROGRESS.md](specify/SPEC_APP_CREW_PROGRESS.md) (niveles y barras tutor), [specify/SPEC_APP_CREW_MEMBER_SETTINGS.md](specify/SPEC_APP_CREW_MEMBER_SETTINGS.md)
 - **Fichas tripulación — cartas TCG:** [specify/SPEC_APP_CREW_MEMBER_CARDS.md](specify/SPEC_APP_CREW_MEMBER_CARDS.md) — **implementada** jul 2026; Fase A visual (lista + hero ficha)
 - **Sistema IA play (aprobado jul 2026 — Fases A–E parciales):** plan [tasks/AI_ADVENTURE_SYSTEM_PLAN.md](tasks/AI_ADVENTURE_SYSTEM_PLAN.md); backlog [tasks/AI_ADVENTURE_BACKLOG.md](tasks/AI_ADVENTURE_BACKLOG.md)
-  - Gateway OpenRouter **solo free** + discovery/ranking + refresh reactivo de colas (máximas inviolables ago 2026): [specify/SPEC_AI_OPENROUTER_GATEWAY.md](specify/SPEC_AI_OPENROUTER_GATEWAY.md) — **Fase A** (`shared/Ai/`, discovery en `AiGateway`, `FreeModelQueueSync`)
+  - Gateway Gemini (canónico): [specify/SPEC_AI_GEMINI_GATEWAY.md](specify/SPEC_AI_GEMINI_GATEWAY.md) — Pydantic AI + Google AI Studio
   - Orquestación / mentor / age bands / memoria: [SPEC_AI_PLAY_ORCHESTRATION](specify/SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_MENTOR](specify/SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS](specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_JOURNEY_MEMORY](specify/SPEC_APP_JOURNEY_MEMORY.md) — **parcial** (context pack L2/L3 + summarizer + summary + timeline tutor); **§1.4 orden diario implementada** (ago 2026)
   - Diálogo API + UI `#/play/:childId`: **section-frame + mundo animado + glass** ([DESIGN.md](DESIGN.md)); **cajetín más alto** ([SPEC_APP_SECTION_FRAME](specify/SPEC_APP_SECTION_FRAME.md) §2.2b) + claridad de input
   - Placement: [SPEC_APP_PLACEMENT_EXAM](specify/SPEC_APP_PLACEMENT_EXAM.md) — **deprecada** (persistencia JSONL; ver JOURNEY_MECHANICS + DATA_STORAGE_LAYERS)
@@ -66,7 +62,7 @@
 - **Historial paginado en play (scroll arriba):** [specify/SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md](specify/SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md) — **implementada** 2 ago 2026; botón explícito; copy aleatorio por mundo×banda; `GET …/dialogue/history`; `page_size` 24
 - **Catálogo de materias (14 áreas):** [specify/SPEC_APP_SUBJECT_CATALOG.md](specify/SPEC_APP_SUBJECT_CATALOG.md) — **implementada** 31 jul 2026; `reading` separada; base por banda; activación por tripulante en ficha
 - **Placement adaptativo + prosa mentor:** [specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md) — **implementada** 31 jul 2026; **A1** (1 ago 2026): examen solo agente, sin banco seed; castellano ES; fallo → reintento
-  - Colas LLM por purpose en BD: `ai_purpose_model_queues` ([SPEC_AI_OPENROUTER_GATEWAY](specify/SPEC_AI_OPENROUTER_GATEWAY.md) §4.3) — **B1**
+  - Colas LLM por purpose en BD: `ai_purpose_model_queues` (legado OpenRouter; ver [SPEC_AI_GEMINI_GATEWAY](specify/SPEC_AI_GEMINI_GATEWAY.md)) — **B1**
   - **A2 (implementada 1 ago 2026):** compose en lotes paralelos (≤4 slots, concurrency 3, sticky winner) + priorización por éxito ([§A2](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md#a2--compose-paralelo-por-lotes--priorización-de-modelos-1-ago-2026)); gateway §4.6; copy espera sin «armar»/«examen», rotación ≥ 8 s, variantes por `age_band` + mundo
 - **Modo debug IA (tutor / local):** [specify/SPEC_APP_DEBUG_MODE.md](specify/SPEC_APP_DEBUG_MODE.md) — **implementada** 1 ago 2026; traza de fallback OpenRouter + panel UI; delta gateway §9
 - **Logs en disco (web/logs):** [specify/SPEC_APP_FILE_LOGGING.md](specify/SPEC_APP_FILE_LOGGING.md) — **implementada** 1 ago 2026; JSONL por canal/nivel; más detalle con `APP_DEBUG_AI`
@@ -74,7 +70,7 @@
 - **Modales glass:** [specify/SPEC_APP_GLASS_MODAL.md](specify/SPEC_APP_GLASS_MODAL.md) — **implementada** jul 2026; alerta y confirmación reutilizables; tripulación y cuenta
 - **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** + delta `choose_character`
 - **Rangos de progresión (sci-fi / fantasía):** [specify/SPEC_APP_PROGRESSION_RANKS.md](specify/SPEC_APP_PROGRESSION_RANKS.md) — **marco** jul 2026; catálogo provisional 5 tiers
-- **Migraciones PHP + documentos legales:** [specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](specify/SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md) — **aprobada** jul 2026; auto-apply en bootstrap, historial compartido con Supabase, Términos/Privacidad versionados
+- **Migraciones Supabase + documentos legales:** `supabase/migrations/` — Términos/Privacidad versionados en Postgres; bootstrap FastAPI aplica estado vía `GET /api/v1/migrations/status`
 - **Loader — lluvia de meteoritos (franja superior):** [specify/SPEC_LOADER_METEOR_SHOWER.md](specify/SPEC_LOADER_METEOR_SHOWER.md) — implementada jun 2026
 - **Loader — terreno fantasía (base inferior):** [specify/SPEC_LOADER_FANTASY_TERRAIN.md](specify/SPEC_LOADER_FANTASY_TERRAIN.md) — implementada jun 2026
 - **Loader — motor de elementos de fantasía:** arquitectura del motor procedural (castillos, aldeas, torres, bosques, cristales, megalitos, portales) con construcción progresiva y erosión.
@@ -96,16 +92,18 @@
   - Arquitectura: [specify/SPEC_LOADER_FX_ENGINE.md](specify/SPEC_LOADER_FX_ENGINE.md)
   - Piloto cristales: [specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md](specify/SPEC_LOADER_FX_CRYSTALS_MAGIC.md)
   - Plan: [tasks/LOADER_FX_EXECUTION_PLAN.md](tasks/LOADER_FX_EXECUTION_PLAN.md)
-- **Tests CI:** [specify/SPEC_DEV_TEST_CI.md](specify/SPEC_DEV_TEST_CI.md) — PHPUnit + Node + Playwright E2E, cobertura ≥90% JS.
+- **Tests CI:** [specify/SPEC_DEV_TEST_CI.md](specify/SPEC_DEV_TEST_CI.md) — pytest + Node + Playwright E2E, cobertura ≥90% JS.
 - **Auth local Playwright:** [specify/SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md](specify/SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md) — **implementada** jul 2026; sesión tutor sin Google OAuth (solo dev).
 - **Capacitor shell (fase posterior):** [specify/SPEC_CAPACITOR_MOBILE_SHELL.md](specify/SPEC_CAPACITOR_MOBILE_SHELL.md).
 - **Plan de ejecución pivot:** [tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md](tasks/WEB_FRONTEND_PIVOT_EXECUTION_PLAN.md).
 
-## Hosting (canónico)
+## Hosting
 
-**Producción:** DreamHost PHP + Supabase + media local — [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md).
+**Dev local (canónico):** Docker `:8082` + FastAPI + Supabase — [specify/SPEC_POC_DOCKER_LOCAL_DEV.md](specify/SPEC_POC_DOCKER_LOCAL_DEV.md).
 
-**Descartado (no reabrir sin decisión explícita):** Cloudflare R2, FastAPI/`backend/`, MinIO, Oracle OCI Always Free, GCP Cloud Run como hosting de API.
+**Producción:** pendiente de decisión — [specify/SPEC_HOSTING_FREE_TIER_STACK.md](specify/SPEC_HOSTING_FREE_TIER_STACK.md) (DreamHost PHP histórico vs FastAPI en VPS/PaaS).
+
+**Descartado (no reabrir sin decisión explícita):** Cloudflare R2, MinIO, Oracle OCI Always Free, GCP Cloud Run como hosting de API.
 
 **Secretos locales (no versionados):** `kidepik/.secrets/` — plantillas en `kidepik/.secrets.sample/` (GCP OAuth; **OpenRouter** `openrouter.env.sample`).
 

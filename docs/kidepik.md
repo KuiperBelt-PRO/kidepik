@@ -343,7 +343,7 @@ Una sola base de código **web** (`web/`) sirve navegador y, en fase posterior, 
 | Capa | Tecnología | Notas |
 | --- | --- | --- |
 | **App cliente** | **HTML + CSS + JS** en `web/`; **Capacitor** (fase posterior) | Android + iOS vía WebView nativo |
-| **Backend / API** | **PHP 8.2+** (`api/` + `shared/`) | Mismo origen que `web/`; DreamHost en prod |
+| **Backend / API** | **FastAPI** (`backend/`) | Mismo origen que `web/`; hosting prod pendiente |
 | **Agentes y RAG** | **Fase posterior** (LangGraph u orquestación acordada) | Narrativa, validación pedagógica — no bloquea MVP hosting |
 | **Base de datos** | **PostgreSQL + pgvector** (Supabase) | Relacional + vectorial |
 | **Auth** | **Supabase Auth** | JWT validado en PHP — ver §10.8 |
@@ -352,7 +352,7 @@ Una sola base de código **web** (`web/`) sirve navegador y, en fase posterior, 
 | **Proxy / TLS** | nginx (Docker/DreamHost) | Producción DreamHost |
 | **Contenedores** | **Docker + Docker Compose** | Local (`poc-up`); prod DreamHost no requiere compose |
 | **TTS (opcional)** | API de voz del proveedor elegido | *Post-MVP* |
-| **CI/CD** | GitHub Actions | Tests PHPUnit; Capacitor build móvil (fase posterior) |
+| **CI/CD** | GitHub Actions | Tests pytest + JS; Capacitor build móvil (fase posterior) |
 | **Web comercial** | **Vercel + Next.js** (*opcional*) | Solo landing/marketing |
 | **Pagos** | Stripe (*futuro*) | Sin coste fijo |
 
@@ -406,20 +406,21 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 
 **Ventaja del monolito (si algún día se unificara compute+DB):** latencia baja. **Producto actual:** PHP en DreamHost + Postgres en Supabase + media en disco.
 
-### 10.5 Hosting — vía canónica (julio 2026)
+### 10.5 Hosting — dev local y producción (ago 2026)
 
 | Vía | Estado | Descripción |
 | --- | --- | --- |
-| **DreamHost PHP + Supabase + media local** | **Única vía de producto** | App+API PHP en DreamHost; Supabase DB+Auth; ficheros en `web/media/` — [SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md) |
+| **Docker local FastAPI + Supabase + media local** | **Canónico (dev)** | nginx `:8082` → FastAPI; Supabase DB+Auth; ficheros en `web/media/` — [SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md) |
+| **Producción** | **Pendiente** | DreamHost PHP (histórico) vs FastAPI en VPS/PaaS — [SPEC_HOSTING_FREE_TIER_STACK.md](../.cursor/specify/SPEC_HOSTING_FREE_TIER_STACK.md) |
 
-**Descartado (no reabrir sin decisión explícita):** Cloudflare R2/S3, MinIO, FastAPI, GCP Cloud Run, Oracle OCI Always Free.
+**Descartado (no reabrir sin decisión explícita):** Cloudflare R2/S3, MinIO, Oracle OCI Always Free, GCP Cloud Run como hosting de API.
 
-#### 10.5.1 DreamHost PHP (arquitectura activa)
+#### 10.5.1 Stack local (arquitectura activa)
 
 ```
 ┌─────────────┐     JWT (Supabase)      ┌─────────────────────────────┐
-│  App web    │ ───────────────────────►│  PHP API (mismo origen)     │
-│  Capacitor  │     HTTPS               │  DreamHost                  │
+│  App web    │ ───────────────────────►│  FastAPI (mismo origen)     │
+│  Capacitor  │     HTTPS               │  Docker :8082               │
 └──────┬──────┘                         └───────┬─────────────────────┘
        │ GET /media/...                         │
        ▼                                        ▼
@@ -432,12 +433,11 @@ Dos entornos con **la misma topología lógica** (API + Postgres + pgvector), di
 
 **Piezas fijas:**
 
-- **Supabase:** Postgres (pgvector) + Auth. La app obtiene JWT; PHP lo valida.
-- **Media:** filesystem bajo `web/media/` (local Docker / DreamHost).
-- **PHP:** API en el mismo dominio que `web/`.
+- **Supabase:** Postgres (pgvector) + Auth. La app obtiene JWT; FastAPI lo valida.
+- **Media:** filesystem bajo `web/media/` (local Docker).
+- **API:** FastAPI en `backend/`, proxy nginx en el mismo origen que `web/`.
 
-Guía local: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md) + [SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md).  
-Aviso histórico FastAPI (no implementar): [SPEC_POC_LOCAL_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_LOCAL_ARCHITECTURE.md).
+Guía local: [docs/POC_LOCAL.md](../docs/POC_LOCAL.md) + [SPEC_FASTAPI_BACKEND_MIGRATION.md](../.cursor/specify/SPEC_FASTAPI_BACKEND_MIGRATION.md).
 
 #### 10.5.2 Neon vs Supabase
 

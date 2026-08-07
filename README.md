@@ -9,12 +9,12 @@ Producto **Kidepik** (ecosistema Kuiper Belt, org `KuiperBelt-PRO`).
 
 ## POC local (arquitectura)
 
-Stack **PHP + Docker** (`:8082`) + Supabase CLI. Cliente en **`web/`** (HTML/CSS/JS):
+Stack **FastAPI + Docker** (`:8082`) + Supabase CLI. Cliente en **`web/`** (HTML/CSS/JS):
 
 - Guía: [docs/POC_LOCAL.md](docs/POC_LOCAL.md)
-- Spec: [.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md)
+- Spec: [.cursor/specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](.cursor/specify/SPEC_FASTAPI_BACKEND_MIGRATION.md), [.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md](.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md)
 - Arranque: `./scripts/poc-up.ps1` · Preview móvil PC: `./scripts/poc-web-preview.ps1`
-- Backend PHP: `api/` + `shared/` · Media: `web/media/`
+- Backend: `backend/` (FastAPI) · Media: `web/media/`
 
 ## Sistema visual
 

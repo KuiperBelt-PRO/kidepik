@@ -1,7 +1,7 @@
 # Spec: Modo debug de producto (tutor / local)
 
 > Estado: **implementada** (1 ago 2026)  
-> Amplía / relaciona: [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md) §9, [SPEC_APP_SETTINGS_SECTION.md](SPEC_APP_SETTINGS_SECTION.md) §2.6, [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [DESIGN.md](../DESIGN.md)  
+> Amplía / relaciona: [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_APP_SETTINGS_SECTION.md](SPEC_APP_SETTINGS_SECTION.md) §2.6, [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [DESIGN.md](../DESIGN.md)  
 > Diagrama: [11-child-adventure-pipeline.md](../diagrams/11-child-adventure-pipeline.md)
 
 ## Contexto
@@ -245,7 +245,7 @@ Ver contrato completo en [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md).
 
 | Spec | Cambio |
 | --- | --- |
-| SPEC_AI_OPENROUTER_GATEWAY | Nueva §9 Telemetría de intentos + `AiUsageTracker` mínimo |
+| SPEC_AI_GEMINI_GATEWAY | Telemetría de intentos + tracker mínimo |
 | SPEC_APP_SETTINGS_SECTION §2.6 | Sustituir «fuera de UI» por enlace a esta spec |
 | SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE | Meta `compose_debug` en fallo |
 | SPEC_APP_ADVENTURE_DIALOGUE | Campo opcional `debug` en response de turn |

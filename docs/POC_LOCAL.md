@@ -2,7 +2,7 @@
 
 > **Estado:** ago 2026 — FastAPI + Docker nginx (`:8082`) + Supabase CLI.
 
-Ver specs: [.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../.cursor/specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md)
+Ver specs: [.cursor/specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](../.cursor/specify/SPEC_FASTAPI_BACKEND_MIGRATION.md), [.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md](../.cursor/specify/SPEC_POC_DOCKER_LOCAL_DEV.md)
 
 ## Requisitos
 
@@ -48,10 +48,10 @@ docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q
 ## Estructura POC
 
 ```
-api/          # Backend PHP
-shared/       # StorageDriver local, Config
+backend/      # Backend FastAPI
 web/          # Cliente + web/media/
-docker/       # compose.yaml (nginx + php)
+data/         # Ledger journey, glosarios JSONL
+docker/       # compose.yaml (nginx + api)
 supabase/
 scripts/      # poc-up, poc-down, poc-web-preview
 ```

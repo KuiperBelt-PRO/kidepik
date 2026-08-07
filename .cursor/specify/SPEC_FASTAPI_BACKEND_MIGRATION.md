@@ -1,8 +1,8 @@
 # Spec: Migración del backend PHP → FastAPI (Supabase + agentes)
 
-> Estado: **aprobada e implementada parcialmente** (ago 2026) — POC Docker local operativo; Play/IA aún sin paridad 1:1 con PHP  
-> Rama: `epic/agentic_approach` → feature `fast_api_backend`  
-> Relacionado: [SPEC_PHP_BACKEND_ARCHITECTURE.md](SPEC_PHP_BACKEND_ARCHITECTURE.md) (legado, se conserva en repo), [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) (legado), [SPEC_POC_LOCAL_ARCHITECTURE.md](SPEC_POC_LOCAL_ARCHITECTURE.md) (aviso histórico), [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md), [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md), [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md), [diagrams/04-backend-php.md](../diagrams/04-backend-php.md)
+> Estado: **implementada** (ago 2026) — POC Docker local operativo; `api/` y `shared/` PHP retirados del repo  
+> Rama: `fast_api_backend`  
+> Relacionado: [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md), [diagrams/04-backend-fastapi.md](../diagrams/04-backend-fastapi.md)
 
 ### Decisiones de aprobación (ago 2026)
 
@@ -12,12 +12,12 @@
 | 2 | ORM | **SQLAlchemy 2.0 async** + asyncpg (queries `text()` al portar; modelos opcionales después). |
 | 3 | Carpeta | **`backend/`** |
 | 4 | Cutover | **Big-bang local:** nginx proxya **todo** `/api/` a FastAPI. PHP permanece en el repo (no se borra); el servicio `php` puede quedar en compose desactivado del camino HTTP. |
-| 5 | Retiro PHP | **No borrar** `api/` ni `shared/` de momento. |
+| 5 | Retiro PHP | **Hecho** (ago 2026): eliminados `api/`, `shared/`, `docker/php/` y servicio php-fpm del compose. |
 | — | Agentic | **Fuera de alcance de esta migración** (ago 2026). Hilo aparte (propuesta): [SPEC_AI_GEMINI_GATEWAY](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_PYDANTIC_AGENTS](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS](SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_JOURNEY_FILE_LEDGER](SPEC_AI_JOURNEY_FILE_LEDGER.md). |
 
 ## 0. Decisión de pivot (reabre FastAPI)
 
-Hasta julio 2026 el stack canónico era **PHP (`api/` + `shared/`) + DreamHost + Supabase + `web/`**. FastAPI quedó **descartado** ([SPEC_POC_LOCAL_ARCHITECTURE](SPEC_POC_LOCAL_ARCHITECTURE.md)).
+Hasta julio 2026 el stack canónico era **PHP (`api/` + `shared/`) + DreamHost + Supabase + `web/`**. FastAPI quedó descartado temporalmente; esta spec lo reabre como canónico (ago 2026).
 
 Esta spec **reabre de forma deliberada** el backend FastAPI en la epic `agentic_approach`, con alcance acotado:
 
@@ -253,7 +253,7 @@ Portar semántica de [SPEC_MEDIA_STORAGE](SPEC_MEDIA_STORAGE.md):
 
 Portar módulos de `shared/Ai/` y services de play con **misma semántica** documentada en:
 
-- [SPEC_AI_OPENROUTER_GATEWAY](SPEC_AI_OPENROUTER_GATEWAY.md)
+- [SPEC_AI_GEMINI_GATEWAY](SPEC_AI_GEMINI_GATEWAY.md)
 - [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md)
 - [SPEC_APP_ADVENTURE_LLM_NARRATIVE](SPEC_APP_ADVENTURE_LLM_NARRATIVE.md)
 - resto de `SPEC_APP_*` / `SPEC_AI_*` vigentes
@@ -367,7 +367,7 @@ Portar PlayDialogue + Placement + Adventure + Journey + gateway OpenRouter + deb
 2. Retirar php-fpm del compose.
 3. Archivar o eliminar `api/` y `shared/` PHP (o mover a `legacy/` temporal con fecha de borrado).
 4. Actualizar skills/reglas que digan “stack = PHP”.
-5. Actualizar [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md) y [SPEC_HOSTING_FREE_TIER_STACK](SPEC_HOSTING_FREE_TIER_STACK.md) a estado **legado / sustituido**.
+5. Actualizar [SPEC_HOSTING_FREE_TIER_STACK](SPEC_HOSTING_FREE_TIER_STACK.md) cuando se decida hosting prod.
 6. Actualizar diagramas `01`, `03`, `04`, `13`, `14` y [PROJECT_OVERVIEW](../plan/PROJECT_OVERVIEW.md).
 
 ## 9. Variables de entorno
@@ -403,22 +403,20 @@ Comando objetivo (tras Fase 0):
 docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q
 ```
 
-PHPUnit se mantiene **solo** mientras exista código PHP; no se exige paridad PHPUnit↔pytest en el cutover final.
+PHPUnit retirado con el código PHP (ago 2026). La suite canónica es **pytest**.
 
 ---
 
 ## 11. Actualización documental obligatoria (al aprobar / al cerrar)
 
-| Documento | Acción al aprobar | Acción al cerrar cutover |
-| --- | --- | --- |
-| Esta spec | Estado → **aprobada** | Estado → **implementada** |
-| [CURRENT_SPECS.md](../CURRENT_SPECS.md) | Entrada pivot FastAPI | Stack canónico actualizado |
-| [SPEC_POC_LOCAL_ARCHITECTURE](SPEC_POC_LOCAL_ARCHITECTURE.md) | Nota: sustituida por esta | — |
-| Specs PHP DreamHost / PHP backend / hosting | Marcar “legado durante migración” | Sustituir o archivar |
-| [SPEC_POC_DOCKER_LOCAL_DEV](SPEC_POC_DOCKER_LOCAL_DEV.md) | Delta nginx→fastapi | Reescribir servicios |
-| Diagramas 01, 03, 04, 13, 14 | — | Mermaid FastAPI |
-| Skills `spec-driven-dev-kidepik`, `AGENTS.md`, `PROJECT_OVERVIEW` | Nota de pivot en curso | Stack = FastAPI + web/ |
-| Plan en `.cursor/tasks/` | Crear plan de fases | Archivar |
+| Documento | Estado (ago 2026) |
+| --- | --- |
+| Esta spec | **implementada** |
+| [CURRENT_SPECS.md](../CURRENT_SPECS.md) | Stack FastAPI canónico |
+| Specs PHP retiradas | Eliminadas del repo |
+| [SPEC_POC_DOCKER_LOCAL_DEV](SPEC_POC_DOCKER_LOCAL_DEV.md) | Actualizada (nginx + api) |
+| Diagramas 01, 02, 03, 04, 05, 13 | Actualizados |
+| Skills `spec-driven-dev-kidepik`, `AGENTS.md`, `PROJECT_OVERVIEW` | Stack = FastAPI + web/ |
 
 ---
 
@@ -447,22 +445,13 @@ PHPUnit se mantiene **solo** mientras exista código PHP; no se exige paridad PH
 
 ---
 
-## 14. Preguntas abiertas (necesitan respuesta del usuario)
+## 14. Preguntas abiertas
 
-1. **Hosting prod (§7):** ¿opción A/B/C/D u otra?
-2. **ORM:** ¿SQLAlchemy async o asyncpg “a pelo”?
-3. **Nombre de carpeta:** ¿confirmar `backend/` (histórico) frente a `api-py/`?
-4. **Strangler:** ¿proxy selectivo por ruta durante fases, o big-bang tras Fase 3 en local?
-5. **Retiro PHP:** ¿borrar del repo en el mismo PR de cutover o carpeta `legacy/` un sprint?
+1. **Hosting prod (§7):** ¿DreamHost PHP, VPS/PaaS FastAPI u otra? — **pendiente decisión del usuario**.
+2. ~~ORM, carpeta, strangler, retiro PHP~~ — **resueltas** (SQLAlchemy async, `backend/`, big-bang local, PHP retirado).
 
 ---
 
 ## 15. Aprobación
 
-**No implementar código de producto** hasta que el usuario apruebe esta spec (y, como mínimo, responda §14.1 hosting o acepte “solo Docker local en esta epic”).
-
-Tras aprobación:
-
-1. Estado → `aprobada`.
-2. Crear [.cursor/tasks/FASTAPI_BACKEND_MIGRATION_PLAN.md](../tasks/FASTAPI_BACKEND_MIGRATION_PLAN.md) con checklist por fase.
-3. Empezar **Fase 0** en la rama `fast_api_backend`.
+**Migración local cerrada** (ago 2026). Hosting producción sigue pendiente (§7 / [SPEC_HOSTING_FREE_TIER_STACK](SPEC_HOSTING_FREE_TIER_STACK.md)).

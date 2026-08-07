@@ -1,13 +1,13 @@
 # Spec: POC — entorno Docker local (única vía de desarrollo)
 
-> Estado: **propuesta para aprobación** (julio 2026)  
-> Relacionado: [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md), [SPEC_WEB_DEV_PREVIEW.md](SPEC_WEB_DEV_PREVIEW.md)
+> Estado: **implementada** (ago 2026)  
+> Relacionado: [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md), [SPEC_MEDIA_STORAGE.md](SPEC_MEDIA_STORAGE.md), [SPEC_WEB_DEV_PREVIEW.md](SPEC_WEB_DEV_PREVIEW.md)
 
 ## Objetivo
 
 Definir el **único** entorno de desarrollo y pruebas de la POC: todo corre en **Docker**; el host Windows **no** levanta servidores de aplicación (`php -S`, `uvicorn`, `npx serve`, etc.).
 
-Los cambios en código PHP, HTML, CSS, JS y ficheros en `web/media/` deben verse **en caliente** vía volúmenes bind-mount, sin reconstruir la imagen salvo cambios en `Dockerfile` o dependencias Composer.
+Los cambios en código Python (backend), HTML, CSS, JS y ficheros en `web/media/` deben verse **en caliente** vía volúmenes bind-mount, sin reconstruir la imagen salvo cambios en `Dockerfile` o dependencias Python.
 
 ## Principio rector
 
@@ -15,7 +15,7 @@ Los cambios en código PHP, HTML, CSS, JS y ficheros en `web/media/` deben verse
 Desarrollador / agente edita ficheros en el repo
         │
         ▼
-  Bind mount → contenedor nginx / php-fpm
+  Bind mount → contenedor nginx / api (uvicorn)
         │
         ▼
   http://localhost:8082  (única URL de app para humanos y Playwright)
@@ -58,16 +58,8 @@ services:
 | Carpeta host | Montaje | Recarga |
 | --- | --- | --- |
 | `web/` (excepto media writes) | `/var/www/html` | F5 |
-| `web/media/` | `/var/www/html/media` (php rw, nginx ro o rw según config) | Tras upload, GET inmediato |
-| `api/`, `shared/` | contenedor php | F5 en endpoints |
-
-### PHP opcache en desarrollo
-
-```ini
-opcache.enable=1
-opcache.validate_timestamps=1
-opcache.revalidate_freq=0
-```
+| `web/media/` | `/var/www/html/media` (api rw, nginx ro o rw según config) | Tras upload, GET inmediato |
+| `backend/` | contenedor api | uvicorn --reload en dev |
 
 ## URLs canónicas (desde el host Windows)
 
@@ -86,13 +78,13 @@ Fichero `.env.poc` (plantilla `.env.poc.sample`):
 
 | Variable | Ejemplo local | Consumidor |
 | --- | --- | --- |
-| `SUPABASE_URL` | `http://host.docker.internal:54321` | PHP |
-| `SUPABASE_ANON_KEY` | desde `supabase status` | PHP + `config.js` |
-| `DATABASE_URL` | connection string local | PHP |
-| `STORAGE_DRIVER` | `local` | PHP |
-| `MEDIA_ROOT` | `/var/www/html/media` | PHP |
-| `MEDIA_PUBLIC_BASE_URL` | `/media` o vacío (rutas relativas) | PHP + cliente |
-| `APP_ENV` | `local` | PHP |
+| `SUPABASE_URL` | `http://host.docker.internal:54321` | FastAPI |
+| `SUPABASE_ANON_KEY` | desde `supabase status` | FastAPI + `config.js` |
+| `DATABASE_URL` | connection string local | FastAPI |
+| `STORAGE_DRIVER` | `local` | FastAPI |
+| `MEDIA_ROOT` | `/var/www/html/media` | FastAPI |
+| `MEDIA_PUBLIC_BASE_URL` | `/media` o vacío (rutas relativas) | FastAPI + cliente |
+| `APP_ENV` | `local` | FastAPI |
 
 Solo `STORAGE_DRIVER=local`. Sin variables S3/R2.
 
@@ -118,13 +110,13 @@ export const config = {
 ## Pruebas
 
 - Playwright: `http://localhost:8082`, viewport 390×844, capturas en `tmp/playwright-output/`.
-- PHPUnit: `docker compose exec php vendor/bin/phpunit`.
+- pytest: `docker compose exec api pytest -q`.
 - Smoke storage: upload POC → GET `/media/poc/...` → 200.
 
 ## Criterios de aceptación
 
 1. `poc-up.ps1` → app en `:8082` sin MinIO ni servidores en host.
-2. Hot reload en `web/`, `api/`, `shared/`.
+2. Hot reload en `web/`, `backend/`.
 3. Upload escribe en `web/media/` visible al refrescar URL pública.
 
 ## Aprobación

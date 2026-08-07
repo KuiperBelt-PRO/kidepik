@@ -2,11 +2,11 @@
 
 > Estado: **aprobada** (ago 2026)  
 > Hilo: IA agentic FastAPI (aparte de la paridad PHP/OpenRouter)  
-> Relacionado: [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS.md](SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md), [SPEC_AI_OPENROUTER_GATEWAY.md](SPEC_AI_OPENROUTER_GATEWAY.md) (legado PHP), [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md), [SPEC_APP_DEBUG_MODE.md](SPEC_APP_DEBUG_MODE.md)
+> Relacionado: [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS.md](SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md), [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md), [SPEC_APP_DEBUG_MODE.md](SPEC_APP_DEBUG_MODE.md)
 
 ## Contexto
 
-El camino PHP usa OpenRouter solo-free ([SPEC_AI_OPENROUTER_GATEWAY](SPEC_AI_OPENROUTER_GATEWAY.md)). En el **hilo agentic FastAPI** el transporte de producto es **Google Gemini API (AI Studio)** vía Pydantic AI (`google:<model>` + `GOOGLE_API_KEY` / `GEMINI_API_KEY`).
+El stack OpenRouter PHP fue retirado (ago 2026). En el **hilo agentic FastAPI** el transporte de producto es **Google Gemini API (AI Studio)** vía Pydantic AI (`google:<model>` + `GOOGLE_API_KEY` / `GEMINI_API_KEY`).
 
 POC: lista ordenada de modelos Gemini free, **sin plantillas** de sustitución y **sin LangGraph**.
 

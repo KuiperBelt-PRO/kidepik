@@ -1,6 +1,6 @@
 # 01 — Contexto de sistema
 
-**Specs:** [docs/kidepik.md](../../docs/kidepik.md), [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md)
+**Specs:** [docs/kidepik.md](../../docs/kidepik.md), [SPEC_FASTAPI_BACKEND_MIGRATION.md](../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](../specify/SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_HOSTING_FREE_TIER_STACK.md](../specify/SPEC_HOSTING_FREE_TIER_STACK.md)
 
 ## Quién usa qué
 
@@ -17,18 +17,18 @@ flowchart TB
   end
 
   subgraph edge [Origen único]
-    Nginx["nginx :8082 / DreamHost\nestáticos + /api + /media"]
+    Nginx["nginx :8082\nestáticos + /api + /media"]
   end
 
-  subgraph php [Backend]
-    Api["api/ PHP 8.2+\nJWT via Supabase Auth"]
-    Shared["shared/ Config Storage DB"]
+  subgraph backend [Backend]
+    Api["backend/ FastAPI\nJWT via Supabase Auth"]
   end
 
   subgraph data [Datos]
     SBAuth[Supabase Auth]
     PG[(Postgres)]
     Media["web/media/ filesystem"]
+    Ledger["data/journey/ archivos"]
   end
 
   Tutor --> Web
@@ -37,20 +37,20 @@ flowchart TB
   Web --> Nginx
   Nginx --> Api
   Nginx --> Media
-  Api --> Shared
   Api --> SBAuth
   Api --> PG
-  Shared --> Media
+  Api --> Media
+  Api --> Ledger
 ```
 
-## Arquitectura vigente (única)
+## Arquitectura vigente (dev local)
 
-| Incluido | Descartado (no reabrir sin decisión) |
+| Incluido | Pendiente / descartado |
 | --- | --- |
-| DreamHost PHP + Supabase + media local | Cloudflare R2 / S3 / MinIO |
-| Auth Google (tutor) | FastAPI / carpeta `backend/` |
-| Cliente `web/` en `:8082` | Oracle OCI Always Free |
-| | GCP Cloud Run como hosting API |
+| Docker `:8082` + FastAPI + Supabase + media local | Hosting prod (DreamHost PHP vs VPS FastAPI — sin decidir) |
+| Auth Google (tutor) | Cloudflare R2 / S3 / MinIO |
+| Cliente `web/` | Oracle OCI Always Free |
+| Ledger `data/journey/` + Gemini (Pydantic AI) | GCP Cloud Run como hosting API |
 
 ## Anti-errores
 

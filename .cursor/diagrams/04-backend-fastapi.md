@@ -1,6 +1,6 @@
 # 04 — Backend FastAPI
 
-**Specs:** [SPEC_FASTAPI_BACKEND_MIGRATION.md](../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) (canónica POC), legado PHP [SPEC_PHP_BACKEND_ARCHITECTURE.md](../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md)  
+**Specs:** [SPEC_FASTAPI_BACKEND_MIGRATION.md](../specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) (canónica)  
 **Entrada:** `backend/app/main.py` → routers FastAPI
 
 ```mermaid
@@ -44,5 +44,5 @@ flowchart LR
 ## Anti-errores
 
 - Cliente `web/` y generadores procedurales **no** se reescriben.
-- PHP `api/`/`shared/` no se borran aún; no reciben tráfico.
+- **No** reintroducir `api/` PHP ni `shared/` — retirados del repo (ago 2026).
 - Hosting prod aplazado (solo Docker local).

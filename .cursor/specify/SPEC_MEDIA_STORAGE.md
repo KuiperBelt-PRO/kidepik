@@ -1,7 +1,7 @@
 # Spec: Almacenamiento de media — filesystem local
 
 > Estado: **aprobada** (julio 2026; actualizada jul 2026 — sin R2/S3)  
-> Relacionado: [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](SPEC_PHP_BACKEND_ARCHITECTURE.md)
+> Relacionado: [SPEC_FASTAPI_BACKEND_MIGRATION.md](SPEC_FASTAPI_BACKEND_MIGRATION.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](SPEC_POC_DOCKER_LOCAL_DEV.md)
 
 ## Decisión
 

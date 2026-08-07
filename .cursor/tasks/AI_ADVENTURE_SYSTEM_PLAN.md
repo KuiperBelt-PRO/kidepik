@@ -11,7 +11,7 @@
 
 | Spec | Rol |
 | --- | --- |
-| [SPEC_AI_OPENROUTER_GATEWAY.md](../specify/SPEC_AI_OPENROUTER_GATEWAY.md) | Solo free + **discovery** + ranking |
+| [SPEC_AI_GEMINI_GATEWAY.md](../specify/SPEC_AI_GEMINI_GATEWAY.md) | Gemini + Pydantic AI |
 | [SPEC_APP_WORLD_JOURNEY_CANON.md](../specify/SPEC_APP_WORLD_JOURNEY_CANON.md) | Espina narrativa |
 | [SPEC_APP_MENTOR.md](../specify/SPEC_APP_MENTOR.md) | Voz única del camino del héroe |
 | [SPEC_APP_JOURNEY_MEMORY.md](../specify/SPEC_APP_JOURNEY_MEMORY.md) | L1 ledger / L2 condensado / L3 reciente |
