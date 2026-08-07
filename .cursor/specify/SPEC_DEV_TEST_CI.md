@@ -10,7 +10,7 @@ Garantizar regresión en API FastAPI, lógica JS testable y flujos UI críticos 
 
 | Suite | Herramienta | Umbral líneas | Alcance |
 | --- | --- | --- | --- |
-| API FastAPI | pytest + pytest-asyncio + httpx | cobertura opcional | `backend/app/**`, `backend/tests/**` |
+| API FastAPI | pytest + pytest-asyncio + httpx + respx | **≥ 55%** (objetivo 85% — ver SPEC_DEV_FASTAPI_PYTEST) | `backend/app/**` |
 | JS unit | Node `node:test` + c8 | **≥ 90%** | `web/js/lib/**`, `web/js/components/**` importados por tests; excluye runtime DOM pesado (ver `web/.c8rc.json`) |
 | E2E API + humo | `@playwright/test` (390×844) | contratos API + status | `web/e2e/smoke.spec.js` |
 | E2E autenticado | `@playwright/test` + storageState | UI post-login local | `web/e2e/authenticated-*.spec.js` + [SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md](SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md) |
@@ -26,7 +26,7 @@ Garantizar regresión en API FastAPI, lógica JS testable y flujos UI críticos 
 Por suite:
 
 ```powershell
-docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q
+docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q --cov=app --cov-report=term-missing --cov-fail-under=55
 cd web && npm run test:coverage
 cd web && npm run test:e2e
 ```

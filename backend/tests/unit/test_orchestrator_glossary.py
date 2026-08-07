@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from app.ai.agents.md_loader import clear_agent_spec_cache, get_agent_spec, load_all_agent_specs
 from app.ai.orchestrator.tools import glossary_search
 
 
+@pytest.mark.unit
 def test_agent_md_loader_finds_mentor_guide() -> None:
     clear_agent_spec_cache()
     specs = load_all_agent_specs()
@@ -17,6 +20,7 @@ def test_agent_md_loader_finds_mentor_guide() -> None:
     assert "mentor" in spec.instructions.lower() or "breve" in spec.instructions.lower()
 
 
+@pytest.mark.unit
 def test_glossary_search_fantasy(tmp_path: Path) -> None:
     fantasy = tmp_path / "fantasy.jsonl"
     fantasy.write_text(
@@ -29,6 +33,7 @@ def test_glossary_search_fantasy(tmp_path: Path) -> None:
     assert hits[0].term == "claro"
 
 
+@pytest.mark.unit
 def test_orchestrator_resolve_purpose() -> None:
     from app.ai.orchestrator import Orchestrator, TurnContext
 

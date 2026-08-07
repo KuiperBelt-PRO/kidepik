@@ -21,7 +21,7 @@ flowchart TB
 | --- | --- |
 | Stack | `./scripts/poc-up.ps1` |
 | **Suite completa** | `./scripts/test-all.ps1` (pytest + JS + Playwright) |
-| Pytest | `docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q` |
+| Pytest + cobertura | `docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q --cov=app` |
 | JS unit + cobertura | `cd web && npm run test:coverage` |
 | Playwright E2E | `cd web && npm run test:e2e` |
 | Health | `GET http://localhost:8082/api/v1/health` |
@@ -29,7 +29,7 @@ flowchart TB
 | **Auth local Playwright** | `./scripts/e2e-auth-setup.ps1` → [SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md](../specify/SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT.md) |
 | Electron | `./scripts/poc-web-preview.ps1` |
 | Codegraph | Desde raíz kidepik: `codegraph index .` / `codegraph status .` |
-| Spec tests | [.cursor/specify/SPEC_DEV_TEST_CI.md](../specify/SPEC_DEV_TEST_CI.md) |
+| Spec tests | [SPEC_DEV_TEST_CI.md](../specify/SPEC_DEV_TEST_CI.md), [SPEC_DEV_FASTAPI_PYTEST.md](../specify/SPEC_DEV_FASTAPI_PYTEST.md) |
 
 ## Anti-errores
 

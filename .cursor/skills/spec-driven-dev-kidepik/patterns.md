@@ -69,6 +69,6 @@ Spec: [SPEC_FASTAPI_BACKEND_MIGRATION.md](../../specify/SPEC_FASTAPI_BACKEND_MIG
 | Cuenta / crew / ajustes / legal | `SPEC_APP_*_SECTION`, `SPEC_LEGAL_*` | 10 |
 | Play / examen / diálogo | `SPEC_APP_PLAY_*`, `SPEC_APP_ADVENTURE_*` | 11 |
 | Media filesystem | `SPEC_MEDIA_*` | 12 |
-| Tests / validación UI / **logs** | `SPEC_WEB_DEV_PREVIEW`, `SPEC_DEV_TEST_CI`, `SPEC_APP_FILE_LOGGING` | 13 |
+| Tests / validación UI / **logs** | `SPEC_DEV_TEST_CI`, `SPEC_DEV_FASTAPI_PYTEST`, `SPEC_APP_FILE_LOGGING` | 13 |
 | Playwright auth local (agentes) | `SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT` | 13 |
 | ¿Qué abrir primero? | — | 14 |

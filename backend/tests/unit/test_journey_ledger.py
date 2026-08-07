@@ -7,6 +7,7 @@ import pytest
 from app.ai.journey.ledger import JourneyLedger, require_uuid
 
 
+@pytest.mark.unit
 def test_require_uuid_rejects_traversal() -> None:
     with pytest.raises(ValueError):
         require_uuid("../etc/passwd", label="child_id")
@@ -14,6 +15,7 @@ def test_require_uuid_rejects_traversal() -> None:
         require_uuid("not-a-uuid", label="child_id")
 
 
+@pytest.mark.unit
 def test_append_and_read_events(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())
@@ -46,6 +48,7 @@ def test_append_and_read_events(tmp_path) -> None:
     assert (tmp_path / parent / child / "index.json").is_file()
 
 
+@pytest.mark.unit
 def test_dialogue_jsonl_world_theme(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())
@@ -65,6 +68,7 @@ def test_dialogue_jsonl_world_theme(tmp_path) -> None:
     assert rows[0]["text"] == "En fantasy"
 
 
+@pytest.mark.unit
 def test_dialogue_jsonl_and_traveler_md(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())
@@ -95,7 +99,6 @@ def test_dialogue_jsonl_and_traveler_md(tmp_path) -> None:
     assert len(journey) == 2
     assert journey[0]["session_id"] == session
 
-    # Eco en sesión (2 eventos echo)
     session_rows = ledger.read_events(parent, child, session)
     assert len(session_rows) == 2
 
@@ -118,6 +121,7 @@ def test_dialogue_jsonl_and_traveler_md(tmp_path) -> None:
     assert "mago metódico" in body.lower()
 
 
+@pytest.mark.unit
 def test_events_world_theme_and_placement_kinds(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())
@@ -146,6 +150,7 @@ def test_events_world_theme_and_placement_kinds(tmp_path) -> None:
     ).exists()
 
 
+@pytest.mark.unit
 def test_summary_md_roundtrip(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())
@@ -164,6 +169,7 @@ def test_summary_md_roundtrip(tmp_path) -> None:
     assert "sesión corta" in body
 
 
+@pytest.mark.unit
 def test_archive_child(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())

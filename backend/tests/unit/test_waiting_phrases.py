@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from app.services.waiting_phrases import clear_waiting_cache, pick_waiting_batch_sync
 
 
+@pytest.mark.unit
 def test_pick_waiting_from_jsonl(tmp_path: Path) -> None:
     clear_waiting_cache()
     fantasy = tmp_path / "fantasy.jsonl"
@@ -30,6 +33,7 @@ def test_pick_waiting_from_jsonl(tmp_path: Path) -> None:
     assert "Frase path" not in out
 
 
+@pytest.mark.unit
 def test_pick_waiting_fallback(tmp_path: Path) -> None:
     clear_waiting_cache()
     out = pick_waiting_batch_sync(

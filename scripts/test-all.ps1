@@ -22,8 +22,8 @@ if (-not $apiStatus) {
   & (Join-Path $Root "scripts\poc-up.ps1")
 }
 
-Write-Host "==> Pytest (FastAPI)" -ForegroundColor Yellow
-docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q
+Write-Host "==> Pytest (FastAPI + cobertura)" -ForegroundColor Yellow
+docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q --cov=app --cov-report=term-missing --cov-fail-under=55
 if ($LASTEXITCODE -ne 0) { Fail "Pytest falló" }
 
 Write-Host "==> Node unit tests (cobertura >= 90%)" -ForegroundColor Yellow

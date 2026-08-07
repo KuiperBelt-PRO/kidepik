@@ -1,12 +1,15 @@
-"""Tests de informes tutor y weak_spots."""
 from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
+from app.config import get_settings
 from app.services.crew import CrewService
 from app.services.tutor_reports import TutorReportService
 
 
+@pytest.mark.unit
 def test_normalize_weak_spots_string_and_list() -> None:
     assert CrewService._normalize_weak_spots("Divisiones") == [
         {"subject_id": None, "note": "Divisiones"}
@@ -17,10 +20,9 @@ def test_normalize_weak_spots_string_and_list() -> None:
     assert CrewService._normalize_weak_spots([]) == []
 
 
-def test_tutor_report_writes_markdown(tmp_path: Path, monkeypatch) -> None:
+@pytest.mark.unit
+def test_tutor_report_writes_markdown(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
-    from app.config import get_settings
-
     get_settings.cache_clear()
     svc = TutorReportService()
     parent = "11111111-1111-4111-8111-111111111111"

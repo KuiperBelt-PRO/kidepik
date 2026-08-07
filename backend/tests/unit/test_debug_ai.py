@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import pytest
+
 from app.services.debug_ai import PURPOSE_ALIASES, normalize_purpose
 
 
+@pytest.mark.unit
 def test_normalize_purpose_aliases() -> None:
     assert normalize_purpose("placement_exam_composer") == "placement_item_writer"
     assert normalize_purpose("dialogue") == "mentor_guide"
