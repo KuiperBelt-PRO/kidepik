@@ -95,13 +95,12 @@ Grid responsive (**3 columnas máximo**) con **fichas tipo carta coleccionable**
 - Badge / gemelo de estado (pendiente / examen / listo / pausa)
 - Línea de tipo: mundo, edad (o «Edad pendiente»)
 - Caja de texto: nota tutor u onboarding
-- Contador «X de Y tripulantes» (fuera del grid)
+- Cupo restante en el CTA «Añadir tripulante (te queda espacio para N)» (fuera del grid, **encima** del grid)
 
 ```
 ┌─────────────────────────────────┐
 │  (título «Tripulación» en cabecera del marco) │
-│  Tripulantes a tu cargo …                   │
-│  Exploradores a tu cargo        │
+│  [ + Añadir tripulante (N) ]    │
 │                                 │
 │  ┌╌╌ Carta ═════════════════┐  │
 │  ║ NUEVO EXPLORADOR    [◆] ║  │
@@ -119,8 +118,6 @@ Grid responsive (**3 columnas máximo**) con **fichas tipo carta coleccionable**
 │  ║ Fantasía · 8 años       ║  │
 │  ║ Listo                   ║  │
 │  └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┘  │
-│                                 │
-│  [ + Añadir explorador ]        │
 └─────────────────────────────────┘
 ```
 
@@ -339,9 +336,8 @@ La ficha de Tripulación **refleja** esos datos al recargar; no duplica el diál
 | ID | Texto |
 | --- | --- |
 | `crew.title` | Tripulación |
-| `crew.subtitle` | Exploradores a tu cargo |
 | `crew.empty` | Tu tripulación espera al primer miembro. |
-| `crew.add` | Añadir tripulante |
+| `crew.add` | Añadir tripulante (te queda espacio para {n}) |
 | `crew.new.title` | Nuevo tripulante |
 | `crew.new.body` | El tripulante elegirá mundo, nombre y edad en su primera aventura. Aquí configurarás límites y permisos. |
 | `crew.new.confirm` | Crear tripulante |

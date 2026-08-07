@@ -183,8 +183,7 @@ Un solo control visible: el **gemelo** (`crew-card__status-gem`) en la cabecera.
 - Grid existente (1 → 2 → 3 columnas por `@container crew-panel`) se mantiene.
 - Cada miembro: `<button type="button" class="crew-card crew-card--{variant}">` con anatomía §1.
 - **Altura mínima lista:** 168px en viewport 390px; la carta escala con `width: 100%` y `aspect-ratio: 5 / 7` con `max-height` para no desbordar el marco scroll.
-- CTA «Añadir tripulante» permanece **fuera** del grid (spec crew); no es carta coleccionable.
-- Contador «X de Y tripulantes» sin cambios.
+- CTA «Añadir tripulante (te queda espacio para N)» permanece **fuera** del grid, **encima** del grid (spec crew); no es carta coleccionable.
 
 ### 4.2 Ficha `#/crew/:id` — hero card
 

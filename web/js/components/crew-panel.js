@@ -209,6 +209,17 @@ function paintBtn(root, sel, iconId, label, opts = {}) {
 }
 
 /**
+ * @param {number} memberCount
+ * @param {number} memberLimit
+ * @param {boolean} atLimit
+ */
+function addCrewButtonLabel(memberCount, memberLimit, atLimit) {
+  if (atLimit) return "Añadir tripulante";
+  const remaining = Math.max(0, memberLimit - memberCount);
+  return `Añadir tripulante (te queda espacio para ${remaining})`;
+}
+
+/**
  * @param {HTMLElement} container
  * @param {{ session: import('@supabase/supabase-js').Session }} options
  */
@@ -237,22 +248,13 @@ export function mountCrewListPanel(container, { session }) {
     }
 
     const atLimit = res.member_count >= res.member_limit;
-    const countLabel =
-      res.members.length === 0
-        ? "Sin tripulantes aún"
-        : res.has_tutor_profile && res.member_count > 0
-          ? `${res.member_count} de ${res.member_limit} tripulantes (+ tú)`
-          : res.has_tutor_profile
-            ? "Solo tu perfil de tutor por ahora"
-            : `${res.member_count} de ${res.member_limit} tripulantes`;
+    const addLabel = addCrewButtonLabel(res.member_count, res.member_limit, atLimit);
     root.innerHTML = `
-      <p class="crew-panel__subtitle">Tripulantes a tu cargo</p>
-      <p class="crew-panel__count" aria-live="polite">${escapeHtml(countLabel)}</p>
+      <button type="button" class="crew-panel__btn crew-panel__btn--primary crew-panel__add" data-add ${atLimit ? "disabled" : ""} aria-live="polite"></button>
+      ${atLimit ? `<p class="crew-panel__helper crew-panel__add-hint">Has alcanzado el máximo de ${res.member_limit} tripulantes.</p>` : ""}
       <div class="crew-panel__grid" data-list></div>
-      <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-add ${atLimit ? "disabled" : ""}></button>
-      ${atLimit ? `<p class="crew-panel__helper">Has alcanzado el máximo de ${res.member_limit} tripulantes.</p>` : ""}
     `;
-    paintBtn(root, "[data-add]", "add", "Añadir tripulante");
+    paintBtn(root, "[data-add]", "add", addLabel);
     unsubIcons = bindGlassIconTheme(root);
 
     const list = root.querySelector("[data-list]");

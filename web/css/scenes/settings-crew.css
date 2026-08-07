@@ -45,6 +45,19 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   letter-spacing: 0.02em;
 }
 
+.crew-panel__add {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  white-space: normal;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.crew-panel__add-hint {
+  margin: -0.25rem 0 0.65rem;
+  text-align: center;
+}
+
 .settings-panel__group,
 .crew-panel__block {
   margin: 1.25rem 0;

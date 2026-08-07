@@ -9,7 +9,7 @@ test.describe("humo autenticado (storageState)", () => {
     await expect(page.getByRole("heading", { name: "Tripulación" })).toBeVisible({
       timeout: 15000,
     });
-    await expect(page.getByText("Tripulantes a tu cargo")).toBeVisible();
+    await expect(page.getByRole("button", { name: /Añadir tripulante/ })).toBeVisible();
     const cards = page.locator(".crew-card");
     await expect(cards.first()).toBeVisible({ timeout: 15000 });
     await cards.first().click();
