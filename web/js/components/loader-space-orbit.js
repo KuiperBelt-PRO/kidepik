@@ -3,6 +3,7 @@ import { mountSpaceShips } from "./loader-space-ships.js";
 import {
   computeSpaceLayoutScale,
   measureOrbitLogoCenterY,
+  resolveOrbitLayerHeight,
   scaleOrbitSystemSpec,
 } from "./loader-space-layout.js";
 
@@ -349,9 +350,7 @@ export function mountSpaceOrbitLayer(container, { reducedMotion = false, layout 
 
   function layoutOrbit() {
     const w = layer.clientWidth;
-    const styleH = parseFloat(getComputedStyle(layer).height);
-    const rect = layer.getBoundingClientRect();
-    const h = Number.isFinite(styleH) && styleH > 0 ? styleH : rect.height;
+    const h = resolveOrbitLayerHeight(layer);
     if (!w || !h) return;
 
     const activeLayout = resolveSpaceLayout(layer);
@@ -563,7 +562,7 @@ function attachPathMotion(
     }
     const point = path.getPointAtLength(cachedLength * progress);
     const w = layer.clientWidth;
-    const h = layer.clientHeight;
+    const h = resolveOrbitLayerHeight(layer);
     if (!w || !h) return;
 
     runner.style.left = `${(point.x / w) * 100}%`;
