@@ -21,6 +21,7 @@ from app.ai.journey.ledger import JourneyLedger
 from app.ai.orchestrator import Orchestrator, TurnContext
 from app.catalogs import AgeBand, SubjectCatalog
 from app.config import get_settings
+from app.services.mentor_profiles import mentor_for_child, mentor_profile, resolve_mentor_key
 from app.services.placement import PlacementService
 from app.services.waiting_copy import WaitingCopyService
 from app.services.waiting_phrases import pick_waiting_batch
@@ -66,7 +67,7 @@ class DialogueService:
             ).mappings().first()
         if not row:
             resolved = self._flow(child)
-            mentor = "architect" if child.get("world_theme") == "sci-fi" else "guardian"
+            mentor = resolve_mentor_key(child)
             row = (
                 await self.session.execute(
                     text(
@@ -87,7 +88,7 @@ class DialogueService:
             "age_band": child.get("age_band") or child.get("effective_age_band"),
             "age_years": child.get("age_years"),
             "display_name": child.get("display_name"),
-            "mentor": self._mentor(str(row.get("mentor_id") or "guardian")),
+            "mentor": mentor_profile(str(row.get("mentor_id") or resolve_mentor_key(child))),
             "turns": turns,
             "history": await self._history(child_id, turns),
             "pending_agent_turn": await self._last_mentor(str(row["id"])),
@@ -285,7 +286,7 @@ class DialogueService:
             ]
 
         fresh = await self._child(auth_user_id, child_id)
-        mid = "architect" if fresh.get("world_theme") == "sci-fi" else "guardian"
+        mid = resolve_mentor_key(fresh)
         result: dict[str, Any] = {
             "agent_turns": turns,
             "effects": effects,
@@ -296,7 +297,7 @@ class DialogueService:
             and fresh.get("placement_status") == "completed",
             "onboarding_step": fresh.get("onboarding_step"),
             "display_name": fresh.get("display_name"),
-            "mentor": self._mentor(mid),
+            "mentor": mentor_profile(mid),
             "world_theme": fresh.get("world_theme"),
             "age_band": fresh.get("age_band") or fresh.get("effective_age_band"),
             "age_years": fresh.get("age_years"),
@@ -336,7 +337,7 @@ class DialogueService:
                     {"phase": "choose_world"},
                 )
             ]
-        mentor = "architect" if theme == "sci-fi" else "guardian"
+        mentor = resolve_mentor_key({"world_theme": theme})
         await self.session.execute(
             text(
                 "update children set world_theme=:theme,mentor_id=:mentor,"
@@ -1384,7 +1385,6 @@ class DialogueService:
         return dict(row) if row else {"id": child_id}
 
     def _deps(self, child: dict[str, Any], session_id: str, purpose: str) -> RunDeps:
-        mid = "architect" if child.get("world_theme") == "sci-fi" else "guardian"
         return RunDeps(
             child_id=UUID(str(child["id"])),
             parent_id=UUID(str(child["parent_id"])) if child.get("parent_id") else None,
@@ -1396,7 +1396,7 @@ class DialogueService:
                 age_band=child.get("age_band") or child.get("effective_age_band"),
                 age_years=child.get("age_years"),
             ),
-            mentor=self._mentor(mid),
+            mentor=mentor_for_child(child),
             player_state={
                 "onboarding_step": child.get("onboarding_step"),
                 "display_name": child.get("display_name"),
@@ -1502,14 +1502,6 @@ class DialogueService:
         if child.get("onboarding_step") == "complete":
             return "adventure"
         return "first_run"
-
-    @staticmethod
-    def _mentor(mid: str) -> dict[str, str]:
-        return {
-            "id": mid,
-            "display_name": "La Arquitecta" if mid == "architect" else "El Guardián",
-            "short_description": "mentor del viaje",
-        }
 
     @staticmethod
     def _world_options() -> list[dict[str, str]]:

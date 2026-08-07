@@ -17,6 +17,7 @@ from app.ai.errors import AiProductError
 from app.ai.journey.ledger import JourneyLedger
 from app.ai.orchestrator.orchestrator import TurnResult
 from app.services.dialogue import DialogueService
+from app.services.mentor_profiles import mentor_profile
 from tests.helpers.db_session import FakeExecuteResult, ScriptedSession
 from tests.helpers.factories import AUTH_USER_ID, CHILD_ID, PARENT_ID
 
@@ -120,9 +121,12 @@ def test_flow_helper(step: str, expected: str) -> None:
 
 @pytest.mark.unit
 def test_mentor_and_world_options() -> None:
-    architect = DialogueService._mentor("architect")
-    guardian = DialogueService._mentor("guardian")
-    assert architect["display_name"] == "La Arquitecta"
+    architect = mentor_profile("architect")
+    guardian = mentor_profile("guardian")
+    host = mentor_profile("host")
+    assert architect["display_name"] == "El Arquitecto del Saber"
+    assert guardian["display_name"] == "El Guardián del Conocimiento"
+    assert host["display_name"] == "El Guía"
     assert guardian["id"] == "guardian"
     options = DialogueService._world_options()
     assert {o["id"] for o in options} == {"fantasy", "sci-fi"}

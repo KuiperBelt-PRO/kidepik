@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { renderMarkdown } from "../js/lib/markdown.js";
+import { renderMarkdown, renderDialogueMarkdown, normalizeDialogueMarkdownInput } from "../js/lib/markdown.js";
 
 describe("renderMarkdown", () => {
   it("renderiza reglas horizontales", () => {
@@ -26,5 +26,26 @@ describe("renderMarkdown", () => {
   it("deja líneas con pipe sueltas como párrafo si no son tabla", () => {
     const html = renderMarkdown("Esto | no | es | tabla");
     assert.match(html, /<p>Esto \| no \| es \| tabla<\/p>/);
+  });
+
+  it("renderDialogueMarkdown resalta negrita en burbujas", () => {
+    const html = renderDialogueMarkdown("Graba tu nombre en la **piedra rúnica**.");
+    assert.match(html, /<strong>piedra rúnica<\/strong>/);
+    assert.doesNotMatch(html, /\*\*/);
+  });
+
+  it("normaliza asteriscos escapados del LLM", () => {
+    const html = renderDialogueMarkdown(
+      "Graba tu nombre en la **\\*\\*piedra rúnica\\*\\***.",
+    );
+    assert.match(html, /<strong>piedra rúnica<\/strong>/);
+    assert.doesNotMatch(html, /\\\*/);
+  });
+
+  it("normalizeDialogueMarkdownInput colapsa envoltorios duplicados", () => {
+    assert.equal(
+      normalizeDialogueMarkdownInput("****hola****"),
+      "**hola**",
+    );
   });
 });

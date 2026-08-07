@@ -9,6 +9,7 @@ from sqlalchemy import text
 from app.ai.journey.ledger import JourneyLedger
 from app.config import get_settings
 from app.services.journey_memory import JourneyMemoryService
+from app.services.mentor_profiles import mentor_for_child
 
 
 class JourneyTimelineService:
@@ -106,9 +107,7 @@ class JourneyTimelineService:
                 child_id
             ),
             "explorer_label": str(child.get("display_name") or "Explorador"),
-            "mentor_label": "La Arquitecta"
-            if child.get("world_theme") == "sci-fi"
-            else "El Guardián",
+            "mentor_label": mentor_for_child(child)["display_name"],
         }
 
     def _event(

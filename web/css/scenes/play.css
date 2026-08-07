@@ -181,6 +181,37 @@
   font-size: calc(0.95rem * var(--font-scale-ui, 1));
 }
 
+.play-bubble__body {
+  font-family: Nunito, system-ui, sans-serif;
+  font-size: calc(0.95rem * var(--font-scale-ui, 1));
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.play-bubble__body p {
+  margin: 0 0 0.35rem;
+  font-weight: 400;
+}
+
+.play-bubble__body p:last-child {
+  margin-bottom: 0;
+}
+
+.play-bubble__body strong {
+  font-weight: 700;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 0.2em;
+  padding: 0 0.12em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.play-bubble__body em {
+  font-style: italic;
+  opacity: 0.95;
+}
+
 .play-bubble--mentor {
   align-self: flex-start;
 }

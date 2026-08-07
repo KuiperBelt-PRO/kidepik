@@ -19,10 +19,11 @@ No es un chatbot genérico ni un coro de NPCs hablando en primera persona de for
 
 ## 1. Identidades canónicas (MVP)
 
-| `world_theme` | `mentor_id` | Nombre mostrado | Rol |
+| `world_theme` | `mentor_id` (BD / sesión) | Nombre mostrado | Rol |
 | --- | --- | --- | --- |
-| `fantasy` | `mentor_fantasy_guardian` | **El Guardián del Conocimiento** | Sabio que guía al aprendiz por los reinos; custodia el saber frente al desequilibrio |
-| `sci-fi` | `mentor_scifi_architect` | **El Arquitecto del Saber** | Veterano de la Academia / Cuerpo; cartógrafo del conocimiento frente al Vacío |
+| *(pre-mundo)* | `host` (`mentor_neutral_host`) | **El Guía** | Anfitrión neutro que presenta la elección de mundo |
+| `fantasy` | `guardian` (`mentor_fantasy_guardian`) | **El Guardián del Conocimiento** | Sabio que guía al aprendiz por los reinos; custodia el saber frente al desequilibrio |
+| `sci-fi` | `architect` (`mentor_scifi_architect`) | **El Arquitecto del Saber** | Veterano de la Academia / Cuerpo; cartógrafo del conocimiento frente al Vacío |
 
 Nombres **genéricos y estables** (no se personalizan por tripulante). El tripulante puede poner apodos en diálogo libre; el sistema sigue usando el nombre canónico en UI y prompts.
 
@@ -50,11 +51,15 @@ interface MentorProfile {
 - Apariencia: piloto-archivista con capa térmica / implantes de luz; hologramas de mapas; cicatriz de una «página en blanco» del Vacío.
 - Voz: clara, metáforas de navegación y constelaciones de datos; humor seco suave.
 
-Textos literales finales viven en `shared/Ai/mentors/{mentor_id}.es.md` (versionables).
+Textos literales finales viven en `backend/agents/mentors/{mentor_id}.es.md` (versionables).
 
 ### 1.2 Antes de elegir mundo
 
-Hasta `world_theme` null, la voz es un **anfitrión neutro KidepiK** (misma UI de burbuja, `mentor_id = mentor_neutral_host`) que presenta la elección de mundo. En cuanto hay mundo → **transición narrativa** («Yo seré tu Guardián…» / «Soy el Arquitecto…») y a partir de ahí solo ese mentor.
+Hasta `world_theme` null, la voz es **El Guía** (`mentor_id` interno `host`, ficha `mentor_neutral_host`): anfitrión neutro KidepiK con la misma UI de burbuja. En cuanto hay mundo → **transición narrativa** («Yo seré tu Guardián…» / «Soy el Arquitecto…») y a partir de ahí solo el mentor canónico de ese tema.
+
+**Markdown en burbujas:** `agent_text` admite **negrita** y *cursiva* (renderizado en cliente `web/js/lib/markdown.js`); los agentes y el orquestador deben conocerlo (ver `build_mentor_prompt`).
+
+**Título de capítulo vs mentor:** el rótulo centrado bajo el logo en play evolucionará a títulos de capítulo — propuesta en [SPEC_APP_JOURNEY_CHAPTERS.md](SPEC_APP_JOURNEY_CHAPTERS.md); no confundir con `display_name` del mentor.
 
 ---
 
@@ -123,10 +128,12 @@ No hay segunda columna de chat con otro bot en MVP.
 
 ## 6. Criterios de aceptación
 
-1. Tras elegir fantasy, todas las burbujas firman «El Guardián del Conocimiento».
-2. Cambio a sci-fi solo con reset de mundo (no a mitad de viaje normal).
-3. Prompts incluyen ficha mentor fija; el LLM no la reescribe en effects.
-4. Tests: invariante de `mentor_id` por `world_theme`; neutral host pre-mundo.
+1. Tras elegir fantasy, todas las burbujas firman «El Guardián del Conocimiento» (no abreviaturas).
+2. Pre-mundo, burbujas y API firman «El Guía».
+3. Cambio a sci-fi solo con reset de mundo (no a mitad de viaje normal).
+4. Prompts incluyen ficha mentor fija; el LLM no la reescribe en effects.
+5. Tests: invariante de `mentor_id` por `world_theme`; host (`El Guía`) pre-mundo.
+6. Burbujas mentor renderizan markdown ligero (`**` / `*`).
 
 ## Aprobación
 

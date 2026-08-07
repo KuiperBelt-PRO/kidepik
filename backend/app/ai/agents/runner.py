@@ -8,6 +8,7 @@ from app.ai.agents.envelopes import DialogueEnvelope
 from app.ai.agents.registry import build_agent, resolve_output_type
 from app.ai.errors import AiProductError, product_error
 from app.ai.gemini_gateway import GeminiGateway
+from app.ai.mentors.loader import load_mentor_body
 from app.config import Settings, get_settings
 
 T = TypeVar("T")
@@ -106,8 +107,18 @@ def build_mentor_prompt(deps: RunDeps, explorer_reply: str | None = None) -> str
     ]
     if deps.mentor:
         parts.append(f"mentor={deps.mentor}")
+        mentor_id = deps.mentor.get("mentor_id")
+        if isinstance(mentor_id, str) and mentor_id:
+            body = load_mentor_body(mentor_id)
+            if body:
+                parts.append(f"MENTOR_PROFILE:\n{body}")
     if explorer_reply:
         parts.append(f"explorer_reply={explorer_reply}")
+    parts.append(
+        "agent_text admite markdown ligero: **negrita**, *cursiva*; sin encabezados ni listas largas. "
+        "No escapes asteriscos (mal: \\*\\*palabra\\*\\*); escribe **palabra** directamente. "
+        "Reserva la negrita para 1-2 palabras clave, no toda la frase."
+    )
     parts.append(
         "Genera la siguiente burbuja del mentor (DialogueEnvelope) coherente con el estado."
     )

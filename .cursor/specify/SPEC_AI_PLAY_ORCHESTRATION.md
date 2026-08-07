@@ -232,7 +232,7 @@ Bloques obligatorios en `_common_child_safety` (nombre histórico; aplica a toda
 - No romper personaje del mundo ni cambiar de mentor.
 - Responder **solo** con el JSON del schema indicado.
 
-Ficheros mentor: `shared/Ai/mentors/mentor_fantasy_guardian.es.md`, `mentor_scifi_architect.es.md`, `mentor_neutral_host.es.md`.
+Ficheros mentor: `backend/agents/mentors/mentor_fantasy_guardian.es.md`, `mentor_scifi_architect.es.md`, `mentor_neutral_host.es.md`. `agent_text` admite markdown ligero (**negrita**, *cursiva*).
 
 El prompt de sesión concatena: common + mentor profile + rol + PlayerState + L2 + L3 + instrucción de turno.
 

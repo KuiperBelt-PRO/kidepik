@@ -1,5 +1,5 @@
 /**
- * Renderizado Markdown seguro (subconjunto para textos legales).
+ * Renderizado Markdown seguro (subconjunto para textos legales y diálogo).
  * @module markdown
  */
 
@@ -13,6 +13,18 @@ function escapeHtml(text) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+/**
+ * Limpia markdown de diálogo (asteriscos escapados por el LLM, envoltorios duplicados).
+ * @param {string} text
+ * @returns {string}
+ */
+export function normalizeDialogueMarkdownInput(text) {
+  let out = String(text || "").replace(/\\\*/g, "*");
+  // ****palabra**** o **\*\*palabra\*\*** → **palabra**
+  out = out.replace(/(\*{2,})([^*]+?)\1/g, "**$2**");
+  return out;
 }
 
 /**
@@ -181,4 +193,13 @@ export function renderMarkdown(markdown) {
 
   flushList();
   return html.join("\n");
+}
+
+/**
+ * Markdown seguro para burbujas de diálogo (mentor / IA).
+ * @param {string} text
+ * @returns {string}
+ */
+export function renderDialogueMarkdown(text) {
+  return renderMarkdown(normalizeDialogueMarkdownInput(text));
 }

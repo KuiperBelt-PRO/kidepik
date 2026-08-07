@@ -203,7 +203,7 @@ class DebugAiService:
             world_theme="fantasy",
             age_band="child",
             audience=AudienceContext(age_band="child", age_years=10),
-            mentor={"id": "guardian", "display_name": "El Guardián"},
+            mentor={"id": "guardian", "display_name": "El Guardián del Conocimiento", "mentor_id": "mentor_fantasy_guardian"},
             player_state={"ping": True},
         )
         try:

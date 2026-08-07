@@ -17,6 +17,7 @@ import { navigateShellRoute } from "../lib/shell-navigation.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 import { openDialogueSession, submitDialogueTurn, loadDialogueHistory } from "../lib/play-api.js?v=244";
+import { renderDialogueMarkdown } from "../lib/markdown.js?v=2";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
 import { appLog } from "../lib/app-logger.js";
@@ -779,8 +780,15 @@ async function mountPlayPanel(root, ctx) {
       localCleanups.push(bindGlassIconTheme(bubble));
     }
 
-    const body = document.createElement("p");
-    body.textContent = displayText;
+    const body = document.createElement("div");
+    body.className = "play-bubble__body";
+    if (role === "mentor") {
+      body.innerHTML = renderDialogueMarkdown(displayText);
+    } else {
+      const para = document.createElement("p");
+      para.textContent = displayText;
+      body.appendChild(para);
+    }
     bubble.appendChild(body);
     return bubble;
   }

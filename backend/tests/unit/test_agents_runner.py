@@ -21,7 +21,11 @@ def sample_deps() -> RunDeps:
         world_theme="fantasy",
         age_band="band_child",
         audience=AudienceContext(age_band="band_child", age_years=9),
-        mentor={"id": "guardian"},
+        mentor={
+            "id": "guardian",
+            "mentor_id": "mentor_fantasy_guardian",
+            "display_name": "El Guardián del Conocimiento",
+        },
         player_state={"onboarding_step": "choose_name"},
     )
 
@@ -30,6 +34,8 @@ def sample_deps() -> RunDeps:
 def test_build_mentor_prompt_includes_state() -> None:
     prompt = build_mentor_prompt(sample_deps(), explorer_reply="Ada")
     assert "purpose=mentor_guide" in prompt
+    assert "markdown" in prompt.lower()
+    assert "MENTOR_PROFILE" in prompt
     assert "explorer_reply=Ada" in prompt
 
 
