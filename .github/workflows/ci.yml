@@ -49,7 +49,7 @@ jobs:
 
       - name: Pytest (FastAPI + cobertura)
         run: |
-          docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q --cov=app --cov-report=term-missing --cov-fail-under=55
+          docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q --cov=app --cov-report=term-missing --cov-fail-under=85
 
       - name: Node unit tests with coverage
         working-directory: web

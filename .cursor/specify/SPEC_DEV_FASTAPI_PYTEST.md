@@ -442,13 +442,13 @@ Reutilizar helpers en `tests/helpers/http.py`:
 | **1 — Tutor** | Contract `parents`, `settings`, `crew` con `mock_auth` | **hecho** ago 2026 |
 | **2 — Play** | Contract play con IA mockeada; unit envelopes | **hecho** ago 2026 |
 | **3 — Integración** | `tests/integration/` opt-in (`KIDEPIK_INTEGRATION_TESTS=1`) | **hecho** ago 2026 |
-| **4 — Cierre** | `fail_under=55` en CI; objetivo **85%** (pendiente `crew.py`, resto `dialogue.py`) | **parcial** — ver nota abajo |
+| **4 — Cierre** | `fail_under=85` en CI; suite ~333 tests | **hecho** ago 2026 |
 
 Plan detallado: [.cursor/tasks/FASTAPI_PYTEST_SUITE_PLAN.md](../tasks/FASTAPI_PYTEST_SUITE_PLAN.md).
 
 ### Nota cobertura 85 %
 
-El umbral **55 %** en CI refleja ~55 % global tras la suite `tests/unit/test_dialogue_service.py` (`dialogue.py` ~69 %). Siguiente escalón: **70 %** con tests de `crew.py` / `parents.py` y fases restantes de diálogo (`_start_placement`, `_finish_placement`, etc.).
+Umbral **85 %** activo en `backend/pyproject.toml`, `.github/workflows/ci.yml` y `scripts/test-all.ps1`. Módulos con menor margen residual: `debug_ai.py`, `orchestrator/tools.py`, ramas finas de `dialogue.py` y `crew.py`.
 
 ---
 

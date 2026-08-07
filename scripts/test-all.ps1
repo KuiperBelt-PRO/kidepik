@@ -23,7 +23,7 @@ if (-not $apiStatus) {
 }
 
 Write-Host "==> Pytest (FastAPI + cobertura)" -ForegroundColor Yellow
-docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q --cov=app --cov-report=term-missing --cov-fail-under=55
+docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q --cov=app --cov-report=term-missing --cov-fail-under=85
 if ($LASTEXITCODE -ne 0) { Fail "Pytest falló" }
 
 Write-Host "==> Node unit tests (cobertura >= 90%)" -ForegroundColor Yellow

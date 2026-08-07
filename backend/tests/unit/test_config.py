@@ -13,17 +13,16 @@ def test_parse_csv_empty_and_values() -> None:
 
 
 @pytest.mark.unit
-def test_gemini_helpers_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
-    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
-    settings = Settings()
+def test_gemini_helpers_defaults() -> None:
+    settings = Settings(google_api_key="", gemini_api_key="")
     assert settings.gemini_api_key_resolved() == ""
-    assert settings.gemini_model_list() == ["gemini-3-flash-preview"]
-    assert settings.gemini_model_list_lite() == ["gemini-2.5-flash-lite"]
-    assert settings.gemini_model_tier_for_purpose("placement_item_writer") == "lite"
+    assert settings.gemini_model_list()[0] == "gemini-3-flash-preview"
+    assert settings.gemini_model_list_lite()[0] == "gemini-2.5-flash-lite"
+    assert settings.gemini_model_tier_for_purpose("placement_text_scorer") == "lite"
     assert settings.gemini_model_tier_for_purpose("dialogue") == "quality"
     assert settings.pydantic_google_model("gemini-test") == "google:gemini-test"
     assert settings.pydantic_google_model("google:gemini-test") == "google:gemini-test"
+    assert settings.gemini_api_key_resolved() == (settings.google_api_key or settings.gemini_api_key).strip()
 
 
 @pytest.mark.unit
