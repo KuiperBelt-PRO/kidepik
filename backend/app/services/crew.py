@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.catalogs import AgeBand, SubjectCatalog
 from app.db import session_scope
+from app.security.exit_pin import hash_exit_pin, verify_exit_pin
 from app.services.parents import ParentAccountService
 from app.services.settings import ParentSettingsRepository
 from app.text_utils import CharacterSummaryBuilder
@@ -137,7 +138,9 @@ class CrewService:
             pin = payload["exit_pin"]
             if pin is None: fields.append("exit_pin_hash = null")
             elif not isinstance(pin, str) or not re.fullmatch(r"\d{4}", pin): raise ValueError("exit_pin invalid")
-            else: fields.append("exit_pin_hash = crypt(:exit_pin, gen_salt('bf'))"); params["exit_pin"] = pin
+            else:
+                fields.append("exit_pin_hash = :exit_pin_hash")
+                params["exit_pin_hash"] = hash_exit_pin(pin)
         if not fields: raise ValueError("No updatable fields")
         async with session_scope() as session: await session.execute(text(f"update public.child_permissions set {', '.join(fields)}, updated_at = now() where child_id = :child_id"), params)
         return await self.get_for_auth_user(auth_user_id, child_id)
@@ -162,16 +165,17 @@ class CrewService:
             row = (
                 await session.execute(
                     text(
-                        """select (exit_pin_hash = crypt(:pin, exit_pin_hash)) as matched
+                        """select p.exit_pin_hash
                            from public.child_permissions p
                            join public.children c on c.id = p.child_id
                            where p.child_id = :id and c.parent_id = :parent_id
                            limit 1"""
                     ),
-                    {"id": child_id, "parent_id": parent_id, "pin": pin},
+                    {"id": child_id, "parent_id": parent_id},
                 )
             ).mappings().first()
-        if not row or not row.get("matched"):
+        stored_hash = str(row["exit_pin_hash"]) if row and row.get("exit_pin_hash") else None
+        if not verify_exit_pin(pin, stored_hash):
             return {"ok": False, "required": True}
         return {"ok": True, "required": True}
 

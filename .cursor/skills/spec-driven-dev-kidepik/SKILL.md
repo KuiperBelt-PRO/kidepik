@@ -32,7 +32,8 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 - Planes de ejecución en [.cursor/tasks/](../../tasks/) cuando una feature sea multi-fase.
 - Fases del repo documentadas en [.cursor/SDD.md](../../SDD.md) (Specify → Plan → Task → Implement → Validate).
 - Respeta versiones en `api/composer.json`, `web/package.json` y manifiestos del stack POC.
-- **Stack canónico:** DreamHost PHP + Supabase + `web/media/`. Sin FastAPI, R2, MinIO, OCI ni Cloud Run.
+- **Stack canónico (POC local):** FastAPI (`backend/`) + nginx Docker + Supabase + `web/media/`. Sin R2, MinIO, OCI ni Cloud Run.
+- **Legado:** `api/` + `shared/` PHP (referencia / PHPUnit con perfil `php-legacy`). **No** implementar rutas de producto nuevas en PHP — ver `.cursor/rules/fastapi-backend-canonical.mdc`.
 
 ---
 
@@ -53,14 +54,15 @@ Esta skill **no sustituye** a `spec-driven-dev` ni a las skills SDD de otros rep
 
 | Capa | Tecnología | Código típico |
 | --- | --- | --- |
-| API | **PHP 8.2+**, Composer, PHPUnit | `api/src/`, `api/tests/`, `shared/` |
+| API (POC local) | **FastAPI** (Python 3.11+), pytest | `backend/app/`, `backend/tests/` |
+| API legado | PHP 8.2 (sin HTTP) | `api/src/`, `api/tests/` — solo perfil `php-legacy` |
 | Datos / auth | Supabase (Postgres, Auth) | `supabase/migrations/`, `supabase/config.toml` |
-| Media | Filesystem `web/media/` | `shared/Storage/LocalFilesystemDriver.php` |
-| Cliente producto | **HTML + CSS + JS** (ES modules); Capacitor fase posterior | `web/` |
-| Preview dev móvil | Electron + Playwright viewport 390×844 | `tools/preview-electron/`, `poc-up.ps1`, `poc-web-preview.ps1` |
-| Orquestación local | Docker Compose (nginx+php) + Supabase CLI | `docker/compose.yaml`, `scripts/poc-up.ps1` |
-| Hosting prod | DreamHost PHP | SPEC_HOSTING_FREE_TIER_STACK |
-| **Logs local (depuración)** | JSONL en `web/logs/` (volumen Docker) | `shared/Logging/AppLogger.php`, `web/js/lib/app-logger.js` |
+| Media | Filesystem `web/media/` | `backend/app/services/storage` + nginx |
+| Cliente producto | **HTML + CSS + JS** (ES modules) | `web/` |
+| Preview dev móvil | Electron + Playwright viewport 390×844 | `tools/preview-electron/`, `poc-up.ps1` |
+| Orquestación local | Docker Compose (nginx + FastAPI) + Supabase CLI | `docker/compose.yaml`, `scripts/poc-up.ps1` |
+| Hosting prod | Pendiente decisión (DreamHost PHP legado en specs antiguas) | `SPEC_FASTAPI_BACKEND_MIGRATION.md` §7 |
+| **Logs local (depuración)** | JSONL en `web/logs/` | `backend/app/logging_.py`, `web/js/lib/app-logger.js` |
 
 **Specs POC:** [SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md](../../specify/SPEC_POC_PHP_DREAMHOST_ARCHITECTURE.md), [SPEC_POC_DOCKER_LOCAL_DEV.md](../../specify/SPEC_POC_DOCKER_LOCAL_DEV.md), [SPEC_PHP_BACKEND_ARCHITECTURE.md](../../specify/SPEC_PHP_BACKEND_ARCHITECTURE.md), [SPEC_MEDIA_STORAGE.md](../../specify/SPEC_MEDIA_STORAGE.md).  
 **Logs en disco:** [SPEC_APP_FILE_LOGGING.md](../../specify/SPEC_APP_FILE_LOGGING.md) — canales `api`, `ai`, `compose`, `client`; más detalle con `APP_DEBUG_AI=true`.  
@@ -227,18 +229,20 @@ Las specs y los diagramas **no son estáticos**: se crean, amplían y actualizan
 
 | Superficie | Tests / código |
 | --- | --- |
-| API | `api/tests/*Test.php` junto a `api/src/` |
+| API | `backend/tests/` (pytest) |
 | SQL | Nueva migración en `supabase/migrations/` con nombre timestamp |
 | Web / UI | `web/` — Playwright viewport 390×844 o checklist en spec |
 | Compose / env | Cambios en `docker/compose.yaml`, `.env.poc.sample` — documentar impacto si afecta al arranque |
 
 ### Fase 3 — Test First
 
-**Backend (PHPUnit):** con stack Docker levantado (`./scripts/poc-up.ps1`):
+**Backend (pytest):** con stack Docker levantado (`./scripts/poc-up.ps1`):
 
 ```powershell
-docker compose --env-file .env.poc -f docker/compose.yaml exec php vendor/bin/phpunit
+docker compose --env-file .env.poc -f docker/compose.yaml exec api pytest -q
 ```
+
+PHPUnit legado (opcional): `docker compose --profile php-legacy up -d php` y `exec php vendor/bin/phpunit`.
 
 **Web:** `./scripts/poc-up.ps1` + MCP browser según [web-mobile-preview](../web-mobile-preview/SKILL.md).
 

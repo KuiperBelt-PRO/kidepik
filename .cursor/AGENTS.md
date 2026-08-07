@@ -7,7 +7,8 @@ Guía operativa para agentes en `kidepik`.
 - Repositorio de producto **Kidepik** del ecosistema Kuiper Belt (org `KuiperBelt-PRO`).
 - No incluir secretos en git.
 - Mantener trazabilidad entre spec, tareas y cambios cuando el trabajo lo merezca.
-- **Stack canónico:** DreamHost PHP + Supabase + `web/media/` + cliente `web/` en `:8082` local. Sin FastAPI, R2, MinIO, OCI ni Cloud Run como producto.
+- **Stack canónico (POC local):** FastAPI (`backend/`) + nginx Docker `:8082` + Supabase + media en `web/media/` + cliente `web/` HTML/CSS/JS.
+- **Legado PHP:** `api/` + `shared/` — sin tráfico HTTP; perfil Docker `php-legacy` solo para PHPUnit histórico.
 
 ## MCP: Context7 y Engram
 

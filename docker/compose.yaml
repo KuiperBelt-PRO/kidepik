@@ -15,8 +15,6 @@ services:
     depends_on:
       api:
         condition: service_started
-      php:
-        condition: service_started
     restart: unless-stopped
 
   api:
@@ -68,8 +66,9 @@ services:
       AI_GEMINI_MODEL_LIST_LITE: ${AI_GEMINI_MODEL_LIST_LITE:-gemini-2.5-flash-lite,gemini-3.1-flash-lite,gemini-2.0-flash}
     restart: unless-stopped
 
-  # Play / IA / debug AI — PHP hasta completar el port FastAPI
+  # Legado PHPUnit / scripts PHP — no recibe tráfico HTTP (perfil php-legacy).
   php:
+    profiles: ["php-legacy"]
     build:
       context: ..
       dockerfile: docker/php/Dockerfile

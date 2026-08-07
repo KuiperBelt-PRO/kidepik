@@ -29,7 +29,8 @@ import {
   setGlassButton,
 } from "./glass-controls.js?v=226";
 import { showGlassConfirm } from "./glass-modal.js?v=2";
-import { showPinPadModal } from "./pin-pad-modal.js?v=1";
+import { showPinPadModal } from "./pin-pad-modal.js?v=3";
+import { markExitPinVerified } from "../lib/exit-pin-gate.js";
 import {
   formatLevelLabel,
   normalizeActiveSubjects,
@@ -73,6 +74,7 @@ async function gatePlayNavigation(childId, session, perms) {
       },
     });
     if (!ok) return;
+    markExitPinVerified(childId);
   }
   void navigateShellRoute(`/play/${childId}`);
 }

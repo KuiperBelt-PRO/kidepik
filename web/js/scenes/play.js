@@ -100,10 +100,12 @@ export function renderPlay(params) {
     // PIN gate (B9): verificar antes de abrir sesión de diálogo
     try {
       const { fetchCrewMember, verifyCrewExitPin } = await import("../lib/crew-api.js");
-      const { showPinPadModal } = await import("../components/pin-pad-modal.js?v=1");
+      const { showPinPadModal } = await import("../components/pin-pad-modal.js?v=3");
+      const { consumeExitPinVerified } = await import("../lib/exit-pin-gate.js");
       const detail = await fetchCrewMember(session, childId);
       const perms = detail.ok ? detail.member?.permissions : null;
-      if (perms?.require_exit_pin && perms?.exit_pin_set) {
+      const pinAlreadyOk = consumeExitPinVerified(childId);
+      if (perms?.require_exit_pin && perms?.exit_pin_set && !pinAlreadyOk) {
         const ok = await showPinPadModal({
           title: "Introduce el PIN",
           verify: async (pin) => {

@@ -36,7 +36,7 @@ jobs:
 
       - name: Build and start Docker stack
         run: |
-          docker compose --env-file .env.poc -f docker/compose.yaml build php
+          docker compose --env-file .env.poc -f docker/compose.yaml build api
           docker compose --env-file .env.poc -f docker/compose.yaml up -d
 
       - name: Wait for health
@@ -47,8 +47,13 @@ jobs:
           done
           exit 1
 
-      - name: PHPUnit with coverage
+      - name: Pytest (FastAPI)
         run: |
+          docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q
+
+      - name: PHPUnit legacy (php-legacy profile)
+        run: |
+          docker compose --env-file .env.poc -f docker/compose.yaml --profile php-legacy up -d php
           docker compose --env-file .env.poc -f docker/compose.yaml exec -T php \
             vendor/bin/phpunit --coverage-text --colors=never
 

@@ -16,13 +16,17 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
   Fail "Docker no encontrado. Levanta el stack con ./scripts/poc-up.ps1"
 }
 
-$phpStatus = docker compose --env-file .env.poc -f docker/compose.yaml ps --status running --services php 2>$null
+$phpStatus = docker compose --env-file .env.poc -f docker/compose.yaml --profile php-legacy ps --status running --services php 2>$null
 if (-not $phpStatus) {
-  Write-Host "Stack no detectado; arrancando poc-up..." -ForegroundColor Yellow
-  & (Join-Path $Root "scripts\poc-up.ps1")
+  Write-Host "PHPUnit legado: levantando perfil php-legacy..." -ForegroundColor Yellow
+  docker compose --env-file .env.poc -f docker/compose.yaml --profile php-legacy up -d php
 }
 
-Write-Host "==> PHPUnit (cobertura >= 90%)" -ForegroundColor Yellow
+Write-Host "==> Pytest (FastAPI)" -ForegroundColor Yellow
+docker compose --env-file .env.poc -f docker/compose.yaml exec -T api pytest -q
+if ($LASTEXITCODE -ne 0) { Fail "Pytest falló" }
+
+Write-Host "==> PHPUnit legado (cobertura >= 90%)" -ForegroundColor Yellow
 docker compose --env-file .env.poc -f docker/compose.yaml exec -T php vendor/bin/phpunit --no-coverage
 if ($LASTEXITCODE -ne 0) { Fail "PHPUnit falló" }
 $covOut = docker compose --env-file .env.poc -f docker/compose.yaml exec -T php vendor/bin/phpunit --coverage-text --colors=never 2>&1

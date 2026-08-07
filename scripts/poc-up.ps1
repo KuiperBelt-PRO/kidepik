@@ -1,4 +1,4 @@
-# Levanta la POC: Supabase CLI + Docker (nginx + FastAPI + PHP Play/IA)
+# Levanta la POC: Supabase CLI + Docker (nginx + FastAPI)
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -46,7 +46,7 @@ if (-not (Test-Path $envFile)) {
 
 & (Join-Path $Root "scripts\poc-write-config.ps1")
 
-Write-Host "==> Docker Compose (nginx + FastAPI + PHP para Play/IA)..." -ForegroundColor Yellow
+Write-Host "==> Docker Compose (nginx + FastAPI)..." -ForegroundColor Yellow
 docker compose --env-file $envFile -f (Join-Path $Root "docker\compose.yaml") up -d --build
 
 Write-Host ""
@@ -57,8 +57,9 @@ Write-Host ""
 Write-Host "==> Endpoints" -ForegroundColor Cyan
 Write-Host "  App (web + API):  http://localhost:8082"
 Write-Host "  API health:       http://localhost:8082/api/v1/health  (FastAPI)"
-Write-Host "  Play / IA:        /api/v1/play/*  /api/v1/debug/ai/*  (PHP)"
+Write-Host "  Play / IA:        /api/v1/play/*  /api/v1/debug/ai/*  (FastAPI)"
 Write-Host "  Media:            http://localhost:8082/media/"
 Write-Host "  Supabase:         http://localhost:54321"
+Write-Host "  PHPUnit legado:   docker compose --profile php-legacy up -d php"
 Write-Host ""
 Write-Host "Preview movil: ./scripts/poc-web-preview.ps1" -ForegroundColor Green

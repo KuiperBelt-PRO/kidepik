@@ -204,7 +204,7 @@ export async function verifyCrewExitPin(session, id, pin) {
     );
     if (res.status === 403) return { ok: false, status: 403, error: "PIN incorrecto" };
     if (!res.ok) {
-      let error = "verify";
+      let error = "No se pudo verificar el PIN";
       try {
         const data = await res.json();
         error = data.detail || error;
@@ -213,7 +213,8 @@ export async function verifyCrewExitPin(session, id, pin) {
       }
       return { ok: false, status: res.status, error };
     }
-    return { ok: true, ...(await res.json()) };
+    const data = await res.json().catch(() => ({}));
+    return { ok: true, required: Boolean(data.required) };
   } catch (err) {
     console.warn("crew verify pin error", err);
     return { ok: false };

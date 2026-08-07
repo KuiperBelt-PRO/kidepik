@@ -221,6 +221,15 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   outline-offset: 2px;
 }
 
+.pin-pad-modal__dialog {
+  max-height: min(72dvh, 480px);
+}
+
+.pin-pad-modal__title {
+  text-align: center;
+  width: 100%;
+}
+
 .pin-pad {
   display: flex;
   flex-direction: column;
