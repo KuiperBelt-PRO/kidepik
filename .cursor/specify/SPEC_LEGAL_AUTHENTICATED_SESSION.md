@@ -1,6 +1,6 @@
 # Spec: Legal autenticado + shell post-login
 
-> Estado: **aprobada** (julio 2026)  
+> Estado: **aprobada** (julio 2026); **delta ago 2026:** legal autenticado usa `mountSectionFrame` (cajetín glass homogéneo)  
 > Relacionado: [SPEC_APP_SHELL_CHROME.md](SPEC_APP_SHELL_CHROME.md), [SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md](SPEC_PHP_DB_MIGRATIONS_AND_LEGAL.md), [SPEC_APP_AUTH.md](SPEC_APP_AUTH.md), [SPEC_WORLD_LAYERS_PERSISTENCE.md](SPEC_WORLD_LAYERS_PERSISTENCE.md)
 
 ## Contexto
@@ -11,7 +11,7 @@ Tras el shell post-login, un padre autenticado puede abrir legal desde el drawer
 
 ## Objetivo
 
-Cuando existe **sesión Supabase válida**, las pantallas legales deben comportarse como **sección autenticada de gestión**: shell visible, vuelta a `#/home` sin cerrar sesión, y tipografía acorde a `uiTheme` del shell (`sci-fi` | `fantasy`).
+Cuando existe **sesión Supabase válida**, las pantallas legales deben comportarse como **sección autenticada de gestión**: shell visible, marco glass (`section-frame`), vuelta vía navegación shell estándar, y tipografía acorde a `uiTheme` del shell (`sci-fi` | `fantasy`).
 
 El flujo **sin sesión** (visitante en loader → legal) **no cambia**.
 
@@ -23,12 +23,13 @@ El flujo **sin sesión** (visitante en loader → legal) **no cambia**.
 
 | Requisito | Detalle |
 | --- | --- |
+| Marco glass | `mountSectionFrame` + `mountLegalPanel` (mismo patrón que Cuenta/Ajustes) |
 | Shell en legal autenticado | `ensureAppShell` activo; menú, toggle tema y cuenta visibles |
-| Volver autenticado | FAB volver (si visible) o navegación equivalente → `#/home`, **sin** `signOut` ni `navigate('/loader')` con `resumeAuth` |
+| Volver autenticado | Navegación shell (menú / atrás del marco) → destino sin `signOut` |
 | Volver anónimo | Mantiene transición legal → loader/auth actual |
-| Tipografía dual | Títulos y logo fallback en legal siguen `data-shell-theme` del documento |
-| FABs legales | Ocultos en modo autenticado (el shell cubre navegación y tema) |
-| Layout bajo chrome | Logo y texto a **la misma altura** que legal anónimo; el shell se superpone sin desplazar el contenido |
+| Tipografía dual | Títulos del markdown y título del marco siguen `data-shell-theme` |
+| FABs legales | Solo en modo anónimo (el shell cubre navegación autenticada) |
+| Layout bajo chrome | Marco glass bajo FABs del shell; scroll con fade del `section-frame` |
 | Persistencia mundo | Capas procedurales siguen entre legal ↔ home ([SPEC_WORLD_LAYERS_PERSISTENCE.md](SPEC_WORLD_LAYERS_PERSISTENCE.md)) |
 
 ### Excluido
@@ -46,9 +47,9 @@ El flujo **sin sesión** (visitante en loader → legal) **no cambia**.
 | Modo | Condición | Shell | FABs legales | Volver |
 | --- | --- | --- | --- | --- |
 | **Anónimo** | Sin `access_token` válido | No montado | Visibles (flecha izq. + subir) | Handoff animado → `#/loader` (`resumeAuth`) |
-| **Autenticado** | Sesión válida | Montado (mismo contrato que home/account) | Ocultos | `#/home` (sesión intacta) |
+| **Autenticado** | Sesión válida | Montado (mismo contrato que home/account) | Ocultos (N/A) | Navegación shell estándar (`navigateShellRoute`) |
 
-Clase escena: `.scene-legal.is-legal-authenticated` cuando hay sesión.
+Clase escena autenticada: usa `scene-loader` + `section-frame` (no `.scene-legal`).
 
 ---
 
@@ -98,7 +99,10 @@ Al cambiar el toggle del shell, el documento actualiza `data-shell-theme` y el l
 
 | Área | Archivos |
 | --- | --- |
-| Escena | `web/js/scenes/legal.js` |
-| Estilos | `web/css/scenes/legal.css` |
+| Escena autenticada | `web/js/scenes/legal.js` (`renderLegalAuthenticated`) |
+| Panel contenido | `web/js/components/legal-panel.js` |
+| Escena anónima | `web/js/scenes/legal.js` (`renderLegalAnonymous`) |
+| Estilos anónimos | `web/css/scenes/legal.css` |
+| Estilos marco | `web/css/components/section-frame.css`, reglas `.section-frame .legal-panel` en `legal.css` |
 | Tema | `web/js/lib/shell-theme.js` |
-| Navegación pura | `web/js/lib/legal-navigation.js` |
+| Navegación | `web/js/lib/shell-navigation.js`, `web/js/lib/legal-navigation.js` |

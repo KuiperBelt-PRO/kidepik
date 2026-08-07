@@ -11,7 +11,7 @@ import {
 } from "./world-band-layout.js";
 import { prepareWorldTransition } from "./world-transition.js";
 import { captureShellNavigationSnapshot } from "./shell-section-transition.js";
-import { isLegalRoutePath, navigateFromLegal } from "./legal-navigation.js";
+import { isLegalRoutePath, legalExitHandlerRegistered, navigateFromLegal } from "./legal-navigation.js";
 import { setShellNavShellRoute } from "./shell-nav-stack.js";
 
 /**
@@ -23,7 +23,18 @@ export async function navigateShellRoute(path) {
   const fromPath = hashRoutePath();
 
   if (isLegalRoutePath(fromPath)) {
-    await navigateFromLegal(normalized);
+    if (legalExitHandlerRegistered()) {
+      await navigateFromLegal(normalized);
+      return;
+    }
+    const bandTransition = worldBandsNeedTransition(fromPath, toPath);
+    if (bandTransition || fromPath !== toPath) {
+      prepareWorldTransition(captureShellNavigationSnapshot(fromPath), {
+        to: toPath,
+        bandTransition,
+      });
+    }
+    navigate(normalized);
     return;
   }
 

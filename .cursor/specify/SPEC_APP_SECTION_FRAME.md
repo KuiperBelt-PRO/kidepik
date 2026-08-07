@@ -11,7 +11,7 @@ Tras el shell post-login, las pantallas de gestión (cuenta, tripulación, ajust
 2. El contenido vive dentro de un **marco central glass** (mismo lenguaje que el drawer).
 3. Tipografía e iconos siguen el `uiTheme` sticky del padre (`sci-fi` | `fantasy`).
 
-Legal autenticado **ya comprime bandas** y tiene scroll con fade propio; **no** adopta el marco glass en esta fase (sigue su layout de documento). Las **nuevas** secciones (empezando por Cuenta) sí usan este marco.
+Legal autenticado **adopta el marco glass** (`mountSectionFrame` + `mountLegalPanel`), homogéneo con Cuenta, Ajustes y Tripulación. El layout de documento a pantalla completa con FABs procedurales se reserva al flujo **anónimo** (loader → auth).
 
 ## Objetivo
 
@@ -39,7 +39,7 @@ Definir el patrón reutilizable de **sección de gestión autenticada** para imp
 | Tema | Notas |
 | --- | --- |
 | Contenido concreto de Cuenta | [SPEC_APP_ACCOUNT_SECTION.md](SPEC_APP_ACCOUNT_SECTION.md) |
-| Rediseño de Legal (marco glass) | Fuera; solo reutiliza bandas compactas ya existentes |
+| Rediseño de Legal anónimo (marco glass) | Fuera; pre-login mantiene layout documento + FABs |
 | Home welcome | Sin marco glass; bandas **expandidas** |
 | HUD de juego infantil **full-bleed** (futuro) | Distinto del chrome de gestión; requiere spec + DESIGN propios. El play MVP tutor usa marco glass. |
 | Tripulación / Ajustes | [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_SETTINGS_SECTION.md](SPEC_APP_SETTINGS_SECTION.md) (propuesta) |
@@ -79,8 +79,8 @@ Reutilizar el mecanismo actual de legal (`animateWorldBands` / `setWorldBandLayo
 | --- | --- | --- |
 | `#/home` | **Expandido** | No |
 | `#/account` | **Compacto** | **Sí** |
-| `#/legal/terminos` (sesión) | **Compacto** | No (layout legal) |
-| `#/legal/privacidad` (sesión) | **Compacto** | No (layout legal) |
+| `#/legal/terminos` (sesión) | **Compacto** | **Sí** |
+| `#/legal/privacidad` (sesión) | **Compacto** | **Sí** |
 | `#/settings` | **Compacto** | **Sí** |
 | `#/crew`, `#/crew/new`, `#/crew/:id` | **Compacto** | **Sí** |
 | `#/play/:childId` | **Compacto** | **Sí** (aventura en marco glass; ver [DESIGN.md](../DESIGN.md)) |

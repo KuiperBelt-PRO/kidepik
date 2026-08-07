@@ -15,6 +15,13 @@ import { shouldCompressWorldBands } from "./world-band-layout.js";
 let legalExitHandler = null;
 
 /**
+ * @returns {boolean}
+ */
+export function legalExitHandlerRegistered() {
+  return legalExitHandler !== null;
+}
+
+/**
  * @param {boolean} hasSession
  * @returns {{ mode: LegalBackMode; path: string }}
  */

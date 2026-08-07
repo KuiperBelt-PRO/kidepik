@@ -44,7 +44,7 @@ import {
 } from "../lib/world-session.js";
 import { scheduleShellFrameSync } from "../lib/shell-frame.js";
 import { mountWorldLogo } from "./world-layers.js";
-import { bindLegalLinkTransitions } from "../scenes/legal.js?v=183";
+import { bindLegalLinkTransitions } from "../scenes/legal.js?v=256";
 import { shouldResumeShellTransition } from "../lib/legal-navigation.js";
 import { syncLogoRevealState } from "../lib/logo-reveal.js";
 

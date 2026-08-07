@@ -5,13 +5,8 @@
  */
 
 import { assetUrl } from "../lib/assets.manifest.js";
-import { hashRoutePath, navigate } from "../lib/router.js";
-import {
-  legalTransitionSourceFromPath,
-  navigateFromLegal,
-  prepareLegalNavigation,
-} from "../lib/legal-navigation.js";
-import { navigateShellRoute } from "../lib/shell-navigation.js?v=183";
+import { hashRoutePath } from "../lib/router.js";
+import { navigateShellRoute } from "../lib/shell-navigation.js?v=256";
 import {
   getShellUiTheme,
   initShellUiTheme,
@@ -327,8 +322,7 @@ export function mountAppShell(options) {
         link.addEventListener("click", (ev) => {
           ev.preventDefault();
           closeDrawer();
-          prepareLegalNavigation(legalTransitionSourceFromPath(hashRoutePath()));
-          navigate(child.href);
+          void navigateShellRoute(child.href);
         });
         childLi.appendChild(link);
         panel.appendChild(childLi);
@@ -370,11 +364,7 @@ export function mountAppShell(options) {
       row.addEventListener("click", () => {
         if (item.kind === "link" && item.href) {
           closeDrawer();
-          if (item.href.startsWith("/legal/")) {
-            void navigateFromLegal(item.href);
-          } else {
-            void navigateShellRoute(item.href);
-          }
+          void navigateShellRoute(item.href);
           return;
         }
         if (item.kind === "stub") {

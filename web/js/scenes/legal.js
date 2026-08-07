@@ -3,16 +3,17 @@
  * @module legal
  */
 
-import { config } from "../config.js";
 import { renderMarkdown } from "../lib/markdown.js";
 import { navigate } from "../lib/router.js";
 import { renderGlassSkeletonHtml } from "../components/glass-controls.js?v=221";
+import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
+import { mountSectionFrame } from "../components/section-frame.js?v=236";
+import { defaultLegalTitle, fetchLegalDoc, mountLegalPanel } from "../components/legal-panel.js?v=256";
 import {
   animateWorldBands,
   captureRect,
   consumeWorldTransition,
   measureAuthBrandLogoTarget,
-  measureShellBrandLogoTarget,
   morphLogoBetweenRects,
   morphLogoWithBands,
   pinLogoAtRect,
@@ -42,15 +43,13 @@ import {
 } from "../components/loader-world-arrows.js";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
 import { getValidSession, signOut } from "../lib/supabase.js";
-import { resolveLegalBackNavigation, shouldAnimateLegalEntry, prepareLegalNavigation, registerLegalExitHandler, prepareAuthenticatedLegalExit } from "../lib/legal-navigation.js";
-import { normalizeShellPath, shouldCompressWorldBands } from "../lib/world-band-layout.js";
+import {
+  resolveLegalBackNavigation,
+  shouldAnimateLegalEntry,
+  prepareLegalNavigation,
+} from "../lib/legal-navigation.js";
+import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 import { initShellUiTheme } from "../lib/shell-theme.js";
-import { scheduleShellFrameSync } from "../lib/shell-frame.js";
-
-const SLUG_API = {
-  terminos: "terminos",
-  privacidad: "privacidad",
-};
 
 const TRANSITION_MS = 720;
 const TRANSITION_MS_REDUCED = 120;
@@ -58,14 +57,6 @@ const TRANSITION_MS_REDUCED = 120;
 /** HTML del skeleton de carga (barras + shimmer). */
 function renderLegalSkeletonHtml() {
   return renderGlassSkeletonHtml({ preset: "document", ariaLabel: "Cargando documento" });
-}
-
-/**
- * @param {string} routeSlug
- * @returns {string | null}
- */
-function apiSlugForRoute(routeSlug) {
-  return SLUG_API[routeSlug] ?? null;
 }
 
 /**
@@ -93,79 +84,95 @@ function createFab(label, kind) {
   return btn;
 }
 
-const LEGAL_FETCH_TIMEOUT_MS = 5_000;
-const LEGAL_FETCH_BASE_BACKOFF_MS = 400;
-const LEGAL_FETCH_MAX_BACKOFF_MS = 8_000;
-
 /**
- * @param {AbortSignal | undefined} signal
- * @param {number} attempt
- * @returns {Promise<void>}
+ * Legal autenticado: marco glass homogéneo con el resto de secciones.
+ * @param {HTMLElement} app
+ * @param {{ slug: string }} params
+ * @returns {{ destroy: (options?: object) => void }}
  */
-function waitLegalFetchBackoff(signal, attempt) {
-  const delay = Math.min(LEGAL_FETCH_MAX_BACKOFF_MS, LEGAL_FETCH_BASE_BACKOFF_MS * (2 ** attempt));
-  return new Promise((resolve) => {
-    const wait = setTimeout(resolve, delay);
-    signal?.addEventListener("abort", () => {
-      clearTimeout(wait);
-      resolve(undefined);
-    }, { once: true });
-  });
-}
+function renderLegalAuthenticated(app, { slug }) {
+  const routeSlug = slug || "terminos";
 
-/**
- * @param {string} routeSlug
- * @param {{ signal?: AbortSignal; retries?: number }} [options]
- * @returns {Promise<{ title: string; body_markdown: string } | null>}
- */
-async function fetchLegalDoc(routeSlug, options = {}) {
-  const apiSlug = apiSlugForRoute(routeSlug);
-  if (!apiSlug) return null;
+  /** @type {{ destroy: (o?: object) => void; sectionHost?: HTMLElement } | null} */
+  let chromeHandle = null;
+  /** @type {{
+   *   destroy: () => Promise<void>;
+   *   contentEl?: HTMLElement;
+   *   logoMountEl?: HTMLElement;
+   *   setTitle?: (text: string) => void;
+   *   syncLogoSkeleton?: (logoWrap?: HTMLElement | null) => void;
+   * } | null} */
+  let frameHandle = null;
+  /** @type {{ destroy: () => void } | null} */
+  let panelHandle = null;
+  /** @type {HTMLElement | null} */
+  let sceneEl = null;
+  let cancelled = false;
 
-  const { signal, retries = 3 } = options;
-  const url = `${config.apiUrl}/legal/${apiSlug}`;
-
-  for (let attempt = 0; attempt < retries; attempt++) {
-    if (signal?.aborted) return null;
-
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), LEGAL_FETCH_TIMEOUT_MS);
-    const onParentAbort = () => controller.abort();
-    signal?.addEventListener("abort", onParentAbort);
-
-    try {
-      const res = await fetch(url, {
-        signal: controller.signal,
-        cache: "no-store",
-        headers: { Accept: "application/json" },
-      });
-      if (!res.ok) continue;
-      const data = await res.json();
-      if (!data?.title || !data?.body_markdown) continue;
-      return data;
-    } catch {
-      if (signal?.aborted) return null;
-    } finally {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", onParentAbort);
-    }
-
-    if (attempt < retries - 1) {
-      await waitLegalFetchBackoff(signal, attempt);
-    }
+  async function doSignOut() {
+    destroyAppShell();
+    await signOut();
+    navigate("/loader");
   }
 
-  return null;
+  void (async () => {
+    const session = await getValidSession();
+    if (cancelled) return;
+    if (!session) {
+      destroyAppShell();
+      navigate("/loader");
+      return;
+    }
+
+    initShellUiTheme();
+    ensureAppShell({ onSignOut: doSignOut });
+
+    chromeHandle = mountLoaderChrome(app, { compactSection: true });
+    sceneEl = app.querySelector(".scene-loader");
+    const host = chromeHandle.sectionHost;
+    if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) {
+      console.warn("legal: missing section host or scene");
+      return;
+    }
+
+    const title = defaultLegalTitle(routeSlug);
+    frameHandle = mountSectionFrame(host, { title, ariaLabel: title });
+    panelHandle = mountLegalPanel(frameHandle.contentEl, {
+      routeSlug,
+      onLoaded(doc) {
+        frameHandle?.setTitle?.(doc.title);
+      },
+    });
+
+    await applySectionEnter({
+      scene: sceneEl,
+      logoMount: frameHandle.logoMountEl,
+      onLogoSettled: (logoWrap) => frameHandle?.syncLogoSkeleton?.(logoWrap),
+    });
+    frameHandle.syncLogoSkeleton?.();
+  })();
+
+  return {
+    destroy(options = {}) {
+      cancelled = true;
+      panelHandle?.destroy();
+      panelHandle = null;
+      void frameHandle?.destroy();
+      frameHandle = null;
+      chromeHandle?.destroy(options);
+      chromeHandle = null;
+      sceneEl = null;
+    },
+  };
 }
 
 /**
+ * Legal anónimo (pre-login): layout de documento con FABs procedurales.
+ * @param {HTMLElement} app
  * @param {{ slug: string }} params
- * @returns {{ destroy: () => void }}
+ * @returns {{ destroy: (options?: object) => void }}
  */
-export function renderLegal({ slug }) {
-  const app = document.getElementById("app");
-  if (!app) return { destroy() {} };
-
+function renderLegalAnonymous(app, { slug }) {
   const routeSlug = slug || "terminos";
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const durationMs = reducedMotion ? TRANSITION_MS_REDUCED : TRANSITION_MS;
@@ -178,8 +185,6 @@ export function renderLegal({ slug }) {
   scene.className = "scene scene-legal scene-world is-reveal-bg is-reveal-fantasy is-reveal-space";
   scene.dataset.legalSlug = routeSlug;
   if (bandNeedsAnim) scene.classList.add("is-orbit-layout-paused");
-  // Compacto→compacto (p. ej. account→privacidad): partir ya comprimido, sin salto expand→compress.
-  // Solo expandido→comprimido parte en loader para poder animar.
   setWorldBandLayout(scene, !bandNeedsAnim);
 
   const reusedLayers = attachWorldLayersTo(scene);
@@ -239,138 +244,19 @@ export function renderLegal({ slug }) {
 
   document.body.classList.add("is-legal-active");
   document.body.classList.remove("is-loader-active");
+  destroyAppShell();
 
   let destroyed = false;
   let backing = false;
-  let hasSession = false;
   let loadSeq = 0;
   const loadAbort = new AbortController();
   /** @type {Promise<void>} */
   let enterPromise = Promise.resolve();
 
-  /** @type {(() => void) | null} */
-  let unregisterLegalExit = null;
-
-  /**
-   * @param {string} targetPath
-   * @returns {{ lineSci: string; lineFantasy: string }}
-   */
-  function shellWelcomeLinesForPath(targetPath) {
-    const route = targetPath.replace(/^#\/?/, "").replace(/^\//, "").split("/")[0] || "home";
-    if (route === "account") {
-      return {
-        lineSci: "Tu cuenta",
-        lineFantasy: "gestión del viaje (próximamente)",
-      };
-    }
-    return {
-      lineSci: "Hola, explorador,",
-      lineFantasy: "bienvenido a tu viaje épico",
-    };
-  }
-
-  async function animateAuthenticatedExit(targetPath) {
-    await enterPromise.catch(() => {});
-
-    article.style.transition = `opacity ${Math.min(280, durationMs)}ms ${WORLD_TRANSITION_EASE}`;
-    article.style.opacity = "0";
-
-    const logoRect = captureRect(logoWrap);
-    const targetRoute = normalizeShellPath(targetPath);
-    const targetCompressed = shouldCompressWorldBands(targetRoute);
-
-    if (logoRect) pinLogoAtRect(logoWrap, logoRect);
-
-    // Compacto → compacto (p. ej. privacidad → cuenta): no tocar bandas.
-    // Solo se expanden al volver a home.
-    if (targetCompressed) {
-      setWorldBandLayout(scene, true);
-      if (logoRect) {
-        document.body.appendChild(logoWrap);
-      }
-      syncWorldSessionFromDom(scene);
-      document.body.classList.remove("is-legal-active");
-      prepareAuthenticatedLegalExit(targetPath, {
-        logo: logoRect,
-        logoEl: logoWrap,
-        bandsAlreadyExpanded: false,
-        fromBandsCompressed: true,
-      });
-      navigate(targetPath);
-      return;
-    }
-
-    const welcomeLines = shellWelcomeLinesForPath(targetPath);
-    const toHint = logoRect ? measureShellBrandLogoTarget(logoRect, welcomeLines) : null;
-
-    setOrbitLayoutPaused(scene, true);
-    try {
-      if (logoRect && toHint) {
-        await morphLogoWithBands(scene, logoWrap, logoRect, false, durationMs, toHint, {
-          keepPinned: true,
-        });
-      } else {
-        await animateWorldBands(scene, false, durationMs);
-      }
-    } catch {
-      setWorldBandLayout(scene, false);
-      if (toHint) pinLogoAtRect(logoWrap, toHint);
-    }
-
-    if (destroyed) return;
-
-    const finalRect = toHint ?? captureRect(logoWrap) ?? logoRect;
-    if (finalRect) pinLogoAtRect(logoWrap, finalRect);
-    document.body.appendChild(logoWrap);
-
-    syncWorldSessionFromDom(scene);
-    document.body.classList.remove("is-legal-active");
-    prepareAuthenticatedLegalExit(targetPath, {
-      logo: finalRect,
-      logoEl: logoWrap,
-      bandsAlreadyExpanded: true,
-      fromBandsCompressed: false,
-    });
-    navigate(targetPath);
-  }
-
-  unregisterLegalExit = registerLegalExitHandler(async (targetPath) => {
-    if (backing || destroyed) return;
-    backing = true;
-    if (!hasSession) {
-      navigate(targetPath);
-      return;
-    }
-    await animateAuthenticatedExit(targetPath);
-  });
-
-  void (async () => {
-    const session = await getValidSession();
-    if (destroyed) return;
-    hasSession = Boolean(session);
-    if (session) {
-      scene.classList.add("is-legal-authenticated");
-      backFab.hidden = true;
-      topFab.hidden = true;
-      initShellUiTheme();
-      ensureAppShell({
-        async onSignOut() {
-          destroyAppShell();
-          await signOut();
-          navigate("/loader");
-        },
-      });
-      scheduleShellFrameSync();
-    } else {
-      destroyAppShell();
-    }
-  })();
-
   if (animateEntry && transition.snapshot?.logo) {
     enterPromise = (async () => {
       await mountWorldLogo(logoWrap, fallback);
       if (fromCompressed) {
-        // Origen ya compacto: solo morph del logo, sin tocar bandas.
         const fromLogo = transition.snapshot.logo;
         const toLogo = captureRect(logoWrap);
         if (fromLogo && toLogo) {
@@ -445,7 +331,6 @@ export function renderLegal({ slug }) {
 
   void loadDocument();
 
-  /** Ancla ramps de mask al borde superior del logo y al borde del footer fantasía. */
   function syncScrollFadeMask() {
     if (destroyed) return;
     const fantasy = scene.querySelector(".loader-layer--fantasy-scene")
@@ -454,8 +339,6 @@ export function renderLegal({ slug }) {
 
     const scrollRect = scroll.getBoundingClientRect();
     const logoRect = logoWrap.getBoundingClientRect();
-
-    /* Port alineado al logo: opacidad 0 en su borde superior (sin clip duro de la banda sci-fi). */
     const topStart = Math.min(0, logoRect.top - scrollRect.top);
     const bottomEnd = scrollRect.height;
 
@@ -489,12 +372,7 @@ export function renderLegal({ slug }) {
     if (backing || destroyed) return;
     backing = true;
 
-    const backTarget = resolveLegalBackNavigation(hasSession);
-    if (backTarget.mode === "authenticated-home") {
-      await animateAuthenticatedExit(backTarget.path);
-      return;
-    }
-
+    const backTarget = resolveLegalBackNavigation(false);
     await enterPromise.catch(() => {});
 
     const logoRect = captureRect(logoWrap);
@@ -509,7 +387,6 @@ export function renderLegal({ slug }) {
 
     setOrbitLayoutPaused(scene, true);
     try {
-      // keepPinned: el morph no debe soltar el logo al layout CSS de legal (salta al handoff).
       await morphLogoWithBands(scene, logoWrap, logoRect, false, durationMs, toHint, {
         keepPinned: true,
       });
@@ -523,7 +400,6 @@ export function renderLegal({ slug }) {
     const finalRect = toHint ?? captureRect(logoWrap) ?? logoRect;
     if (finalRect) pinLogoAtRect(logoWrap, finalRect);
     document.body.appendChild(logoWrap);
-    /* Mantener overflow bloqueado antes de destruir la escena legal (evita flash de scrollbar). */
     document.body.classList.add("is-loader-active");
     document.body.classList.remove("is-legal-active");
     prepareWorldTransition(
@@ -553,8 +429,6 @@ export function renderLegal({ slug }) {
       destroyed = true;
       loadSeq += 1;
       loadAbort.abort();
-      unregisterLegalExit?.();
-      unregisterLegalExit = null;
       document.body.classList.remove("is-legal-active");
       fadeMaskObserver.disconnect();
       window.removeEventListener("resize", scheduleScrollFadeMask);
@@ -575,6 +449,35 @@ export function renderLegal({ slug }) {
 
       world.destroy();
       destroyWorldSession();
+    },
+  };
+}
+
+/**
+ * @param {{ slug: string }} params
+ * @returns {{ destroy: (options?: object) => void }}
+ */
+export function renderLegal({ slug }) {
+  const app = document.getElementById("app");
+  if (!app) return { destroy() {} };
+
+  let cancelled = false;
+  /** @type {(options?: object) => void} */
+  let innerDestroy = () => {};
+
+  void (async () => {
+    const session = await getValidSession();
+    if (cancelled) return;
+    const handle = session
+      ? renderLegalAuthenticated(app, { slug })
+      : renderLegalAnonymous(app, { slug });
+    innerDestroy = handle.destroy.bind(handle);
+  })();
+
+  return {
+    destroy(options = {}) {
+      cancelled = true;
+      innerDestroy(options);
     },
   };
 }
