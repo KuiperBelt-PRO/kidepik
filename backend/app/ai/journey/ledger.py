@@ -33,6 +33,7 @@ Kind = Literal[
     "placement_result",
     "path_pack",
     "path_progress",
+    "chapter_opened",
 ]
 
 
@@ -473,3 +474,88 @@ class JourneyLedger:
             return False
         shutil.rmtree(src)
         return True
+
+    @staticmethod
+    def _trim_jsonl_file(
+        path: Path,
+        *,
+        anchor_at: str,
+        session_id: str | None = None,
+    ) -> int:
+        if not path.exists():
+            return 0
+        kept: list[str] = []
+        removed = 0
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                raw = line.strip()
+                if not raw:
+                    continue
+                try:
+                    row = json.loads(raw)
+                except json.JSONDecodeError:
+                    kept.append(raw)
+                    continue
+                if session_id and row.get("session_id"):
+                    if str(row.get("session_id")) != session_id:
+                        kept.append(raw)
+                        continue
+                at = str(row.get("at") or "")
+                if at and at > anchor_at:
+                    removed += 1
+                    continue
+                kept.append(raw)
+        path.write_text(
+            ("\n".join(kept) + "\n") if kept else "",
+            encoding="utf-8",
+        )
+        return removed
+
+    def trim_after(
+        self,
+        parent_id: str,
+        child_id: str,
+        *,
+        session_id: str,
+        anchor_at: str,
+        world_theme: str | None = None,
+        clear_traveler: bool = False,
+        clear_session_summary: bool = False,
+    ) -> int:
+        """Elimina eventos posteriores al ancla en dialogue.jsonl y events.jsonl."""
+        trimmed = self._trim_jsonl_file(
+            self.dialogue_path(parent_id, child_id, world_theme=world_theme),
+            anchor_at=anchor_at,
+            session_id=session_id,
+        )
+        if world_theme:
+            trimmed += self._trim_jsonl_file(
+                self.dialogue_path(parent_id, child_id, world_theme=None),
+                anchor_at=anchor_at,
+                session_id=session_id,
+            )
+        trimmed += self._trim_jsonl_file(
+            self.events_path(parent_id, child_id, session_id, world_theme=world_theme),
+            anchor_at=anchor_at,
+            session_id=session_id,
+        )
+        if world_theme:
+            trimmed += self._trim_jsonl_file(
+                self.events_path(parent_id, child_id, session_id, world_theme=None),
+                anchor_at=anchor_at,
+                session_id=session_id,
+            )
+        if clear_traveler:
+            traveler = self.traveler_path(parent_id, child_id)
+            if traveler.exists():
+                traveler.unlink()
+        if clear_session_summary:
+            summary = (
+                self.session_dir(
+                    parent_id, child_id, session_id, world_theme=world_theme
+                )
+                / "summary.md"
+            )
+            if summary.exists():
+                summary.unlink()
+        return trimmed

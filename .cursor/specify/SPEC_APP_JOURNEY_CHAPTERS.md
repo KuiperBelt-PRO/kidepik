@@ -1,19 +1,20 @@
 # Spec: Capítulos del viaje (título de escena en play)
 
-> Estado: **propuesta — pendiente de aprobación** (ago 2026)  
-> Relacionado: [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md)
+> Estado: **aprobada** (ago 2026)  
+> Relacionado: [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md)
 
 ## Contexto
 
-En play, bajo el logotipo KidepiK, hay una línea centrada (`data-mentor-name`, clase `play-panel__mentor`) que hoy muestra el **nombre del mentor** (p. ej. «El Guardián del Conocimiento»). En la práctica actúa como **ancla narrativa** de la escena actual, pero no refleja el arco del viaje ni las decisiones del explorador.
+En play, bajo el logotipo KidepiK, hay una línea centrada que hoy muestra el **nombre del mentor** (`data-mentor-name`). En la práctica actúa como ancla narrativa, pero mezcla **quién habla** con **en qué parte de la historia estamos**.
 
-La idea de producto: tratar el viaje como una **historia por capítulos**. Cada fase relevante (elección de mundo, nombre, personaje, prueba de ingreso, llegada a zona, etc.) tendría un **título de capítulo** legible para el niño y el tutor, distinto del nombre del mentor en la burbuja.
+La idea de producto: el viaje se lee como **historia por capítulos**, con tres macro-fases antes de la aventura libre, y capítulos de aventura ligados al **camino elegido**.
 
 ## Objetivo
 
-1. Separar **quién habla** (mentor en burbuja) de **en qué capítulo estamos** (título superior).
-2. Actualizar el título al avanzar `onboarding_step`, fase de placement o `chapter_id` de aventura.
-3. Persistir capítulos en historial / timeline tutor sin sobrecargar cada turno.
+1. Separar **mentor** (burbuja) de **capítulo** (rótulo fijo bajo el logo).
+2. Usar **tres macro-capítulos** hasta terminar el examen: umbral → rito → aventura.
+3. En aventura, el **título del capítulo lo fija el LLM** según el camino elegido (pitch / intro del path).
+4. El título de capítulo **permanece siempre visible** al hacer scroll del diálogo.
 
 ---
 
@@ -21,63 +22,118 @@ La idea de producto: tratar el viaje como una **historia por capítulos**. Cada 
 
 | Concepto | Descripción |
 | --- | --- |
-| `chapter_id` | Clave estable interna (`prelude`, `choose_world`, `forge_name`, …) |
-| `chapter_title` | Texto mostrado bajo el logo («El umbral», «La forja del nombre», …) |
-| `mentor.display_name` | Sigue siendo el hablante de las burbujas IA (spec mentor) |
-| `scene_heading` | Sinónimo UI de `chapter_title` en play |
+| `chapter_id` | Clave estable interna (`umbral`, `rito`, `adventure`, o id de capítulo de camino) |
+| `chapter_title` | Texto mostrado bajo el logo |
+| `mentor.display_name` | Habla en la burbuja ([SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md)) |
+| `scene_heading` | Sinónimo UI de `chapter_title` |
 
-**Regla:** el título de capítulo **no** sustituye al nombre del mentor en la cabecera de burbuja; son capas distintas.
+**Regla:** capítulo ≠ mentor. El mentor puede nombrar el capítulo en prosa; el rótulo UI es contrato aparte.
 
 ---
 
-## 2. Mapeo MVP (first_run + placement)
+## 2. Macro-fases (producto acordado)
 
-| `onboarding_step` / fase | `chapter_id` | `chapter_title` (ejemplo) |
+No hay un capítulo distinto por cada paso de onboarding. Hasta el examen solo existen **dos** títulos de sistema; después, los de aventura.
+
+| Fase | `chapter_id` | `chapter_title` | Cubre |
+| --- | --- | --- | --- |
+| First-run completo **antes** del examen | `umbral` | **Catálogo por mundo** (§2.2) | `pending_entry` … `choose_character` hasta handoff al examen |
+| Examen de ingreso (placement) | `rito` | **Catálogo por mundo** (§2.2) | `placement`, handoff, ítems activos |
+| Aventura | `adventure:…` | **LLM** (§3); fallback §2.2 | Tras `onboarding_step === 'complete'` |
+
+**No** se fragmenta el umbral en subtítulos por paso de onboarding; eso vive en el diálogo.
+
+### 2.2 Catálogo normativo por `world_theme`
+
+El servidor resuelve `chapter.title` con `chapter_id` + `world_theme` del viajero. **Obligatorio** variante por mundo en `umbral` y `rito`. En aventura el LLM genera el título; si falla, fallback del catálogo.
+
+| `chapter_id` | `world_theme` | `chapter_title` (normativo) |
 | --- | --- | --- |
-| `pending_entry`, `choose_world` | `prelude` | **El umbral** |
-| Tras `set_world_theme` (transición) | `mentor_revealed` | **El mentor se presenta** |
-| `choose_name` | `forge_name` | **La forja del nombre** |
-| `choose_age` | `measure_years` | **La medida de los años** |
-| `choose_character` / traits | `shape_hero` | **La forma del héroe** |
-| `placement` (handoff) | `rite_entry` | **El rito de ingreso** |
-| `placement` (ítems activos) | `rite_entry` | **La prueba del saber** |
-| `complete` → aventura | `adventure` | Título de zona activa o «La aventura comienza» |
+| `umbral` | `null` (pre-mundo) | **El umbral** |
+| `umbral` | `fantasy` | **El umbral** |
+| `umbral` | `sci-fi` | **La puerta estelar** |
+| `rito` | `fantasy` | **La prueba del saber** |
+| `rito` | `sci-fi` | **La prueba de acceso** |
+| `adventure` (fallback LLM) | `fantasy` | **La senda continúa** |
+| `adventure` (fallback LLM) | `sci-fi` | **Rumbo desconocido** |
 
-Títulos literales finales pueden variar por `world_theme` y `age_band` (sci-fi: «La cartografía del nombre»; banda menor: frases más cortas).
+**Transición pre-mundo → mundo:** mientras `world_theme` es `null`, rótulo «El umbral». Tras `set_world_theme`, **misma fase** `umbral` pero título pasa a la fila fantasy/sci-fi (cambio visible al elegir mundo, sin cambiar `chapter_id`).
+
+**`age_band` (opcional MVP+):** misma clave de catálogo; si `band_young` o equivalente, permitir alias más cortos en fichero (p. ej. fantasy `rito` → «La prueba»; sci-fi `rito` → «La prueba»). No inventar en cliente.
+
+Implementación de referencia (código, no LLM):
+
+```ts
+// data/chapters/system_titles.es.json (o módulo Python equivalente)
+{
+  "umbral": { "neutral": "El umbral", "fantasy": "El umbral", "sci-fi": "La puerta estelar" },
+  "rito": { "fantasy": "La prueba del saber", "sci-fi": "La prueba de acceso" },
+  "adventure_fallback": {
+    "fantasy": "La senda continúa",
+    "sci-fi": "Rumbo desconocido"
+  }
+}
+```
+
+API: incluir `chapter.world_theme` cuando ayude al cliente a auditar; `chapter.title` ya viene resuelto.
+
+### 2.3 Transiciones
+
+| Evento | `chapter_id` | Quién fija `chapter_title` |
+| --- | --- | --- |
+| Entrada a play (first_run) | `umbral` | Catálogo sistema |
+| Handoff a placement | `rito` | Catálogo sistema |
+| Fin examen → aventura | primer capítulo del camino | LLM (al abrir camino / pitch) |
+| Avance dentro del camino | `adventure:<path_id>:<chapter_seq>` | LLM al abrir cada capítulo del path |
 
 ---
 
-## 3. Aventura (post-onboarding)
+## 3. Aventura — título desde el camino (LLM)
 
-Cuando `flow_id = adventure` y existe `active_zone_id` / `chapter_id` en sesión:
+En aventura el nombre del capítulo **sí sale del LLM**, porque deriva del **camino elegido** por el explorador (pitch, intro del path, beat narrativo del capítulo).
 
-| Fuente | `chapter_title` |
+| Origen | Cuándo |
 | --- | --- |
-| `zone_bible.title` o pitch de zona | Nombre de la zona («El bosque de los ecos») |
-| Transición entre zonas | «Camino a …» / «Nuevo horizonte» |
-| Boss / fragmento | Título evento puntual (evento, no capítulo largo) |
+| Agente de pitch / path / zone_scene | Al presentar caminos o al abrir un capítulo del path seleccionado |
+| Persistencia | `session` / ledger: `chapter_title` validado se guarda y reutiliza hasta cambio de capítulo |
 
-El mentor puede **mencionar** el capítulo en prosa; el título UI viene del **sistema**, no del LLM (evita títulos inventados o spoilers).
+**Contrato LLM:**
+
+- Campo dedicado en envelope o effect tipado: `set_chapter: { id, title }` **o** `chapter_title` en meta del turno que abre capítulo.
+- Validación servidor: longitud (p. ej. 4–48 chars), sin saltos de línea, castellano, sin spoilers de capítulos futuros.
+- Fallback si falla compose: título de `adventure_fallback` en §2.2 según `world_theme` + reintento en background; **no** dejar rótulo vacío.
+
+El mentor integra el nombre en `agent_text` si encaja; el rótulo UI **no** se infiere parseando la burbuja — viene del estado `chapter` de la sesión.
 
 ---
 
-## 4. UI (play)
+## 4. UI — siempre visible (fuera del scroll)
 
 ```
 ┌─────────────────────────────────┐
-│ [←]     [logo KidepiK]          │
-│        El umbral                │  ← chapter_title (nuevo contrato)
-│  ┌ mentor ───────────────────┐  │
-│  │ ◉ El Guía                 │  │  ← display_name mentor (burbuja)
-│  │ «Texto…»                  │  │
-│  └───────────────────────────┘  │
+│ [←]     [logo KidepiK]          │  ← section-frame__header (fijo)
+│        El umbral                │  ← chapter_title (FIJO, no scrollea)
+├─────────────────────────────────┤
+│ ▲ scroll                        │
+│ │  burbujas mentor / explorador │
+│ │  historial…                   │
+│ ▼                               │
+├─────────────────────────────────┤
+│ opciones / compose              │  ← footer fijo
 └─────────────────────────────────┘
 ```
 
-- Elemento actual `data-mentor-name` → renombrar a `data-chapter-title` (o dual durante migración).
-- Tipografía: misma banda que hoy (`play-panel__mentor` → `play-panel__chapter`).
-- Skeleton: una línea glass mientras no hay `chapter_title`.
-- **No** mostrar `chapter_id` técnico al usuario.
+### 4.1 Reglas de layout
+
+| Regla | Decisión |
+| --- | --- |
+| Ubicación | `chapter_title` en **cabecera del marco** (`section-frame__header` / brand), **debajo del logo**, **fuera** de `.section-frame__scroll` |
+| No scrollea | Solo `.play-panel__log` (y contenido de diálogo) vive dentro del área con scroll; el rótulo de capítulo **no** puede quedar dentro de `[data-log]` |
+| Migración | `data-mentor-name` → `data-chapter-title`; clase `play-panel__mentor` → `play-panel__chapter` |
+| Skeleton | Una línea glass en cabecera mientras no hay `chapter.title` |
+| Accesibilidad | `aria-live="polite"` al cambiar capítulo; no anunciar en cada burbuja |
+
+Implementación de referencia: reutilizar slot de título bajo logo en [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md) o slot dedicado `section-frame__chapter` entre `__header` y `__scroll`.
 
 ---
 
@@ -87,52 +143,81 @@ Extender respuestas de diálogo / sesión play:
 
 ```json
 {
-  "mentor": { "id": "host", "display_name": "El Guía", "mentor_id": "mentor_neutral_host" },
+  "mentor": {
+    "id": "host",
+    "display_name": "El Guía",
+    "mentor_id": "mentor_neutral_host"
+  },
   "chapter": {
-    "id": "prelude",
-    "title": "El umbral"
+    "id": "umbral",
+    "title": "La puerta estelar",
+    "source": "system",
+    "world_theme": "sci-fi"
+  }
+}
+```
+
+En aventura:
+
+```json
+{
+  "chapter": {
+    "id": "adventure:path_alpha:2",
+    "title": "El bosque de los ecos",
+    "source": "llm",
+    "path_id": "path_alpha"
   }
 }
 ```
 
 | Campo | Origen |
 | --- | --- |
-| `chapter.id` | Resolver servidor según `onboarding_step`, `flow_id`, `active_zone_id` |
-| `chapter.title` | Catálogo estático + variantes por mundo/edad; aventura desde zone bible |
+| `chapter.id` | Resolver: `umbral` \| `rito` \| `adventure:…` según fase y camino |
+| `chapter.title` | Catálogo §2.2 (`umbral`, `rito`) o LLM validado (aventura) |
+| `chapter.world_theme` | Mundo usado para resolver título de catálogo (`null` \| `fantasy` \| `sci-fi`) |
+| `chapter.source` | `system` \| `llm` — auditoría y tests |
 
-Efectos tipados (opcional fase 2): `set_chapter: { id, title }` en effects de turno cuando el LLM no debe decidir título.
+`chapter` se envía en **open session**, **submit turn** y **resync** cuando cambia.
 
 ---
 
 ## 6. Persistencia y timeline tutor
 
-- `dialogue_turns.meta.chapter_id` en turnos donde cambia el capítulo.
-- Evento ledger `chapter_opened` con `{ chapter_id, title, world_theme }`.
-- Timeline tripulación: fila «Capítulo: El umbral» al abrir prelude (icono distinto de `mentor_utterance`).
+- `dialogue_turns.meta.chapter_id` cuando cambia el capítulo.
+- Ledger `chapter_opened`: `{ chapter_id, title, source, world_theme, path_id? }`.
+- Timeline tutor: «Capítulo: El umbral» / «Capítulo: El bosque de los ecos» con icono distinto de `mentor_utterance`.
 
 ---
 
 ## 7. IA y orquestador
 
-- Los agentes **no** generan `chapter_title` en MVP salvo copy narrativo dentro de `agent_text`.
-- El orquestador resuelve capítulo **antes** del turno y lo incluye en `RunDeps.player_state.chapter`.
-- Prompt: «El capítulo actual se llama {title}; no lo repitas como encabezado; intégralo en la escena si encaja.»
+| Fase | Quién define título |
+| --- | --- |
+| `umbral`, `rito` | Servidor (catálogo); LLM solo lo puede **mencionar** en prosa |
+| Aventura | LLM al abrir capítulo del camino; servidor valida y persiste |
+
+Prompt (aventura): «Propón `chapter_title` corto para este tramo del camino {path_label}; devuélvelo en meta/effect; no uses el título como encabezado duplicado en agent_text.»
+
+Orquestador: incluir `player_state.chapter` en `RunDeps` antes de cada turno.
 
 ---
 
 ## 8. Criterios de aceptación
 
-1. Pre-mundo: título «El umbral» (o equivalente); mentor en burbuja «El Guía».
-2. Tras elegir fantasy: título pasa a fase mentor/nombre; burbuja firma «El Guardián del Conocimiento».
-3. Cambio de `onboarding_step` actualiza título sin recargar página.
-4. En aventura, título refleja zona activa cuando hay `zone_bible`.
-5. Timeline tutor registra apertura de capítulo.
-6. Tests: resolver `chapter` por estado; UI muestra `chapter.title` ≠ `mentor.display_name`.
+1. Pre-examen: rótulo de catálogo `umbral` por mundo (§2.2); pre-mundo «El umbral» hasta elegir tema.
+2. Placement: rótulo de catálogo `rito` por mundo («La prueba del saber» / «La prueba de acceso»).
+3. En aventura: rótulo = título LLM del capítulo del camino elegido, persistido y estable entre turnos del mismo capítulo.
+4. Al hacer scroll del historial, el rótulo de capítulo **sigue visible** (no sale del viewport del marco).
+5. Cambio de macro-fase o de capítulo de aventura actualiza rótulo sin recargar página.
+6. Timeline tutor registra `chapter_opened`.
+7. Tests: resolver `chapter` por fase; UI sticky/fuera de scroll; validación LLM + fallback.
 
 ## Aprobación
 
-- [ ] Separar título de capítulo vs nombre de mentor
-- [ ] Catálogo MVP first_run + placement
-- [ ] Campo `chapter` en API play
-- [ ] Persistencia timeline / meta turnos
-- [ ] Aventura: título por zona (fase 2 si hace falta acotar MVP)
+- [x] Macro-fases: umbral → rito → aventura
+- [x] Catálogo `umbral` / `rito` / fallback aventura **por mundo** (§2.2)
+- [x] Aventura: título de capítulo desde LLM / camino elegido
+- [x] Rótulo siempre visible (fuera de scroll)
+- [x] Campo `chapter` en API play
+- [x] Persistencia timeline / meta turnos
+- [x] Validación y fallback de títulos LLM

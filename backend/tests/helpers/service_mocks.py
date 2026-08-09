@@ -20,6 +20,7 @@ _PARENT_PATHS = (
     "app.routers.crew.ParentAccountService",
     "app.routers.play.ParentAccountService",
     "app.routers.debug_ai.ParentAccountService",
+    "app.routers.debug_journey.ParentAccountService",
 )
 
 
@@ -83,6 +84,7 @@ def mock_session_scope(mocker: MockerFixture) -> AsyncMock:
     for path in (
         "app.routers.play.session_scope",
         "app.routers.debug_ai.session_scope",
+        "app.routers.debug_journey.session_scope",
     ):
         mocker.patch(path, _scope)
     return session

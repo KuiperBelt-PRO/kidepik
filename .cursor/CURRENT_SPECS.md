@@ -50,7 +50,7 @@
 - **Sistema IA play (aprobado jul 2026 — Fases A–E parciales):** plan [tasks/AI_ADVENTURE_SYSTEM_PLAN.md](tasks/AI_ADVENTURE_SYSTEM_PLAN.md); backlog [tasks/AI_ADVENTURE_BACKLOG.md](tasks/AI_ADVENTURE_BACKLOG.md)
   - Gateway Gemini (canónico): [specify/SPEC_AI_GEMINI_GATEWAY.md](specify/SPEC_AI_GEMINI_GATEWAY.md) — Pydantic AI + Google AI Studio
   - Orquestación / mentor / age bands / memoria: [SPEC_AI_PLAY_ORCHESTRATION](specify/SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_MENTOR](specify/SPEC_APP_MENTOR.md), [SPEC_APP_AGE_BANDS](specify/SPEC_APP_AGE_BANDS.md), [SPEC_APP_JOURNEY_MEMORY](specify/SPEC_APP_JOURNEY_MEMORY.md) — **parcial** (context pack L2/L3 + summarizer + summary + timeline tutor); **§1.4 orden diario implementada** (ago 2026); mentor: **El Guía** pre-mundo + nombres completos + markdown en burbujas (ago 2026)
-  - **Capítulos del viaje (propuesta ago 2026):** [specify/SPEC_APP_JOURNEY_CHAPTERS.md](specify/SPEC_APP_JOURNEY_CHAPTERS.md) — título bajo logo ≠ nombre mentor; mapeo first_run/placement/aventura
+  - **Capítulos del viaje (implementada ago 2026):** [specify/SPEC_APP_JOURNEY_CHAPTERS.md](specify/SPEC_APP_JOURNEY_CHAPTERS.md) — umbral → rito → aventura; rótulo fijo bajo logo; API `chapter`; catálogo por mundo + título LLM del camino
   - Diálogo API + UI `#/play/:childId`: **section-frame + mundo animado + glass** ([DESIGN.md](DESIGN.md)); **cajetín más alto** ([SPEC_APP_SECTION_FRAME](specify/SPEC_APP_SECTION_FRAME.md) §2.2b) + claridad de input
   - Placement: [SPEC_APP_PLACEMENT_EXAM](specify/SPEC_APP_PLACEMENT_EXAM.md) — **deprecada** (persistencia JSONL; ver JOURNEY_MECHANICS + DATA_STORAGE_LAYERS)
   - Adventure: [SPEC_APP_ADVENTURE_SESSION](specify/SPEC_APP_ADVENTURE_SESSION.md) — vertical slice zona/reto
@@ -66,6 +66,7 @@
   - Colas LLM por purpose en BD: `ai_purpose_model_queues` (legado OpenRouter; ver [SPEC_AI_GEMINI_GATEWAY](specify/SPEC_AI_GEMINI_GATEWAY.md)) — **B1**
   - **A2 (implementada 1 ago 2026):** compose en lotes paralelos (≤4 slots, concurrency 3, sticky winner) + priorización por éxito ([§A2](specify/SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md#a2--compose-paralelo-por-lotes--priorización-de-modelos-1-ago-2026)); gateway §4.6; copy espera sin «armar»/«examen», rotación ≥ 8 s, variantes por `age_band` + mundo
 - **Modo debug IA (tutor / local):** [specify/SPEC_APP_DEBUG_MODE.md](specify/SPEC_APP_DEBUG_MODE.md) — **implementada** 1 ago 2026; traza de fallback OpenRouter + panel UI; delta gateway §9
+- **Rebobinado de viaje en debug (implementada ago 2026):** [specify/SPEC_APP_DEBUG_JOURNEY_REWIND.md](specify/SPEC_APP_DEBUG_JOURNEY_REWIND.md) — icono ↺ en burbujas play; trunca turnos/ledger posteriores; solo tutor + local
 - **Logs en disco (web/logs):** [specify/SPEC_APP_FILE_LOGGING.md](specify/SPEC_APP_FILE_LOGGING.md) — **implementada** 1 ago 2026; JSONL por canal/nivel; más detalle con `APP_DEBUG_AI`
 - **Notificaciones glass:** [specify/SPEC_APP_GLASS_TOAST.md](specify/SPEC_APP_GLASS_TOAST.md) — **implementada** jul 2026; errores/warnings/success/info reutilizables
 - **Modales glass:** [specify/SPEC_APP_GLASS_MODAL.md](specify/SPEC_APP_GLASS_MODAL.md) — **implementada** jul 2026; alerta y confirmación reutilizables; tripulación y cuenta

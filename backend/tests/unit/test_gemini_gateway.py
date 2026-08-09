@@ -118,6 +118,7 @@ def test_skill_ids_for_mentor() -> None:
     ids = skill_ids_for("mentor_guide")
     assert "audience-language" in ids
     assert "mentor-voice" in ids
+    assert "original-ip" in ids
     assert "evaluation-rubric" not in ids
 
 

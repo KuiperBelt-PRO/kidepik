@@ -1,5 +1,14 @@
 # POC local — nginx + FastAPI (API producto)
 # Supabase: `supabase start` (ver scripts/poc-up.ps1)
+#
+# Bind mounts (datos en disco del repo, no solo dentro del contenedor):
+#   data/journey   -> /data/journey        (ledger viajeros; gitignored)
+#   data/glossary  -> /data/glossary:ro   (producto, versionado)
+#   data/waiting   -> /data/waiting:ro    (producto, versionado)
+#   data/chapters  -> /data/chapters:ro   (producto, versionado)
+#   web/media      -> /var/www/html/media  (subidas; gitignored)
+#   web/logs       -> /var/www/html/logs   (logs API; gitignored)
+# Backup antes de reset: ./scripts/poc-backup-local.ps1
 
 name: kidepik-poc
 
@@ -35,6 +44,7 @@ services:
       - ../data/journey:/data/journey
       - ../data/glossary:/data/glossary:ro
       - ../data/waiting:/data/waiting:ro
+      - ../data/chapters:/data/chapters:ro
     environment:
       APP_NAME: kidepik-api
       APP_ENV: ${APP_ENV:-local}
@@ -58,6 +68,7 @@ services:
       JOURNEY_DATA_DIR: /data/journey
       GLOSSARY_DATA_DIR: ${GLOSSARY_DATA_DIR:-/data/glossary}
       WAITING_DATA_DIR: ${WAITING_DATA_DIR:-/data/waiting}
+      CHAPTERS_DATA_DIR: ${CHAPTERS_DATA_DIR:-/data/chapters}
       AI_ENABLED: ${AI_ENABLED:-true}
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}

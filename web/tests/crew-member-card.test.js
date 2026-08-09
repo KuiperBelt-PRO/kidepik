@@ -5,6 +5,7 @@ import {
   memberCornerStateLabel,
   memberTypeLine,
   memberWorldModifier,
+  memberPlayCtaLabel,
   memberTextBoxContent,
 } from "../js/lib/crew-member-card.js";
 
@@ -59,5 +60,21 @@ describe("crew-member-card", () => {
     const html = buildCrewMemberCardInner(baseMember);
     assert.match(html, /crew-card__status-gem/);
     assert.doesNotMatch(html, /corner--state/);
+  });
+
+  it("memberPlayCtaLabel distingue primera entrada y retomar", () => {
+    assert.equal(memberPlayCtaLabel(baseMember), "Continuar aventura");
+    assert.equal(
+      memberPlayCtaLabel({ ...baseMember, onboarding_step: "pending_entry", placement_status: "not_started" }),
+      "Comenzar aventura",
+    );
+  });
+
+  it("buildCrewListCardInner integra CTA play en la carta", async () => {
+    const { buildCrewListCardInner } = await import("../js/lib/crew-member-card.js");
+    const html = buildCrewListCardInner(baseMember);
+    assert.match(html, /crew-card__play/);
+    assert.match(html, /Continuar aventura/);
+    assert.match(html, /crew-card__open/);
   });
 });

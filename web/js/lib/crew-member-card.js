@@ -126,6 +126,15 @@ export function memberCardAriaLabel(m) {
 }
 
 /**
+ * CTA de play en lista: primera entrada vs retomar sesión.
+ * @param {CrewListItem} m
+ */
+export function memberPlayCtaLabel(m) {
+  if (m.is_tutor_profile) return "";
+  return m.onboarding_step === "complete" ? "Continuar aventura" : "Comenzar aventura";
+}
+
+/**
  * @param {string} s
  */
 export function escapeHtml(s) {
@@ -139,13 +148,12 @@ export function escapeHtml(s) {
 /**
  * @param {CrewListItem} m
  */
-export function buildCrewMemberCardInner(m) {
+export function buildCrewMemberCardBody(m) {
   const tone = memberCardTone(m);
   const textBox = memberTextBoxContent(m);
   const stateCorner = memberCornerStateLabel(m);
 
   return `
-    <span class="crew-card__frame">
       <span class="crew-card__header">
         <span class="crew-card__title">${escapeHtml(memberTitle(m))}</span>
         <span class="crew-card__status-gem crew-card__status-gem--${tone}">${escapeHtml(stateCorner)}</span>
@@ -153,6 +161,29 @@ export function buildCrewMemberCardInner(m) {
       <span class="crew-card__art" data-icon="${memberAvatarIcon(m)}" aria-hidden="true"></span>
       <span class="crew-card__type-line">${escapeHtml(memberTypeLine(m))}</span>
       ${textBox ? `<span class="crew-card__text-box">${escapeHtml(textBox)}</span>` : ""}
+  `;
+}
+
+/**
+ * @param {CrewListItem} m
+ */
+export function buildCrewMemberCardInner(m) {
+  return `<span class="crew-card__frame">${buildCrewMemberCardBody(m)}</span>`;
+}
+
+/**
+ * Carta de lista con CTA de play integrado (exploradores; no tutor).
+ * @param {CrewListItem} m
+ */
+export function buildCrewListCardInner(m) {
+  const playLabel = memberPlayCtaLabel(m);
+  const paused = m.status === "paused";
+  return `
+    <span class="crew-card__frame">
+      <button type="button" class="crew-card__open" aria-label="Ver ficha de ${escapeHtml(memberTitle(m))}">
+        ${buildCrewMemberCardBody(m)}
+      </button>
+      <button type="button" class="crew-card__play" ${paused ? "disabled" : ""}>${escapeHtml(playLabel)}</button>
     </span>
   `;
 }

@@ -249,6 +249,7 @@ Ver contrato completo en [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md).
 | SPEC_APP_SETTINGS_SECTION §2.6 | Sustituir «fuera de UI» por enlace a esta spec |
 | SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE | Meta `compose_debug` en fallo |
 | SPEC_APP_ADVENTURE_DIALOGUE | Campo opcional `debug` en response de turn |
+| SPEC_APP_DEBUG_JOURNEY_REWIND | Rebobinar viaje a un turno en play (solo debug local) |
 | DESIGN.md | Nota panel diagnóstico glass |
 | Diagrama 11 | Nodo DebugAi opcional |
 

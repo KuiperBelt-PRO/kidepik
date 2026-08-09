@@ -155,12 +155,15 @@ Fuente: DTO de [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md) §4.
 | `is_tutor_profile` | Variante tutor; arte icono `account` |
 | `rank_id` (futuro) | Esquina rango — oculta en Fase A |
 
-### 3.0 Delta ago 2026 — CTA Continuar
+### 3.0 Delta ago 2026 — CTA play integrado
 
 > Ver [SPEC_APP_PRODUCT_BACKLOG_AGO2026](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) B8–B9.
 
-- En carta de explorador (no tutor): control **Continuar aventura** (botón o zona primaria) → play, con modal PIN si aplica.
-- El resto de la carta sigue abriendo la ficha `#/crew/:id`.
+- En carta de explorador (no tutor): botón **integrado en el marco** de la carta (pie del `crew-card__frame`).
+- Copy: **Comenzar aventura** si `onboarding_step !== complete`; **Continuar aventura** si ya completó el onboarding.
+- Terminología: **aventura** en CTAs de play; **viaje** en pestaña/diario/mapa (no mezclar en el botón de lista).
+- Zona superior (cabecera, arte, tipo, nota) abre la ficha `#/crew/:id`; CTA play → `#/play/:childId` (modal PIN si aplica).
+- En pausa: CTA deshabilitado.
 
 ### 3.1 Estado en carta
 
@@ -181,7 +184,8 @@ Un solo control visible: el **gemelo** (`crew-card__status-gem`) en la cabecera.
 ### 4.1 Lista `#/crew`
 
 - Grid existente (1 → 2 → 3 columnas por `@container crew-panel`) se mantiene.
-- Cada miembro: `<button type="button" class="crew-card crew-card--{variant}">` con anatomía §1.
+- Explorador: `<article class="crew-card crew-card--{variant}">` con CTA play integrado (§3.0).
+- Tutor: `<button type="button" class="crew-card crew-card--tutor">` con anatomía §1 (sin CTA play).
 - **Altura mínima lista:** 168px en viewport 390px; la carta escala con `width: 100%` y `aspect-ratio: 5 / 7` con `max-height` para no desbordar el marco scroll.
 - CTA «Añadir tripulante (te queda espacio para N)» permanece **fuera** del grid, **encima** del grid (spec crew); no es carta coleccionable.
 

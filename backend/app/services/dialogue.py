@@ -19,9 +19,17 @@ from app.ai.errors import AiProductError
 from app.ai.gemini_gateway import GeminiGateway
 from app.ai.journey.ledger import JourneyLedger
 from app.ai.orchestrator import Orchestrator, TurnContext
+from app.ai.orchestrator.input_modes import PHASE_INPUT_MODE
 from app.catalogs import AgeBand, SubjectCatalog
+from app.catalogs.character_species import resolve_species_input, species_options_for_world
 from app.config import get_settings
+from app.services.chapter_titles import read_latest_chapter_opened, resolve_chapter
 from app.services.mentor_profiles import mentor_for_child, mentor_profile, resolve_mentor_key
+from app.services.mentor_prose import (
+    franchise_violations_in_text,
+    validate_mentor_prose,
+    validate_species_options,
+)
 from app.services.placement import PlacementService
 from app.services.waiting_copy import WaitingCopyService
 from app.services.waiting_phrases import pick_waiting_batch
@@ -79,7 +87,11 @@ class DialogueService:
             ).mappings().one()
             await self._seed(str(row["id"]), child_id, resolved, child)
             child = await self._child(auth_user_id, child_id)
-        turns = await self._recent(child_id, self.PAGE_SIZE)
+        turns = await self._recent(child_id, self.PAGE_SIZE, str(row["id"]))
+        last = await self._last_mentor(str(row["id"]))
+        last_phase = (last or {}).get("meta", {}).get("phase")
+        chapter = self._resolve_chapter(child, str(row["id"]), last_phase)
+        self._record_chapter_if_changed(child, str(row["id"]), chapter)
         return {
             "session_id": str(row["id"]),
             "flow_id": str(row["flow_id"]),
@@ -89,8 +101,9 @@ class DialogueService:
             "age_years": child.get("age_years"),
             "display_name": child.get("display_name"),
             "mentor": mentor_profile(str(row.get("mentor_id") or resolve_mentor_key(child))),
+            "chapter": chapter,
             "turns": turns,
-            "history": await self._history(child_id, turns),
+            "history": await self._history(child_id, turns, str(row["id"])),
             "pending_agent_turn": await self._last_mentor(str(row["id"])),
             "waiting_copy": await WaitingCopyService(self.session).waiting_copy_from_cache(
                 child_id
@@ -118,7 +131,10 @@ class DialogueService:
             raise RuntimeError("Dialogue session not found or closed")
         anchor = (
             await self.session.execute(
-                text("select id,created_at from dialogue_turns where id=:id and child_id=:cid"),
+                text(
+                    "select id, sequence, session_id from dialogue_turns "
+                    "where id=:id and child_id=:cid"
+                ),
                 {"id": before_turn_id, "cid": child_id},
             )
         ).mappings().first()
@@ -128,20 +144,19 @@ class DialogueService:
         rows = (
             await self.session.execute(
                 text(
-                    "select * from dialogue_turns where child_id=:cid and "
-                    "(created_at<:at or (created_at=:at and id<:id)) "
-                    "order by created_at desc,id desc limit :lim"
+                    "select * from dialogue_turns where child_id=:cid and session_id=:sid "
+                    "and sequence < :seq order by sequence desc limit :lim"
                 ),
                 {
                     "cid": child_id,
-                    "at": anchor["created_at"],
-                    "id": anchor["id"],
+                    "sid": session_id,
+                    "seq": anchor["sequence"],
                     "lim": amount,
                 },
             )
         ).mappings().all()
-        turns = [self._turn(row) for row in reversed(rows)]
-        return {"turns": turns, "history": await self._history(child_id, turns)}
+        turns = await self._turns_from_rows(reversed(rows), child_id)
+        return {"turns": turns, "history": await self._history(child_id, turns, session_id)}
 
     async def submit_turn(
         self,
@@ -179,7 +194,7 @@ class DialogueService:
                 )
             ).scalar()
         )
-        await self._insert(
+        explorer_turn = await self._insert(
             {
                 "session_id": session_id,
                 "child_id": child_id,
@@ -192,6 +207,162 @@ class DialogueService:
             }
         )
         self._ledger_explorer(child, session_id, value, reply)
+        return await self._advance_from_last_explorer(
+            auth_user_id,
+            child_id,
+            session_id,
+            session,
+            int(explorer_turn["sequence"]),
+            reply,
+            child,
+            attach_debug=attach_debug,
+        )
+
+    async def replay_last_explorer_reply(
+        self,
+        auth_user_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        attach_debug: bool = False,
+    ) -> dict[str, Any] | None:
+        """Re-ejecuta la fase actual sin insertar otro turno explorador (rewind debug)."""
+        child = await self._child(auth_user_id, child_id)
+        session = (
+            await self.session.execute(
+                text(
+                    "select * from dialogue_sessions where id=:id and child_id=:cid and status='open'"
+                ),
+                {"id": session_id, "cid": child_id},
+            )
+        ).mappings().first()
+        if not session:
+            raise ValueError("session not found")
+        row = (
+            await self.session.execute(
+                text(
+                    "select * from dialogue_turns where session_id=:sid and role='explorer' "
+                    "order by sequence desc limit 1"
+                ),
+                {"sid": session_id},
+            )
+        ).mappings().first()
+        if not row:
+            return None
+        reply = row.get("explorer_reply")
+        if isinstance(reply, str):
+            try:
+                reply = json.loads(reply)
+            except ValueError:
+                reply = {}
+        if not isinstance(reply, dict):
+            reply = {}
+        if not reply:
+            kind = "text" if str(row.get("text") or "").strip() else "continue"
+            reply = {
+                "kind": kind,
+                "text": str(row.get("text") or ""),
+                "option_id": str(row.get("text") or ""),
+            }
+        return await self._advance_from_last_explorer(
+            auth_user_id,
+            child_id,
+            session_id,
+            session,
+            int(row["sequence"]),
+            reply,
+            child,
+            attach_debug=attach_debug,
+        )
+
+    async def reemit_placement_item(
+        self,
+        auth_user_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        item_index: int,
+    ) -> dict[str, Any] | None:
+        """Vuelve a emitir un ítem del examen en curso sin recomponer la cola (rewind debug)."""
+        child = await self._child(auth_user_id, child_id)
+        session = (
+            await self.session.execute(
+                text(
+                    "select * from dialogue_sessions where id=:id and child_id=:cid and status='open'"
+                ),
+                {"id": session_id, "cid": child_id},
+            )
+        ).mappings().first()
+        if not session:
+            raise ValueError("session not found")
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        state = self._read_placement_state(
+            str(parent_id) if parent_id else None, child_id, session_id, world
+        )
+        if not state or not state.get("queue"):
+            return None
+        queue = state["queue"]
+        if item_index < 0 or item_index >= len(queue):
+            return None
+        sequence = int(
+            (
+                await self.session.execute(
+                    text(
+                        "select coalesce(max(sequence),0)+1 from dialogue_turns where session_id=:id"
+                    ),
+                    {"id": session_id},
+                )
+            ).scalar()
+        )
+        mentor_id = str(session.get("mentor_id") or "guardian")
+        turn_payload = PlacementService(self.session).item_to_turn(
+            session_id,
+            child_id,
+            str(session["flow_id"]),
+            sequence,
+            mentor_id,
+            str(world or "fantasy"),
+            queue[item_index],
+            item_index,
+            len(queue),
+            child,
+        )
+        return await self._insert(
+            {
+                **{
+                    k: turn_payload[k]
+                    for k in (
+                        "session_id",
+                        "child_id",
+                        "flow_id",
+                        "sequence",
+                        "role",
+                        "text",
+                        "input_mode",
+                        "options",
+                        "meta",
+                    )
+                },
+                "explorer_reply": None,
+                "model_used": turn_payload.get("model_used"),
+            }
+        )
+
+    async def _advance_from_last_explorer(
+        self,
+        auth_user_id: str,
+        child_id: str,
+        session_id: str,
+        session: Any,
+        sequence: int,
+        reply: dict[str, Any],
+        child: dict[str, Any],
+        *,
+        attach_debug: bool = False,
+    ) -> dict[str, Any]:
+        kind = reply.get("kind")
+        value = str(reply.get("text") or reply.get("option_id") or "").strip()
 
         last = await self._last_mentor(session_id)
         phase = (last or {}).get("meta", {}).get("phase")
@@ -287,9 +458,14 @@ class DialogueService:
 
         fresh = await self._child(auth_user_id, child_id)
         mid = resolve_mentor_key(fresh)
+        last_turn = turns[-1] if turns else last
+        last_phase = (last_turn or {}).get("meta", {}).get("phase")
+        chapter = self._resolve_chapter(fresh, session_id, last_phase)
+        self._record_chapter_if_changed(fresh, session_id, chapter)
         result: dict[str, Any] = {
             "agent_turns": turns,
             "effects": effects,
+            "pending_agent_turn": await self._last_mentor(session_id),
             "waiting_copy": await WaitingCopyService(self.session).waiting_copy_from_cache(
                 child_id
             ),
@@ -298,6 +474,7 @@ class DialogueService:
             "onboarding_step": fresh.get("onboarding_step"),
             "display_name": fresh.get("display_name"),
             "mentor": mentor_profile(mid),
+            "chapter": chapter,
             "world_theme": fresh.get("world_theme"),
             "age_band": fresh.get("age_band") or fresh.get("effective_age_band"),
             "age_years": fresh.get("age_years"),
@@ -441,14 +618,24 @@ class DialogueService:
         child["age_years"] = age
         child["age_band"] = band
         child["onboarding_step"] = "choose_character"
+        world = self._world(child) or "fantasy"
         turn = await self._agent_mentor_turn(
             child,
             session_id,
             str(session["flow_id"]),
             sequence + 1,
-            "Pide que describa su forma/especie/criatura para la aventura (texto libre).",
+            "Pide que elija una de las sugerencias o describa su personaje con sus palabras. "
+            "Devuelve exactamente 3 opciones en `options` (id slug, label, description breve). "
+            "Los labels deben ser variados y evocadores (título, rol, lugar o historia). "
+            "Si el arquetipo es humano, no hace falta decir «humano». Si NO es humano, "
+            "el label debe nombrar la especie (elfo, orco, androide…). Ejemplos: "
+            "«El mago de la noche blanca», «El elfo explorador del bosque milenario», "
+            "«La bibliotecaria de Anderlogia». Al menos una opción no humana entre las tres. "
+            "Inspírate en el glosario; no copies lista fija. No hables de «forma y oficio». "
+            "No uses continue: chips temáticos + texto libre.",
             "choose_character_species",
             purpose="mentor_guide",
+            force_input_mode="options_or_text",
         )
         return effects, [turn]
 
@@ -461,7 +648,7 @@ class DialogueService:
         value: str,
         child: dict[str, Any],
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        raw = value.strip()[:120] or "explorador"
+        raw = resolve_species_input(value, self._world(child))[:120] or "explorador"
         deps = self._deps(child, session_id, "character_coach")
         prompt = (
             "El explorador describe su forma. Genera TravelerProfileEnvelope: "
@@ -667,7 +854,8 @@ class DialogueService:
             "Genera exactamente 3 ítems de examen de ingreso (PlacementQueueEnvelope). "
             f"Materias permitidas: {subjects}. Mundo: {child.get('world_theme')}. "
             f"Edad/banda: {child.get('age_years')}/{child.get('age_band')}. "
-            "Mezcla mcq y short_text. Castellano de España."
+            "Mezcla mcq y short_text. Castellano de España. "
+            "Sin nombres de franquicias conocidas; inventa escenarios originales."
         )
         try:
             bundle, model = await run_purpose(
@@ -695,6 +883,13 @@ class DialogueService:
                     }
                 )
             if items:
+                for item in items:
+                    blob = " ".join(
+                        str(item.get(key) or "")
+                        for key in ("prompt_text", "presentation_text", "item_key")
+                    )
+                    if franchise_violations_in_text(blob):
+                        raise RuntimeError("franchise_reference")
                 return items
         except Exception:
             pass
@@ -1007,6 +1202,7 @@ class DialogueService:
                 f"{child.get('age_years')}/{child.get('age_band')}. "
                 "Camino: path_id, subject_id, title, intro, learning_blurb y 3 challenges "
                 "con prompt, tipo, opciones/respuesta y explanation. Castellano de España. "
+                "Sin nombres de franquicias conocidas; inventa títulos y lugares originales. "
                 "Intros y blurbs breves (1–2 frases)."
             )
             try:
@@ -1037,6 +1233,23 @@ class DialogueService:
                     )
                 if not challenges:
                     raise RuntimeError("empty challenges")
+                path_blob = " ".join(
+                    [
+                        str(p.title or ""),
+                        str(p.intro or ""),
+                        str(p.learning_blurb or ""),
+                        *(
+                            str(ch.prompt_text or "")
+                            for ch in detail.challenges[:3]
+                        ),
+                        *(
+                            str(ch.explanation or "")
+                            for ch in detail.challenges[:3]
+                        ),
+                    ]
+                )
+                if franchise_violations_in_text(path_blob):
+                    raise RuntimeError("franchise_reference")
                 out.append(
                     {
                         "path_id": p.path_id or f"path_{i+1}",
@@ -1323,6 +1536,70 @@ class DialogueService:
             child_id, session_id, session, sequence, child2
         )
 
+    async def regenerate_anchor_mentor_turn(
+        self,
+        auth_user_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        phase: str,
+    ) -> dict[str, Any] | None:
+        """Regenera el primer turno mentor de una fase (rewind sin explorador previo)."""
+        child = await self._child(auth_user_id, child_id)
+        session = (
+            await self.session.execute(
+                text(
+                    "select * from dialogue_sessions where id=:id and child_id=:cid and status='open'"
+                ),
+                {"id": session_id, "cid": child_id},
+            )
+        ).mappings().first()
+        if not session:
+            raise ValueError("session not found")
+        sequence = int(
+            (
+                await self.session.execute(
+                    text(
+                        "select coalesce(max(sequence),0)+1 from dialogue_turns where session_id=:id"
+                    ),
+                    {"id": session_id},
+                )
+            ).scalar()
+        )
+        flow = str(session["flow_id"])
+        if phase == "choose_world":
+            return await self._agent_mentor_turn(
+                child,
+                session_id,
+                flow,
+                sequence,
+                "Preséntate y pide elegir mundo (fantasy o sci-fi). Sé breve y claro.",
+                "choose_world",
+                purpose="onboarding_host",
+                force_options=self._world_options(),
+                force_input_mode="options_only",
+            )
+        if phase == "handoff_placement":
+            return await self._insert(
+                {
+                    "session_id": session_id,
+                    "child_id": child_id,
+                    "flow_id": flow,
+                    "sequence": sequence,
+                    "role": "mentor",
+                    "text": (
+                        "Cuando quieras, abrimos la prueba de ingreso. "
+                        "Te haré unas preguntas para situarte."
+                    ),
+                    "input_mode": "continue",
+                    "options": None,
+                    "meta": {"phase": "handoff_placement"},
+                    "explorer_reply": None,
+                    "model_used": None,
+                }
+            )
+        return None
+
     async def _agent_mentor_turn(
         self,
         child: dict[str, Any],
@@ -1335,9 +1612,13 @@ class DialogueService:
         purpose: str,
         force_options: list[dict[str, Any]] | None = None,
         force_input_mode: str | None = None,
+        prose_retry_hint: str | None = None,
     ) -> dict[str, Any]:
         purpose_run = purpose if purpose != "character_coach" else "mentor_guide"
         deps = self._deps(child, session_id, purpose_run)
+        extra = value
+        if prose_retry_hint:
+            extra = f"{value}\n\nCorrección obligatoria: {prose_retry_hint}"
         ctx = TurnContext(
             child=child,
             session_id=session_id,
@@ -1346,6 +1627,7 @@ class DialogueService:
             phase=str(phase or "dialogue"),
             purpose=purpose_run,
             explorer_reply=value,
+            extra_prompt=prose_retry_hint and f"Corrección obligatoria: {prose_retry_hint}" or None,
             force_options=force_options,
             force_input_mode=force_input_mode,
             deps=deps,
@@ -1356,7 +1638,29 @@ class DialogueService:
         result = await self.orchestrator.run(ctx)
         envelope = result.output
         assert isinstance(envelope, DialogueEnvelope)
+        phase_key = str(phase or "")
+        world = self._world(child) or "fantasy"
         options = force_options or [o.model_dump() for o in envelope.options] or None
+        prose_issues = validate_mentor_prose(envelope.agent_text)
+        option_issues: list[str] = []
+        if phase_key == "choose_character_species" and not force_options:
+            option_issues = validate_species_options(options, world)
+        all_issues = prose_issues + option_issues
+        if all_issues and prose_retry_hint is None:
+            return await self._agent_mentor_turn(
+                child,
+                session_id,
+                flow,
+                sequence,
+                value,
+                phase,
+                purpose=purpose,
+                force_options=force_options,
+                force_input_mode=force_input_mode,
+                prose_retry_hint="; ".join(all_issues[:6]),
+            )
+        if option_issues and phase_key == "choose_character_species" and not force_options:
+            options = species_options_for_world(world)
         input_mode = force_input_mode or envelope.input_mode
         return await self._mentor_turn(
             session_id,
@@ -1369,6 +1673,7 @@ class DialogueService:
             {
                 **(envelope.meta or {}),
                 "phase": phase or "dialogue",
+                "world_theme": child.get("world_theme"),
                 "mentor_id": deps.mentor and deps.mentor.get("id"),
                 "tool_notes": result.tool_notes,
             },
@@ -1503,6 +1808,90 @@ class DialogueService:
             return "adventure"
         return "first_run"
 
+    def _chapter_events(
+        self,
+        parent_id: str | None,
+        child_id: str,
+        session_id: str,
+        world: str | None,
+    ) -> list[dict[str, Any]]:
+        if not parent_id:
+            return []
+        try:
+            return self.ledger.read_events(
+                parent_id, child_id, session_id, world_theme=world
+            )
+        except TypeError:
+            return self.ledger.read_events(parent_id, child_id, session_id)
+
+    def _resolve_chapter(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        last_phase: str | None,
+    ) -> dict[str, Any]:
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        events = self._chapter_events(
+            str(parent_id) if parent_id else None,
+            str(child["id"]),
+            session_id,
+            world,
+        )
+        persisted = read_latest_chapter_opened(events)
+        progress = self._read_path_progress(
+            str(parent_id) if parent_id else None,
+            str(child["id"]),
+            session_id,
+            world,
+        )
+        return resolve_chapter(
+            child,
+            world_theme=world,
+            last_phase=last_phase,
+            persisted=persisted,
+            path_progress=progress or None,
+        )
+
+    def _record_chapter_if_changed(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        chapter: dict[str, Any],
+    ) -> None:
+        parent_id = child.get("parent_id")
+        if not parent_id:
+            return
+        world = self._world(child)
+        events = self._chapter_events(str(parent_id), str(child["id"]), session_id, world)
+        latest = read_latest_chapter_opened(events)
+        chapter_id = str(chapter.get("id") or "")
+        title = str(chapter.get("title") or "")
+        if (
+            latest
+            and str(latest.get("chapter_id") or latest.get("id") or "") == chapter_id
+            and str(latest.get("title") or "") == title
+        ):
+            return
+        try:
+            self.ledger.append_event(
+                str(parent_id),
+                str(child["id"]),
+                session_id,
+                kind="chapter_opened",
+                payload={
+                    "chapter_id": chapter_id,
+                    "title": title,
+                    "source": chapter.get("source"),
+                    "world_theme": chapter.get("world_theme"),
+                    "path_id": chapter.get("path_id"),
+                },
+                world_theme=world,
+                summary=f"Capítulo: {title}",
+            )
+        except Exception:
+            pass
+
     @staticmethod
     def _world_options() -> list[dict[str, str]]:
         return [
@@ -1625,18 +2014,46 @@ class DialogueService:
                 },
             )
         ).mappings().one()
-        return self._turn(saved)
+        child = await self._child_by_id(str(saved["child_id"]))
+        return self._enrich_turn(self._turn(saved), child)
 
-    async def _recent(self, cid: str, limit: int) -> list[dict[str, Any]]:
+    async def _turns_from_rows(
+        self, rows: list[Any], child_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        if not rows:
+            return []
+        cid = child_id or str(rows[0]["child_id"])
+        child = await self._child_by_id(cid)
+        return [self._enrich_turn(self._turn(row), child) for row in rows]
+
+    async def _recent(
+        self, cid: str, limit: int, session_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        if session_id:
+            rows = (
+                await self.session.execute(
+                    text(
+                        "select * from dialogue_turns where child_id=:id and session_id=:sid "
+                        "order by sequence asc"
+                    ),
+                    {"id": cid, "sid": session_id},
+                )
+            ).mappings().all()
+            if len(rows) > limit:
+                rows = rows[-limit:]
+            return await self._turns_from_rows(rows, cid)
         rows = (
             await self.session.execute(
                 text(
-                    "select * from dialogue_turns where child_id=:id order by created_at desc,id desc limit :lim"
+                    "select * from dialogue_turns where child_id=:id "
+                    "order by sequence asc"
                 ),
-                {"id": cid, "lim": limit},
+                {"id": cid},
             )
         ).mappings().all()
-        return [self._turn(row) for row in reversed(rows)]
+        if len(rows) > limit:
+            rows = rows[-limit:]
+        return await self._turns_from_rows(rows, cid)
 
     async def _last_mentor(self, sid: str) -> dict[str, Any] | None:
         row = (
@@ -1648,9 +2065,14 @@ class DialogueService:
                 {"id": sid},
             )
         ).mappings().first()
-        return self._turn(row) if row else None
+        if not row:
+            return None
+        child = await self._child_by_id(str(row["child_id"]))
+        return self._enrich_turn(self._turn(row), child)
 
-    async def _history(self, cid: str, turns: list[dict[str, Any]]) -> dict[str, Any]:
+    async def _history(
+        self, cid: str, turns: list[dict[str, Any]], session_id: str | None = None
+    ) -> dict[str, Any]:
         if not turns:
             return {
                 "page_size": self.PAGE_SIZE,
@@ -1661,15 +2083,20 @@ class DialogueService:
                 "newest_sequence": None,
             }
         old, new = turns[0], turns[-1]
-        older = (
-            await self.session.execute(
-                text(
-                    "select 1 from dialogue_turns where child_id=:cid and "
-                    "(created_at<:at or (created_at=:at and id<:id)) limit 1"
-                ),
-                {"cid": cid, "at": old["created_at"], "id": old["id"]},
+        sid = session_id or new.get("session_id")
+        older = False
+        if sid and old.get("sequence") is not None:
+            older = bool(
+                (
+                    await self.session.execute(
+                        text(
+                            "select 1 from dialogue_turns where child_id=:cid and session_id=:sid "
+                            "and sequence < :seq limit 1"
+                        ),
+                        {"cid": cid, "sid": sid, "seq": old["sequence"]},
+                    )
+                ).scalar()
             )
-        ).scalar()
         return {
             "page_size": self.PAGE_SIZE,
             "has_older": bool(older),
@@ -1680,6 +2107,120 @@ class DialogueService:
         }
 
     @staticmethod
+    def _normalize_options_list(raw: Any) -> list[dict[str, Any]] | None:
+        if raw is None:
+            return None
+        if isinstance(raw, dict):
+            raw = [{"id": str(key), "label": str(value)} for key, value in raw.items()]
+        if not isinstance(raw, list):
+            return None
+        out: list[dict[str, Any]] = []
+        for idx, item in enumerate(raw):
+            if isinstance(item, str):
+                out.append({"id": item, "label": item})
+                continue
+            if not isinstance(item, dict):
+                continue
+            oid = str(
+                item.get("id") or item.get("option_id") or item.get("key") or ""
+            ).strip()
+            label = str(
+                item.get("label")
+                or item.get("text")
+                or item.get("value")
+                or item.get("answer")
+                or item.get("content")
+                or ""
+            ).strip()
+            desc = str(item.get("description") or "").strip()
+            if not label and desc:
+                label = desc
+            elif (
+                label
+                and desc
+                and len(label) <= 2
+                and label.upper() == oid.upper()
+                and desc.lower() != oid.lower()
+            ):
+                label = desc
+            if not oid:
+                oid = chr(ord("a") + idx) if idx < 26 else str(idx)
+            if not label:
+                label = oid
+            entry: dict[str, Any] = {"id": oid, "label": label}
+            if desc and desc != label:
+                entry["description"] = desc
+            out.append(entry)
+        return out or None
+
+    @staticmethod
+    def _options_are_letter_only(options: list[dict[str, Any]] | None) -> bool:
+        if not options:
+            return True
+        for opt in options:
+            oid = str(opt.get("id") or "").strip()
+            label = str(opt.get("label") or "").strip()
+            if not label:
+                return True
+            if len(label) <= 2 and label.upper() == oid.upper():
+                return True
+        return False
+
+    def _placement_options_from_ledger(
+        self, child: dict[str, Any], turn: dict[str, Any]
+    ) -> list[dict[str, Any]] | None:
+        parent_id = child.get("parent_id")
+        if not parent_id:
+            return None
+        meta = turn.get("meta") if isinstance(turn.get("meta"), dict) else {}
+        session_id = str(turn.get("session_id") or "")
+        world = str(meta.get("world_theme") or self._world(child) or "")
+        state = self._read_placement_state(
+            str(parent_id), str(child["id"]), session_id, world or None
+        )
+        if not state:
+            return None
+        index = int(
+            meta.get("index")
+            if meta.get("index") is not None
+            else state.get("index") or 0
+        )
+        queue = state.get("queue") or []
+        if index >= len(queue):
+            return None
+        item = queue[index]
+        return self._normalize_options_list(item.get("options"))
+
+    def _enrich_turn(self, turn: dict[str, Any], child: dict[str, Any]) -> dict[str, Any]:
+        d = dict(turn)
+        d["options"] = self._normalize_options_list(d.get("options"))
+        meta = d.get("meta") if isinstance(d.get("meta"), dict) else {}
+        if meta.get("phase") == "placement_item" and self._options_are_letter_only(
+            d.get("options")
+        ):
+            restored = self._placement_options_from_ledger(child, d)
+            if restored:
+                d["options"] = restored
+        return DialogueService._normalize_turn_fields(d)
+
+    @staticmethod
+    def _normalize_turn_fields(d: dict[str, Any]) -> dict[str, Any]:
+        meta = d.get("meta") if isinstance(d.get("meta"), dict) else {}
+        phase = str(meta.get("phase") or "")
+        d["options"] = DialogueService._normalize_options_list(d.get("options"))
+        if phase in PHASE_INPUT_MODE:
+            d["input_mode"] = PHASE_INPUT_MODE[phase]
+        if phase == "choose_age" and not d.get("options"):
+            d["options"] = [
+                {"id": str(age), "label": str(age)}
+                for age in (6, 7, 8, 9, 10, 12, 15, 18, 30, 50, 70)
+            ]
+        if phase in {"choose_character_species", "choose_character"} and not d.get("options"):
+            world = str(meta.get("world_theme") or "")
+            d["options"] = species_options_for_world(world if world in {"fantasy", "sci-fi"} else "fantasy")
+        return d
+
+    @staticmethod
     def _turn(row: Any) -> dict[str, Any]:
         d = dict(row)
         for key in ("options", "explorer_reply", "meta"):
@@ -1688,6 +2229,9 @@ class DialogueService:
                     d[key] = json.loads(d[key])
                 except ValueError:
                     d[key] = None if key != "meta" else {}
+        if isinstance(d.get("options"), list):
+            d["options"] = DialogueService._normalize_options_list(d.get("options"))
+        d = DialogueService._normalize_turn_fields(d)
         created = d.get("created_at")
         return {
             "id": str(d["id"]),

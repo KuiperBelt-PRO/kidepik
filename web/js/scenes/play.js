@@ -22,7 +22,10 @@ import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
 import { appLog } from "../lib/app-logger.js";
 import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
-import { isDebugAiClientActive } from "../lib/debug-ai.js?v=244";
+import { showGlassConfirm } from "../components/glass-modal.js";
+import { isDebugAiAllowed, isDebugAiClientActive, setDebugAiServerAllowed } from "../lib/debug-ai.js?v=256";
+import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
+import { postDebugJourneyRewind } from "../lib/debug-journey-api.js?v=256";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=244";
 
 /** Copy canónico de elección de mundo (fallback si el turno no trae description). */
@@ -88,7 +91,7 @@ export function renderPlay(params) {
     if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) return;
 
     frameHandle = mountSectionFrame(host, {
-      title: "Aventura",
+      title: "",
       ariaLabel: "Aventura",
       navigation: { forward: false },
     });
@@ -137,6 +140,7 @@ export function renderPlay(params) {
       session,
       childId,
       frameRoot: frameHandle.root,
+      setChapterTitle: (text) => frameHandle?.setTitle(text),
       sessionOpenPromise,
       onReady(handle) {
         cleanups.push(() => handle.destroy());
@@ -168,6 +172,7 @@ export function renderPlay(params) {
  *   session: import('@supabase/supabase-js').Session;
  *   childId: string;
  *   frameRoot?: HTMLElement;
+ *   setChapterTitle?: (text: string) => void;
  *   onReady: (h: { destroy: () => void }) => void;
  *   getSessionId: () => string | null;
  *   setSessionId: (id: string) => void;
@@ -189,6 +194,8 @@ async function mountPlayPanel(root, ctx) {
   /** @type {object | null} */
   let lastPendingTurn = null;
   let sending = false;
+  let rewinding = false;
+  let debugRewindEnabled = false;
   /** @type {{ has_older: boolean, oldest_turn_id: string | null, page_size: number }} */
   let historyMeta = { has_older: false, oldest_turn_id: null, page_size: 24 };
   /** @type {Set<string>} */
@@ -302,6 +309,22 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * @param {{ title?: string } | null | undefined} chapter
+   */
+  function applyChapterTitle(chapter) {
+    const title = typeof chapter?.title === "string" ? chapter.title.trim() : "";
+    if (!title) return;
+    ctx.setChapterTitle?.(title);
+    if (ctx.frameRoot instanceof HTMLElement) {
+      const titleEl = ctx.frameRoot.querySelector(".section-frame__title");
+      if (titleEl instanceof HTMLElement) {
+        titleEl.setAttribute("aria-live", "polite");
+        titleEl.classList.add("section-frame__title--chapter");
+      }
+    }
+  }
+
+  /**
    * @param {object} data
    */
   function applyDialogueState(data) {
@@ -314,6 +337,8 @@ async function mountPlayPanel(root, ctx) {
     }
     if (typeof data.age_band === "string" && data.age_band.trim()) {
       playAgeBand = data.age_band.trim();
+    } else if (data.age_years == null && data.age_band == null) {
+      playAgeBand = null;
     }
     if (typeof data.onboarding_step === "string") {
       onboardingStep = data.onboarding_step;
@@ -370,7 +395,10 @@ async function mountPlayPanel(root, ctx) {
     spark: "Chispa de niebla",
     drake: "Dragón pequeño",
     spot: "Explorador spot",
+    guardian: "Guardián del claro",
+    cadete: "Cadete estelar",
     orbit: "Criatura orbital",
+    androide: "Androide curioso",
     custom: "Escribir la mía",
     continue: "Continuar",
   });
@@ -394,7 +422,6 @@ async function mountPlayPanel(root, ctx) {
   }
 
   root.innerHTML = `
-    <p class="crew-panel__subtitle play-panel__mentor" data-mentor-name>Aventura</p>
     <div class="play-panel__log" data-log role="log" aria-live="polite"></div>
     <p class="crew-panel__status play-panel__status" data-status aria-live="polite"></p>
   `;
@@ -452,7 +479,6 @@ async function mountPlayPanel(root, ctx) {
   const optionsEl = footer.querySelector("[data-options]");
   const formEl = footer.querySelector("[data-form]");
   const statusEl = root.querySelector("[data-status]");
-  const mentorNameEl = root.querySelector("[data-mentor-name]");
   const progressEl = footer.querySelector("[data-exam-progress]");
   const inputEl = footer.querySelector("#play-reply");
   const sendBtn = footer.querySelector("[data-send]");
@@ -509,6 +535,96 @@ async function mountPlayPanel(root, ctx) {
   /** Copy de sistema (no narrativa) cuando falla el compose de aventura. */
   const ADVENTURE_COMPOSE_FAILED_COPY =
     "No he podido preparar este tramo ahora mismo. Cuando quieras, lo intentamos de nuevo.";
+
+  /** Contrato servidor: la fase manda sobre input_mode almacenado (rewind / turnos legacy). */
+  const PHASE_INPUT_MODE = Object.freeze({
+    choose_world: "options_only",
+    choose_name: "text_only",
+    choose_age: "options_or_text",
+    choose_character_species: "options_or_text",
+    choose_character: "options_or_text",
+    handoff_placement: "continue",
+    placement_item: "options_only",
+    placement_feedback: "continue",
+    choose_path: "options_only",
+    path_intro: "continue",
+  });
+
+  const DEFAULT_AGE_OPTIONS = Object.freeze(
+    [6, 7, 8, 9, 10, 12, 15, 18, 30, 50, 70].map((age) => ({
+      id: String(age),
+      label: String(age),
+    })),
+  );
+
+  const SPECIES_OPTIONS_BY_WORLD = Object.freeze({
+    fantasy: [
+      { id: "spark", label: "Chispa de niebla" },
+      { id: "drake", label: "Dragón pequeño" },
+      { id: "guardian", label: "Guardián del claro" },
+    ],
+    "sci-fi": [
+      { id: "cadete", label: "Cadete estelar" },
+      { id: "orbit", label: "Criatura orbital" },
+      { id: "androide", label: "Androide curioso" },
+    ],
+  });
+
+  /**
+   * @param {'fantasy' | 'sci-fi' | null | undefined} world
+   */
+  function speciesOptionsForWorld(world) {
+    const theme = world === "sci-fi" ? "sci-fi" : "fantasy";
+    return SPECIES_OPTIONS_BY_WORLD[theme];
+  }
+
+  /**
+   * Etiqueta visible de una opción (soporta alias LLM: text, value, description…).
+   * @param {{ id?: string, label?: string, text?: string, value?: string, answer?: string, description?: string } | null | undefined} opt
+   * @param {string} [phase]
+   */
+  function optionChipLabel(opt, phase = "") {
+    const id = String(opt?.id ?? "").trim();
+    const label = String(
+      opt?.label ?? opt?.text ?? opt?.value ?? opt?.answer ?? "",
+    ).trim();
+    const desc = String(opt?.description ?? "").trim();
+    let body = label;
+    if (
+      body &&
+      id &&
+      body.length <= 2 &&
+      body.toUpperCase() === id.toUpperCase() &&
+      desc
+    ) {
+      body = desc;
+    } else if (!body && desc) {
+      body = desc;
+    }
+    if (phase === "placement_item" && body) return body;
+    return body || id;
+  }
+
+  /**
+   * @param {object | null | undefined} turn
+   */
+  function resolvePendingInputMode(turn) {
+    const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
+    if (phase && PHASE_INPUT_MODE[phase]) return PHASE_INPUT_MODE[phase];
+    return turn?.input_mode || "continue";
+  }
+
+  /** Restaura footer y flags tras rehidratar (rewind, resync). */
+  function resetPlayInteractionState() {
+    hideThinking();
+    sending = false;
+    if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
+    if (inputEl instanceof HTMLTextAreaElement) {
+      inputEl.disabled = false;
+      inputEl.readOnly = false;
+    }
+    footer.classList.remove("play-panel__footer--thinking");
+  }
 
   /** @type {Record<string, string[]>} */
   let waitingCopy = {
@@ -673,6 +789,39 @@ async function mountPlayPanel(root, ctx) {
     syncFooterChrome();
   }
 
+  /**
+   * Quita la burbuja del turno ancla y todo lo posterior (rewind en curso).
+   * @param {string} turnId
+   */
+  function removeLogFromTurn(turnId) {
+    if (!(logEl instanceof HTMLElement) || !turnId) return;
+    const safeId = typeof CSS !== "undefined" && CSS.escape ? CSS.escape(turnId) : turnId;
+    const anchor =
+      logEl.querySelector(`.play-bubble[data-turn-id="${safeId}"]`) ||
+      logEl.querySelector(`.play-bubble__rewind[data-turn-id="${safeId}"]`)?.closest(".play-bubble");
+    if (!(anchor instanceof HTMLElement)) return;
+
+    let node = anchor;
+    while (node) {
+      const next = node.nextSibling;
+      if (
+        node instanceof HTMLElement &&
+        !node.classList.contains("play-history-load-wrap")
+      ) {
+        node.remove();
+      }
+      node = next;
+    }
+
+    renderedTurnIds.delete(turnId);
+    clearWorldHints();
+    if (optionsEl instanceof HTMLElement) optionsEl.innerHTML = "";
+    if (formEl instanceof HTMLElement) formEl.hidden = true;
+    syncFooterComposeMode(false);
+    syncExamProgress(null);
+    lastPendingTurn = null;
+  }
+
   if (inputEl instanceof HTMLTextAreaElement) {
     inputEl.addEventListener("input", () => autoGrowTextarea(inputEl));
     inputEl.addEventListener("keydown", (ev) => {
@@ -740,11 +889,15 @@ async function mountPlayPanel(root, ctx) {
    * @param {string} role
    * @param {string} text
    * @param {string} [who]
+   * @param {object} [turn]
    * @returns {HTMLElement}
    */
-  function buildBubbleElement(role, text, who) {
+  function buildBubbleElement(role, text, who, turn) {
     const bubble = document.createElement("div");
     bubble.className = `play-bubble play-bubble--${role}`;
+    if (turn?.id) {
+      bubble.dataset.turnId = String(turn.id);
+    }
 
     const displayText = role === "explorer" ? formatExplorerBubbleText(text) : text;
     const explorerWho = role === "explorer" ? explorerDisplayName : null;
@@ -757,8 +910,9 @@ async function mountPlayPanel(root, ctx) {
           ? "crew"
           : null;
 
-    const showHead =
-      iconId || (role === "mentor" && mentorWho) || (role === "explorer" && explorerWho);
+    const whoLabel = mentorWho || explorerWho;
+    const showRewind = Boolean(debugRewindEnabled && turn?.id);
+    const showHead = Boolean(iconId || whoLabel || showRewind);
 
     if (showHead) {
       const head = document.createElement("div");
@@ -769,12 +923,29 @@ async function mountPlayPanel(root, ctx) {
         iconSlot.appendChild(createGlassIconSvg(iconId, { size: 16 }));
         head.appendChild(iconSlot);
       }
-      const whoLabel = mentorWho || explorerWho;
       if (whoLabel) {
         const name = document.createElement("div");
         name.className = "play-bubble__who";
         name.textContent = whoLabel;
         head.appendChild(name);
+      }
+      if (showRewind) {
+        const rewindBtn = document.createElement("button");
+        rewindBtn.type = "button";
+        rewindBtn.className = "play-bubble__rewind";
+        rewindBtn.dataset.turnId = String(turn.id);
+        rewindBtn.setAttribute("aria-label", "Rebobinar viaje hasta aquí");
+        rewindBtn.textContent = "↺";
+        rewindBtn.disabled = sending || rewinding;
+        if (rewinding) rewindBtn.setAttribute("aria-disabled", "true");
+        rewindBtn.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const phase =
+            typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
+          void handleRewindClick(String(turn.id), phase);
+        });
+        head.appendChild(rewindBtn);
       }
       bubble.appendChild(head);
       localCleanups.push(bindGlassIconTheme(bubble));
@@ -842,7 +1013,7 @@ async function mountPlayPanel(root, ctx) {
     if (!String(text).trim() && turn?.meta?.compose_failed) {
       text = ADVENTURE_COMPOSE_FAILED_COPY;
     }
-    const nodes = [buildBubbleElement(role, text, role === "mentor" ? who : undefined)];
+    const nodes = [buildBubbleElement(role, text, role === "mentor" ? who : undefined, turn)];
     if (role === "mentor" && turn?.meta?.phase === "choice_resolved") {
       const echo = buildChoiceResolvedEcho(turn.meta);
       if (echo) nodes.push(echo);
@@ -868,7 +1039,7 @@ async function mountPlayPanel(root, ctx) {
    */
   function appendBubble(role, text, who, opts = {}) {
     if (!(logEl instanceof HTMLElement)) return;
-    insertLogNodes([buildBubbleElement(role, text, who)], opts);
+    insertLogNodes([buildBubbleElement(role, text, who, turn)], opts);
   }
 
   /**
@@ -1129,9 +1300,28 @@ async function mountPlayPanel(root, ctx) {
     clearWorldHints();
     syncExamProgress(turn);
 
-    const mode = turn.input_mode || "continue";
+    const mode = resolvePendingInputMode(turn);
     /** @type {{ id: string, label?: string, description?: string, why_for_you?: string }[]} */
     let opts = Array.isArray(turn.options) ? turn.options : [];
+    const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
+    if (phase === "choose_age" && opts.length === 0) {
+      opts = [...DEFAULT_AGE_OPTIONS];
+    }
+    if (
+      (phase === "choose_character_species" || phase === "choose_character") &&
+      opts.length === 0
+    ) {
+      opts = [...speciesOptionsForWorld(playWorldTheme)];
+    }
+    if (mode === "text_only") {
+      opts = [];
+    } else {
+      opts = opts.filter(
+        (opt) =>
+          String(opt.id || "").toLowerCase() !== "continue" &&
+          String(opt.label || "").trim().toLowerCase() !== "continuar",
+      );
+    }
     if (mode === "continue" && opts.length === 0) {
       opts = [{ id: "continue", label: "Continuar" }];
     }
@@ -1151,7 +1341,8 @@ async function mountPlayPanel(root, ctx) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "crew-panel__chip play-panel__option";
-        btn.textContent = opt.label || opt.id;
+        const chipLabel = optionChipLabel(opt, phase);
+        btn.textContent = chipLabel;
         if (chooseWorld && WORLD_THEME_HINTS[opt.id]) {
           const hint = enrichWorldOptions([opt])[0];
           btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
@@ -1167,7 +1358,7 @@ async function mountPlayPanel(root, ctx) {
               : {
                   kind: "option",
                   option_id: opt.id,
-                  displayLabel: opt.label || opt.id,
+                  displayLabel: chipLabel,
                 },
           );
         });
@@ -1185,6 +1376,10 @@ async function mountPlayPanel(root, ctx) {
     } else {
       syncFooterComposeMode(false);
     }
+    if (phase === "placement_item") {
+      formEl.hidden = true;
+      syncFooterComposeMode(false);
+    }
     syncFooterChrome();
     lastPendingTurn = turn;
     captureWaitingHints(turn);
@@ -1198,10 +1393,112 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * @param {string} turnId
+   * @param {string} [phase]
+   */
+  function resolveRewindThinkingKind(phase) {
+    if (phase === "placement_item" || phase === "placement_feedback") {
+      return "evaluating_answer";
+    }
+    if (phase === "handoff_placement" || phase === "placement_compose") {
+      return "preparing_exam";
+    }
+    if (
+      phase === "choose_zone" ||
+      phase === "admission_map" ||
+      phase === "zone_arrive" ||
+      phase === "zone_between" ||
+      phase === "adventure_challenge" ||
+      phase === "compose_failed"
+    ) {
+      return "adventure_compose";
+    }
+    return "general";
+  }
+
+  /**
+   * @param {string} turnId
+   * @param {string} [phase]
+   */
+  async function handleRewindClick(turnId, phase = "") {
+    if (rewinding || sending || !debugRewindEnabled) return;
+    const sid = ctx.getSessionId();
+    if (!sid) return;
+
+    const confirmed = await showGlassConfirm({
+      title: "Rebobinar viaje",
+      body:
+        phase === "placement_item"
+          ? "<p>¿Volver a mostrar esta pregunta del examen? Se mantendrá el mismo examen.</p>"
+          : "<p>¿Rebobinar hasta este mensaje? Se borrará lo posterior y el mentor volverá a redactar esta pregunta.</p>",
+      footer: "Esta acción no se puede deshacer.",
+      danger: true,
+      confirmLabel: "Rebobinar",
+    });
+    if (!confirmed) return;
+
+    rewinding = true;
+    logEl?.querySelectorAll(".play-bubble__rewind").forEach((btn) => {
+      if (btn instanceof HTMLButtonElement) {
+        btn.disabled = true;
+        btn.setAttribute("aria-disabled", "true");
+      }
+    });
+
+    removeLogFromTurn(turnId);
+    const thinkingKind = resolveRewindThinkingKind(phase);
+    showThinking(thinkingKind);
+    if (phase === "placement_item" && lastPendingTurn?.id === turnId) {
+      syncExamProgress(lastPendingTurn);
+    }
+
+    try {
+      const session = await getValidSession();
+      if (!session) {
+        showGlassToast("Sesión expirada. Vuelve a iniciar sesión.", { variant: "error" });
+        return;
+      }
+      const res = await postDebugJourneyRewind(session, ctx.childId, sid, turnId);
+      if (!res.ok || !res.data) {
+        const message =
+          res.detail || "No se pudo rebobinar el viaje. Prueba con reset completo del viajero.";
+        showGlassToast(message, { variant: "error" });
+        appLog.warn("play_rewind_failed", { status: res.status, turnId });
+        return;
+      }
+      hydrateFromSession(res.data);
+      const rewind = res.data?.debug?.rewind;
+      const regenerateMode =
+        typeof rewind?.regenerate_mode === "string" ? rewind.regenerate_mode : "";
+      showGlassToast(
+        regenerateMode === "placement_reemit"
+          ? "Pregunta del examen restaurada"
+          : rewind?.regenerated
+            ? "Mensaje regenerado"
+            : "Viaje rebobinado",
+        { variant: "success" },
+      );
+    } catch (err) {
+      appLog.error("play_rewind_error", { turnId, error: String(err) });
+      showGlassToast("No se pudo rebobinar el viaje.", { variant: "error" });
+    } finally {
+      hideThinking();
+      rewinding = false;
+      logEl?.querySelectorAll(".play-bubble__rewind").forEach((btn) => {
+        if (btn instanceof HTMLButtonElement) {
+          btn.disabled = sending;
+          btn.removeAttribute("aria-disabled");
+        }
+      });
+    }
+  }
+
+  /**
    * Rehidrata el log y el pending desde openSession (resync tras fallo de transporte).
    * @param {object} data
    */
   function hydrateFromSession(data) {
+    resetPlayInteractionState();
     ctx.setSessionId(data.session_id);
     if (logEl instanceof HTMLElement) {
       logEl.innerHTML = "";
@@ -1210,10 +1507,10 @@ async function mountPlayPanel(root, ctx) {
     mountHistoryLoadControl();
     applyDialogueState(data);
     applyWaitingCopy(data);
-    if (data.mentor?.display_name && mentorNameEl instanceof HTMLElement) {
+    if (data.mentor?.display_name) {
       mentorLabel = data.mentor.display_name;
-      mentorNameEl.textContent = mentorLabel;
     }
+    applyChapterTitle(data.chapter);
     if (data.history && typeof data.history === "object") {
       historyMeta = {
         has_older: Boolean(data.history.has_older),
@@ -1230,7 +1527,7 @@ async function mountPlayPanel(root, ctx) {
         renderTurn(t, mentorLabel, { scrollToEnd: false });
       } else {
         if (t?.id) renderedTurnIds.add(String(t.id));
-        insertLogNodes([buildBubbleElement(role, t.text || "", undefined)], { scrollToEnd: false });
+        insertLogNodes([buildBubbleElement(role, t.text || "", undefined, t)], { scrollToEnd: false });
       }
     }
     scrollLogToEnd({ force: true });
@@ -1314,36 +1611,47 @@ async function mountPlayPanel(root, ctx) {
     }
 
     hideThinking();
-    appendBubble("explorer", shown);
 
     const data = result.data;
     if (data.debug?.compose) {
       lastComposeDebug = data.debug.compose;
     }
-    applyDialogueState(data);
-    if (data.mentor?.display_name && mentorNameEl instanceof HTMLElement) {
-      mentorLabel = data.mentor.display_name;
-      mentorNameEl.textContent = mentorLabel;
+
+    const synced = await openDialogueSession(ctx.session, ctx.childId, "first_run");
+    if (!ctx.isCancelled() && synced.ok && synced.data) {
+      hydrateFromSession(synced.data);
+      if (lastComposeDebug) showComposeDebugChip(lastComposeDebug);
+      scrollLogToEnd({ force: true });
+      sending = false;
+      if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
+      return;
     }
+
+    applyDialogueState(data);
+    if (data.mentor?.display_name) {
+      mentorLabel = data.mentor.display_name;
+    }
+    applyChapterTitle(data.chapter);
+    appendBubble("explorer", shown);
 
     const turns = Array.isArray(data.agent_turns) ? data.agent_turns : [];
     for (const t of turns) {
       captureWaitingHints(t);
       appendMentorTurn(t, mentorLabel);
     }
-    const last = turns[turns.length - 1];
-    if (last) {
-      const phase = typeof last.meta?.phase === "string" ? last.meta.phase : "";
+    const pending = data.pending_agent_turn || turns[turns.length - 1];
+    if (pending) {
+      const phase = typeof pending.meta?.phase === "string" ? pending.meta.phase : "";
       if (phase === "placement_item" || phase === "placement_feedback") {
         onboardingStep = "placement";
       } else if (phase) {
         onboardingStep = phase;
       }
-      if (last.meta?.compose_failed) {
-        lastComposeDebug = last.meta.compose_debug ?? data.debug?.compose ?? lastComposeDebug;
+      if (pending.meta?.compose_failed) {
+        lastComposeDebug = pending.meta.compose_debug ?? data.debug?.compose ?? lastComposeDebug;
         showComposeDebugChip(lastComposeDebug);
       }
-      renderPending(last);
+      renderPending(pending);
     }
     scrollLogToEnd();
     sending = false;
@@ -1360,6 +1668,15 @@ async function mountPlayPanel(root, ctx) {
 
   const opened = await (ctx.sessionOpenPromise ?? openDialogueSession(ctx.session, ctx.childId, "first_run"));
   if (ctx.isCancelled()) return;
+
+  if (isDebugAiClientActive()) {
+    const statusRes = await fetchDebugAiStatus(ctx.session);
+    if (statusRes.ok && statusRes.data?.debug_allowed) {
+      setDebugAiServerAllowed(true);
+      debugRewindEnabled = isDebugAiAllowed();
+    }
+  }
+
   if (!opened.ok || !opened.data) {
     footer.remove();
     root.innerHTML = `

@@ -12,6 +12,7 @@ COPY backend/skills /app/skills
 COPY backend/agents /app/agents
 COPY data/glossary /data/glossary
 COPY data/waiting /data/waiting
+COPY data/chapters /data/chapters
 
 RUN pip install --no-cache-dir -e ".[dev]"
 
@@ -22,6 +23,7 @@ ENV MIGRATIONS_DIR=/var/www/supabase/migrations
 ENV JOURNEY_DATA_DIR=/data/journey
 ENV GLOSSARY_DATA_DIR=/data/glossary
 ENV WAITING_DATA_DIR=/data/waiting
+ENV CHAPTERS_DATA_DIR=/data/chapters
 
 EXPOSE 8000
 

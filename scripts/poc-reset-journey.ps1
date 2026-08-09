@@ -2,7 +2,8 @@
 # SPEC_AI_JOURNEY_FILE_LEDGER §10
 param(
   [switch]$Apply,
-  [switch]$DryRun
+  [switch]$DryRun,
+  [switch]$SkipBackup
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +12,11 @@ Set-Location $repo
 
 if (-not $Apply -and -not $DryRun) {
   $DryRun = $true
+}
+
+if ($Apply -and -not $SkipBackup) {
+  Write-Host "==> Backup local antes del reset de journey..." -ForegroundColor Yellow
+  & (Join-Path $repo "scripts\poc-backup-local.ps1") -Label "antes-reset-journey"
 }
 
 $flag = if ($Apply) { "--apply" } else { "--dry-run" }

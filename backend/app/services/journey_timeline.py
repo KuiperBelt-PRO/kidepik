@@ -21,6 +21,7 @@ class JourneyTimelineService:
         "mentor_utterance": 50,
         "explorer_reply": 60,
         "traveler_update": 65,
+        "chapter_opened": 68,
         "level": 70,
         "rank": 70,
     }

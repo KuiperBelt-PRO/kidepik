@@ -59,7 +59,7 @@ Hasta `world_theme` null, la voz es **El Guía** (`mentor_id` interno `host`, fi
 
 **Markdown en burbujas:** `agent_text` admite **negrita** y *cursiva* (renderizado en cliente `web/js/lib/markdown.js`); los agentes y el orquestador deben conocerlo (ver `build_mentor_prompt`).
 
-**Título de capítulo vs mentor:** el rótulo centrado bajo el logo en play evolucionará a títulos de capítulo — propuesta en [SPEC_APP_JOURNEY_CHAPTERS.md](SPEC_APP_JOURNEY_CHAPTERS.md); no confundir con `display_name` del mentor.
+**Título de capítulo vs mentor:** el rótulo bajo el logo en play es el **capítulo** (umbral → rito → aventura LLM), no el nombre del mentor — propuesta en [SPEC_APP_JOURNEY_CHAPTERS.md](SPEC_APP_JOURNEY_CHAPTERS.md).
 
 ---
 

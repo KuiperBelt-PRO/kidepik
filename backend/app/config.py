@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     journey_data_dir: str = Field(default="/data/journey", alias="JOURNEY_DATA_DIR")
     glossary_data_dir: str = Field(default="/data/glossary", alias="GLOSSARY_DATA_DIR")
     waiting_data_dir: str = Field(default="/data/waiting", alias="WAITING_DATA_DIR")
+    chapters_data_dir: str = Field(default="/data/chapters", alias="CHAPTERS_DATA_DIR")
     ai_summary_every_n: int = Field(default=8, alias="AI_SUMMARY_EVERY_N")
 
     # Legado OpenRouter (PHP / port parcial) — no usar en camino agentic Gemini

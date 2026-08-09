@@ -27,6 +27,7 @@ def settings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Settings:
     monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path / "journey"))
     monkeypatch.setenv("GLOSSARY_DATA_DIR", str(tmp_path / "glossary"))
     monkeypatch.setenv("WAITING_DATA_DIR", str(tmp_path / "waiting"))
+    monkeypatch.setenv("CHAPTERS_DATA_DIR", str(tmp_path / "chapters"))
     monkeypatch.setenv("MEDIA_ROOT", str(tmp_path / "media"))
     get_settings.cache_clear()
     return get_settings()

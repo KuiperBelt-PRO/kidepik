@@ -1,5 +1,33 @@
 /* Play — diálogo en marco glass (mismo lenguaje que Tripulación / Ajustes) */
 
+.section-frame:has(.play-panel) .section-frame__brand {
+  flex-direction: column;
+  gap: 0.15rem;
+  max-width: min(100%, 18rem);
+}
+
+.section-frame:has(.play-panel) .section-frame__title--chapter,
+.section-frame:has(.play-panel) .section-frame__title {
+  flex: 0 0 auto;
+  width: 100%;
+  font-size: calc(0.88rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.9;
+  text-transform: none;
+  font-family: Nunito, system-ui, sans-serif;
+}
+
+.section-frame[data-play-theme="fantasy"] .section-frame__title--chapter,
+.section-frame[data-play-theme="fantasy"]:has(.play-panel) .section-frame__title {
+  font-family: "Uncial Antiqua", Cinzel, Georgia, serif;
+}
+
+.section-frame[data-play-theme="sci-fi"] .section-frame__title--chapter,
+.section-frame[data-play-theme="sci-fi"]:has(.play-panel) .section-frame__title {
+  font-family: "Bruno Ace", Orbitron, system-ui, sans-serif;
+}
+
 .section-frame:has(.play-panel) {
   /* SPEC_APP_SECTION_FRAME §2.2b — cajetín más alto en aventura */
   bottom: calc(6% + env(safe-area-inset-bottom, 0px));
@@ -49,9 +77,8 @@
   gap: 0.55rem;
 }
 
-.play-panel__mentor {
+.play-panel__status {
   margin: 0;
-  text-align: center;
 }
 
 .play-panel__footer-progress {
@@ -77,10 +104,6 @@
 
 .play-panel__footer:not(.play-panel__footer--idle) .play-panel__footer-progress:not([hidden]) {
   border-bottom-color: rgba(255, 255, 255, 0.08);
-}
-
-.play-panel__status {
-  margin: 0;
 }
 
 .play-panel__log {
@@ -223,6 +246,36 @@
   margin-bottom: 0.25rem;
 }
 
+.play-bubble__rewind {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 160ms ease, background 160ms ease, border-color 160ms ease;
+}
+
+.play-bubble__rewind:hover,
+.play-bubble__rewind:focus-visible {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.42);
+  outline: none;
+}
+
+.play-bubble__rewind:disabled,
+.play-bubble__rewind[aria-disabled="true"] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .play-bubble__icon {
   flex: 0 0 auto;
   display: flex;
@@ -239,12 +292,10 @@
   margin: 0;
 }
 
-.section-frame[data-play-theme="fantasy"] .play-panel__mentor,
 .section-frame[data-play-theme="fantasy"] .play-bubble__who {
   font-family: "Uncial Antiqua", Cinzel, Georgia, serif;
 }
 
-.section-frame[data-play-theme="sci-fi"] .play-panel__mentor,
 .section-frame[data-play-theme="sci-fi"] .play-bubble__who {
   font-family: "Bruno Ace", Orbitron, system-ui, sans-serif;
 }

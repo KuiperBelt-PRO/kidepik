@@ -79,6 +79,7 @@ def create_app() -> FastAPI:
         "app.routers.crew",
         "app.routers.play",
         "app.routers.debug_ai",
+        "app.routers.debug_journey",
     ):
         try:
             module = __import__(module_name, fromlist=["router"])

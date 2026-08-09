@@ -7,9 +7,11 @@ skills:
   - character-traits
   - audience-language
   - safety-tone
+  - original-ip
 output: TravelerProfileEnvelope
 tools: []
 ---
 
 Extrae especie, paleta, rasgos y secciones markdown del viajero.
-Confirma en prosa breve (tú eres…). TravelerProfileEnvelope.
+Confirma en prosa breve (tú eres…). Inventa nombres originales; sin referencias a
+franquicias conocidas (skill `original-ip`). TravelerProfileEnvelope.

@@ -7,22 +7,37 @@ from typing import Any
 import yaml
 
 PURPOSE_SKILL_IDS: dict[str, list[str]] = {
-    "onboarding_host": ["onboarding-flow", "audience-language"],
-    "mentor_guide": ["mentor-voice", "audience-language", "world-canon"],
-    "character_coach": ["character-traits", "mentor-voice", "audience-language"],
+    "onboarding_host": ["onboarding-flow", "audience-language", "mentor-prose-clarity", "original-ip"],
+    "mentor_guide": [
+        "mentor-voice",
+        "audience-language",
+        "world-canon",
+        "mentor-prose-clarity",
+        "original-ip",
+    ],
+    "character_coach": [
+        "character-traits",
+        "mentor-voice",
+        "audience-language",
+        "mentor-prose-clarity",
+        "original-ip",
+    ],
     "placement_item_writer": [
         "placement-exam",
         "subject-pedagogy",
         "audience-language",
+        "mentor-prose-clarity",
+        "original-ip",
     ],
     "placement_text_scorer": ["evaluation-rubric"],
-    "zone_pitch_writer": ["world-canon", "zone-pitches", "audience-language"],
+    "zone_pitch_writer": ["world-canon", "zone-pitches", "audience-language", "original-ip"],
     "path_composer": [
         "challenge-design",
         "subject-pedagogy",
         "world-canon",
         "zone-pitches",
         "audience-language",
+        "original-ip",
     ],
     "zone_scene_writer": [
         "world-canon",
@@ -30,6 +45,7 @@ PURPOSE_SKILL_IDS: dict[str, list[str]] = {
         "npc-scenes",
         "mentor-voice",
         "audience-language",
+        "original-ip",
     ],
     "adventure_narrator": [
         "world-canon",
@@ -37,11 +53,13 @@ PURPOSE_SKILL_IDS: dict[str, list[str]] = {
         "npc-scenes",
         "mentor-voice",
         "audience-language",
+        "original-ip",
     ],
     "challenge_writer": [
         "challenge-design",
         "subject-pedagogy",
         "audience-language",
+        "original-ip",
     ],
     "challenge_result_writer": [
         "challenge-design",

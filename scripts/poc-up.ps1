@@ -1,5 +1,10 @@
 # Levanta la POC: Supabase CLI + Docker (nginx + FastAPI)
 
+param(
+    [switch]$SkipBackup,
+    [switch]$SkipDbReset
+)
+
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
 Set-Location $Root
@@ -31,10 +36,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 $null = Invoke-Supabase start
 
+if (-not $SkipBackup) {
+    Write-Host "==> Backup local (journey, media, logs, Supabase)..." -ForegroundColor Yellow
+    & (Join-Path $Root "scripts\poc-backup-local.ps1") -Label "antes-poc-up"
+}
+
 Write-Host "==> Aplicando migraciones..." -ForegroundColor Yellow
-$null = Invoke-Supabase db reset --local --no-seed
-if ($LASTEXITCODE -ne 0) {
+if ($SkipDbReset) {
     $null = Invoke-Supabase migration up --local
+} else {
+    $null = Invoke-Supabase db reset --local --no-seed
+    if ($LASTEXITCODE -ne 0) {
+        $null = Invoke-Supabase migration up --local
+    }
 }
 
 $envFile = Join-Path $Root ".env.poc"

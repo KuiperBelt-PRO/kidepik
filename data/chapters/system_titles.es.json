@@ -1,0 +1,15 @@
+{
+  "umbral": {
+    "neutral": "El umbral",
+    "fantasy": "El umbral",
+    "sci-fi": "La puerta estelar"
+  },
+  "rito": {
+    "fantasy": "La prueba del saber",
+    "sci-fi": "La prueba de acceso"
+  },
+  "adventure_fallback": {
+    "fantasy": "La senda continúa",
+    "sci-fi": "Rumbo desconocido"
+  }
+}

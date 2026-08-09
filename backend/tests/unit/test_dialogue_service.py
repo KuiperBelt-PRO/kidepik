@@ -146,6 +146,80 @@ def test_turn_parses_json_fields() -> None:
 
 
 @pytest.mark.unit
+def test_turn_normalizes_input_mode_from_phase() -> None:
+    turn = DialogueService._turn(
+        {
+            **sample_turn_row(),
+            "input_mode": "continue",
+            "options": None,
+            "meta": {"phase": "choose_age"},
+        }
+    )
+    assert turn["input_mode"] == "options_or_text"
+    assert len(turn["options"]) == 11
+    assert turn["options"][0]["id"] == "6"
+
+
+@pytest.mark.unit
+def test_turn_normalizes_choose_name_text_only() -> None:
+    turn = DialogueService._turn(
+        {
+            **sample_turn_row(),
+            "input_mode": "continue",
+            "meta": {"phase": "choose_name"},
+        }
+    )
+    assert turn["input_mode"] == "text_only"
+
+
+@pytest.mark.unit
+def test_turn_normalizes_species_options() -> None:
+    turn = DialogueService._turn(
+        {
+            **sample_turn_row(),
+            "input_mode": "continue",
+            "options": None,
+            "meta": {"phase": "choose_character_species", "world_theme": "fantasy"},
+        }
+    )
+    assert turn["input_mode"] == "options_or_text"
+    assert len(turn["options"]) == 3
+    assert turn["options"][0]["id"] == "mago_noche_blanca"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_recent_orders_by_sequence_within_session(dialogue_svc) -> None:
+    mentor = sample_turn_row(
+        id="11111111-1111-4111-8111-111111111111",
+        sequence=1,
+        role="mentor",
+        text="Edad?",
+        meta={"phase": "choose_age"},
+    )
+    explorer = sample_turn_row(
+        id="22222222-2222-4222-8222-222222222222",
+        sequence=2,
+        role="explorer",
+        text="42",
+        meta={},
+    )
+    species = sample_turn_row(
+        id="33333333-3333-4333-8333-333333333333",
+        sequence=3,
+        role="mentor",
+        text="Elige forma",
+        meta={"phase": "choose_character_species"},
+    )
+    dialogue_svc.session = ScriptedSession(
+        [FakeExecuteResult(rows=[mentor, explorer, species])]
+    )
+    turns = await dialogue_svc._recent(CHILD_ID, 24, SESSION_ID)
+    assert [t["sequence"] for t in turns] == [1, 2, 3]
+    assert turns[1]["text"] == "42"
+
+
+@pytest.mark.unit
 def test_deps_builds_run_context(dialogue_svc) -> None:
     deps = dialogue_svc._deps(sample_child(), SESSION_ID, "mentor_guide")
     assert str(deps.child_id) == CHILD_ID
@@ -236,10 +310,14 @@ async def test_open_session_reuses_existing_row(dialogue_svc, mocker) -> None:
         ]
     )
     mocker.patch.object(dialogue_svc, "_history", new=AsyncMock(return_value={"has_older": False}))
+    mocker.patch.object(dialogue_svc, "_last_mentor", new=AsyncMock(return_value=None))
     body = await dialogue_svc.open_session(AUTH_USER_ID, CHILD_ID, "first_run")
     assert body["session_id"] == SESSION_ID
     assert body["flow_id"] == "first_run"
     assert body["onboarding_step"] == "choose_world"
+    assert body["chapter"]["id"] == "umbral"
+    assert body["chapter"]["title"] == "El umbral"
+    assert body["chapter"]["source"] == "system"
 
 
 @pytest.mark.unit
@@ -399,7 +477,7 @@ async def test_submit_turn_session_not_found(dialogue_svc) -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_load_history_success(dialogue_svc, mocker) -> None:
-    anchor = {"id": "turn-2", "created_at": datetime.now(timezone.utc)}
+    anchor = {"id": "turn-2", "sequence": 2, "session_id": SESSION_ID}
     turn_row = sample_turn_row(id="turn-1", sequence=1)
     dialogue_svc.session = ScriptedSession(
         [
@@ -1509,4 +1587,129 @@ async def test_compose_path_pack_with_weak_spots(dialogue_svc, mocker) -> None:
     )
     pack = await dialogue_svc._compose_path_pack(child, SESSION_ID)
     assert len(pack) == 3
+
+
+@pytest.mark.unit
+def test_normalize_options_maps_text_and_value_to_label() -> None:
+    opts = DialogueService._normalize_options_list(
+        [
+            {"id": "A", "text": "240"},
+            {"id": "B", "value": "180"},
+        ]
+    )
+    assert opts is not None
+    assert opts[0]["label"] == "240"
+    assert opts[1]["label"] == "180"
+
+
+@pytest.mark.unit
+def test_normalize_options_uses_description_when_label_is_letter() -> None:
+    opts = DialogueService._normalize_options_list(
+        [{"id": "A", "label": "A", "description": "240 monedas"}]
+    )
+    assert opts is not None
+    assert opts[0]["label"] == "240 monedas"
+
+
+@pytest.mark.unit
+def test_enrich_turn_restores_placement_options_from_ledger(dialogue_svc, mocker) -> None:
+    child = sample_child()
+    turn = DialogueService._turn(
+        {
+            "id": uuid4(),
+            "child_id": CHILD_ID,
+            "session_id": SESSION_ID,
+            "flow_id": "first_run",
+            "sequence": 5,
+            "role": "mentor",
+            "text": "¿Cuántas monedas?",
+            "options": [
+                {"id": "A", "label": "A"},
+                {"id": "B", "label": "B"},
+            ],
+            "input_mode": "options_only",
+            "explorer_reply": None,
+            "meta": {
+                "phase": "placement_item",
+                "index": 0,
+                "total": 3,
+                "world_theme": "fantasy",
+            },
+            "model_used": None,
+            "created_at": datetime.now(timezone.utc),
+        }
+    )
+    mocker.patch.object(
+        dialogue_svc,
+        "_read_placement_state",
+        return_value={
+            "queue": [
+                {
+                    "item_key": "q1",
+                    "options": [
+                        {"id": "A", "label": "240"},
+                        {"id": "B", "label": "180"},
+                    ],
+                }
+            ],
+            "index": 0,
+        },
+    )
+    enriched = dialogue_svc._enrich_turn(turn, child)
+    assert enriched["options"][0]["label"] == "240"
+    assert enriched["options"][1]["label"] == "180"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_reemit_placement_item_reuses_queue(dialogue_svc, mocker) -> None:
+    child = sample_child(onboarding_step="placement", placement_status="in_progress")
+    session = sample_session_row()
+    queue_item = {
+        "subject_id": "math",
+        "item_key": "q1",
+        "item_type": "mcq",
+        "prompt_text": "¿2+2?",
+        "presentation_text": "Calienta motores: ¿2+2?",
+        "options": [
+            {"id": "a", "label": "3"},
+            {"id": "b", "label": "4"},
+        ],
+        "correct_option_id": "b",
+    }
+    dialogue_svc._child = mocker.AsyncMock(return_value=child)
+    dialogue_svc.session = ScriptedSession(
+        [
+            FakeExecuteResult(rows=session),
+            FakeExecuteResult(scalar=6),
+        ]
+    )
+    dialogue_svc._read_placement_state = mocker.Mock(
+        return_value={"queue": [queue_item, queue_item], "index": 0}
+    )
+    inserted: dict[str, Any] = {}
+
+    async def fake_insert(row: dict[str, Any]) -> dict[str, Any]:
+        inserted.update(row)
+        return DialogueService._turn(
+            sample_turn_row(
+                sequence=row["sequence"],
+                text=row["text"],
+                options=row.get("options"),
+                meta=row.get("meta"),
+            )
+        )
+
+    dialogue_svc._insert = fake_insert
+    turn = await dialogue_svc.reemit_placement_item(
+        AUTH_USER_ID,
+        CHILD_ID,
+        SESSION_ID,
+        item_index=0,
+    )
+    assert turn is not None
+    assert inserted["text"] == "Calienta motores: ¿2+2?"
+    assert inserted["meta"]["phase"] == "placement_item"
+    assert inserted["meta"]["index"] == 0
+    assert inserted["meta"]["total"] == 2
 

@@ -10,6 +10,7 @@ from app.ai.agents.md_loader import get_agent_spec
 from app.ai.agents.runner import build_mentor_prompt, run_purpose
 from app.ai.gemini_gateway import GeminiGateway
 from app.ai.orchestrator.tools import glossary_search, ledger_recent_stems
+from app.ai.orchestrator.input_modes import normalize_dialogue_envelope
 from app.ai.orchestrator.turn_context import TurnContext
 from app.config import Settings, get_settings
 
@@ -56,10 +57,21 @@ class Orchestrator:
         tools = spec.tools if spec else ()
         world = ctx.world_theme or "fantasy"
         if "glossary_search" in tools and world in {"fantasy", "sci-fi"}:
-            hits = glossary_search(world, limit=5)  # type: ignore[arg-type]
+            is_character_choice = ctx.phase == "choose_character_species"
+            limit = 18 if is_character_choice else 5
+            hits = glossary_search(
+                world,  # type: ignore[arg-type]
+                limit=limit,
+            )
             if hits:
+                header = (
+                    "Glosario de arquetipos (especies, profesiones, criaturas y referencias; "
+                    "inspírate, no copies una lista cerrada):"
+                    if is_character_choice
+                    else "Glosario (tipos, no nombres propios):"
+                )
                 lines = [f"- {h.term}: {h.definition}" for h in hits]
-                chunks.append("Glosario (tipos, no nombres propios):\n" + "\n".join(lines))
+                chunks.append(header + "\n" + "\n".join(lines))
                 notes.append(f"glossary:{len(hits)}")
         if ctx.ledger and ctx.parent_id and "ledger_query" in tools:
             stems = ledger_recent_stems(
@@ -118,6 +130,13 @@ class Orchestrator:
             gateway=self.gateway,
             expect_type=expect,
         )
+        if isinstance(output, DialogueEnvelope):
+            output = normalize_dialogue_envelope(
+                ctx.phase,
+                output,
+                force_input_mode=ctx.force_input_mode,
+                force_options=ctx.force_options,
+            )
         return TurnResult(
             purpose=purpose,
             output=output,

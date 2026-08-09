@@ -38,6 +38,10 @@ web/logs/*
 data/journey/*
 !data/journey/.gitkeep
 
+# Copias de seguridad locales (generadas por scripts/poc-backup-local.ps1)
+data/backups/*
+!data/backups/.gitkeep
+
 # Supabase CLI (estado local; versionar config.toml + migrations/)
 supabase/.branches/
 supabase/.temp/

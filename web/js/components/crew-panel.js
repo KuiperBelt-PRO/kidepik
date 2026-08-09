@@ -38,6 +38,7 @@ import {
   SUBJECT_CATALOG,
 } from "../lib/subject-catalog.js?v=253";
 import {
+  buildCrewListCardInner,
   buildCrewMemberCardInner,
   escapeHtml,
   memberCardAriaLabel,
@@ -264,21 +265,27 @@ export function mountCrewListPanel(container, { session }) {
       for (const m of res.members) {
         const wrap = document.createElement("div");
         wrap.className = "crew-card-wrap";
-        const btn = document.createElement("button");
         const tone = memberCardTone(m);
-        btn.type = "button";
-        btn.className = `crew-card crew-card--${tone} ${memberWorldModifier(m)}`;
-        btn.setAttribute("aria-label", memberCardAriaLabel(m));
-        btn.innerHTML = buildCrewMemberCardInner(m);
-        paintCrewCardIcons(btn);
-        btn.addEventListener("click", () => navigateShellRoute(`/crew/${m.id}`));
-        wrap.appendChild(btn);
-        if (!m.is_tutor_profile) {
-          const playBtn = document.createElement("button");
-          playBtn.type = "button";
-          playBtn.className = "crew-card__continue";
-          playBtn.textContent = "Continuar aventura";
-          playBtn.addEventListener("click", (ev) => {
+        const worldMod = memberWorldModifier(m);
+
+        if (m.is_tutor_profile) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `crew-card crew-card--${tone} ${worldMod}`;
+          btn.setAttribute("aria-label", memberCardAriaLabel(m));
+          btn.innerHTML = buildCrewMemberCardInner(m);
+          paintCrewCardIcons(btn);
+          btn.addEventListener("click", () => navigateShellRoute(`/crew/${m.id}`));
+          wrap.appendChild(btn);
+        } else {
+          const card = document.createElement("article");
+          card.className = `crew-card crew-card--${tone} ${worldMod}`;
+          card.innerHTML = buildCrewListCardInner(m);
+          paintCrewCardIcons(card);
+          card.querySelector(".crew-card__open")?.addEventListener("click", () => {
+            navigateShellRoute(`/crew/${m.id}`);
+          });
+          card.querySelector(".crew-card__play")?.addEventListener("click", (ev) => {
             ev.preventDefault();
             ev.stopPropagation();
             void (async () => {
@@ -287,7 +294,7 @@ export function mountCrewListPanel(container, { session }) {
               await gatePlayNavigation(m.id, session, perms);
             })();
           });
-          wrap.appendChild(playBtn);
+          wrap.appendChild(card);
         }
         list.appendChild(wrap);
       }
