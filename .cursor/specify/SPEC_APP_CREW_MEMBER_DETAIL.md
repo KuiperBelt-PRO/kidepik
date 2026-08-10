@@ -86,6 +86,7 @@ Orden vertical (scroll dentro del marco):
 | --- | --- | --- |
 | Nombre de tripulación | `display_name` | Sí (`PATCH` perfil) |
 | Edad | `age_years` + banda | Sí |
+| Sexo | `explorer_gender` — ver [SPEC_APP_EXPLORER_GENDER.md](SPEC_APP_EXPLORER_GENDER.md); legacy `null` se muestra como «Chico» | Sí (`PATCH` perfil) |
 | Mundo | `world_theme` | Sí (con lock) |
 | Descripción tutor | `settings.tutor_label` | Sí |
 | Descripción del personaje | `traits.character_summary` | Sí |

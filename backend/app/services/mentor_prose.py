@@ -4,6 +4,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from app.catalogs.age_band import AgeBand
+
 # Muletillas y giros «olor a LLM» — castellano de España, tono natural.
 BANNED_PHRASES: tuple[str, ...] = (
     "vibra",
@@ -51,12 +53,158 @@ BANNED_PHRASES: tuple[str, ...] = (
 )
 
 MULETILLA_LIMITS: dict[str, int] = {
-    "niebla": 2,
+    "niebla": 1,
     "chispa": 1,
     "runa": 2,
     "fragmento": 2,
     "equilibrio": 1,
 }
+
+_AUDIENCE_MAX_WORDS_PER_SENTENCE: dict[str, int] = {
+    AgeBand.EARLY: 12,
+    AgeBand.CHILD: 18,
+    AgeBand.TWEEN: 24,
+    AgeBand.TEEN: 28,
+    AgeBand.ADULT: 28,
+    AgeBand.SENIOR: 28,
+}
+
+_CHILD_COMPLEX_MARKERS: tuple[str, ...] = (
+    "onírico",
+    "onirico",
+    "vigía oníric",
+    "vigia oniric",
+    "sentinela oníric",
+    "sentinela oniric",
+    "custodio oníric",
+    "custodio oniric",
+    "penumbra",
+    "remanso",
+    "anhelad",
+    "anhelar",
+    "valía",
+    "valia",
+    "perentori",
+    "efímer",
+    "efemer",
+    "luctuos",
+    "inenarr",
+    "empíreo",
+    "empireo",
+    "melancol",
+    "sibil",
+    "lambisc",
+    "auspic",
+    "opípar",
+    "opipar",
+    "limerenc",
+)
+
+_CHILD_POMPOUS_TITLE_RE = re.compile(
+    r"\b(vigía|vigia|sentinela|custodio|arcano|heraldo)\s+[\wáéíóúñ]+",
+    re.IGNORECASE,
+)
+
+
+def resolve_audience_band(age_band: str | None, age_years: int | None) -> str:
+    """Resuelve la banda efectiva para validación de audiencia."""
+    if age_years is not None:
+        return AgeBand.from_age_years(age_years)
+    if age_band and AgeBand.is_valid(age_band):
+        return age_band
+    legacy = AgeBand.from_legacy(age_band, age_years)
+    return legacy or AgeBand.CHILD
+
+
+def validate_audience_prose(
+    text: str,
+    *,
+    age_band: str | None = None,
+    age_years: int | None = None,
+) -> list[str]:
+    """Incidencias de registro inadecuado para la edad del explorador."""
+    issues: list[str] = []
+    body = (text or "").strip()
+    if not body:
+        return issues
+
+    band = resolve_audience_band(age_band, age_years)
+    if band not in {AgeBand.EARLY, AgeBand.CHILD, AgeBand.TWEEN}:
+        return issues
+
+    lower = body.lower()
+    if band in {AgeBand.EARLY, AgeBand.CHILD}:
+        for marker in _CHILD_COMPLEX_MARKERS:
+            if marker in lower:
+                issues.append(
+                    f"vocabulario demasiado difícil para {band} (5–7 o 8–10 años); "
+                    f"evita palabras como «{marker}» y usa lenguaje más sencillo"
+                )
+                break
+        if not issues and _CHILD_POMPOUS_TITLE_RE.search(body):
+            issues.append(
+                f"apodo demasiado pomposo para {band}; "
+                "usa frases sencillas como las del explorador (p. ej. «protector de los sueños»)"
+            )
+
+    max_words = _AUDIENCE_MAX_WORDS_PER_SENTENCE.get(band, 28)
+    sentences = [s.strip() for s in re.split(r"[.!?]+", body) if s.strip()]
+    for sentence in sentences:
+        words = sentence.split()
+        if len(words) > max_words:
+            issues.append(
+                f"frase demasiado larga para la edad del explorador; máximo ~{max_words} palabras"
+            )
+            break
+
+    if band == AgeBand.EARLY and len(body) > 320:
+        issues.append("texto demasiado largo para band_early; acorta a 2–3 frases simples")
+    elif band == AgeBand.CHILD and len(body) > 420:
+        issues.append("texto demasiado largo para un niño de 8–10 años; acorta la burbuja")
+
+    return issues
+
+
+def simple_character_agent_text(explorer_choice: str) -> str:
+    """Prosa mínima cuando el LLM no respeta la audiencia infantil."""
+    choice = (explorer_choice or "explorador").strip()
+    return f"Perfecto: eres {choice}. ¿Empezamos tu prueba de ingreso?"
+
+
+def validate_traveler_profile_prose(
+    *,
+    agent_text: str,
+    species: str | None = None,
+    vibe: str | None = None,
+    age_band: str | None = None,
+    age_years: int | None = None,
+    description_md: str | None = None,
+    personality_md: str | None = None,
+    avoid_phrases: list[str] | None = None,
+) -> list[str]:
+    """Valida prosa del character_coach (burbuja + campos visibles del perfil)."""
+    issues: list[str] = []
+    for issue in validate_mentor_prose(
+        agent_text,
+        age_band=age_band,
+        age_years=age_years,
+        avoid_phrases=avoid_phrases,
+    ):
+        issues.append(issue)
+    for label, text in {
+        "species": species or "",
+        "vibe": vibe or "",
+        "description_md": description_md or "",
+        "personality_md": personality_md or "",
+    }.items():
+        if not text.strip():
+            continue
+        for issue in validate_audience_prose(
+            text, age_band=age_band, age_years=age_years
+        ):
+            issues.append(f"{label}: {issue}")
+    return issues
+
 
 _SLUG_RE = re.compile(r"^[a-z][a-z0-9_]{1,23}$")
 
@@ -236,7 +384,33 @@ def _slug_implies_non_human(slug: str) -> bool:
     return any(marker in slug for marker in _SLUG_SPECIES_MARKERS)
 
 
-def validate_mentor_prose(text: str) -> list[str]:
+def validate_avoid_repetition(
+    text: str,
+    avoid_phrases: list[str] | None,
+) -> list[str]:
+    """Marca términos del glosario o chips ya usados en el viaje."""
+    if not avoid_phrases:
+        return []
+    lower = (text or "").lower()
+    issues: list[str] = []
+    seen: set[str] = set()
+    for phrase in avoid_phrases:
+        key = phrase.strip().lower()
+        if len(key) < 5 or key in seen:
+            continue
+        if key in lower:
+            seen.add(key)
+            issues.append(f"evita repetir «{phrase.strip()}» (ya usado en este viaje)")
+    return issues
+
+
+def validate_mentor_prose(
+    text: str,
+    *,
+    age_band: str | None = None,
+    age_years: int | None = None,
+    avoid_phrases: list[str] | None = None,
+) -> list[str]:
     """Devuelve incidencias de prosa; lista vacía = OK."""
     issues: list[str] = []
     body = (text or "").strip()
@@ -259,12 +433,20 @@ def validate_mentor_prose(text: str) -> list[str]:
     if len(body) > 520:
         issues.append("texto demasiado largo; máximo ~80 palabras")
     issues.extend(_franchise_issues_for_fields(body))
+    issues.extend(
+        validate_audience_prose(body, age_band=age_band, age_years=age_years)
+    )
+    issues.extend(validate_avoid_repetition(body, avoid_phrases))
     return issues
 
 
 def validate_species_options(
     options: list[dict[str, Any]] | None,
     world_theme: str | None,
+    *,
+    age_band: str | None = None,
+    age_years: int | None = None,
+    avoid_phrases: list[str] | None = None,
 ) -> list[str]:
     """Valida 3 sugerencias de arquetipo generadas por el LLM.
 
@@ -298,6 +480,12 @@ def validate_species_options(
                     issues.append(f"opción {idx + 1}: evita «{phrase}»")
             for franchise_issue in _franchise_issues_for_fields(field):
                 issues.append(f"opción {idx + 1}: {franchise_issue}")
+            for audience_issue in validate_audience_prose(
+                field, age_band=age_band, age_years=age_years
+            ):
+                issues.append(f"opción {idx + 1}: {audience_issue}")
+            for repeat_issue in validate_avoid_repetition(field, avoid_phrases):
+                issues.append(f"opción {idx + 1}: {repeat_issue}")
         for franchise_issue in _franchise_issues_for_fields(oid):
             issues.append(f"opción {idx + 1}: {franchise_issue}")
         if _slug_implies_non_human(oid) and not _label_mentions_non_human(label, theme):

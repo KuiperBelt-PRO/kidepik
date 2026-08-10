@@ -13,6 +13,11 @@ description: >
 
 Si una frase no ayuda a (1)–(3), recórtala.
 
+## Audiencia (obligatorio)
+
+Adapta vocabulario y longitud a `age_years` del explorador (skill `audience-language`).
+Mantén tono fantasy/sci-fi, pero legible para esa edad.
+
 ## Castellano de España
 
 - Vocabulario de España (ordenador, coger en sentido tomar, «vosotros» solo si encaja).
@@ -46,3 +51,10 @@ chispa del saber, equilibrio tiembla, pergeñar, dilucidar, elucubrar.
 - **Sin franquicias:** no uses nombres de sagas conocidas (skill `original-ip`).
 - Inspírate en el glosario completo; **no** copies una lista fija ni limites las
   opciones a `kind=creature`.
+- Si el contexto trae **ingredientes por slot** (`[place_form]`, `[species]`, …),
+  combínalos en labels y prosa nuevos; no pegues frases compuestas del glosario.
+- **No repitas términos del glosario al pie de la letra** en `label` ni en la prosa
+  (p. ej. si ya salió «puente de niebla», inventa otro lugar con otro nombre).
+- Las **referencias de tono** del contexto son solo para el estilo: parafrasea,
+  no uses esos nombres literal en chips ni burbujas.
+- Si el contexto incluye «No reutilices…», obedece esa lista antes de escribir.

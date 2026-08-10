@@ -9,8 +9,13 @@ import pytest
 
 from app.ai.agents.envelopes import (
     DialogueEnvelope,
+    DialogueOption,
     PlacementItemEnvelope,
     PlacementQueueEnvelope,
+    PathChallengeSeed,
+    PathDetail,
+    PathOption,
+    PathPackEnvelope,
     TravelerProfileEnvelope,
 )
 from app.ai.errors import AiProductError
@@ -18,6 +23,7 @@ from app.ai.journey.ledger import JourneyLedger
 from app.ai.orchestrator.orchestrator import TurnResult
 from app.services.dialogue import DialogueService
 from app.services.mentor_profiles import mentor_profile
+from app.services.traveler_profile import extract_palette_tokens
 from tests.helpers.db_session import FakeExecuteResult, ScriptedSession
 from tests.helpers.factories import AUTH_USER_ID, CHILD_ID, PARENT_ID
 
@@ -593,7 +599,15 @@ async def test_phase_choose_age_out_of_range(dialogue_svc) -> None:
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_phase_choose_age_valid(dialogue_svc) -> None:
-    dialogue_svc._agent_mentor_turn = AsyncMock(return_value={"id": "t-char", "role": "agent"})
+    dialogue_svc._mentor_turn = AsyncMock(
+        return_value={
+            "id": "t-gender",
+            "role": "mentor",
+            "meta": {"phase": "choose_gender"},
+            "input_mode": "options_only",
+            "text": "En la aventura, ¿eres chico o chica?",
+        }
+    )
     dialogue_svc.session = ScriptedSession(
         [
             FakeExecuteResult(),
@@ -601,7 +615,7 @@ async def test_phase_choose_age_valid(dialogue_svc) -> None:
                 rows=sample_child(
                     age_years=9,
                     age_band="band_child",
-                    onboarding_step="choose_character",
+                    onboarding_step="choose_gender",
                 )
             ),
         ]
@@ -614,6 +628,62 @@ async def test_phase_choose_age_valid(dialogue_svc) -> None:
         "9",
     )
     assert effects[0]["type"] == "set_age"
+    assert effects[1]["to"] == "choose_gender"
+    assert turns[0]["meta"]["phase"] == "choose_gender"
+    assert turns[0]["input_mode"] == "options_only"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_phase_choose_gender_invalid_reprompts(dialogue_svc) -> None:
+    dialogue_svc._mentor_turn = AsyncMock(
+        return_value={
+            "id": "t-gender-retry",
+            "role": "mentor",
+            "meta": {"phase": "choose_gender"},
+            "text": "No he entendido. En la aventura, ¿eres chico o chica?",
+        }
+    )
+    dialogue_svc.session = ScriptedSession([])
+    child = sample_child(age_years=9, age_band="band_child", onboarding_step="choose_gender")
+    dialogue_svc._child_by_id = AsyncMock(return_value=child)  # type: ignore[method-assign]
+    effects, turns = await dialogue_svc._phase_choose_gender(
+        CHILD_ID,
+        SESSION_ID,
+        sample_session_row(),
+        1,
+        "no-valido",
+    )
+    assert effects == []
+    assert turns[0]["meta"]["phase"] == "choose_gender"
+    assert "No he entendido" in turns[0]["text"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_phase_choose_gender_valid(dialogue_svc) -> None:
+    dialogue_svc._agent_mentor_turn = AsyncMock(return_value={"id": "t-char", "role": "agent"})
+    dialogue_svc.session = ScriptedSession(
+        [
+            FakeExecuteResult(),
+            FakeExecuteResult(
+                rows=sample_child(
+                    age_years=9,
+                    age_band="band_child",
+                    explorer_gender="female",
+                    onboarding_step="choose_character",
+                )
+            ),
+        ]
+    )
+    effects, turns = await dialogue_svc._phase_choose_gender(
+        CHILD_ID,
+        SESSION_ID,
+        sample_session_row(),
+        1,
+        "female",
+    )
+    assert effects[0] == {"type": "set_explorer_gender", "value": "female"}
     assert effects[1]["to"] == "choose_character"
     assert turns[0]["role"] == "agent"
 
@@ -680,18 +750,191 @@ async def test_phase_character_with_profile(dialogue_svc, mocker) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_compose_placement_queue_fallback(dialogue_svc, mocker) -> None:
+async def test_phase_character_fallback_simple_copy_for_child_audience(
+    dialogue_svc, mocker
+) -> None:
+    profile = TravelerProfileEnvelope(
+        agent_text="Eres un Vigía Onírico. Un guardián de estrellas.",
+        species="Vigía Onírico",
+        palette="plata",
+        features=["valiente"],
+        abilities=[],
+        vibe="vigía onírico",
+    )
     mocker.patch(
         "app.services.dialogue.run_purpose",
-        new=AsyncMock(side_effect=RuntimeError("fallo")),
+        new=AsyncMock(return_value=(profile, "gemini-test")),
     )
-    queue = await dialogue_svc._compose_placement_queue(
+    captured: list[str] = []
+
+    async def _capture_turn(*args: Any, **_kwargs: Any) -> dict[str, Any]:
+        captured.append(str(args[4]))
+        return DialogueService._turn(
+            sample_turn_row(meta={"phase": "handoff_placement"}, role="mentor")
+        )
+
+    dialogue_svc._mentor_turn = AsyncMock(side_effect=_capture_turn)
+    dialogue_svc.session = ScriptedSession([FakeExecuteResult()])
+    child = sample_child(
+        onboarding_step="choose_character",
+        parent_id=PARENT_ID,
+        age_years=10,
+        age_band="band_child",
+    )
+    await dialogue_svc._phase_character(
+        CHILD_ID,
+        SESSION_ID,
+        sample_session_row(),
+        1,
+        "Protector de los sueños abandonados",
+        child,
+    )
+    assert captured
+    final = captured[-1].lower()
+    assert "protector de los sueños abandonados" in final
+    assert "onírico" not in final
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_placement_queue_raises_on_compose_failure(dialogue_svc, mocker) -> None:
+    mocker.patch(
+        "app.services.dialogue.run_purpose",
+        new=AsyncMock(side_effect=AiProductError("ai_compose_failed", "fallo", retryable=False)),
+    )
+    child = sample_child(
+        settings={"learning": {"active_subjects": ["math"]}},
+    )
+    with pytest.raises(AiProductError, match="fallo"):
+        await dialogue_svc._compose_placement_queue(child, SESSION_ID)
+
+
+@pytest.mark.unit
+def test_chunk_subject_slots() -> None:
+    slots = ["math", "language", "reading", "logic", "science"]
+    assert DialogueService._chunk_subject_slots(slots, 4) == [
+        ["math", "language", "reading", "logic"],
+        ["science"],
+    ]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_placement_queue_batches_large_subject_list(
+    dialogue_svc, mocker
+) -> None:
+    child = sample_child(
+        settings={
+            "learning": {
+                "active_subjects": [
+                    "math",
+                    "language",
+                    "reading",
+                    "logic",
+                    "science",
+                    "arts",
+                    "communication",
+                    "sports",
+                ]
+            }
+        },
+        display_name="Aleria",
+    )
+    calls: list[list[str]] = []
+
+    async def fake_batch(
+        _child,
+        _session_id,
+        subject_slots,
+        _band,
+        *,
+        batch_index=0,
+        palette_tokens=None,
+        **_kwargs,
+    ):
+        calls.append(list(subject_slots))
+        return [
+            {
+                "subject_id": sid,
+                "item_key": f"{sid}_1",
+                "item_type": "mcq",
+                "prompt_text": f"Pregunta {sid}",
+                "presentation_text": f"Pregunta {sid}",
+                "options": [
+                    {"id": "a", "label": "uno"},
+                    {"id": "b", "label": "dos"},
+                ],
+                "correct_option_id": "a",
+            }
+            for sid in subject_slots
+        ]
+
+    mocker.patch.object(
+        dialogue_svc,
+        "_compose_placement_batch",
+        side_effect=fake_batch,
+    )
+    queue = await dialogue_svc._compose_placement_queue(child, SESSION_ID)
+    assert len(queue) == 8
+    assert len(calls) == 2
+    assert len(calls[0]) == 4
+    assert len(calls[1]) == 4
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_placement_batch_quality_fallback_on_last_retry(
+    dialogue_svc,
+) -> None:
+    fallback_items = [
+        {
+            "subject_id": "reading",
+            "item_key": "reading_1",
+            "item_type": "mcq",
+            "presentation_text": "¿Qué ocurre?",
+            "options": [{"id": "a", "label": "El viento suave"}, {"id": "b", "label": "Nada"}],
+            "correct_option_id": "a",
+        }
+    ]
+
+    async def always_quality_reject(*_args, **_kwargs):
+        raise dialogue_svc._placement_compose_error(
+            issue="reading_event_answer_mismatch",
+            quality_fallback_items=fallback_items,
+        )
+
+    dialogue_svc._compose_placement_batch = always_quality_reject  # type: ignore[method-assign]
+
+    result = await dialogue_svc._compose_placement_batch_with_retry(
         sample_child(),
         SESSION_ID,
-        ["math"],
+        ["reading"],
+        "band_child",
+        batch_index=0,
+        batch_retries=2,
     )
-    assert queue[0]["item_key"] == "fallback_1"
-    assert queue[0]["correct_option_id"] == "b"
+    assert result == fallback_items
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_placement_batch_llm_failure_still_raises_on_last_retry(
+    dialogue_svc,
+) -> None:
+    async def always_llm_fail(*_args, **_kwargs):
+        raise dialogue_svc._placement_compose_error(issue="batch_count_mismatch")
+
+    dialogue_svc._compose_placement_batch = always_llm_fail  # type: ignore[method-assign]
+
+    with pytest.raises(AiProductError, match="No se pudo generar"):
+        await dialogue_svc._compose_placement_batch_with_retry(
+            sample_child(),
+            SESSION_ID,
+            ["math"],
+            "band_child",
+            batch_index=0,
+            batch_retries=1,
+        )
 
 
 @pytest.mark.unit
@@ -702,8 +945,55 @@ async def test_compose_placement_queue_from_llm(dialogue_svc, mocker) -> None:
             PlacementItemEnvelope(
                 subject_id="math",
                 item_key="q1",
-                prompt_text="¿2+2?",
-                options=[],
+                prompt_text="¿Cuánto es 2+2?",
+                options=[
+                    {"id": "a", "label": "3"},
+                    {"id": "b", "label": "4"},
+                ],
+                correct_option_id="b",
+            ),
+            PlacementItemEnvelope(
+                subject_id="language",
+                item_key="q2",
+                prompt_text="¿Sinónimo de grande?",
+                options=[
+                    {"id": "a", "label": "enorme"},
+                    {"id": "b", "label": "pequeño"},
+                ],
+                correct_option_id="a",
+            ),
+        ]
+    )
+    run_mock = AsyncMock(return_value=(bundle, "gemini-test"))
+    mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
+    child = sample_child(
+        settings={"learning": {"active_subjects": ["math", "language"]}},
+        display_name="Aleria",
+        explorer_gender="female",
+    )
+    queue = await dialogue_svc._compose_placement_queue(child, SESSION_ID)
+    assert len(queue) == 2
+    assert queue[0]["item_key"] == "q1"
+    assert queue[1]["subject_id"] == "language"
+    assert run_mock.await_count == 1
+    prompt = run_mock.await_args.args[1]
+    assert "math" in prompt and "language" in prompt
+    assert "Aleria" in prompt
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_placement_queue_rejects_incomplete_batch(dialogue_svc, mocker) -> None:
+    bundle = PlacementQueueEnvelope(
+        items=[
+            PlacementItemEnvelope(
+                subject_id="math",
+                item_key="q1",
+                prompt_text="¿Cuánto es 2+2?",
+                options=[
+                    {"id": "a", "label": "3"},
+                    {"id": "b", "label": "4"},
+                ],
                 correct_option_id="b",
             )
         ]
@@ -712,12 +1002,11 @@ async def test_compose_placement_queue_from_llm(dialogue_svc, mocker) -> None:
         "app.services.dialogue.run_purpose",
         new=AsyncMock(return_value=(bundle, "gemini-test")),
     )
-    queue = await dialogue_svc._compose_placement_queue(
-        sample_child(),
-        SESSION_ID,
-        ["math"],
+    child = sample_child(
+        settings={"learning": {"active_subjects": ["math", "language"]}},
     )
-    assert queue[0]["item_key"] == "q1"
+    with pytest.raises(AiProductError):
+        await dialogue_svc._compose_placement_queue(child, SESSION_ID)
 
 
 @pytest.mark.unit
@@ -730,6 +1019,247 @@ async def test_compose_path_pack_fallback(dialogue_svc, mocker) -> None:
     pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
     assert len(pack) == 3
     assert pack[0]["path_id"] == "path_1"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_path_pack_single_batch_call(dialogue_svc, mocker) -> None:
+    def make_detail(i: int) -> PathDetail:
+        return PathDetail(
+            path=PathOption(
+                path_id=f"path_{i}",
+                subject_id="math",
+                title=f"Camino {i}",
+                intro="Intro breve",
+                learning_blurb="Blurb",
+            ),
+            challenges=[
+                PathChallengeSeed(
+                    prompt_text="¿2+2?",
+                    item_type="mcq",
+                    options=[DialogueOption(id="a", label="4")],
+                    correct_option_id="a",
+                    explanation="Sumar",
+                )
+            ],
+        )
+
+    bundle = PathPackEnvelope(
+        agent_text="Elige tu camino",
+        paths=[make_detail(1), make_detail(2), make_detail(3)],
+    )
+    run_mock = AsyncMock(return_value=(bundle, "gemini-3.1-flash-lite"))
+    mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
+
+    pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
+    assert len(pack) == 3
+    assert run_mock.await_count == 1
+    assert pack[0]["title"] == "Camino 1"
+    assert pack[0]["challenges"][0]["explanation"] == "Sumar"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "item,reply,expected",
+    [
+        (
+            {"correct_option_id": "b"},
+            {"kind": "option", "option_id": "b"},
+            1.0,
+        ),
+        (
+            {"correct_option_id": "b"},
+            {"kind": "option", "option_id": "a"},
+            0.0,
+        ),
+        (
+            {"expected_answer": "adjetivo|adj"},
+            {"kind": "text", "text": "Adjetivo"},
+            1.0,
+        ),
+        (
+            {"expected_answer": "sustantivo"},
+            {"kind": "text", "text": "verbo"},
+            0.0,
+        ),
+        (
+            {
+                "correct_option_id": "a",
+                "options": [
+                    {"id": "8", "label": "8"},
+                    {"id": "5", "label": "5"},
+                    {"id": "7", "label": "7"},
+                ],
+            },
+            {"kind": "option", "option_id": "8"},
+            1.0,
+        ),
+        (
+            {
+                "correct_option_id": "8",
+                "options": [
+                    {"id": "a", "label": "8"},
+                    {"id": "b", "label": "5"},
+                ],
+            },
+            {"kind": "option", "option_id": "a"},
+            1.0,
+        ),
+    ],
+)
+def test_score_placement_item(item, reply, expected) -> None:
+    assert DialogueService._score_placement_item(item, reply) == expected
+
+
+@pytest.mark.unit
+def test_finalize_placement_queue_item_maps_letter_correct_id() -> None:
+    item = DialogueService._finalize_placement_queue_item(
+        {
+            "correct_option_id": "a",
+            "options": [
+                {"id": "8", "label": "8"},
+                {"id": "5", "label": "5"},
+            ],
+        }
+    )
+    assert item["correct_option_id"] == "8"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "item,issue",
+    [
+        (
+            {
+                "item_type": "mcq",
+                "presentation_text": "¿Cuánto es 2+2?",
+                "options": [{"id": "a", "label": "4"}, {"id": "b", "label": "5"}],
+                "correct_option_id": "a",
+            },
+            None,
+        ),
+        (
+            {
+                "item_type": "mcq",
+                "presentation_text": "La respuesta es valle. ¿Cómo se dice valle?",
+                "options": [{"id": "a", "label": "valle"}, {"id": "b", "label": "río"}],
+                "correct_option_id": "a",
+            },
+            "answer_leak_in_prompt",
+        ),
+        (
+            {
+                "item_type": "short_text",
+                "presentation_text": "¿Cómo se dice valle?",
+                "expected_answer": "valle",
+            },
+            "answer_leak_in_prompt",
+        ),
+        (
+            {
+                "subject_id": "reading",
+                "item_type": "short_text",
+                "presentation_text": "El dragón volaba sobre el lago. ¿Qué animal era?",
+                "expected_answer": "dragón",
+            },
+            None,
+        ),
+        (
+            {
+                "subject_id": "reading",
+                "item_type": "mcq",
+                "presentation_text": (
+                    "El viento mueve las hojas del bosque. "
+                    "¿Qué ocurre en el bosque según el texto?"
+                ),
+                "options": [
+                    {"id": "a", "label": "El viento suave"},
+                    {"id": "b", "label": "El sol brillante"},
+                ],
+                "correct_option_id": "a",
+            },
+            "reading_event_answer_mismatch",
+        ),
+        (
+            {
+                "subject_id": "language",
+                "item_type": "mcq",
+                "presentation_text": "¿Qué llave necesita Aleria?",
+                "options": [
+                    {"id": "a", "label": "Llave plata"},
+                    {"id": "b", "label": "Llave de madera"},
+                ],
+                "correct_option_id": "a",
+            },
+            "language_ungrammatical_option",
+        ),
+        (
+            {
+                "subject_id": "arts",
+                "item_type": "mcq",
+                "presentation_text": (
+                    "En los templos, los maestros dibujan mapas. Para que un dibujo "
+                    "tenga volumen y parezca real, los artistas usan una técnica "
+                    "especial. ¿Para qué sirven los colores oscuros y los colores "
+                    "claros juntos en una obra?"
+                ),
+                "options": [
+                    {"id": "a", "label": "Oscuros y claros"},
+                    {"id": "b", "label": "Solo colores brillantes"},
+                    {"id": "c", "label": "Tinta de color negro"},
+                ],
+                "correct_option_id": "a",
+            },
+            "purpose_question_echo_option",
+        ),
+        (
+            {
+                "subject_id": "arts",
+                "item_type": "mcq",
+                "presentation_text": (
+                    "¿Para qué sirven los colores oscuros y los colores claros "
+                    "juntos en una obra?"
+                ),
+                "options": [
+                    {"id": "a", "label": "Para dar volumen al dibujo"},
+                    {"id": "b", "label": "Solo colores brillantes"},
+                    {"id": "c", "label": "Tinta de color negro"},
+                ],
+                "correct_option_id": "a",
+            },
+            None,
+        ),
+    ],
+)
+def test_placement_item_quality_issue(item, issue) -> None:
+    item = DialogueService._finalize_placement_queue_item(item)
+    assert DialogueService._placement_item_quality_issue(item) == issue
+
+
+@pytest.mark.unit
+def test_placement_batch_quality_rejects_palette_overuse() -> None:
+    tokens = extract_palette_tokens("Azul claro, blanco y plata")
+    items = [
+        {"presentation_text": "Un bosque azul brilla.", "prompt_text": ""},
+        {"presentation_text": "Cristales plateados en la cueva.", "prompt_text": ""},
+    ]
+    assert (
+        DialogueService._placement_batch_quality_issue(items, palette_tokens=tokens)
+        == "palette_overuse"
+    )
+
+
+@pytest.mark.unit
+def test_placement_batch_quality_allows_one_palette_mention() -> None:
+    tokens = extract_palette_tokens("Azul claro, blanco y plata")
+    items = [
+        {"presentation_text": "Un bosque azul brilla.", "prompt_text": ""},
+        {"presentation_text": "Cristales verdes en la cueva.", "prompt_text": ""},
+    ]
+    assert (
+        DialogueService._placement_batch_quality_issue(items, palette_tokens=tokens)
+        is None
+    )
 
 
 @pytest.mark.unit
@@ -784,6 +1314,11 @@ async def test_placement_answer_finishes_and_starts_paths(dialogue_svc, mocker, 
         [FakeExecuteResult(rows=sample_child(parent_id=PARENT_ID))]
     )
     mocker.patch.object(dialogue_svc, "_finish_placement", new=AsyncMock())
+    dialogue_svc._mentor_turn = AsyncMock(
+        return_value=DialogueService._turn(
+            sample_turn_row(meta={"phase": "placement_feedback", "score": 1.0})
+        )
+    )
     mocker.patch.object(
         dialogue_svc,
         "_start_path_choice",
@@ -800,7 +1335,9 @@ async def test_placement_answer_finishes_and_starts_paths(dialogue_svc, mocker, 
     )
     dialogue_svc._finish_placement.assert_awaited_once()
     dialogue_svc._start_path_choice.assert_awaited_once()
-    assert turns[0]["id"] == "path-turn"
+    assert len(turns) == 2
+    assert turns[0]["meta"]["phase"] == "placement_feedback"
+    assert turns[1]["id"] == "path-turn"
     get_settings.cache_clear()
 
 
@@ -1249,8 +1786,15 @@ async def test_placement_answer_advances_queue(dialogue_svc, tmp_path, monkeypat
     dialogue_svc.session = ScriptedSession(
         [FakeExecuteResult(rows=sample_child(parent_id=PARENT_ID))]
     )
+    dialogue_svc._mentor_turn = AsyncMock(
+        return_value=DialogueService._turn(
+            sample_turn_row(meta={"phase": "placement_feedback", "score": 1.0})
+        )
+    )
     dialogue_svc._insert = AsyncMock(
-        return_value=DialogueService._turn(sample_turn_row(meta={"phase": "placement_item"}))
+        side_effect=lambda row: DialogueService._turn(
+            sample_turn_row(meta=row.get("meta") or {"phase": "placement_item"})
+        )
     )
     effects, turns = await dialogue_svc._placement_answer(
         CHILD_ID,
@@ -1262,7 +1806,9 @@ async def test_placement_answer_advances_queue(dialogue_svc, tmp_path, monkeypat
         {"meta": {"phase": "placement_item"}},
     )
     assert effects == []
-    assert turns[0]["meta"]["phase"] == "placement_item"
+    assert len(turns) == 2
+    assert turns[0]["meta"]["phase"] == "placement_feedback"
+    assert turns[1]["meta"]["phase"] == "placement_item"
     get_settings.cache_clear()
 
 
@@ -1420,6 +1966,40 @@ async def test_submit_turn_routes_choose_name(dialogue_svc, mocker) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_submit_turn_stores_option_display_label(dialogue_svc, mocker) -> None:
+    child = sample_child(onboarding_step="choose_gender")
+    mentor_turn = sample_turn_row(meta={"phase": "choose_gender"})
+    dialogue_svc.session = ScriptedSession(
+        [
+            FakeExecuteResult(rows=child),
+            FakeExecuteResult(rows=sample_session_row()),
+            FakeExecuteResult(scalar=1),
+            FakeExecuteResult(rows=sample_turn_row(role="explorer", sequence=2)),
+            FakeExecuteResult(rows=child),
+            FakeExecuteResult(rows=child),
+        ]
+    )
+    dialogue_svc._insert = AsyncMock(side_effect=lambda row: DialogueService._turn(sample_turn_row(**row)))
+    dialogue_svc._last_mentor = AsyncMock(return_value=DialogueService._turn(mentor_turn))
+    dialogue_svc._phase_choose_gender = AsyncMock(
+        return_value=([], [{"id": "gender-turn", "role": "mentor"}])
+    )
+    mocker.patch(
+        "app.services.dialogue.WaitingCopyService"
+    ).return_value.waiting_copy_from_cache = AsyncMock(return_value=[])
+    await dialogue_svc.submit_turn(
+        AUTH_USER_ID,
+        CHILD_ID,
+        SESSION_ID,
+        {"kind": "option", "option_id": "male", "displayLabel": "Chico"},
+    )
+    insert_row = dialogue_svc._insert.await_args.args[0]
+    assert insert_row["text"] == "Chico"
+    assert insert_row["explorer_reply"]["option_id"] == "male"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_maybe_write_session_summary_fallback(dialogue_svc, tmp_path, monkeypatch, mocker) -> None:
     monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
     from app.config import get_settings
@@ -1448,9 +2028,11 @@ async def test_maybe_write_session_summary_fallback(dialogue_svc, tmp_path, monk
     "phase,handler_name",
     [
         ("choose_age", "_phase_choose_age"),
+        ("choose_gender", "_phase_choose_gender"),
         ("choose_character_species", "_phase_character"),
         ("handoff_placement", "_start_placement"),
         ("placement_item", "_placement_answer"),
+        ("placement_feedback", "_placement_feedback_continue"),
         ("choose_path", "_choose_path"),
         ("path_intro", "_path_next_challenge"),
         ("path_challenge", "_path_challenge_answer"),

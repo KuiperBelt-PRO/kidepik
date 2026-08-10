@@ -7,10 +7,12 @@ from sqlalchemy import bindparam, text
 from sqlalchemy.dialects.postgresql import JSONB
 
 from app.catalogs import AgeBand, SubjectCatalog
+from app.catalogs.explorer_gender import assert_explorer_gender, display_label_for_gender
 from app.db import session_scope
 from app.security.exit_pin import hash_exit_pin, verify_exit_pin
 from app.services.parents import ParentAccountService
 from app.services.settings import ParentSettingsRepository
+from app.services.traveler_profile import TravelerProfileService
 from app.text_utils import CharacterSummaryBuilder
 
 
@@ -23,7 +25,7 @@ class CrewService:
         await self.ensure_tutor_profile_for_auth_user(auth_user_id)
         parent_id = await self._parent_id(auth_user_id)
         async with session_scope() as session:
-            rows = (await session.execute(text("""select id, display_name, age_years, age_band, world_theme, status, onboarding_step, placement_status, settings, is_tutor_profile, updated_at from public.children where parent_id = :parent_id and status <> 'deleted' order by is_tutor_profile desc, created_at asc"""), {"parent_id": parent_id})).mappings().all()
+            rows = (await session.execute(text("""select id, display_name, age_years, age_band, world_theme, explorer_gender, status, onboarding_step, placement_status, settings, is_tutor_profile, updated_at from public.children where parent_id = :parent_id and status <> 'deleted' order by is_tutor_profile desc, created_at asc"""), {"parent_id": parent_id})).mappings().all()
         members = [self._list_item(row) for row in rows]
         return {"members": members, "member_count": sum(not x["is_tutor_profile"] for x in members), "member_limit": self.MEMBER_LIMIT, "has_tutor_profile": any(x["is_tutor_profile"] for x in members)}
 
@@ -63,6 +65,9 @@ class CrewService:
             traits = (await session.execute(text("select species, palette, features, vibe, achievements, character_summary, updated_at from public.child_traits where child_id = :id limit 1"), {"id": child_id})).mappings().first()
         if traits: detail["traits"] = self._traits(traits)
         if not detail["is_tutor_profile"]:
+            traveler = TravelerProfileService().read_for_child(parent_id, child_id)
+            if traveler:
+                detail["traveler_profile"] = traveler
             from app.services.crew_progress import CrewProgressService
             built = await CrewProgressService().build_for_child(dict(row, settings=detail["settings"]))
             detail.update({"progress": built["progress"], "journey": built["journey"], "general_level": built["progress"].get("general_level"), "rank_id": self._string(row.get("rank_id")), "rank": built["progress"].get("rank")})
@@ -78,6 +83,11 @@ class CrewService:
             if age is not None: AgeBand.assert_age_years(age)
             fields.append("age_years = :age_years"); params["age_years"] = age
             if age is not None: fields.extend(("age_band = :age_band", "effective_age_band = :effective_age_band")); params.update(age_band=AgeBand.from_age_years(age), effective_age_band=AgeBand.from_age_years(age))
+        if "explorer_gender" in payload:
+            if detail["is_tutor_profile"]:
+                raise ValueError("Cannot set explorer_gender on tutor profile")
+            fields.append("explorer_gender = :explorer_gender")
+            params["explorer_gender"] = assert_explorer_gender(str(payload["explorer_gender"]))
         if "status" in payload:
             if detail["is_tutor_profile"]: raise ValueError("Cannot change tutor profile status")
             if payload["status"] not in ("active", "paused"): raise ValueError("status invalid")
@@ -104,16 +114,35 @@ class CrewService:
             settings["learning"] = learning
         if "tutor_label" in payload or "learning" in payload: fields.append("settings = CAST(:settings AS jsonb)"); params["settings"] = settings
         traits_changed = "character_summary" in payload
+        traveler_changed = "traveler_profile" in payload
+        if traveler_changed:
+            if detail["is_tutor_profile"]:
+                raise ValueError("Cannot set traveler_profile on tutor profile")
+            parent_id = await self._parent_id(auth_user_id)
+            TravelerProfileService().update_for_child(
+                parent_id,
+                child_id,
+                child_snapshot=detail,
+                patch=payload["traveler_profile"] or {},
+            )
         if traits_changed:
-            if detail["is_tutor_profile"]: raise ValueError("Cannot set character_summary on tutor profile")
+            if detail["is_tutor_profile"]:
+                raise ValueError("Cannot set character_summary on tutor profile")
             await self._upsert_summary(child_id, self._summary(payload["character_summary"]))
-        if not fields and not traits_changed: raise ValueError("No updatable fields")
+        if not fields and not traits_changed and not traveler_changed:
+            raise ValueError("No updatable fields")
         async with session_scope() as session:
             if fields:
                 statement = text(f"update public.children set {', '.join(fields)}, updated_at = now() where id = :id and status <> 'deleted'")
                 if "settings" in params: statement = statement.bindparams(bindparam("settings", type_=JSONB))
                 await session.execute(statement, params)
-            elif traits_changed: await session.execute(text("update public.children set updated_at = now() where id = :id and status <> 'deleted'"), {"id": child_id})
+            elif traits_changed or traveler_changed:
+                await session.execute(
+                    text(
+                        "update public.children set updated_at = now() where id = :id and status <> 'deleted'"
+                    ),
+                    {"id": child_id},
+                )
         return await self.get_for_auth_user(auth_user_id, child_id)
 
     async def update_permissions_for_auth_user(self, auth_user_id: str, child_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -190,12 +219,12 @@ class CrewService:
     @staticmethod
     def _string(value: object) -> str | None: return value if isinstance(value, str) and value else None
     def _list_item(self, row: Any) -> dict[str, Any]:
-        settings = self._json(row["settings"]); return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "world_theme": self._string(row["world_theme"]), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "tutor_label": self._string(settings.get("tutor_label")), "is_tutor_profile": bool(row["is_tutor_profile"]), "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
+        settings = self._json(row["settings"]); return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "world_theme": self._string(row["world_theme"]), "explorer_gender": self._string(row.get("explorer_gender")), "explorer_gender_label": display_label_for_gender(self._string(row.get("explorer_gender")), int(row["age_years"]) if row["age_years"] is not None else None), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "tutor_label": self._string(settings.get("tutor_label")), "is_tutor_profile": bool(row["is_tutor_profile"]), "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
     def _detail(self, row: Any) -> dict[str, Any]:
         settings, learning, hours = self._json(row["settings"]), self._json(row["learning_overrides"]), row["allowed_hours"]
         band = AgeBand.from_legacy(row["age_band"], int(row["age_years"]) if row["age_years"] is not None else None) or AgeBand.CHILD
         active = settings.get("learning", {}).get("active_subjects") if isinstance(settings.get("learning"), dict) else None
-        return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "effective_age_band": self._string(row["effective_age_band"]), "birth_year": int(row["birth_year"]) if row["birth_year"] is not None else None, "world_theme": self._string(row["world_theme"]), "locale": str(row["locale"] or "es-ES"), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "is_tutor_profile": bool(row["is_tutor_profile"]), "settings": settings, "subject_catalog": SubjectCatalog.list_for_ui(), "active_subjects": active if isinstance(active, list) else SubjectCatalog.base_subjects_for_band(band), "permissions": {"allow_solo_start": bool(row["allow_solo_start"]), "require_exit_pin": bool(row["require_exit_pin"]), "exit_pin_set": bool(row["exit_pin_hash"]), "session_limit_per_day": row["session_limit_per_day"], "max_session_minutes": int(row["max_session_minutes"] or 10), "allowed_hours": hours, "can_choose_story_branch": bool(row["can_choose_story_branch"]), "lock_world_theme": bool(row["lock_world_theme"]), "font_scale_play": str(row["font_scale_play"] or "md"), "learning_overrides": learning}, "traits": None, "created_at": str(row["created_at"]) if row["created_at"] else None, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
+        return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "effective_age_band": self._string(row["effective_age_band"]), "birth_year": int(row["birth_year"]) if row["birth_year"] is not None else None, "world_theme": self._string(row["world_theme"]), "explorer_gender": self._string(row.get("explorer_gender")), "explorer_gender_label": display_label_for_gender(self._string(row.get("explorer_gender")), int(row["age_years"]) if row["age_years"] is not None else None), "locale": str(row["locale"] or "es-ES"), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "is_tutor_profile": bool(row["is_tutor_profile"]), "settings": settings, "subject_catalog": SubjectCatalog.list_for_ui(), "active_subjects": active if isinstance(active, list) else SubjectCatalog.base_subjects_for_band(band), "permissions": {"allow_solo_start": bool(row["allow_solo_start"]), "require_exit_pin": bool(row["require_exit_pin"]), "exit_pin_set": bool(row["exit_pin_hash"]), "session_limit_per_day": row["session_limit_per_day"], "max_session_minutes": int(row["max_session_minutes"] or 10), "allowed_hours": hours, "can_choose_story_branch": bool(row["can_choose_story_branch"]), "lock_world_theme": bool(row["lock_world_theme"]), "font_scale_play": str(row["font_scale_play"] or "md"), "learning_overrides": learning}, "traits": None, "created_at": str(row["created_at"]) if row["created_at"] else None, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
     def _traits(self, row: Any) -> dict[str, Any]:
         species, palette = str(row["species"] or ""), str(row["palette"] or ""); features = [x for x in row["features"] or [] if isinstance(x, str) and x.strip()]; achievements = [x for x in row["achievements"] or [] if isinstance(x, str) and x.strip()]; summary = self._string(row["character_summary"]) or (CharacterSummaryBuilder.build(species, palette, features, self._string(row["vibe"])) if species else None)
         return {"species": species, "palette": palette, "features": features, "vibe": self._string(row["vibe"]), "achievements": achievements, "character_summary": summary, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}

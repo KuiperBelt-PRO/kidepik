@@ -7,6 +7,7 @@ import {
   memberWorldModifier,
   memberPlayCtaLabel,
   memberTextBoxContent,
+  genderSelectOptions,
 } from "../js/lib/crew-member-card.js";
 
 /** @type {import('../js/lib/crew-api.js').CrewListItem} */
@@ -40,7 +41,19 @@ describe("crew-member-card", () => {
   });
 
   it("memberTypeLine combina mundo y edad", () => {
-    assert.equal(memberTypeLine(baseMember), "Fantasía · 8 años");
+    assert.equal(memberTypeLine(baseMember), "Fantasía · Chico · 8 años");
+  });
+
+  it("memberTypeLine usa etiqueta de género explícita", () => {
+    assert.equal(
+      memberTypeLine({ ...baseMember, explorer_gender: "female", explorer_gender_label: "Chica" }),
+      "Fantasía · Chica · 8 años",
+    );
+  });
+
+  it("genderSelectOptions adapta labels por edad", () => {
+    assert.equal(genderSelectOptions(8)[0].label, "Chico");
+    assert.equal(genderSelectOptions(30)[0].label, "Hombre");
   });
 
   it("memberTextBoxContent prioriza nota tutor", () => {

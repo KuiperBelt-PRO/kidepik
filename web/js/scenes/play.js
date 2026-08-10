@@ -26,7 +26,7 @@ import { showGlassConfirm } from "../components/glass-modal.js";
 import { isDebugAiAllowed, isDebugAiClientActive, setDebugAiServerAllowed } from "../lib/debug-ai.js?v=256";
 import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
 import { postDebugJourneyRewind } from "../lib/debug-journey-api.js?v=256";
-import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=244";
+import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=257";
 
 /** Copy canónico de elección de mundo (fallback si el turno no trae description). */
 const WORLD_THEME_HINTS = Object.freeze({
@@ -190,6 +190,8 @@ async function mountPlayPanel(root, ctx) {
   let playWorldTheme = null;
   /** @type {string | null} */
   let playAgeBand = null;
+  /** @type {number | null} */
+  let playAgeYears = null;
   let onboardingStep = "";
   /** @type {object | null} */
   let lastPendingTurn = null;
@@ -340,6 +342,9 @@ async function mountPlayPanel(root, ctx) {
     } else if (data.age_years == null && data.age_band == null) {
       playAgeBand = null;
     }
+    if (typeof data.age_years === "number") {
+      playAgeYears = data.age_years;
+    }
     if (typeof data.onboarding_step === "string") {
       onboardingStep = data.onboarding_step;
     }
@@ -357,6 +362,9 @@ async function mountPlayPanel(root, ctx) {
       }
       if (effect?.type === "set_age" && effect.value && typeof effect.value.age_band === "string") {
         playAgeBand = effect.value.age_band;
+      }
+      if (effect?.type === "set_age" && effect.value && typeof effect.value.age_years === "number") {
+        playAgeYears = effect.value.age_years;
       }
       if (effect?.type === "set_effective_age_band" && typeof effect.value === "string") {
         playAgeBand = effect.value;
@@ -401,14 +409,40 @@ async function mountPlayPanel(root, ctx) {
     androide: "Androide curioso",
     custom: "Escribir la mía",
     continue: "Continuar",
+    male: "Chico",
+    female: "Chica",
   });
+
+  /**
+   * @param {string} id
+   */
+  function genderChipLabel(id) {
+    const adult = playAgeYears != null && playAgeYears >= 18;
+    if (id === "male") return adult ? "Hombre" : "Chico";
+    if (id === "female") return adult ? "Mujer" : "Chica";
+    return null;
+  }
+
+  /**
+   * @param {string} text
+   * @param {object} [turn]
+   */
+  function resolveExplorerBubbleText(text, turn) {
+    const reply = turn?.explorer_reply;
+    if (reply && typeof reply.displayLabel === "string" && reply.displayLabel.trim()) {
+      return reply.displayLabel.trim();
+    }
+    const key = String(text || "").trim();
+    const genderLabel = genderChipLabel(key);
+    if (genderLabel) return genderLabel;
+    return EXPLORER_OPTION_LABELS[key] ?? key;
+  }
 
   /**
    * @param {string} text
    */
   function formatExplorerBubbleText(text) {
-    const key = text.trim();
-    return EXPLORER_OPTION_LABELS[key] ?? key;
+    return resolveExplorerBubbleText(text);
   }
 
   function mentorIconId() {
@@ -531,6 +565,8 @@ async function mountPlayPanel(root, ctx) {
   let thinkingRotateTimer = null;
   /** @type {HTMLElement | null} */
   let thinkingTextEl = null;
+  /** @type {HTMLElement | null} */
+  let optimisticExplorerBubble = null;
 
   /** Copy de sistema (no narrativa) cuando falla el compose de aventura. */
   const ADVENTURE_COMPOSE_FAILED_COPY =
@@ -541,6 +577,7 @@ async function mountPlayPanel(root, ctx) {
     choose_world: "options_only",
     choose_name: "text_only",
     choose_age: "options_or_text",
+    choose_gender: "options_only",
     choose_character_species: "options_or_text",
     choose_character: "options_or_text",
     handoff_placement: "continue",
@@ -549,6 +586,11 @@ async function mountPlayPanel(root, ctx) {
     choose_path: "options_only",
     path_intro: "continue",
   });
+
+  const DEFAULT_GENDER_OPTIONS = Object.freeze([
+    { id: "male", label: "Chico" },
+    { id: "female", label: "Chica" },
+  ]);
 
   const DEFAULT_AGE_OPTIONS = Object.freeze(
     [6, 7, 8, 9, 10, 12, 15, 18, 30, 50, 70].map((age) => ({
@@ -854,7 +896,9 @@ async function mountPlayPanel(root, ctx) {
     const panel = document.createElement("div");
     panel.className = "play-choice-echo";
     panel.setAttribute("role", "region");
-    panel.setAttribute("aria-label", "Elección de destino");
+    const echoLabel =
+      meta.phase === "placement_choice_echo" ? "Respuesta del reto" : "Elección de destino";
+    panel.setAttribute("aria-label", echoLabel);
 
     if (taken && (taken.label || taken.id)) {
       const chosen = document.createElement("div");
@@ -899,7 +943,7 @@ async function mountPlayPanel(root, ctx) {
       bubble.dataset.turnId = String(turn.id);
     }
 
-    const displayText = role === "explorer" ? formatExplorerBubbleText(text) : text;
+    const displayText = role === "explorer" ? resolveExplorerBubbleText(text, turn) : text;
     const explorerWho = role === "explorer" ? explorerDisplayName : null;
     const mentorWho = role === "mentor" ? who : null;
 
@@ -1018,6 +1062,13 @@ async function mountPlayPanel(root, ctx) {
       const echo = buildChoiceResolvedEcho(turn.meta);
       if (echo) nodes.push(echo);
     }
+    if (
+      role === "explorer" &&
+      (turn?.meta?.phase === "placement_choice_echo" || turn?.meta?.choice_taken)
+    ) {
+      const echo = buildChoiceResolvedEcho(turn.meta);
+      if (echo) nodes.push(echo);
+    }
     return nodes;
   }
 
@@ -1032,6 +1083,22 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * @param {string} text
+   */
+  function appendOptimisticExplorerBubble(text) {
+    optimisticExplorerBubble?.remove();
+    const bubble = buildBubbleElement("explorer", text, undefined, undefined);
+    bubble.dataset.optimistic = "1";
+    insertLogNodes([bubble], { scrollToEnd: true });
+    optimisticExplorerBubble = bubble;
+  }
+
+  function clearOptimisticExplorerBubble() {
+    optimisticExplorerBubble?.remove();
+    optimisticExplorerBubble = null;
+  }
+
+  /**
    * @param {string} role
    * @param {string} text
    * @param {string} [who]
@@ -1039,7 +1106,7 @@ async function mountPlayPanel(root, ctx) {
    */
   function appendBubble(role, text, who, opts = {}) {
     if (!(logEl instanceof HTMLElement)) return;
-    insertLogNodes([buildBubbleElement(role, text, who, turn)], opts);
+    insertLogNodes([buildBubbleElement(role, text, who, undefined)], opts);
   }
 
   /**
@@ -1278,10 +1345,15 @@ async function mountPlayPanel(root, ctx) {
     btn.type = "button";
     btn.textContent = "Ver diagnóstico de la prueba";
     btn.addEventListener("click", () => {
+      const debug = composeDebug ?? lastComposeDebug;
       void openDebugAiPanel({
         session: ctx.session,
         childId: ctx.childId,
-        composeDebug: composeDebug ?? lastComposeDebug,
+        composeDebug: debug,
+        purpose:
+          typeof debug?.purpose === "string"
+            ? debug.purpose
+            : "placement_item_writer",
       });
     });
     p.appendChild(btn);
@@ -1306,6 +1378,9 @@ async function mountPlayPanel(root, ctx) {
     const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
     if (phase === "choose_age" && opts.length === 0) {
       opts = [...DEFAULT_AGE_OPTIONS];
+    }
+    if (phase === "choose_gender" && opts.length === 0) {
+      opts = [...DEFAULT_GENDER_OPTIONS];
     }
     if (
       (phase === "choose_character_species" || phase === "choose_character") &&
@@ -1499,6 +1574,7 @@ async function mountPlayPanel(root, ctx) {
    */
   function hydrateFromSession(data) {
     resetPlayInteractionState();
+    clearOptimisticExplorerBubble();
     ctx.setSessionId(data.session_id);
     if (logEl instanceof HTMLElement) {
       logEl.innerHTML = "";
@@ -1526,8 +1602,7 @@ async function mountPlayPanel(root, ctx) {
         captureWaitingHints(t);
         renderTurn(t, mentorLabel, { scrollToEnd: false });
       } else {
-        if (t?.id) renderedTurnIds.add(String(t.id));
-        insertLogNodes([buildBubbleElement(role, t.text || "", undefined, t)], { scrollToEnd: false });
+        insertLogNodes(buildTurnNodes(t, mentorLabel), { scrollToEnd: false });
       }
     }
     scrollLogToEnd({ force: true });
@@ -1537,6 +1612,20 @@ async function mountPlayPanel(root, ctx) {
       turns.filter((t) => t.role === "mentor" || t.role === "agent").at(-1);
     if (pending) renderPending(pending);
     if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+  }
+
+  /**
+   * @param {{ kind: string, option_id?: string, text?: string, displayLabel?: string }} reply
+   */
+  function explorerReplyShown(reply) {
+    if (typeof reply.displayLabel === "string" && reply.displayLabel.trim()) {
+      return reply.displayLabel.trim();
+    }
+    if (reply.kind === "text") return reply.text || "";
+    if (reply.kind === "option") {
+      return resolveExplorerBubbleText(reply.option_id || "", { explorer_reply: reply });
+    }
+    return "Continuar";
   }
 
   /**
@@ -1554,6 +1643,11 @@ async function mountPlayPanel(root, ctx) {
     }
 
     if (statusEl instanceof HTMLElement) statusEl.textContent = "";
+
+    const shown = explorerReplyShown(reply);
+
+    appendOptimisticExplorerBubble(shown);
+
     const thinkingKind = resolveThinkingKind(reply);
     showThinking(thinkingKind);
     if (thinkingKind === "evaluating_answer") {
@@ -1565,14 +1659,6 @@ async function mountPlayPanel(root, ctx) {
     if (optionsEl instanceof HTMLElement) optionsEl.innerHTML = "";
     if (formEl instanceof HTMLElement) formEl.hidden = true;
     syncFooterComposeMode(false);
-
-    const shown =
-      reply.displayLabel ||
-      (reply.kind === "text"
-        ? reply.text || ""
-        : reply.kind === "option"
-          ? reply.option_id || ""
-          : "Continuar");
 
     const prevPhase =
       typeof lastPendingTurn?.meta?.phase === "string" ? lastPendingTurn.meta.phase : "";
@@ -1632,7 +1718,7 @@ async function mountPlayPanel(root, ctx) {
       mentorLabel = data.mentor.display_name;
     }
     applyChapterTitle(data.chapter);
-    appendBubble("explorer", shown);
+    clearOptimisticExplorerBubble();
 
     const turns = Array.isArray(data.agent_turns) ? data.agent_turns : [];
     for (const t of turns) {

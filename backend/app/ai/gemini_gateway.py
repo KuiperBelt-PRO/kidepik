@@ -55,7 +55,7 @@ class GeminiGateway:
         last_code = "ai_provider_unavailable"
         last_model: str | None = None
 
-        for model_id in self.model_ids_for_purpose(purpose):
+        for model_id in self.settings.gemini_model_list_resilient(purpose):
             tried.append(model_id)
             last_model = model_id
             started = time.perf_counter()

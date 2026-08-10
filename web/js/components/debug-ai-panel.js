@@ -21,15 +21,47 @@ import {
  */
 
 /**
+ * @param {string} text
+ * @returns {Promise<boolean>}
+ */
+async function copyTextToClipboard(text) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* fallback below */
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+  }
+}
+
+/**
  * @param {DebugAiPanelOptions} options
  */
 export async function openDebugAiPanel(options) {
   const { session, childId, composeDebug, purpose = "mentor_guide" } = options;
+  const resolvedPurposeFromCompose =
+    typeof composeDebug?.purpose === "string" ? composeDebug.purpose : null;
+  const panelPurpose = resolvedPurposeFromCompose || purpose;
 
   const statusRes = await fetchDebugAiStatus(session);
   const status = statusRes.ok ? statusRes.data : null;
-  const resolveRes = await fetchDebugAiResolve(session, purpose);
-  const queuesRes = await fetchDebugAiQueues(session, purpose);
+  const resolveRes = await fetchDebugAiResolve(session, panelPurpose);
+  const queuesRes = await fetchDebugAiQueues(session, panelPurpose);
   const attemptsRes = await fetchDebugAiAttempts(session, 12);
 
   const body = document.createElement("div");
@@ -41,7 +73,7 @@ export async function openDebugAiPanel(options) {
     : "Estado no disponible";
 
   const resolvedPurpose =
-    (resolveRes.ok && resolveRes.data?.purpose) || purpose;
+    (resolveRes.ok && resolveRes.data?.purpose) || panelPurpose;
 
   body.innerHTML = `
     <p class="debug-ai-panel__line"><strong>Estado:</strong> ${escapeHtml(statusLine)}</p>
@@ -54,10 +86,36 @@ export async function openDebugAiPanel(options) {
     composeEl.textContent = JSON.stringify(composeDebug, null, 2);
     const h = document.createElement("p");
     h.className = "debug-ai-panel__line";
-    h.innerHTML = `<strong>Compose:</strong> outcome=${escapeHtml(String(composeDebug.outcome ?? "?"))}`;
+    const issue =
+      composeDebug.quality_issue != null
+        ? ` · issue=${escapeHtml(String(composeDebug.quality_issue))}`
+        : "";
+    h.innerHTML = `<strong>Compose:</strong> outcome=${escapeHtml(String(composeDebug.outcome ?? "?"))}${issue}`;
     body.appendChild(h);
     body.appendChild(composeEl);
   }
+
+  const payload = {
+    status,
+    purpose: resolvedPurpose,
+    compose: composeDebug ?? null,
+    resolve: resolveRes.ok ? resolveRes.data : null,
+    queues: queuesRes.ok ? queuesRes.data : null,
+    attempts: attemptsRes.ok ? attemptsRes.data : null,
+  };
+  const payloadText = JSON.stringify(payload, null, 2);
+
+  const exportPre = document.createElement("pre");
+  exportPre.className = "debug-ai-panel__mono debug-ai-panel__mono--short";
+  exportPre.textContent = payloadText;
+  exportPre.setAttribute("tabindex", "0");
+  exportPre.setAttribute("aria-label", "JSON de diagnóstico (seleccionable)");
+  const exportLabel = document.createElement("p");
+  exportLabel.className = "debug-ai-panel__line";
+  exportLabel.innerHTML =
+    "<strong>JSON completo:</strong> (también puedes seleccionar y copiar manualmente)";
+  body.appendChild(exportLabel);
+  body.appendChild(exportPre);
 
   if (resolveRes.ok && resolveRes.data) {
     const resolved =
@@ -109,15 +167,12 @@ export async function openDebugAiPanel(options) {
   copyBtn.className = "debug-ai-panel__btn";
   copyBtn.textContent = "Copiar JSON";
   copyBtn.addEventListener("click", () => {
-    const payload = {
-      status,
-      purpose: resolvedPurpose,
-      compose: composeDebug ?? null,
-      resolve: resolveRes.ok ? resolveRes.data : null,
-      queues: queuesRes.ok ? queuesRes.data : null,
-      attempts: attemptsRes.ok ? attemptsRes.data : null,
-    };
-    void navigator.clipboard?.writeText(JSON.stringify(payload, null, 2));
+    void copyTextToClipboard(payloadText).then((ok) => {
+      copyBtn.textContent = ok ? "¡Copiado!" : "Selecciona el JSON de arriba";
+      window.setTimeout(() => {
+        copyBtn.textContent = "Copiar JSON";
+      }, 2200);
+    });
   });
   const pingBtn = document.createElement("button");
   pingBtn.type = "button";

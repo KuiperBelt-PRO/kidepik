@@ -18,6 +18,7 @@ class AiProductError(Exception):
         model: str | None = None,
         models_tried: list[str] | None = None,
         retryable: bool = False,
+        compose_debug: dict[str, Any] | None = None,
     ) -> None:
         super().__init__(detail)
         self.error_code = error_code
@@ -27,6 +28,7 @@ class AiProductError(Exception):
         self.model = model
         self.models_tried = models_tried or []
         self.retryable = retryable
+        self.compose_debug = compose_debug or {}
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
@@ -106,6 +108,7 @@ def product_error(
     models_tried: list[str] | None = None,
     retryable: bool | None = None,
     http_status: int | None = None,
+    compose_debug: dict[str, Any] | None = None,
 ) -> AiProductError:
     defaults = {
         "ai_quota_exhausted": (503, False),
@@ -123,6 +126,7 @@ def product_error(
         model=model,
         models_tried=models_tried,
         retryable=retryable if retryable is not None else retry,
+        compose_debug=compose_debug,
     )
 
 

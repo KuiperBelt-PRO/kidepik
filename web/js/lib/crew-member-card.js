@@ -100,10 +100,42 @@ export function memberWorldModifier(m) {
 /**
  * @param {CrewListItem} m
  */
+export function memberGenderLabel(m) {
+  if (m.is_tutor_profile) return "";
+  if (m.explorer_gender_label) return m.explorer_gender_label;
+  if (m.explorer_gender === "female") {
+    return m.age_years != null && m.age_years >= 18 ? "Mujer" : "Chica";
+  }
+  return m.age_years != null && m.age_years >= 18 ? "Hombre" : "Chico";
+}
+
+/**
+ * @param {number | null | undefined} ageYears
+ */
+export function genderSelectOptions(ageYears) {
+  const adult = ageYears != null && ageYears >= 18;
+  if (adult) {
+    return [
+      { value: "male", label: "Hombre" },
+      { value: "female", label: "Mujer" },
+    ];
+  }
+  return [
+    { value: "male", label: "Chico" },
+    { value: "female", label: "Chica" },
+  ];
+}
+
+/**
+ * @param {CrewListItem} m
+ */
 export function memberTypeLine(m) {
   if (m.is_tutor_profile) return "Perfil de tutor";
   const level = m.general_level ? ` · ${m.general_level}` : "";
-  return `${memberWorldLabel(m)} · ${memberAgeLabel(m)}${level}`;
+  const gender = memberGenderLabel(m);
+  const age = memberAgeLabel(m);
+  const genderPart = gender && m.age_years != null ? `${gender} · ` : "";
+  return `${memberWorldLabel(m)} · ${genderPart}${age}${level}`;
 }
 
 /**

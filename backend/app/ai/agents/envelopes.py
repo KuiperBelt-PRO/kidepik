@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class DialogueOption(BaseModel):
@@ -40,6 +40,20 @@ class PlacementItemEnvelope(BaseModel):
     options: list[DialogueOption] = Field(default_factory=list)
     correct_option_id: str | None = None
     expected_answer: str | None = None
+    success_feedback: str | None = None
+    explanation: str | None = None
+
+    @model_validator(mode="after")
+    def validate_answer_fields(self) -> PlacementItemEnvelope:
+        if self.item_type == "mcq":
+            if len(self.options) < 2:
+                raise ValueError("mcq_needs_options")
+            if not str(self.correct_option_id or "").strip():
+                raise ValueError("mcq_missing_correct_option_id")
+        elif self.item_type == "short_text":
+            if not str(self.expected_answer or "").strip():
+                raise ValueError("short_text_missing_expected")
+        return self
 
 
 class PlacementQueueEnvelope(BaseModel):

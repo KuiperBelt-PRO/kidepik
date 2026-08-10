@@ -14,6 +14,7 @@
 - **Mecánicas de viaje (aprobada ago 2026):** [specify/SPEC_APP_JOURNEY_MECHANICS.md](specify/SPEC_APP_JOURNEY_MECHANICS.md) — flujos espera / first-run / prueba / caminos / rangos.
 - **Orquestador central (aprobada ago 2026 — cableado en play):** [specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md](specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md) — subagentes desde `.md` + tools.
 - **Glosarios mundo (aprobada — seed + tool):** [specify/SPEC_APP_WORLD_GLOSSARY.md](specify/SPEC_APP_WORLD_GLOSSARY.md) — JSONL + DuckDB `glossary_search`.
+- **Glosario en capas y composición (aprobada ago 2026 — implementada):** [specify/SPEC_APP_GLOSSARY_LAYERED_COMPOSITION.md](specify/SPEC_APP_GLOSSARY_LAYERED_COMPOSITION.md) — ingredientes L1 + referencias L2; `glossary_compose`; flag `GLOSSARY_COMPOSE_ENABLED`.
 - **Frases de espera (JSONL — implementado):** [specify/SPEC_APP_WAITING_PHRASES.md](specify/SPEC_APP_WAITING_PHRASES.md) — `data/waiting/*.jsonl`; rotación 8 s; **no** PG.
 - **Backlog UI/mecánicas (aprobado — en curso):** [specify/SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](specify/SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) — ficha 3 tabs, PIN, informes, play polish; **sin** Parquet/ETL.
 - Plan: [tasks/PRODUCT_BACKLOG_AGO2026_PLAN.md](tasks/PRODUCT_BACKLOG_AGO2026_PLAN.md)
@@ -70,7 +71,8 @@
 - **Logs en disco (web/logs):** [specify/SPEC_APP_FILE_LOGGING.md](specify/SPEC_APP_FILE_LOGGING.md) — **implementada** 1 ago 2026; JSONL por canal/nivel; más detalle con `APP_DEBUG_AI`
 - **Notificaciones glass:** [specify/SPEC_APP_GLASS_TOAST.md](specify/SPEC_APP_GLASS_TOAST.md) — **implementada** jul 2026; errores/warnings/success/info reutilizables
 - **Modales glass:** [specify/SPEC_APP_GLASS_MODAL.md](specify/SPEC_APP_GLASS_MODAL.md) — **implementada** jul 2026; alerta y confirmación reutilizables; tripulación y cuenta
-- **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** + delta `choose_character`
+- **Primer acceso a la aventura:** [specify/SPEC_APP_PLAY_FIRST_RUN.md](specify/SPEC_APP_PLAY_FIRST_RUN.md) — **contrato** + delta `choose_character` + **`choose_gender`**
+- **Sexo del explorador (implementada ago 2026):** [specify/SPEC_APP_EXPLORER_GENDER.md](specify/SPEC_APP_EXPLORER_GENDER.md) — paso `choose_gender` tras edad; binario POC; legacy→masculino; editable en ficha tutor
 - **Rangos de progresión (sci-fi / fantasía):** [specify/SPEC_APP_PROGRESSION_RANKS.md](specify/SPEC_APP_PROGRESSION_RANKS.md) — **marco** jul 2026; catálogo provisional 5 tiers
 - **Migraciones Supabase + documentos legales:** `supabase/migrations/` — Términos/Privacidad versionados en Postgres; bootstrap FastAPI aplica estado vía `GET /api/v1/migrations/status`
 - **Loader — lluvia de meteoritos (franja superior):** [specify/SPEC_LOADER_METEOR_SHOWER.md](specify/SPEC_LOADER_METEOR_SHOWER.md) — implementada jun 2026

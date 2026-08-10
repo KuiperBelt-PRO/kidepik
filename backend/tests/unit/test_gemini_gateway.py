@@ -48,8 +48,21 @@ def test_gemini_model_list_for_purpose() -> None:
         ai_gemini_model_list="flash-3,flash-25",
         ai_gemini_model_list_lite="lite-25,lite-31",
     )
-    assert settings.gemini_model_list_for_purpose("mentor_guide") == ["flash-3", "flash-25"]
-    assert settings.gemini_model_list_for_purpose("journey_summarizer") == ["lite-25", "lite-31"]
+    assert settings.gemini_model_list_for_purpose("mentor_guide")[0] == "gemini-3-flash-preview"
+    assert settings.gemini_model_list_for_purpose("path_composer")[0] == "gemini-3.1-flash-lite"
+    assert settings.gemini_model_list_for_purpose("journey_summarizer") == [
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash-lite",
+    ]
+    resilient = settings.gemini_model_list_resilient("mentor_guide")
+    assert resilient[0] == "gemini-3-flash-preview"
+    assert "gemini-3.1-flash-lite" in resilient
+    assert settings.gemini_model_list_resilient("journey_summarizer") == [
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash-lite",
+        "gemini-2.5-flash-lite",
+    ]
     assert settings.gemini_model_tier_for_purpose("waiting_copy_writer") == "lite"
     assert settings.gemini_model_tier_for_purpose("placement_item_writer") == "quality"
 
@@ -72,8 +85,8 @@ async def test_gateway_uses_lite_list_for_summarizer() -> None:
 
     result, used = await gw.run_with_model_list("journey_summarizer", runner)
     assert result == {"ok": True}
-    assert used == "lite-25"
-    assert calls == ["lite-25"]
+    assert used == "gemini-3.1-flash-lite"
+    assert calls == ["gemini-3.1-flash-lite"]
 
 
 @pytest.mark.unit
@@ -93,7 +106,7 @@ async def test_gateway_advances_model_list() -> None:
             raise product_error("ai_quota_exhausted", model=model_id)
         return {"ok": True}
 
-    result, used = await gw.run_with_model_list("mentor_guide", runner)
+    result, used = await gw.run_with_model_list("dialogue", runner)
     assert result == {"ok": True}
     assert used == "model-b"
     assert calls == ["model-a", "model-b"]

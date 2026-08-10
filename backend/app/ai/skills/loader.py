@@ -6,6 +6,14 @@ from typing import Any
 
 import yaml
 
+# Skills que deben ir siempre en contexto (no defer) — reglas de producto críticas.
+_EAGER_SKILL_IDS = frozenset({"audience-language", "mentor-prose-clarity"})
+
+# Skills críticos por purpose (siempre en contexto para ese agente).
+_PURPOSE_EAGER_SKILL_IDS: dict[str, frozenset[str]] = {
+    "placement_item_writer": frozenset({"placement-exam", "subject-pedagogy"}),
+}
+
 PURPOSE_SKILL_IDS: dict[str, list[str]] = {
     "onboarding_host": ["onboarding-flow", "audience-language", "mentor-prose-clarity", "original-ip"],
     "mentor_guide": [
@@ -99,15 +107,19 @@ def parse_skill_md(path: Path) -> dict[str, Any]:
     }
 
 
-def load_skill_capability(path: Path) -> Any:
+def load_skill_capability(path: Path, *, purpose: str | None = None) -> Any:
     from pydantic_ai.capabilities import Capability
 
     parsed = parse_skill_md(path)
+    skill_id = parsed["id"]
+    eager = skill_id in _EAGER_SKILL_IDS
+    if purpose:
+        eager = eager or skill_id in _PURPOSE_EAGER_SKILL_IDS.get(purpose, frozenset())
     return Capability(
-        id=parsed["id"],
+        id=skill_id,
         description=parsed["description"],
         instructions=parsed["instructions"],
-        defer_loading=True,
+        defer_loading=not eager,
     )
 
 
@@ -126,7 +138,7 @@ def load_skills_for_purpose(
         path = base / skill_id / "SKILL.md"
         if not path.is_file():
             raise FileNotFoundError(f"missing skill: {path}")
-        caps.append(load_skill_capability(path))
+        caps.append(load_skill_capability(path, purpose=purpose))
     return caps
 
 

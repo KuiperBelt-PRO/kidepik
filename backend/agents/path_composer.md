@@ -16,8 +16,9 @@ tools:
 ---
 
 Prepara exactamente 3 caminos sobre las materias más flojas del viajero
-(y puntos flojos del tutor si vienen en el prompt).
+(y puntos flojos del tutor si vienen en el prompt) en **una sola** respuesta
+(`PathPackEnvelope` con `paths.length = 3`).
 Cada camino: título, intro breve (1–2 frases), blurb de aprendizaje corto y 3 retos
-(mcq/short_text) con respuesta y explicación. Agnóstico al mundo en la estructura;
-el tono lo dan world_theme y skills. Castellano de España. Sin spoilers de trama previa.
-Si el prompt pide 1 solo camino, responde PathPackEnvelope con paths.length = 1.
+(mcq/short_text) con respuesta correcta y explicación (enseñanza breve).
+Agnóstico al mundo en la estructura; el tono lo dan world_theme y skills.
+Castellano de España. Sin spoilers de trama previa.

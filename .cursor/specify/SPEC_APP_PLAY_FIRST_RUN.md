@@ -62,7 +62,9 @@ choose_world
 choose_name
     → (display_name) → choose_age
 choose_age
-    → (age_years + age_band) → choose_character
+    → (age_years + age_band) → choose_gender
+choose_gender
+    → (explorer_gender) → choose_character
 choose_character
     → (traits persistidos) → placement
 placement
@@ -77,6 +79,7 @@ complete
 | Mundo | `choose_world` | Elige CF o Fantasía (opciones claras) | `set_world_theme` + advance |
 | Nombre | `choose_name` | Nombre de tripulación | `set_display_name` + advance |
 | Edad | `choose_age` | Edad (opciones por rangos y/o texto numérico) | `set_age` + advance |
+| Sexo | `choose_gender` | Chico/chica o hombre/mujer según edad ([SPEC_APP_EXPLORER_GENDER.md](SPEC_APP_EXPLORER_GENDER.md)) | `set_explorer_gender` + advance |
 | Personaje | `choose_character` | Co-crea especie/color/rasgos ([SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md)) | `set_traits` + advance |
 | Examen | `placement` | Delega en flow `placement` | ver exam spec |
 | Listo | `complete` | Cierre narrativo breve | handoff |
@@ -140,21 +143,29 @@ Copy de apoyo (agente): breve evocación de cada mundo (nave/galaxia vs reinos/m
 - Persistir `age_years` (5–99).
 - Derivar `age_band` según [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md) (no solo age_7/age_9).
 - `effective_age_band` inicial = `age_band` (placement/rendimiento pueden ajustarla ±1 banda).
+- Advance → `choose_gender`.
+
+### 3.5 Sexo del explorador
+
+- Detalle completo: [SPEC_APP_EXPLORER_GENDER.md](SPEC_APP_EXPLORER_GENDER.md).
+- Tras edad: pregunta binaria (chico/chica o hombre/mujer según `age_band`).
+- `input_mode`: `options_only` (2 chips).
+- Persistir `explorer_gender` (`male` \| `female`).
 - Advance → `choose_character`.
 
-### 3.5 Personaje (rasgos)
+### 3.6 Personaje (rasgos)
 
 - Tras edad, el coach de personaje co-crea la ficha textual (especie, color, rasgos) ya en el tono del mundo.
 - Detalle completo: [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md).
 - Sin traits válidos **no** se avanza a placement.
 
-### 3.6 Handoff a examen
+### 3.7 Handoff a examen
 
 - El agente enmarca el examen como prueba de ingreso (Academia Espacial / Escuela de Magos / variante según mundo y traits).
 - Abre o continúa `flow_id = "placement"` sin salir de la escena de diálogo.
 - No mostrar “vas a hacer un test”.
 
-### 3.7 Cierre first-run tras examen
+### 3.8 Cierre first-run tras examen
 
 - Mensaje narrativo de admisión (sin nota numérica).
 - `onboarding_step = complete`.
@@ -180,6 +191,7 @@ Los effects del diálogo bastan si el servicio de play aplica:
 set_world_theme: "fantasy" | "sci-fi"
 set_display_name: string
 set_age: { age_years: number; age_band: AgeBand }  // SPEC_APP_AGE_BANDS
+set_explorer_gender: "male" | "female"  // SPEC_APP_EXPLORER_GENDER
 set_traits: { species: string; palette: string; features: string[]; vibe?: string }
 set_mentor: { mentor_id: string }  // al fijar world_theme
 advance_onboarding: OnboardingStep
@@ -217,7 +229,8 @@ El tutor **puede corregir** nombre/edad/mundo (con unlock) sin rehacer el diálo
 
 - [x] Mundo elegido por el niño en primera aventura
 - [x] Orden original: bienvenida → mundo → nombre → edad → examen → aventura
-- [ ] **Delta:** insertar `choose_character` entre edad y examen ([SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md))
+- [x] **Delta:** `choose_gender` entre edad y personaje ([SPEC_APP_EXPLORER_GENDER.md](SPEC_APP_EXPLORER_GENDER.md))
+- [ ] **Delta:** insertar `choose_character` entre género y examen ([SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md))
 - [ ] **Delta:** edades abiertas + bandas ([SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md))
 - [ ] **Delta:** voz mentor canónico post-mundo ([SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md))
 - [x] Persistencia en perfil del tripulante

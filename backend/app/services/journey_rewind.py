@@ -14,6 +14,7 @@ from app.ai.journey.ledger import JourneyLedger
 from app.catalogs import AgeBand
 from app.config import Settings, get_settings
 from app.logging_ import AppLogger
+from app.catalogs.explorer_gender import assert_explorer_gender
 from app.services.dialogue import DialogueService
 from app.services.mentor_profiles import resolve_mentor_key
 
@@ -24,6 +25,7 @@ PRE_CHARACTER_PHASES = frozenset(
         "choose_world",
         "choose_name",
         "choose_age",
+        "choose_gender",
         "choose_character",
         "choose_character_species",
     }
@@ -109,6 +111,13 @@ def _phase_base_fields(phase: str) -> dict[str, Any]:
             "age_years": None,
             "age_band": None,
             "effective_age_band": None,
+            "explorer_gender": None,
+        }
+    if phase == "choose_gender":
+        return {
+            "onboarding_step": "choose_gender",
+            "placement_status": "not_started",
+            "explorer_gender": None,
         }
     if phase in {"choose_character", "choose_character_species"}:
         return {
@@ -158,6 +167,11 @@ def _replay_explorer_state(turns: list[dict[str, Any]]) -> dict[str, Any]:
                 state["age_years"] = age
                 state["age_band"] = band
                 state["effective_age_band"] = band
+            except ValueError:
+                pass
+        elif prev_phase == "choose_gender":
+            try:
+                state["explorer_gender"] = assert_explorer_gender(value)
             except ValueError:
                 pass
     return state

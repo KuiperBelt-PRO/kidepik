@@ -258,7 +258,7 @@ Body vacío o `{ "tutor_label": "…" }`. Respuesta DTO completo con permisos.
 
 Como en la propuesta previa, con campos nullable y:
 
-- `PATCH` puede corregir `display_name`, `age_years`, `world_theme` (respetando lock) y `character_summary` (solo exploradores; persiste en `child_traits.character_summary`).
+- `PATCH` puede corregir `display_name`, `age_years`, `explorer_gender` ([SPEC_APP_EXPLORER_GENDER.md](SPEC_APP_EXPLORER_GENDER.md)), `world_theme` (respetando lock) y `character_summary` (solo exploradores; persiste en `child_traits.character_summary`).
 - Endpoints de **play/onboarding** (escribir mundo/nombre/edad desde el diálogo) viven en [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md) — autenticados con JWT del **tutor** (el dispositivo está en sesión adulta; el niño no tiene token propio).
 
 ### 4.4 apply-defaults

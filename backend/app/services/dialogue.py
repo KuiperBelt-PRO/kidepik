@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any
 from uuid import UUID
 
@@ -14,25 +15,39 @@ from app.ai.agents.envelopes import (
     PlacementQueueEnvelope,
     TravelerProfileEnvelope,
 )
-from app.ai.agents.runner import run_purpose
-from app.ai.errors import AiProductError
+from app.ai.agents.runner import build_character_coach_prompt, run_purpose
+from app.ai.errors import AiProductError, product_error
 from app.ai.gemini_gateway import GeminiGateway
 from app.ai.journey.ledger import JourneyLedger
 from app.ai.orchestrator import Orchestrator, TurnContext
 from app.ai.orchestrator.input_modes import PHASE_INPUT_MODE
+from app.ai.orchestrator.tools import ledger_recent_avoid_phrases
 from app.catalogs import AgeBand, SubjectCatalog
 from app.catalogs.character_species import resolve_species_input, species_options_for_world
+from app.catalogs.explorer_gender import (
+    assert_explorer_gender,
+    canonical_gender_question,
+    gender_chip_options,
+    gender_grammar_prompt_block,
+    resolve_explorer_gender,
+)
 from app.config import get_settings
+from app.logging_ import AppLogger
 from app.services.chapter_titles import read_latest_chapter_opened, resolve_chapter
 from app.services.mentor_profiles import mentor_for_child, mentor_profile, resolve_mentor_key
 from app.services.mentor_prose import (
     franchise_violations_in_text,
+    simple_character_agent_text,
     validate_mentor_prose,
     validate_species_options,
+    validate_traveler_profile_prose,
 )
 from app.services.placement import PlacementService
+from app.services.traveler_profile import extract_palette_tokens, palette_is_meaningful
 from app.services.waiting_copy import WaitingCopyService
 from app.services.waiting_phrases import pick_waiting_batch
+
+compose_log = AppLogger("compose")
 
 
 class DialogueService:
@@ -49,6 +64,20 @@ class DialogueService:
     def _world(child: dict[str, Any]) -> str | None:
         theme = child.get("active_world_theme") or child.get("world_theme")
         return theme if theme in {"fantasy", "sci-fi"} else None
+
+    def _ledger_avoid_phrases(self, child: dict[str, Any]) -> list[str]:
+        parent_id = child.get("parent_id")
+        if not parent_id:
+            return []
+        try:
+            return ledger_recent_avoid_phrases(
+                self.ledger,
+                str(parent_id),
+                str(child["id"]),
+                self._world(child),
+            )
+        except Exception:
+            return []
 
     async def open_session(
         self, auth_user_id: str, child_id: str, flow_id: str = "first_run"
@@ -183,6 +212,33 @@ class DialogueService:
         value = str(reply.get("text") or reply.get("option_id") or "").strip()
         if kind != "continue" and not value:
             raise ValueError("reply empty")
+        display_label = str(reply.get("displayLabel") or "").strip()
+        if kind == "continue":
+            bubble_text = display_label or "Continuar"
+        elif kind == "option" and display_label:
+            bubble_text = display_label
+        else:
+            bubble_text = value
+
+        explorer_meta: dict[str, Any] = {}
+        if kind == "option":
+            last_mentor = await self._last_mentor(session_id)
+            mentor_meta = (
+                last_mentor.get("meta") if isinstance(last_mentor.get("meta"), dict) else {}
+            )
+            if mentor_meta.get("phase") == "placement_item":
+                opts = self._normalize_options_list(last_mentor.get("options"))
+                taken = next(
+                    (opt for opt in opts if str(opt.get("id")) == value),
+                    {"id": value, "label": display_label or value},
+                )
+                explorer_meta = {
+                    "phase": "placement_choice_echo",
+                    "choice_taken": taken,
+                    "choices_discarded": [
+                        opt for opt in opts if str(opt.get("id")) != value
+                    ],
+                }
 
         sequence = int(
             (
@@ -201,9 +257,9 @@ class DialogueService:
                 "flow_id": session["flow_id"],
                 "sequence": sequence,
                 "role": "explorer",
-                "text": value,
+                "text": bubble_text,
                 "explorer_reply": reply,
-                "meta": {},
+                "meta": explorer_meta,
             }
         )
         self._ledger_explorer(child, session_id, value, reply)
@@ -382,6 +438,10 @@ class DialogueService:
                 effects, turns = await self._phase_choose_age(
                     child_id, session_id, session, sequence, value
                 )
+            elif phase == "choose_gender":
+                effects, turns = await self._phase_choose_gender(
+                    child_id, session_id, session, sequence, value
+                )
             elif phase in {"choose_character_species", "choose_character"}:
                 effects, turns = await self._phase_character(
                     child_id, session_id, session, sequence, value, child
@@ -397,6 +457,10 @@ class DialogueService:
             elif phase == "placement_item":
                 effects, turns = await self._placement_answer(
                     child_id, session_id, session, sequence, value, reply, last or {}
+                )
+            elif phase == "placement_feedback":
+                effects, turns = await self._placement_feedback_continue(
+                    child_id, session_id, session, sequence, last or {}
                 )
             elif phase == "choose_path":
                 effects, turns = await self._choose_path(
@@ -436,6 +500,17 @@ class DialogueService:
             retry_action = "placement"
             if phase in {"choose_path", "adventure_ready", "path_intro"}:
                 retry_action = "path_pack"
+            compose_debug = dict(getattr(exc, "compose_debug", None) or {})
+            compose_debug.setdefault("outcome", "failed")
+            compose_debug.setdefault("error_code", exc.error_code)
+            if retry_action == "placement":
+                compose_debug.setdefault("purpose", "placement_item_writer")
+            elif retry_action == "path_pack":
+                compose_debug.setdefault("purpose", "path_composer")
+            if exc.model:
+                compose_debug.setdefault("model", exc.model)
+            if exc.models_tried:
+                compose_debug.setdefault("models_tried", exc.models_tried)
             turns = [
                 await self._mentor_turn(
                     session_id,
@@ -452,6 +527,7 @@ class DialogueService:
                         "retry": True,
                         "retry_action": retry_action,
                         "compose_failed": True,
+                        "compose_debug": compose_debug,
                     },
                 )
             ]
@@ -602,13 +678,13 @@ class DialogueService:
         await self.session.execute(
             text(
                 "update children set age_years=:age,age_band=:band,effective_age_band=:band,"
-                "onboarding_step='choose_character',updated_at=now() where id=:id"
+                "onboarding_step='choose_gender',updated_at=now() where id=:id"
             ),
             {"age": age, "band": band, "id": child_id},
         )
         effects = [
             {"type": "set_age", "value": {"age_years": age, "age_band": band}},
-            {"type": "advance_onboarding", "to": "choose_character"},
+            {"type": "advance_onboarding", "to": "choose_gender"},
             {
                 "type": "suggest_active_subjects",
                 "value": SubjectCatalog.base_subjects_for_band(band),
@@ -617,8 +693,74 @@ class DialogueService:
         child = await self._child_by_id(child_id)
         child["age_years"] = age
         child["age_band"] = band
+        child["onboarding_step"] = "choose_gender"
+        turn = await self._mentor_choose_gender_turn(
+            child,
+            session_id,
+            str(session["flow_id"]),
+            sequence + 1,
+        )
+        return effects, [turn]
+
+    async def _mentor_choose_gender_turn(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        flow: str,
+        sequence: int,
+        *,
+        reprompt: bool = False,
+    ) -> dict[str, Any]:
+        band = child.get("age_band") or child.get("effective_age_band")
+        age = child.get("age_years")
+        question = canonical_gender_question(band, age)
+        options = gender_chip_options(band, age)
+        prefix = "No he entendido. " if reprompt else ""
+        return await self._mentor_turn(
+            session_id,
+            str(child["id"]),
+            flow,
+            sequence,
+            f"{prefix}{question}",
+            "options_only",
+            options,
+            {
+                "phase": "choose_gender",
+                "world_theme": child.get("world_theme"),
+            },
+            None,
+        )
+
+    async def _phase_choose_gender(
+        self, child_id: str, session_id: str, session: Any, sequence: int, value: str
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        try:
+            gender = assert_explorer_gender(value)
+        except ValueError:
+            child = await self._child_by_id(child_id)
+            turn = await self._mentor_choose_gender_turn(
+                child,
+                session_id,
+                str(session["flow_id"]),
+                sequence + 1,
+                reprompt=True,
+            )
+            return [], [turn]
+
+        await self.session.execute(
+            text(
+                "update children set explorer_gender=:gender,"
+                "onboarding_step='choose_character',updated_at=now() where id=:id"
+            ),
+            {"gender": gender, "id": child_id},
+        )
+        effects = [
+            {"type": "set_explorer_gender", "value": gender},
+            {"type": "advance_onboarding", "to": "choose_character"},
+        ]
+        child = await self._child_by_id(child_id)
+        child["explorer_gender"] = gender
         child["onboarding_step"] = "choose_character"
-        world = self._world(child) or "fantasy"
         turn = await self._agent_mentor_turn(
             child,
             session_id,
@@ -632,7 +774,8 @@ class DialogueService:
             "«El mago de la noche blanca», «El elfo explorador del bosque milenario», "
             "«La bibliotecaria de Anderlogia». Al menos una opción no humana entre las tres. "
             "Inspírate en el glosario; no copies lista fija. No hables de «forma y oficio». "
-            "No uses continue: chips temáticos + texto libre.",
+            "No uses continue: chips temáticos + texto libre. "
+            f"Concordancia de género: explorer_gender={gender}.",
             "choose_character_species",
             purpose="mentor_guide",
             force_input_mode="options_or_text",
@@ -647,16 +790,18 @@ class DialogueService:
         sequence: int,
         value: str,
         child: dict[str, Any],
+        *,
+        prose_retry_hint: str | None = None,
+        prose_attempt: int = 0,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         raw = resolve_species_input(value, self._world(child))[:120] or "explorador"
         deps = self._deps(child, session_id, "character_coach")
-        prompt = (
-            "El explorador describe su forma. Genera TravelerProfileEnvelope: "
-            "species, palette, features, abilities, vibe, y secciones markdown "
-            "(description_md, outfit_md, personality_md, abilities_md). "
-            f"Respuesta del explorador: {raw!r}. "
-            "agent_text: confirma la forma en 2ª persona (tú eres…) y ofrece continuar a la prueba de ingreso. "
-            "input_mode=continue. Castellano de España; adapta tono a age_band y world_theme."
+        age_years = child.get("age_years")
+        age_band = child.get("age_band") or child.get("effective_age_band")
+        prompt = build_character_coach_prompt(
+            deps,
+            explorer_choice=raw,
+            extra_hint=prose_retry_hint,
         )
         try:
             profile, model = await run_purpose(
@@ -674,6 +819,32 @@ class DialogueService:
             abilities = profile.abilities[:8]
             vibe = profile.vibe or f"{species} de tonos {palette}"
             agent_text = profile.agent_text
+            avoid_phrases = self._ledger_avoid_phrases(child)
+            prose_issues = validate_traveler_profile_prose(
+                agent_text=agent_text,
+                species=species,
+                vibe=vibe,
+                age_band=age_band,
+                age_years=age_years,
+                description_md=profile.description_md,
+                personality_md=profile.personality_md,
+                avoid_phrases=avoid_phrases,
+            )
+            if prose_issues and prose_attempt < 2:
+                return await self._phase_character(
+                    child_id,
+                    session_id,
+                    session,
+                    sequence,
+                    value,
+                    child,
+                    prose_retry_hint="; ".join(prose_issues[:6]),
+                    prose_attempt=prose_attempt + 1,
+                )
+            if prose_issues:
+                species = raw[:64]
+                vibe = species
+                agent_text = simple_character_agent_text(raw)
             input_mode = profile.input_mode or "continue"
         except Exception:
             species = raw[:64]
@@ -724,6 +895,9 @@ class DialogueService:
                         "age_band": child.get("age_band")
                         or child.get("effective_age_band"),
                         "age_years": child.get("age_years"),
+                        "explorer_gender": resolve_explorer_gender(
+                            child.get("explorer_gender")
+                        ),
                         "species": species,
                         "palette": palette,
                         "features": features,
@@ -790,15 +964,13 @@ class DialogueService:
         sequence: int,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         child = await self._child(auth_user_id, child_id)
-        subjects = PlacementService.active_subjects_for_child(child)[:4]
-        # Hints de espera (JSONL data/waiting) — el cliente puede rotarlos cada 8s
         waiting_hints = await pick_waiting_batch(
             self.session,
             world_theme=str(self._world(child) or "neutral"),
             age_band=child.get("age_band") or child.get("effective_age_band"),
             phase="placement_compose",
         )
-        queue = await self._compose_placement_queue(child, session_id, subjects)
+        queue = await self._compose_placement_queue(child, session_id)
         parent_id = child.get("parent_id")
         if parent_id:
             try:
@@ -847,68 +1019,810 @@ class DialogueService:
         return started["effects"], [turn]
 
     async def _compose_placement_queue(
-        self, child: dict[str, Any], session_id: str, subjects: list[str]
+        self, child: dict[str, Any], session_id: str
+    ) -> list[dict[str, Any]]:
+        active = PlacementService.active_subjects_for_child(child)
+        band = (
+            AgeBand.from_legacy(child.get("age_band"), child.get("age_years"))
+            or AgeBand.CHILD
+        )
+        subject_slots = SubjectCatalog.exam_subject_slots(band, active)
+        if not subject_slots:
+            raise product_error("ai_compose_failed")
+
+        batch_max = max(1, int(self.settings.ai_compose_batch_max_slots))
+        batch_retries = max(0, int(self.settings.ai_compose_batch_retries))
+        batches = (
+            self._chunk_subject_slots(subject_slots, batch_max)
+            if len(subject_slots) > batch_max
+            else [subject_slots]
+        )
+        items: list[dict[str, Any]] = []
+        palette_tokens = self._traveler_palette_tokens(child)
+        for batch_index, batch_slots in enumerate(batches):
+            batch_items = await self._compose_placement_batch_with_retry(
+                child,
+                session_id,
+                batch_slots,
+                band,
+                batch_index=batch_index,
+                batch_retries=batch_retries,
+                palette_tokens=palette_tokens,
+            )
+            items.extend(batch_items)
+        return items
+
+    def _traveler_palette_tokens(self, child: dict[str, Any]) -> list[str]:
+        parent_id = child.get("parent_id")
+        if not parent_id:
+            return []
+        try:
+            frontmatter, _body = self.ledger.read_traveler_profile(
+                str(parent_id), str(child["id"])
+            )
+        except Exception:
+            return []
+        return extract_palette_tokens(str(frontmatter.get("palette") or ""))
+
+    @staticmethod
+    def _chunk_subject_slots(slots: list[str], size: int) -> list[list[str]]:
+        if size <= 0:
+            return [slots]
+        return [slots[i : i + size] for i in range(0, len(slots), size)]
+
+    @staticmethod
+    def _placement_compose_error(
+        model: str | None = None,
+        *,
+        issue: str | None = None,
+        batch_index: int | None = None,
+        subject_id: str | None = None,
+        quality_fallback_items: list[dict[str, Any]] | None = None,
+    ) -> AiProductError:
+        debug: dict[str, Any] = {
+            "outcome": "failed",
+            "purpose": "placement_item_writer",
+        }
+        if issue:
+            debug["quality_issue"] = issue
+        if batch_index is not None:
+            debug["batch_index"] = batch_index
+        if subject_id:
+            debug["subject_id"] = subject_id
+        if model:
+            debug["model"] = model
+        err = product_error("ai_compose_failed", model=model, compose_debug=debug)
+        if quality_fallback_items:
+            err.quality_fallback_items = list(quality_fallback_items)
+        return err
+
+    async def _compose_placement_batch_with_retry(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        subject_slots: list[str],
+        age_band: str,
+        *,
+        batch_index: int,
+        batch_retries: int,
+        palette_tokens: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        last_error: AiProductError | None = None
+        last_quality_items: list[dict[str, Any]] | None = None
+        tokens = palette_tokens or []
+        for attempt in range(batch_retries + 1):
+            try:
+                return await self._compose_placement_batch(
+                    child,
+                    session_id,
+                    subject_slots,
+                    age_band,
+                    batch_index=batch_index,
+                    palette_tokens=tokens,
+                )
+            except AiProductError as exc:
+                last_error = exc
+                fallback = getattr(exc, "quality_fallback_items", None)
+                if isinstance(fallback, list) and fallback:
+                    last_quality_items = fallback
+                compose_log.warning(
+                    "placement_compose_batch_retry",
+                    batch_index=batch_index,
+                    attempt=attempt + 1,
+                    slots=len(subject_slots),
+                    error_code=exc.error_code,
+                    quality_fallback=bool(last_quality_items),
+                )
+                if attempt >= batch_retries:
+                    if last_quality_items is not None:
+                        issue = (exc.compose_debug or {}).get("quality_issue")
+                        compose_log.warning(
+                            "placement_compose_quality_fallback",
+                            batch_index=batch_index,
+                            issue=issue,
+                            slots=len(last_quality_items),
+                        )
+                        return last_quality_items
+                    raise
+        if last_error:
+            raise last_error
+        raise self._placement_compose_error()
+
+    async def _compose_placement_batch(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        subject_slots: list[str],
+        age_band: str,
+        *,
+        batch_index: int = 0,
+        palette_tokens: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         deps = self._deps(child, session_id, "placement_item_writer")
-        prompt = (
-            "Genera exactamente 3 ítems de examen de ingreso (PlacementQueueEnvelope). "
-            f"Materias permitidas: {subjects}. Mundo: {child.get('world_theme')}. "
-            f"Edad/banda: {child.get('age_years')}/{child.get('age_band')}. "
-            "Mezcla mcq y short_text. Castellano de España. "
-            "Sin nombres de franquicias conocidas; inventa escenarios originales."
+        prompt = self._placement_compose_prompt(
+            child, subject_slots, age_band, batch_index=batch_index
         )
-        try:
-            bundle, model = await run_purpose(
-                "placement_item_writer",
-                prompt,
-                deps,
-                settings=self.settings,
-                gateway=self.gateway,
-                expect_type=PlacementQueueEnvelope,
+        bundle, model = await run_purpose(
+            "placement_item_writer",
+            prompt,
+            deps,
+            settings=self.settings,
+            gateway=self.gateway,
+            expect_type=PlacementQueueEnvelope,
+        )
+        if not isinstance(bundle, PlacementQueueEnvelope) or len(bundle.items) != len(
+            subject_slots
+        ):
+            compose_log.warning(
+                "placement_compose_batch_count_mismatch",
+                batch_index=batch_index,
+                expected=len(subject_slots),
+                got=len(bundle.items) if isinstance(bundle, PlacementQueueEnvelope) else None,
+                model=model,
             )
-            assert isinstance(bundle, PlacementQueueEnvelope)
-            items = []
-            for idx, item in enumerate(bundle.items[:3]):
-                items.append(
-                    {
-                        "subject_id": item.subject_id if item.subject_id in subjects else subjects[0],
-                        "item_key": item.item_key or f"item_{idx+1}",
-                        "item_type": item.item_type,
-                        "prompt_text": item.prompt_text,
-                        "presentation_text": item.presentation_text or item.prompt_text,
-                        "options": [o.model_dump() for o in item.options],
-                        "correct_option_id": item.correct_option_id,
-                        "expected_answer": item.expected_answer,
-                        "model_used": model,
-                    }
+            raise self._placement_compose_error(
+                model=model,
+                issue="batch_count_mismatch",
+                batch_index=batch_index,
+            )
+
+        items: list[dict[str, Any]] = []
+        for idx, (subject_id, item) in enumerate(
+            zip(subject_slots, bundle.items, strict=True)
+        ):
+            blob = " ".join(
+                str(getattr(item, key, "") or "")
+                for key in ("prompt_text", "presentation_text", "item_key")
+            )
+            if franchise_violations_in_text(blob):
+                raise self._placement_compose_error(
+                    model=model,
+                    issue="franchise_violation",
+                    batch_index=batch_index,
+                    subject_id=subject_id,
                 )
-            if items:
-                for item in items:
-                    blob = " ".join(
-                        str(item.get(key) or "")
-                        for key in ("prompt_text", "presentation_text", "item_key")
-                    )
-                    if franchise_violations_in_text(blob):
-                        raise RuntimeError("franchise_reference")
-                return items
-        except Exception:
-            pass
-        # Fallback mínimo sin LLM (solo si compose falla): 1 pregunta trivial por materia
-        return [
-            {
-                "subject_id": subjects[0] if subjects else "math",
-                "item_key": "fallback_1",
-                "item_type": "mcq",
-                "prompt_text": "¿Cuánto es 2+2?",
-                "presentation_text": "Para calentar: ¿cuánto es 2+2?",
-                "options": [
-                    {"id": "a", "label": "3"},
-                    {"id": "b", "label": "4"},
-                    {"id": "c", "label": "5"},
-                ],
-                "correct_option_id": "b",
+            resolved_subject = (
+                item.subject_id
+                if SubjectCatalog.is_valid(item.subject_id)
+                else subject_id
+            )
+            item_dict = {
+                "subject_id": resolved_subject,
+                "item_key": item.item_key or f"{subject_id}_{idx + 1}",
+                "item_type": item.item_type,
+                "prompt_text": item.prompt_text,
+                "presentation_text": item.presentation_text or item.prompt_text,
+                "options": [option.model_dump() for option in item.options],
+                "correct_option_id": item.correct_option_id,
+                "expected_answer": item.expected_answer,
+                "success_feedback": item.success_feedback,
+                "explanation": item.explanation,
+                "model_used": model,
             }
+            items.append(self._finalize_placement_queue_item(item_dict))
+        for item in items:
+            issue = self._placement_item_quality_issue(item)
+            if issue:
+                compose_log.warning(
+                    "placement_compose_quality_reject",
+                    batch_index=batch_index,
+                    subject_id=item.get("subject_id"),
+                    issue=issue,
+                    model=model,
+                )
+                raise self._placement_compose_error(
+                    model=model,
+                    issue=issue,
+                    batch_index=batch_index,
+                    subject_id=str(item.get("subject_id") or ""),
+                    quality_fallback_items=items,
+                )
+        batch_issue = self._placement_batch_quality_issue(
+            items, palette_tokens=palette_tokens
+        )
+        if batch_issue:
+            compose_log.warning(
+                "placement_compose_batch_quality_reject",
+                batch_index=batch_index,
+                issue=batch_issue,
+                model=model,
+            )
+            raise self._placement_compose_error(
+                model=model,
+                issue=batch_issue,
+                batch_index=batch_index,
+                quality_fallback_items=items,
+            )
+        compose_log.info(
+            "placement_compose_batch_ok",
+            batch_index=batch_index,
+            slots=len(subject_slots),
+            model=model,
+        )
+        return items
+
+    @staticmethod
+    def _finalize_placement_queue_item(item: dict[str, Any]) -> dict[str, Any]:
+        """Normaliza opciones y alinea correct_option_id con los ids reales."""
+        out = dict(item)
+        options = DialogueService._normalize_options_list(out.get("options")) or []
+        out["options"] = options
+        resolved = DialogueService._resolved_correct_option_id(out, options)
+        if resolved:
+            out["correct_option_id"] = resolved
+        return out
+
+    @staticmethod
+    def _resolved_correct_option_id(
+        item: dict[str, Any], options: list[dict[str, Any]]
+    ) -> str | None:
+        raw = item.get("correct_option_id")
+        if not raw:
+            return None
+        raw_s = str(raw).strip()
+        if not raw_s:
+            return None
+        ids = {str(opt.get("id")) for opt in options}
+        if raw_s in ids:
+            return raw_s
+        raw_lower = raw_s.lower()
+        for opt in options:
+            label = str(opt.get("label") or "").strip().lower()
+            if label and label == raw_lower:
+                return str(opt.get("id"))
+        if (
+            len(raw_s) == 1
+            and raw_s.isalpha()
+            and raw_s not in ids
+            and options
+        ):
+            idx = ord(raw_lower) - ord("a")
+            if 0 <= idx < len(options):
+                return str(options[idx].get("id"))
+        return raw_s
+
+    _READING_EVENT_QUESTION_MARKERS = (
+        "qué ocurre",
+        "que ocurre",
+        "qué pasa",
+        "que pasa",
+        "qué sucede",
+        "que sucede",
+    )
+    _READING_ACTION_VERBS = (
+        "hay",
+        "había",
+        "mueve",
+        "mueven",
+        "cae",
+        "caen",
+        "brilla",
+        "brillan",
+        "suena",
+        "suenan",
+        "pasa",
+        "pasan",
+        "corre",
+        "corren",
+        "vuela",
+        "vuelan",
+        "escucha",
+        "escuchan",
+        "sopla",
+        "soplan",
+        "llueve",
+        "nieva",
+        "golpea",
+        "golpean",
+        "entra",
+        "entran",
+        "sale",
+        "salen",
+    )
+    _PURPOSE_QUESTION_MARKERS = (
+        "para qué",
+        "para que ",
+        "para qué sirven",
+        "para que sirven",
+        "para qué sirve",
+        "para que sirve",
+        "cuál es la función",
+        "cual es la funcion",
+        "cuál es el uso",
+        "cual es el uso",
+        "qué función",
+        "que función",
+        "con qué fin",
+        "con que fin",
+    )
+    _PURPOSE_ANSWER_KEYWORDS = frozenset(
+        {
+            "volumen",
+            "sombra",
+            "sombras",
+            "luz",
+            "luces",
+            "contraste",
+            "profundidad",
+            "realismo",
+            "relieve",
+            "forma",
+            "efecto",
+            "sombreado",
+            "iluminación",
+            "iluminacion",
+            "medir",
+            "calentar",
+            "absorber",
+            "nutrir",
+            "proteger",
+            "crear",
+            "dar",
+            "hacer",
+            "mostrar",
+            "marcar",
+            "definir",
+            "conseguir",
+            "representar",
+            "ayudar",
+            "dibujar",
+            "pintar",
+            "expresar",
+            "comunicar",
+            "identificar",
+            "clasificar",
+            "ordenar",
+            "comparar",
+        }
+    )
+    _SPANISH_STOPWORDS = frozenset(
+        {
+            "para",
+            "qué",
+            "que",
+            "los",
+            "las",
+            "del",
+            "de",
+            "la",
+            "el",
+            "un",
+            "una",
+            "en",
+            "y",
+            "o",
+            "es",
+            "son",
+            "con",
+            "por",
+            "se",
+            "al",
+            "a",
+            "como",
+            "cómo",
+            "juntos",
+            "juntas",
+            "obra",
+            "unas",
+            "unos",
+            "su",
+            "sus",
+            "este",
+            "esta",
+            "ese",
+            "esa",
+            "una",
+            "uno",
+            "muy",
+            "más",
+            "mas",
+            "sin",
+            "sobre",
+            "entre",
+            "tiene",
+            "tienen",
+            "sirven",
+            "sirve",
+            "usar",
+            "usan",
+            "usa",
+            "solo",
+            "sólo",
+            "toda",
+            "todo",
+            "todos",
+            "todas",
+            "cada",
+            "otro",
+            "otra",
+            "otros",
+            "otras",
+            "ser",
+            "parezca",
+            "parece",
+            "parecen",
+            "según",
+            "segun",
+            "texto",
+            "pregunta",
+        }
+    )
+    _PALETTE_MAX_MENTIONS_PER_BATCH = 1
+
+    @staticmethod
+    def _is_purpose_question(text: str) -> bool:
+        lowered = text.lower()
+        return any(marker in lowered for marker in DialogueService._PURPOSE_QUESTION_MARKERS)
+
+    @staticmethod
+    def _content_tokens(text: str) -> set[str]:
+        tokens = re.findall(r"[a-záéíóúñü]+", text.lower())
+        return {
+            token
+            for token in tokens
+            if len(token) >= 3 and token not in DialogueService._SPANISH_STOPWORDS
+        }
+
+    @staticmethod
+    def _option_echoes_question_subject(presentation: str, label: str) -> bool:
+        question_tokens = DialogueService._content_tokens(presentation)
+        option_tokens = DialogueService._content_tokens(label)
+        if not option_tokens or len(option_tokens) > 4:
+            return False
+        return option_tokens.issubset(question_tokens)
+
+    @staticmethod
+    def _option_has_purpose_semantics(label: str) -> bool:
+        lowered = label.lower().strip()
+        if re.search(r"\bpara\s+\w{3,}", lowered):
+            return True
+        option_tokens = set(re.findall(r"[a-záéíóúñü]+", lowered))
+        if option_tokens & DialogueService._PURPOSE_ANSWER_KEYWORDS:
+            return True
+        return DialogueService._spanish_label_has_action_verb(label)
+
+    @staticmethod
+    def _palette_mention_count(
+        items: list[dict[str, Any]], palette_tokens: list[str]
+    ) -> int:
+        if not palette_tokens:
+            return 0
+        hits = 0
+        for item in items:
+            presentation = " ".join(
+                str(item.get(key) or "")
+                for key in ("presentation_text", "prompt_text")
+            ).lower()
+            if any(token in presentation for token in palette_tokens):
+                hits += 1
+        return hits
+
+    @staticmethod
+    def _placement_batch_quality_issue(
+        items: list[dict[str, Any]],
+        *,
+        palette_tokens: list[str] | None = None,
+    ) -> str | None:
+        tokens = palette_tokens or []
+        if (
+            tokens
+            and DialogueService._palette_mention_count(items, tokens)
+            > DialogueService._PALETTE_MAX_MENTIONS_PER_BATCH
+        ):
+            return "palette_overuse"
+        return None
+
+    _UNNATURAL_MATERIAL_LABEL = re.compile(
+        r"\b(llave|caja|anillo|moneda|espada|corona)\s+"
+        r"(plata|oro|madera|hierro|cobre|cristal)\b",
+        re.IGNORECASE,
+    )
+
+    @staticmethod
+    def _spanish_label_has_action_verb(label: str) -> bool:
+        lowered = label.lower()
+        tokens = re.findall(r"[a-záéíóúñü]+", lowered)
+        for token in tokens:
+            if token in DialogueService._READING_ACTION_VERBS:
+                return True
+            if len(token) >= 4 and token.endswith(("ando", "iendo")):
+                return True
+            if (
+                len(token) >= 4
+                and token.endswith(("an", "en", "as", "es"))
+                and not token.endswith(("mas", "pes", "les", "nos"))
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _placement_item_quality_issue(item: dict[str, Any]) -> str | None:
+        """Devuelve motivo de rechazo o None si el ítem es válido."""
+        presentation = " ".join(
+            str(item.get(key) or "")
+            for key in ("presentation_text", "prompt_text")
+        ).strip()
+        if not presentation:
+            return "empty_prompt"
+        presentation_lower = presentation.lower()
+        item_type = str(item.get("item_type") or "mcq")
+        subject_id = str(item.get("subject_id") or "").lower()
+        # Comprensión lectora: la respuesta puede estar en el pasaje citado.
+        skip_answer_leak = subject_id == "reading"
+        options = item.get("options") if isinstance(item.get("options"), list) else []
+
+        if item_type == "mcq":
+            if len(options) < 2:
+                return "mcq_needs_options"
+            correct_id = DialogueService._resolved_correct_option_id(item, options)
+            if not correct_id or not any(
+                str(opt.get("id")) == correct_id for opt in options
+            ):
+                return "mcq_invalid_correct_option"
+            correct_opt = next(
+                (opt for opt in options if str(opt.get("id")) == correct_id),
+                None,
+            )
+            if correct_opt and not skip_answer_leak:
+                label = str(correct_opt.get("label") or "").strip().lower()
+                if label and len(label) >= 2 and label in presentation_lower:
+                    return "answer_leak_in_prompt"
+        else:
+            expected = str(item.get("expected_answer") or "").strip()
+            if not expected:
+                return "short_text_missing_expected"
+            if not skip_answer_leak:
+                for alt in expected.split("|"):
+                    token = alt.strip().lower()
+                    if len(token) >= 3 and token in presentation_lower:
+                        return "answer_leak_in_prompt"
+
+        banned = (
+            "cómo se dice",
+            "como se dice",
+            "¿qué palabra es",
+            "que palabra es",
+        )
+        if any(phrase in presentation_lower for phrase in banned):
+            for alt in str(item.get("expected_answer") or "").split("|"):
+                token = alt.strip().lower()
+                if token and token in presentation_lower:
+                    return "circular_translation_prompt"
+            if item_type == "mcq":
+                correct_id = DialogueService._resolved_correct_option_id(item, options)
+                correct_opt = next(
+                    (
+                        opt
+                        for opt in options
+                        if str(opt.get("id")) == str(correct_id or "")
+                    ),
+                    None,
+                )
+                if correct_opt:
+                    label = str(correct_opt.get("label") or "").strip().lower()
+                    if label and label in presentation_lower:
+                        return "circular_translation_prompt"
+
+        if subject_id == "reading" and item_type == "mcq":
+            if any(marker in presentation_lower for marker in DialogueService._READING_EVENT_QUESTION_MARKERS):
+                correct_id = DialogueService._resolved_correct_option_id(item, options)
+                correct_opt = next(
+                    (
+                        opt
+                        for opt in options
+                        if str(opt.get("id")) == str(correct_id or "")
+                    ),
+                    None,
+                )
+                if correct_opt:
+                    label = str(correct_opt.get("label") or "").strip()
+                    if label and not DialogueService._spanish_label_has_action_verb(label):
+                        return "reading_event_answer_mismatch"
+
+        if subject_id == "language" and item_type == "mcq":
+            for opt in options:
+                label = str(opt.get("label") or "")
+                if DialogueService._UNNATURAL_MATERIAL_LABEL.search(label):
+                    return "language_ungrammatical_option"
+
+        if item_type == "mcq" and DialogueService._is_purpose_question(presentation):
+            correct_id = DialogueService._resolved_correct_option_id(item, options)
+            correct_opt = next(
+                (opt for opt in options if str(opt.get("id")) == str(correct_id or "")),
+                None,
+            )
+            if correct_opt:
+                label = str(correct_opt.get("label") or "").strip()
+                if label:
+                    if DialogueService._option_echoes_question_subject(
+                        presentation, label
+                    ):
+                        return "purpose_question_echo_option"
+                    if not DialogueService._option_has_purpose_semantics(label):
+                        return "purpose_question_weak_option"
+
+        return None
+
+    def _placement_compose_prompt(
+        self,
+        child: dict[str, Any],
+        subject_slots: list[str],
+        age_band: str,
+        *,
+        batch_index: int = 0,
+    ) -> str:
+        """Prompt de un lote: N ítems (típicamente ≤4) con contexto del viajero."""
+        count = len(subject_slots)
+        parts = [
+            f"Genera exactamente {count} ítems de examen de ingreso (PlacementQueueEnvelope).",
+            (
+                "Un ítem por posición en esta lista de materias "
+                f"(respeta orden y subject_id): {subject_slots}."
+            ),
         ]
+        if batch_index > 0:
+            parts.append(
+                f"Este es el lote {batch_index + 1} de un examen más largo; "
+                "mantén coherencia narrativa pero ítems independientes."
+            )
+        parts.append(
+            f"Mundo activo: {child.get('world_theme') or child.get('active_world_theme')}."
+        )
+        parts.append(
+            f"Edad cronológica: {child.get('age_years')}. Banda pedagógica: {age_band}."
+        )
+        display_name = child.get("display_name")
+        if display_name:
+            parts.append(f"Nombre del explorador: {display_name}.")
+        gender = resolve_explorer_gender(child.get("explorer_gender"))
+        if gender in {"male", "female"}:
+            parts.append(
+                gender_grammar_prompt_block(gender, display_name)
+            )
+        parent_id = child.get("parent_id")
+        if parent_id:
+            try:
+                frontmatter, _body = self.ledger.read_traveler_profile(
+                    str(parent_id), str(child["id"])
+                )
+            except Exception:
+                frontmatter = None
+            if frontmatter:
+                species = frontmatter.get("species")
+                palette = frontmatter.get("palette")
+                vibe = frontmatter.get("vibe")
+                if species:
+                    parts.append(
+                        "Personaje del explorador: "
+                        f"especie {species}, personalidad {vibe or '—'}."
+                    )
+                    if palette and palette_is_meaningful(palette):
+                        parts.append(
+                            f"Paleta visual de referencia: {palette}. "
+                            "Úsala como acento ocasional del personaje: como máximo "
+                            "1 ítem de este lote puede mencionar colores de la paleta; "
+                            "el resto debe usar escenarios neutros del mundo (sin repetir "
+                            "plata, azul, blanco u otros tonos de la paleta en cada pregunta)."
+                        )
+        allowed_types = SubjectCatalog.allowed_item_types(age_band)
+        parts.append(
+            f"Tipos de ítem permitidos para esta edad: {', '.join(allowed_types)}. "
+            "En este examen de ingreso usa SOLO item_type mcq (no short_text ni true_false)."
+        )
+        parts.append(
+            "Aplica los skills placement-exam y subject-pedagogy (checklist MCQ, "
+            "alineación pregunta↔opciones por tipo). "
+            "Cada ítem: subject_id, item_key único, prompt_text, presentation_text, "
+            "3–4 opciones mcq (ids a/b/c), correct_option_id obligatorio (id, no texto), "
+            "success_feedback y explanation si aplica. "
+            "Solo item_type mcq en este examen. Castellano de España. Sin franquicias."
+        )
+        return "\n".join(parts)
+
+    @staticmethod
+    def _score_placement_item(item: dict[str, Any], reply: dict[str, Any]) -> float:
+        options = DialogueService._normalize_options_list(item.get("options")) or []
+        correct_id = DialogueService._resolved_correct_option_id(item, options)
+        if correct_id and reply.get("option_id"):
+            chosen = str(reply.get("option_id"))
+            if chosen == correct_id:
+                return 1.0
+            chosen_opt = next(
+                (opt for opt in options if str(opt.get("id")) == chosen),
+                None,
+            )
+            correct_opt = next(
+                (opt for opt in options if str(opt.get("id")) == correct_id),
+                None,
+            )
+            if chosen_opt and correct_opt:
+                chosen_label = str(chosen_opt.get("label") or "").strip().lower()
+                correct_label = str(correct_opt.get("label") or "").strip().lower()
+                if chosen_label and chosen_label == correct_label:
+                    return 1.0
+            return 0.0
+        expected = str(item.get("expected_answer") or "").strip().lower()
+        answer = str(reply.get("text") or reply.get("option_id") or "").strip().lower()
+        if expected and answer:
+            alts = [part.strip() for part in expected.split("|") if part.strip()]
+            return 1.0 if answer in alts else 0.0
+        if correct_id:
+            return 0.0
+        return 0.5
+
+    @staticmethod
+    def _placement_feedback_text(item: dict[str, Any], score: float) -> str:
+        if score >= 1.0:
+            custom = str(item.get("success_feedback") or "").strip()
+            return custom or "¡Correcto! Sigue así."
+        expl = str(item.get("explanation") or "").strip()
+        return expl or "Casi. Vamos con la siguiente."
+
+    async def _placement_item_turn(
+        self,
+        child_id: str,
+        session: Any,
+        session_id: str,
+        sequence: int,
+        item: dict[str, Any],
+        index: int,
+        total: int,
+        child: dict[str, Any],
+        world: str | None,
+    ) -> dict[str, Any]:
+        mentor_id = str(session.get("mentor_id") or "guardian")
+        turn_payload = PlacementService(self.session).item_to_turn(
+            session_id,
+            child_id,
+            str(session["flow_id"]),
+            sequence,
+            mentor_id,
+            str(world or "fantasy"),
+            item,
+            index,
+            total,
+            child,
+        )
+        return await self._insert(
+            {
+                **{
+                    k: turn_payload[k]
+                    for k in (
+                        "session_id",
+                        "child_id",
+                        "flow_id",
+                        "sequence",
+                        "role",
+                        "text",
+                        "input_mode",
+                        "options",
+                        "meta",
+                    )
+                },
+                "explorer_reply": None,
+                "model_used": turn_payload.get("model_used"),
+            }
+        )
 
     async def _placement_answer(
         self,
@@ -942,38 +1856,50 @@ class DialogueService:
         queue = state["queue"]
         index = int(state.get("index") or 0)
         item = queue[index] if index < len(queue) else None
-        score = 0.5
-        if item:
-            if item.get("correct_option_id") and reply.get("option_id"):
-                score = (
-                    1.0
-                    if reply.get("option_id") == item.get("correct_option_id")
-                    else 0.0
+        score = self._score_placement_item(item or {}, reply)
+        if item and parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="placement_answer",
+                    payload={
+                        "index": index,
+                        "item_key": item.get("item_key"),
+                        "subject_id": item.get("subject_id"),
+                        "score": score,
+                        "response": reply,
+                    },
+                    world_theme=world,
                 )
-            if parent_id:
-                try:
-                    self.ledger.append_event(
-                        str(parent_id),
-                        child_id,
-                        session_id,
-                        kind="placement_answer",
-                        payload={
-                            "index": index,
-                            "item_key": item.get("item_key"),
-                            "subject_id": item.get("subject_id"),
-                            "score": score,
-                            "response": reply,
-                        },
-                        world_theme=world,
-                    )
-                except Exception:
-                    pass
+            except Exception:
+                pass
+        feedback_turn = await self._mentor_turn(
+            session_id,
+            child_id,
+            session["flow_id"],
+            sequence + 1,
+            self._placement_feedback_text(item or {}, score),
+            "continue",
+            [{"id": "continue", "label": "Continuar"}],
+            {
+                "phase": "placement_feedback",
+                "subject_id": (item or {}).get("subject_id"),
+                "item_key": (item or {}).get("item_key"),
+                "score": score,
+                "index": index,
+                "next_index": index + 1,
+                "total": len(queue),
+            },
+        )
         next_index = index + 1
         if next_index >= len(queue):
             await self._finish_placement(child, session_id, queue)
-            return await self._start_path_choice(
-                child, session_id, session, sequence
+            effects, path_turns = await self._start_path_choice(
+                child, session_id, session, sequence + 1
             )
+            return effects, [feedback_turn, *path_turns]
 
         if parent_id:
             try:
@@ -987,39 +1913,65 @@ class DialogueService:
                 )
             except Exception:
                 pass
-        nxt = queue[next_index]
-        mentor_id = str(session.get("mentor_id") or "guardian")
-        turn_payload = PlacementService(self.session).item_to_turn(
-            session_id,
+        next_turn = await self._placement_item_turn(
             child_id,
-            str(session["flow_id"]),
-            sequence + 1,
-            mentor_id,
-            str(world or "fantasy"),
-            nxt,
+            session,
+            session_id,
+            sequence + 2,
+            queue[next_index],
             next_index,
             len(queue),
             child,
+            world,
         )
-        turn = await self._insert(
-            {
-                **{
-                    k: turn_payload[k]
-                    for k in (
-                        "session_id",
-                        "child_id",
-                        "flow_id",
-                        "sequence",
-                        "role",
-                        "text",
-                        "input_mode",
-                        "options",
-                        "meta",
-                    )
-                },
-                "explorer_reply": None,
-                "model_used": None,
-            }
+        return [], [feedback_turn, next_turn]
+
+    async def _placement_feedback_continue(
+        self,
+        child_id: str,
+        session_id: str,
+        session: Any,
+        sequence: int,
+        last: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Fallback si el cliente queda en placement_feedback sin el siguiente ítem."""
+        child = await self._child_by_id(child_id)
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        state = self._read_placement_state(
+            str(parent_id) if parent_id else None, child_id, session_id, world
+        )
+        if not state or not state.get("queue"):
+            return [], [
+                await self._mentor_turn(
+                    session_id,
+                    child_id,
+                    session["flow_id"],
+                    sequence + 1,
+                    "La prueba no está activa. Pulsa continuar para empezarla.",
+                    "continue",
+                    None,
+                    {"phase": "handoff_placement"},
+                )
+            ]
+        meta = last.get("meta") if isinstance(last.get("meta"), dict) else {}
+        next_index = int(meta.get("next_index") or state.get("index") or 0)
+        queue = state["queue"]
+        if next_index >= len(queue):
+            await self._finish_placement(child, session_id, queue)
+            return await self._start_path_choice(
+                child, session_id, session, sequence
+            )
+        turn = await self._placement_item_turn(
+            child_id,
+            session,
+            session_id,
+            sequence + 1,
+            queue[next_index],
+            next_index,
+            len(queue),
+            child,
+            world,
         )
         return [], [turn]
 
@@ -1191,19 +2143,49 @@ class DialogueService:
             if spot_notes
             else ""
         )
-        # Compone caminos de uno en uno: si falla el N, reutiliza los ya OK.
+        batch_prompt = self._path_compose_prompt(
+            child,
+            weak,
+            spot_line,
+            path_count=3,
+        )
+        try:
+            bundle, model = await run_purpose(
+                "path_composer",
+                batch_prompt,
+                deps,
+                settings=self.settings,
+                gateway=self.gateway,
+                expect_type=PathPackEnvelope,
+            )
+            assert isinstance(bundle, PathPackEnvelope)
+            if len(bundle.paths) >= 3:
+                out = []
+                for i, detail in enumerate(bundle.paths[:3]):
+                    subject = weak[i % len(weak)]
+                    parsed = self._path_detail_to_pack_entry(
+                        detail,
+                        subject,
+                        subjects,
+                        i,
+                        model,
+                    )
+                    if parsed:
+                        out.append(parsed)
+                if len(out) == 3:
+                    return out
+        except Exception:
+            pass
+
+        # Reserva: un camino por llamada (legacy) si el batch falla o devuelve incompleto.
         out: list[dict[str, Any]] = []
         for i in range(3):
             subject = weak[i % len(weak)]
-            prompt = (
-                "Genera PathPackEnvelope con exactamente 1 camino (paths length 1). "
-                f"Materia prioritaria: {subject}.{spot_line} "
-                f"Mundo: {child.get('world_theme')}. Edad/banda: "
-                f"{child.get('age_years')}/{child.get('age_band')}. "
-                "Camino: path_id, subject_id, title, intro, learning_blurb y 3 challenges "
-                "con prompt, tipo, opciones/respuesta y explanation. Castellano de España. "
-                "Sin nombres de franquicias conocidas; inventa títulos y lugares originales. "
-                "Intros y blurbs breves (1–2 frases)."
+            prompt = self._path_compose_prompt(
+                child,
+                [subject],
+                spot_line,
+                path_count=1,
             )
             try:
                 bundle, model = await run_purpose(
@@ -1218,72 +2200,107 @@ class DialogueService:
                 detail = bundle.paths[0] if bundle.paths else None
                 if detail is None:
                     raise RuntimeError("empty path")
-                p = detail.path
-                challenges = []
-                for ch in detail.challenges[:3]:
-                    challenges.append(
-                        {
-                            "prompt_text": ch.prompt_text,
-                            "item_type": ch.item_type,
-                            "options": [o.model_dump() for o in ch.options],
-                            "correct_option_id": ch.correct_option_id,
-                            "expected_answer": ch.expected_answer,
-                            "explanation": ch.explanation,
-                        }
-                    )
-                if not challenges:
-                    raise RuntimeError("empty challenges")
-                path_blob = " ".join(
-                    [
-                        str(p.title or ""),
-                        str(p.intro or ""),
-                        str(p.learning_blurb or ""),
-                        *(
-                            str(ch.prompt_text or "")
-                            for ch in detail.challenges[:3]
-                        ),
-                        *(
-                            str(ch.explanation or "")
-                            for ch in detail.challenges[:3]
-                        ),
-                    ]
+                parsed = self._path_detail_to_pack_entry(
+                    detail,
+                    subject,
+                    subjects,
+                    i,
+                    model,
                 )
-                if franchise_violations_in_text(path_blob):
-                    raise RuntimeError("franchise_reference")
-                out.append(
-                    {
-                        "path_id": p.path_id or f"path_{i+1}",
-                        "subject_id": p.subject_id if p.subject_id in subjects else subject,
-                        "title": p.title or f"Camino {i+1}",
-                        "intro": p.intro,
-                        "learning_blurb": p.learning_blurb,
-                        "challenges": challenges,
-                        "model_used": model,
-                    }
-                )
+                if parsed:
+                    out.append(parsed)
+                    continue
             except Exception:
-                out.append(
-                    {
-                        "path_id": f"path_{i+1}",
-                        "subject_id": subject,
-                        "title": f"Ruta de {subject}",
-                        "intro": f"Un tramo corto para practicar {subject}.",
-                        "learning_blurb": "Repasamos lo esencial con calma.",
-                        "challenges": [
-                            {
-                                "prompt_text": "¿Seguimos con el reto?",
-                                "item_type": "mcq",
-                                "options": [
-                                    {"id": "a", "label": "Sí"},
-                                    {"id": "b", "label": "Un momento"},
-                                ],
-                                "correct_option_id": "a",
-                                "explanation": "Cuando quieras, lo intentamos otra vez.",
-                            }
-                        ],
-                    }
-                )
+                pass
+            out.append(self._path_pack_fallback_entry(subject, i))
         return out
+
+    def _path_compose_prompt(
+        self,
+        child: dict[str, Any],
+        subject_slots: list[str],
+        spot_line: str,
+        *,
+        path_count: int,
+    ) -> str:
+        subjects_line = ", ".join(subject_slots)
+        return (
+            f"Genera PathPackEnvelope con exactamente {path_count} camino(s) "
+            f"(paths.length = {path_count}). "
+            f"Materias prioritarias (orden): {subjects_line}.{spot_line} "
+            f"Mundo: {child.get('world_theme')}. Edad/banda: "
+            f"{child.get('age_years')}/{child.get('age_band')}. "
+            "Cada camino: path_id, subject_id, title, intro, learning_blurb y 3 challenges "
+            "con prompt_text, item_type, opciones o expected_answer, correct_option_id y "
+            "explanation (enseñanza breve). Castellano de España. "
+            "Sin nombres de franquicias conocidas; inventa títulos y lugares originales. "
+            "Intros, blurbs y explicaciones breves (1–2 frases)."
+        )
+
+    def _path_detail_to_pack_entry(
+        self,
+        detail: Any,
+        subject: str,
+        subjects: list[str],
+        index: int,
+        model: str,
+    ) -> dict[str, Any] | None:
+        p = detail.path
+        challenges = []
+        for ch in detail.challenges[:3]:
+            challenges.append(
+                {
+                    "prompt_text": ch.prompt_text,
+                    "item_type": ch.item_type,
+                    "options": [o.model_dump() for o in ch.options],
+                    "correct_option_id": ch.correct_option_id,
+                    "expected_answer": ch.expected_answer,
+                    "explanation": ch.explanation,
+                }
+            )
+        if not challenges:
+            return None
+        path_blob = " ".join(
+            [
+                str(p.title or ""),
+                str(p.intro or ""),
+                str(p.learning_blurb or ""),
+                *(str(ch.prompt_text or "") for ch in detail.challenges[:3]),
+                *(str(ch.explanation or "") for ch in detail.challenges[:3]),
+            ]
+        )
+        if franchise_violations_in_text(path_blob):
+            return None
+        return {
+            "path_id": p.path_id or f"path_{index + 1}",
+            "subject_id": p.subject_id if p.subject_id in subjects else subject,
+            "title": p.title or f"Camino {index + 1}",
+            "intro": p.intro,
+            "learning_blurb": p.learning_blurb,
+            "challenges": challenges,
+            "model_used": model,
+        }
+
+    def _path_pack_fallback_entry(self, subject: str, index: int) -> dict[str, Any]:
+        return {
+            "path_id": f"path_{index + 1}",
+            "subject_id": subject,
+            "title": f"Ruta de {subject}",
+            "intro": f"Un tramo corto para practicar {subject}.",
+            "learning_blurb": "Repasamos lo esencial con calma.",
+            "challenges": [
+                {
+                    "prompt_text": "¿Seguimos con el reto?",
+                    "item_type": "mcq",
+                    "options": [
+                        {"id": "a", "label": "Sí"},
+                        {"id": "b", "label": "Un momento"},
+                    ],
+                    "correct_option_id": "a",
+                    "explanation": "Cuando quieras, lo intentamos otra vez.",
+                }
+            ],
+        }
 
     def _read_path_pack(
         self,
@@ -1598,6 +2615,10 @@ class DialogueService:
                     "model_used": None,
                 }
             )
+        if phase == "choose_gender":
+            return await self._mentor_choose_gender_turn(
+                child, session_id, flow, sequence
+            )
         return None
 
     async def _agent_mentor_turn(
@@ -1640,11 +2661,23 @@ class DialogueService:
         assert isinstance(envelope, DialogueEnvelope)
         phase_key = str(phase or "")
         world = self._world(child) or "fantasy"
+        avoid_phrases = self._ledger_avoid_phrases(child)
         options = force_options or [o.model_dump() for o in envelope.options] or None
-        prose_issues = validate_mentor_prose(envelope.agent_text)
+        prose_issues = validate_mentor_prose(
+            envelope.agent_text,
+            age_band=child.get("age_band") or child.get("effective_age_band"),
+            age_years=child.get("age_years"),
+            avoid_phrases=avoid_phrases,
+        )
         option_issues: list[str] = []
         if phase_key == "choose_character_species" and not force_options:
-            option_issues = validate_species_options(options, world)
+            option_issues = validate_species_options(
+                options,
+                world,
+                age_band=child.get("age_band") or child.get("effective_age_band"),
+                age_years=child.get("age_years"),
+                avoid_phrases=avoid_phrases,
+            )
         all_issues = prose_issues + option_issues
         if all_issues and prose_retry_hint is None:
             return await self._agent_mentor_turn(
@@ -1690,6 +2723,7 @@ class DialogueService:
         return dict(row) if row else {"id": child_id}
 
     def _deps(self, child: dict[str, Any], session_id: str, purpose: str) -> RunDeps:
+        resolved_gender = resolve_explorer_gender(child.get("explorer_gender"))
         return RunDeps(
             child_id=UUID(str(child["id"])),
             parent_id=UUID(str(child["parent_id"])) if child.get("parent_id") else None,
@@ -1706,6 +2740,7 @@ class DialogueService:
                 "onboarding_step": child.get("onboarding_step"),
                 "display_name": child.get("display_name"),
                 "placement_status": child.get("placement_status"),
+                "explorer_gender": resolved_gender,
             },
             ledger=self.ledger,
         )
@@ -2215,6 +3250,8 @@ class DialogueService:
                 {"id": str(age), "label": str(age)}
                 for age in (6, 7, 8, 9, 10, 12, 15, 18, 30, 50, 70)
             ]
+        if phase == "choose_gender" and not d.get("options"):
+            d["options"] = gender_chip_options(None, None)
         if phase in {"choose_character_species", "choose_character"} and not d.get("options"):
             world = str(meta.get("world_theme") or "")
             d["options"] = species_options_for_world(world if world in {"fantasy", "sci-fi"} else "fantasy")

@@ -17,6 +17,7 @@ from app.services.crew import CrewService
         ({"learning": "bad"}, "learning invalid"),
         ({"learning": {"active_subjects": "bad"}}, "learning.active_subjects invalid"),
         ({"character_summary": 1}, "character_summary invalid"),
+        ({"explorer_gender": "other"}, "explorer_gender invalid"),
     ],
 )
 @pytest.mark.asyncio

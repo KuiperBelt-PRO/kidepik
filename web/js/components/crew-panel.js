@@ -46,6 +46,7 @@ import {
   memberSectionTitle,
   memberTitle,
   memberWorldModifier,
+  genderSelectOptions,
 } from "../lib/crew-member-card.js?v=254";
 
 /** Altura mínima ~2 líneas; máxima ~4 líneas; scroll nativo sin fade. */
@@ -418,6 +419,10 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     const p = member.permissions || {};
     const isTutor = Boolean(member.is_tutor_profile);
     const tutorLabel = member.settings?.tutor_label ?? member.tutor_label ?? "";
+    const traveler = !isTutor ? member.traveler_profile || {} : null;
+    const travelerFeatures = traveler?.features?.length
+      ? traveler.features.join("\n")
+      : "";
     const characterSummary =
       !isTutor && member.traits?.character_summary
         ? String(member.traits.character_summary).trim()
@@ -435,7 +440,11 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       is_tutor_profile: isTutor,
       rank_label: member.rank?.label_child || member.rank?.label_tutor || "",
       general_level: member.general_level || member.progress?.general_level || null,
+      explorer_gender: member.explorer_gender,
+      explorer_gender_label: member.explorer_gender_label,
     };
+    /** @type {"male" | "female"} */
+    let selectedGender = member.explorer_gender === "female" ? "female" : "male";
     const profileBlock = `
       <section class="crew-panel__block">
         <h2 class="crew-panel__block-title">Perfil</h2>
@@ -452,7 +461,27 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         }</p>
         ${
           !isTutor
-            ? `<label class="crew-panel__label">Descripción del personaje
+            ? `<section class="crew-panel__block crew-panel__block--nested">
+        <h3 class="crew-panel__block-title">Personaje en el viaje</h3>
+        <p class="crew-panel__helper">Generado en la primera aventura; la IA puede haber inventado detalles. Revísalos y corrígelos aquí.</p>
+        <label class="crew-panel__label">Especie / tipo
+          <input class="crew-panel__input" data-traveler="species" value="${escapeAttr(traveler?.species || "")}" maxlength="64" placeholder="p. ej. Intérprete del viento" />
+        </label>
+        <label class="crew-panel__label">Colores (paleta)
+          <input class="crew-panel__input" data-traveler="palette" value="${escapeAttr(traveler?.palette || "")}" maxlength="64" placeholder="p. ej. verde y dorado (deja vacío si no aplica)" />
+        </label>
+        <label class="crew-panel__label">Rasgos (uno por línea)
+          <textarea class="crew-panel__input crew-panel__input--character-summary" data-traveler="features" rows="3" maxlength="480" spellcheck="false">${escapeHtml(travelerFeatures)}</textarea>
+        </label>
+        <label class="crew-panel__label">Descripción narrativa
+          <textarea class="crew-panel__input crew-panel__input--character-summary" data-traveler="description_md" rows="3" maxlength="1200" spellcheck="false">${escapeHtml(traveler?.description_md || "")}</textarea>
+        </label>
+      </section>`
+            : ""
+        }
+        ${
+          !isTutor
+            ? `<label class="crew-panel__label">Descripción del personaje (resumen tutor)
           <textarea
             class="crew-panel__input crew-panel__input--character-summary"
             data-profile="character_summary"
@@ -484,6 +513,9 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
             ? ""
             : `<label class="crew-panel__label">Edad
           <div data-age-host></div>
+        </label>
+        <label class="crew-panel__label">Sexo
+          <div data-gender-host></div>
         </label>
         <label class="crew-panel__label">Estado
           <div data-status-host></div>
@@ -745,6 +777,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     }
 
     const ageHost = root.querySelector("[data-age-host]");
+    const genderHost = root.querySelector("[data-gender-host]");
     const statusHost = root.querySelector("[data-status-host]");
     const durationHost = root.querySelector("[data-duration-host]");
 
@@ -757,6 +790,19 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           })
         : null;
     if (ageStepper) cleanups.push(() => ageStepper.destroy());
+
+    const genderSelect =
+      genderHost instanceof HTMLElement
+        ? mountGlassSelect(genderHost, {
+            value: selectedGender,
+            ariaLabel: "Sexo",
+            options: genderSelectOptions(ageStepper?.getValue() ?? member.age_years),
+            onChange(v) {
+              selectedGender = v === "female" ? "female" : "male";
+            },
+          })
+        : null;
+    if (genderSelect) cleanups.push(() => genderSelect.destroy());
 
     const statusSelect =
       statusHost instanceof HTMLElement
@@ -812,6 +858,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           /** @type {Record<string, unknown>} */
           const patch = {
             age_years: ageStepper?.getValue() ?? null,
+            explorer_gender: selectedGender,
           };
           if (!isTutor) {
             patch.status = selectedStatus;
@@ -825,6 +872,32 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           if (!isTutor && summaryInput instanceof HTMLTextAreaElement) {
             patch.character_summary = summaryInput.value.trim() || null;
           }
+          if (!isTutor) {
+            const speciesInput = root.querySelector('[data-traveler="species"]');
+            const paletteInput = root.querySelector('[data-traveler="palette"]');
+            const featuresInput = root.querySelector('[data-traveler="features"]');
+            const descriptionInput = root.querySelector('[data-traveler="description_md"]');
+            /** @type {Record<string, unknown>} */
+            const travelerPatch = {};
+            if (speciesInput instanceof HTMLInputElement) {
+              travelerPatch.species = speciesInput.value.trim();
+            }
+            if (paletteInput instanceof HTMLInputElement) {
+              travelerPatch.palette = paletteInput.value.trim();
+            }
+            if (featuresInput instanceof HTMLTextAreaElement) {
+              travelerPatch.features = featuresInput.value
+                .split("\n")
+                .map((line) => line.trim())
+                .filter(Boolean);
+            }
+            if (descriptionInput instanceof HTMLTextAreaElement) {
+              travelerPatch.description_md = descriptionInput.value.trim();
+            }
+            if (Object.keys(travelerPatch).length > 0) {
+              patch.traveler_profile = travelerPatch;
+            }
+          }
           if (!isTutor && selectedWorld && !worldLocked) {
             patch.world_theme = selectedWorld;
           }
@@ -833,6 +906,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
             // Evitar remount completo: no perder foco ni estado de tabs al guardar.
             Object.assign(member, res.member);
             if (res.member.traits) member.traits = res.member.traits;
+            if (res.member.traveler_profile) member.traveler_profile = res.member.traveler_profile;
             if (res.member.world_theme) {
               applyCrewMemberWorldTheme(res.member.world_theme);
               selectedWorld = res.member.world_theme;

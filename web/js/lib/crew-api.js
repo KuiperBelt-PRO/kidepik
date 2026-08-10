@@ -10,6 +10,8 @@
  * @property {number | null} age_years
  * @property {string | null} age_band
  * @property {string | null} world_theme
+ * @property {string | null} [explorer_gender]
+ * @property {string | null} [explorer_gender_label]
  * @property {string} status
  * @property {string} onboarding_step
  * @property {string} placement_status

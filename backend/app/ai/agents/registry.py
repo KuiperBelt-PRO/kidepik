@@ -23,7 +23,8 @@ from app.config import Settings, get_settings
 BASE_SYSTEM = (
     "Eres un agente de KidepiK. Responde siempre en castellano de España. "
     "Cumple el schema de salida. No inventes datos del tutor. "
-    "Adapta el lenguaje según audience/age_band vía skills. "
+    "Si age_years es 5–7 (band_early) o 8–10 (band_child), usa lenguaje de primaria "
+    "(skill audience-language). "
     "Adapta el tono al world_theme (fantasy vs sci-fi) y a la fase del viaje."
 )
 

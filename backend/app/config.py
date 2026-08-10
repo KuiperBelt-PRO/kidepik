@@ -15,6 +15,51 @@ GEMINI_LITE_PURPOSES = frozenset(
     }
 )
 
+# Cadenas por tier (ver .cursor/operations/GEMINI_API_FREE_TIER_LIMITS_KIDEPIK.md)
+GEMINI_LITE_CHAIN: tuple[str, ...] = (
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash-lite",
+)
+GEMINI_QUALITY_CHAIN: tuple[str, ...] = (
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+    "gemini-3.5-flash-preview",
+    "gemini-3.6-flash-preview",
+)
+
+def _dedupe_models(models: list[str]) -> list[str]:
+    return list(dict.fromkeys(m for m in models if m))
+
+
+def _chain(*parts: tuple[str, ...]) -> list[str]:
+    merged: list[str] = []
+    for part in parts:
+        merged.extend(part)
+    return _dedupe_models(merged)
+
+
+# Orden de fallback por agente: primero preferente, luego reserva si cuota/RPM agotada.
+GEMINI_PURPOSE_MODEL_DEFAULTS: dict[str, list[str]] = {
+    # Composes batch: lite primero (≈500 RPD en proyecto kidepik) → quality
+    "path_composer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+    "placement_item_writer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+    "zone_pitch_writer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+    # Diálogo / narrativa: calidad primero → lite
+    "mentor_guide": _chain(GEMINI_QUALITY_CHAIN, GEMINI_LITE_CHAIN),
+    "onboarding_host": _chain(GEMINI_QUALITY_CHAIN, GEMINI_LITE_CHAIN),
+    "character_coach": _chain(GEMINI_QUALITY_CHAIN, GEMINI_LITE_CHAIN),
+    "zone_scene_writer": _chain(GEMINI_QUALITY_CHAIN, GEMINI_LITE_CHAIN),
+    "adventure_narrator": _chain(GEMINI_QUALITY_CHAIN, GEMINI_LITE_CHAIN),
+    # Lite-only / scoring
+    "placement_text_scorer": list(GEMINI_LITE_CHAIN),
+    "waiting_copy_writer": list(GEMINI_LITE_CHAIN),
+    "journey_summarizer": list(GEMINI_LITE_CHAIN),
+    "safety_rewriter": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+    "challenge_writer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+    "challenge_result_writer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -65,15 +110,16 @@ class Settings(BaseSettings):
     google_api_key: str = Field(default="", alias="GOOGLE_API_KEY")
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     ai_gemini_model_list: str = Field(
-        default="gemini-3-flash-preview,gemini-2.5-flash,gemini-2.0-flash",
+        default="gemini-3-flash-preview,gemini-2.5-flash,gemini-3.5-flash-preview,gemini-3.6-flash-preview",
         alias="AI_GEMINI_MODEL_LIST",
     )
     ai_gemini_model_list_lite: str = Field(
-        default="gemini-2.5-flash-lite,gemini-3.1-flash-lite,gemini-2.0-flash",
+        default="gemini-3.1-flash-lite,gemini-3.5-flash-lite,gemini-2.5-flash-lite",
         alias="AI_GEMINI_MODEL_LIST_LITE",
     )
     journey_data_dir: str = Field(default="/data/journey", alias="JOURNEY_DATA_DIR")
     glossary_data_dir: str = Field(default="/data/glossary", alias="GLOSSARY_DATA_DIR")
+    glossary_compose_enabled: bool = Field(default=True, alias="GLOSSARY_COMPOSE_ENABLED")
     waiting_data_dir: str = Field(default="/data/waiting", alias="WAITING_DATA_DIR")
     chapters_data_dir: str = Field(default="/data/chapters", alias="CHAPTERS_DATA_DIR")
     ai_summary_every_n: int = Field(default=8, alias="AI_SUMMARY_EVERY_N")
@@ -96,6 +142,8 @@ class Settings(BaseSettings):
     ai_app_title: str = Field(default="KidepiK Local", alias="AI_APP_TITLE")
     ai_max_model_attempts: int = Field(default=12, alias="AI_MAX_MODEL_ATTEMPTS")
     ai_rate_limit_per_child_day: int = Field(default=80, alias="AI_RATE_LIMIT_PER_CHILD_DAY")
+    ai_compose_batch_max_slots: int = Field(default=4, alias="AI_COMPOSE_BATCH_MAX_SLOTS")
+    ai_compose_batch_retries: int = Field(default=3, alias="AI_COMPOSE_BATCH_RETRIES")
 
     @property
     def media_base(self) -> str:
@@ -136,9 +184,21 @@ class Settings(BaseSettings):
         return "lite" if purpose in GEMINI_LITE_PURPOSES else "quality"
 
     def gemini_model_list_for_purpose(self, purpose: str) -> list[str]:
+        if purpose in GEMINI_PURPOSE_MODEL_DEFAULTS:
+            return list(GEMINI_PURPOSE_MODEL_DEFAULTS[purpose])
         if purpose in GEMINI_LITE_PURPOSES:
             return self.gemini_model_list_lite()
         return self.gemini_model_list()
+
+    def gemini_model_list_resilient(self, purpose: str) -> list[str]:
+        """Lista ordenada de fallback para el purpose (incluye reserva lite/quality si aplica)."""
+        if purpose in GEMINI_PURPOSE_MODEL_DEFAULTS:
+            return list(GEMINI_PURPOSE_MODEL_DEFAULTS[purpose])
+        primary = self.gemini_model_list_for_purpose(purpose)
+        if purpose in GEMINI_LITE_PURPOSES:
+            return primary
+        extra = [model for model in self.gemini_model_list_lite() if model not in primary]
+        return primary + extra
 
     def pydantic_google_model(self, model_id: str | None = None) -> str:
         mid = (model_id or self.gemini_model_list()[0]).strip()

@@ -83,7 +83,15 @@ Ej.: `google:gemini-3-flash-preview`. Structured output: `output_type=<Pydantic 
 
 Los límites RPM/TPM/RPD dependen del proyecto ([AI Studio rate limits](https://aistudio.google.com/rate-limit)). **No** hardcodear números como verdad de negocio. Clasificar `429` / `RESOURCE_EXHAUSTED` y avanzar en la lista según §2.
 
-### 3.3 Matriz de reintentos
+**Referencia capturada (proyecto `kidepik`):** [.cursor/operations/GEMINI_API_FREE_TIER_LIMITS_KIDEPIK.md](../operations/GEMINI_API_FREE_TIER_LIMITS_KIDEPIK.md).
+
+### 3.3 Listas por purpose (fallback ordenado)
+
+`backend/app/config.py` define `GEMINI_PURPOSE_MODEL_DEFAULTS`: cada agente tiene lista propia (preferente → reserva si cuota/RPM agotada). Composes batch (`path_composer`, `placement_item_writer`) priorizan **lite** (≈500 RPD); diálogo prioriza **quality** y reserva lite.
+
+Override global opcional: `AI_GEMINI_MODEL_LIST` / `AI_GEMINI_MODEL_LIST_LITE` solo para purposes sin entrada explícita en el mapa.
+
+### 3.4 Matriz de reintentos
 
 | Situación | Acción |
 | --- | --- |

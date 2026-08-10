@@ -7,7 +7,12 @@ import pytest
 
 from app.ai.agents.deps import AudienceContext, RunDeps
 from app.ai.agents.envelopes import DialogueEnvelope
-from app.ai.agents.runner import build_mentor_prompt, run_dialogue_purpose, run_purpose
+from app.ai.agents.runner import (
+    build_character_coach_prompt,
+    build_mentor_prompt,
+    run_dialogue_purpose,
+    run_purpose,
+)
 from app.ai.errors import AiProductError
 from app.config import Settings
 
@@ -37,6 +42,50 @@ def test_build_mentor_prompt_includes_state() -> None:
     assert "markdown" in prompt.lower()
     assert "MENTOR_PROFILE" in prompt
     assert "explorer_reply=Ada" in prompt
+    assert "age_years=9" in prompt
+
+
+@pytest.mark.unit
+def test_build_character_coach_prompt_includes_age() -> None:
+    deps = sample_deps()
+    deps = deps.model_copy(update={"purpose": "character_coach"})
+    prompt = build_character_coach_prompt(deps, explorer_choice="protector de sueños")
+    assert "TravelerProfileEnvelope" in prompt
+    assert "protector de sueños" in prompt
+    assert "age_years=9" in prompt
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_run_purpose_prepends_audience_block_for_child(mocker) -> None:
+    envelope = DialogueEnvelope(agent_text="Hola", input_mode="continue")
+    agent = MagicMock()
+    captured: list[str] = []
+
+    async def _run(prompt: str, **_kwargs: object) -> MagicMock:
+        captured.append(prompt)
+        return MagicMock(output=envelope)
+
+    agent.run = _run
+    mocker.patch("app.ai.agents.runner.build_agent", return_value=agent)
+
+    async def _run_list(_purpose, runner, **_kwargs):
+        return await runner("gemini-test"), "gemini-test"
+
+    gateway = MagicMock()
+    gateway.model_string = lambda mid: mid
+    gateway.run_with_model_list = AsyncMock(side_effect=_run_list)
+    await run_purpose(
+        "mentor_guide",
+        "hola",
+        sample_deps(),
+        settings=Settings(ai_enabled=False),
+        gateway=gateway,
+        expect_type=DialogueEnvelope,
+    )
+    assert captured
+    assert captured[0].startswith("AUDIENCIA OBLIGATORIA")
+    assert "hola" in captured[0]
 
 
 @pytest.mark.unit

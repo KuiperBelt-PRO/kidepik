@@ -7,7 +7,7 @@ description: >
 
 ## Orden
 
-Respeta `onboarding_step`: mundo → nombre → edad → personaje → examen.
+Respeta `onboarding_step`: mundo → nombre → edad → **sexo** → personaje → examen.
 
 Host neutro (**El Guía**) solo antes de elegir mundo.
 
@@ -20,6 +20,7 @@ El modo **debe coincidir** con lo que pides en `agent_text`. No mezcles.
 | `choose_world` | `options_only` | ≥2 opciones de mundo; **no** pidas escribir |
 | `choose_name` | `text_only` | Pide solo el nombre; **sin** opciones ni `continue` |
 | `choose_age` | `options_or_text` | Chips de edad **o** número escrito; **sin** `continue` |
+| `choose_gender` | `options_only` | Exactamente 2 chips (chico/chica o hombre/mujer según `age_band`); **sin** texto libre |
 | `choose_character_species` | `options_or_text` | 3 sugerencias temáticas (LLM, glosario como referencia) + «escribe la tuya»; **sin** `continue` |
 | `handoff_placement` | `continue` | Solo avanzar; no pidas respuesta libre en el mismo turno |
 

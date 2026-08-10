@@ -89,6 +89,7 @@ async def reset_travelers(
                       age_years = null,
                       age_band = null,
                       effective_age_band = null,
+                      explorer_gender = null,
                       general_level = null,
                       rank_id = null,
                       rank_track = null,

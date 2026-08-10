@@ -18,6 +18,7 @@ PHASE_INPUT_MODE: dict[str, InputMode] = {
     "choose_world": "options_only",
     "choose_name": "text_only",
     "choose_age": "options_or_text",
+    "choose_gender": "options_only",
     "choose_character_species": "options_or_text",
     "choose_character": "options_or_text",
     "handoff_placement": "continue",

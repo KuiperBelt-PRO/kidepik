@@ -9,7 +9,15 @@ from app.ai.agents.envelopes import DialogueEnvelope, TravelerProfileEnvelope
 from app.ai.agents.md_loader import get_agent_spec
 from app.ai.agents.runner import build_mentor_prompt, run_purpose
 from app.ai.gemini_gateway import GeminiGateway
-from app.ai.orchestrator.tools import glossary_search, ledger_recent_stems
+from app.ai.orchestrator.tools import (
+    glossary_search,
+    ledger_recent_avoid_phrases,
+    ledger_recent_stems,
+)
+from app.ai.orchestrator.glossary_layers import (
+    format_glossary_compose_block,
+    glossary_compose,
+)
 from app.ai.orchestrator.input_modes import normalize_dialogue_envelope
 from app.ai.orchestrator.turn_context import TurnContext
 from app.config import Settings, get_settings
@@ -42,7 +50,7 @@ class Orchestrator:
         world = ctx.world_theme
         if not world and phase in {"pending_entry", "choose_world", ""}:
             return "onboarding_host"
-        if phase in {"choose_name", "choose_age", "choose_character_species"}:
+        if phase in {"choose_name", "choose_age", "choose_gender", "choose_character_species"}:
             return "mentor_guide"
         if phase in {"choose_character", "character"}:
             return "character_coach"
@@ -58,21 +66,62 @@ class Orchestrator:
         world = ctx.world_theme or "fantasy"
         if "glossary_search" in tools and world in {"fantasy", "sci-fi"}:
             is_character_choice = ctx.phase == "choose_character_species"
-            limit = 18 if is_character_choice else 5
-            hits = glossary_search(
-                world,  # type: ignore[arg-type]
-                limit=limit,
-            )
-            if hits:
-                header = (
-                    "Glosario de arquetipos (especies, profesiones, criaturas y referencias; "
-                    "inspírate, no copies una lista cerrada):"
-                    if is_character_choice
-                    else "Glosario (tipos, no nombres propios):"
+            avoid: list[str] = []
+            if ctx.ledger and ctx.parent_id:
+                avoid = ledger_recent_avoid_phrases(
+                    ctx.ledger,
+                    str(ctx.parent_id),
+                    str(ctx.child_id),
+                    world,
                 )
-                lines = [f"- {h.term}: {h.definition}" for h in hits]
-                chunks.append(header + "\n" + "\n".join(lines))
-                notes.append(f"glossary:{len(hits)}")
+            rotate_seed = hash(
+                (str(ctx.child_id), ctx.session_id, ctx.sequence, ctx.phase)
+            ) & 0xFFFFFFFF
+            world_key = world  # type: ignore[assignment]
+            if self.settings.glossary_compose_enabled:
+                compose_purpose = "species_chip" if is_character_choice else "mentor_prose"
+                composed = glossary_compose(
+                    world_key,
+                    purpose=compose_purpose,
+                    exclude_terms=avoid,
+                    rotate_seed=rotate_seed,
+                    age_band=ctx.child.get("age_band")
+                    or ctx.child.get("effective_age_band"),
+                )
+                header = (
+                    "Vocabulario para arquetipos (combina ingredientes; no copies frases del glosario):"
+                    if is_character_choice
+                    else "Vocabulario composable para la escena (no copies frases del glosario):"
+                )
+                chunks.append(format_glossary_compose_block(composed, header=header))
+                notes.append(
+                    f"compose:{len(composed.ingredients)}+{len(composed.style_refs)}"
+                )
+            else:
+                limit = 18 if is_character_choice else 5
+                hits = glossary_search(
+                    world_key,
+                    limit=limit,
+                    exclude_terms=avoid,
+                    rotate_seed=rotate_seed,
+                    layer="ingredient",
+                )
+                if hits:
+                    header = (
+                        "Glosario de arquetipos (especies, profesiones, criaturas; "
+                        "inspírate sin copiar literal):"
+                        if is_character_choice
+                        else "Glosario (tipos, no nombres propios; inspírate sin copiar literal):"
+                    )
+                    lines = [f"- {h.term}: {h.definition}" for h in hits]
+                    chunks.append(header + "\n" + "\n".join(lines))
+                    notes.append(f"glossary:{len(hits)}")
+            if avoid:
+                chunks.append(
+                    "No reutilices estos términos o etiquetas ya usados en el viaje:\n- "
+                    + "\n- ".join(avoid[:16])
+                )
+                notes.append(f"avoid:{len(avoid)}")
         if ctx.ledger and ctx.parent_id and "ledger_query" in tools:
             stems = ledger_recent_stems(
                 ctx.ledger,
