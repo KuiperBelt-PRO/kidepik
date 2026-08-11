@@ -47,7 +47,11 @@ def mock_parent_service(mocker: MockerFixture) -> Any:
 def mock_crew_service(mocker: MockerFixture) -> Any:
     ensure_tutor = AsyncMock(return_value=None)
     services = []
-    for path in ("app.routers.crew.CrewService", "app.routers.parents.CrewService"):
+    for path in (
+        "app.routers.crew.CrewService",
+        "app.routers.parents.CrewService",
+        "app.routers.play.CrewService",
+    ):
         service = mocker.patch(path).return_value
         service.ensure_tutor_profile_for_auth_user = ensure_tutor
         services.append(service)
@@ -62,6 +66,11 @@ def mock_crew_service(mocker: MockerFixture) -> Any:
     crew.soft_delete_for_auth_user = AsyncMock(return_value={"deleted": True})
     crew.verify_exit_pin_for_auth_user = AsyncMock(return_value={"ok": True})
     crew._ensure_tutor = ensure_tutor
+    # Keep play router's CrewService in sync with the primary mock
+    if len(services) > 2:
+        play_crew = services[2]
+        play_crew.get_for_auth_user = crew.get_for_auth_user
+        play_crew.list_for_auth_user = crew.list_for_auth_user
     return crew
 
 

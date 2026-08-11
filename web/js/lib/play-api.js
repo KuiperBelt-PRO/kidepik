@@ -187,3 +187,95 @@ export async function fetchJourneyTimeline(_session, childId, opts = {}) {
     return { ok: false };
   }
 }
+
+/**
+ * @param {import('@supabase/supabase-js').Session} _session
+ * @param {string} childId
+ */
+export async function fetchPlayBaggage(_session, childId) {
+  try {
+    const session = await requirePlaySession();
+    if (!session) return { ok: false, status: 401, error: "session_expired" };
+    const { config } = await import("../config.js");
+    const res = await fetch(`${config.apiUrl}/play/${encodeURIComponent(childId)}/baggage`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        ...debugAiRequestHeaders(),
+      },
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    return { ok: true, data: await res.json() };
+  } catch (err) {
+    console.warn("play baggage error", err);
+    return { ok: false };
+  }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').Session} _session
+ * @param {string} childId
+ * @param {string} itemRowId
+ * @param {{ effect_id: string, session_id: string }} body
+ */
+export async function usePlayBaggageItem(_session, childId, itemRowId, body) {
+  try {
+    const session = await requirePlaySession();
+    if (!session) return { ok: false, status: 401, error: "session_expired" };
+    const { config } = await import("../config.js");
+    const res = await fetch(
+      `${config.apiUrl}/play/${encodeURIComponent(childId)}/baggage/${encodeURIComponent(itemRowId)}/use`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          ...debugAiRequestHeaders(),
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      /** @type {any} */
+      let errBody = null;
+      try {
+        errBody = await res.json();
+      } catch {
+        errBody = null;
+      }
+      const code =
+        errBody && typeof errBody === "object" && errBody.detail?.code
+          ? String(errBody.detail.code)
+          : typeof errBody?.detail === "string"
+            ? errBody.detail
+            : `http_${res.status}`;
+      return { ok: false, status: res.status, error: code };
+    }
+    return { ok: true, data: await res.json() };
+  } catch (err) {
+    console.warn("play baggage use error", err);
+    return { ok: false };
+  }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').Session} _session
+ * @param {string} childId
+ */
+export async function fetchPlayProgress(_session, childId) {
+  try {
+    const session = await requirePlaySession();
+    if (!session) return { ok: false, status: 401, error: "session_expired" };
+    const { config } = await import("../config.js");
+    const res = await fetch(`${config.apiUrl}/play/${encodeURIComponent(childId)}/progress`, {
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        ...debugAiRequestHeaders(),
+      },
+    });
+    if (!res.ok) return { ok: false, status: res.status };
+    return { ok: true, data: await res.json() };
+  } catch (err) {
+    console.warn("play progress error", err);
+    return { ok: false };
+  }
+}

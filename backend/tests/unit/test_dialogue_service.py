@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -1022,31 +1022,69 @@ async def test_compose_path_pack_fallback(dialogue_svc, mocker) -> None:
 
 
 @pytest.mark.unit
+def _path_challenge_seed(prompt: str = "¿2+2?") -> PathChallengeSeed:
+    return PathChallengeSeed(
+        prompt_text=prompt,
+        item_type="mcq",
+        options=[
+            DialogueOption(id="a", label="4"),
+            DialogueOption(id="b", label="5"),
+            DialogueOption(id="c", label="6"),
+        ],
+        correct_option_id="a",
+        explanation="La respuesta correcta es 4.",
+    )
+
+
+_LONG_SCENE = (
+    "El sendero baja hacia un cruce de piedras. "
+    "Un guía local detiene al viajero y le pide escuchar con atención."
+)
+_LONG_LESSON = (
+    "El guía muestra dos montones de fruta y cuenta en voz alta. "
+    "«Si juntas lo mismo en cada lado, el trueque sale justo», dice. "
+    "Explica que sumar es juntar cantidades sin perder el orden. "
+    "Te deja practicar con los dedos antes de los retos del camino."
+)
+
+
+def _valid_path_challenges() -> list[dict[str, Any]]:
+    return [
+        {
+            "prompt_text": "¿Cuánto es 2+2?",
+            "item_type": "mcq",
+            "options": [
+                {"id": "a", "label": "4"},
+                {"id": "b", "label": "5"},
+                {"id": "c", "label": "6"},
+            ],
+            "correct_option_id": "a",
+            "explanation": "La respuesta correcta es 4.",
+        }
+    ] * 3
+
+
+def _path_detail(i: int, *, title: str | None = None) -> PathDetail:
+    return PathDetail(
+        path=PathOption(
+            path_id=f"path_{i}",
+            subject_id="math",
+            title=title or f"El cruce de las balanzas {i}",
+            intro="Intro breve",
+            learning_blurb="Blurb",
+            path_narrative=_LONG_SCENE,
+            lesson_narrative=_LONG_LESSON,
+        ),
+        challenges=[_path_challenge_seed(f"¿2+{i}?") for _ in range(3)],
+    )
+
+
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_compose_path_pack_single_batch_call(dialogue_svc, mocker) -> None:
-    def make_detail(i: int) -> PathDetail:
-        return PathDetail(
-            path=PathOption(
-                path_id=f"path_{i}",
-                subject_id="math",
-                title=f"Camino {i}",
-                intro="Intro breve",
-                learning_blurb="Blurb",
-            ),
-            challenges=[
-                PathChallengeSeed(
-                    prompt_text="¿2+2?",
-                    item_type="mcq",
-                    options=[DialogueOption(id="a", label="4")],
-                    correct_option_id="a",
-                    explanation="Sumar",
-                )
-            ],
-        )
-
     bundle = PathPackEnvelope(
         agent_text="Elige tu camino",
-        paths=[make_detail(1), make_detail(2), make_detail(3)],
+        paths=[_path_detail(1), _path_detail(2), _path_detail(3)],
     )
     run_mock = AsyncMock(return_value=(bundle, "gemini-3.1-flash-lite"))
     mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
@@ -1054,8 +1092,126 @@ async def test_compose_path_pack_single_batch_call(dialogue_svc, mocker) -> None
     pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
     assert len(pack) == 3
     assert run_mock.await_count == 1
-    assert pack[0]["title"] == "Camino 1"
-    assert pack[0]["challenges"][0]["explanation"] == "Sumar"
+    assert pack[0]["title"] == "El cruce de las balanzas 1"
+    assert len(pack[0]["challenges"]) == 3
+    assert pack[0]["lesson_narrative"]
+    assert "4" in pack[0]["challenges"][0]["explanation"]
+
+
+@pytest.mark.unit
+def test_path_pack_quality_rejects_cliche_title() -> None:
+    entry = {
+        "path_id": "p1",
+        "subject_id": "math",
+        "title": "El bosque de los números",
+        "intro": "Intro",
+        "path_narrative": _LONG_SCENE,
+        "lesson_narrative": _LONG_LESSON,
+        "challenges": _valid_path_challenges(),
+    }
+    assert (
+        DialogueService._path_pack_entry_quality_issue(entry, "fantasy")
+        == "path_title_cliche"
+    )
+
+
+@pytest.mark.unit
+def test_path_pack_quality_accepts_original_title() -> None:
+    entry = {
+        "path_id": "p1",
+        "subject_id": "math",
+        "title": "El cruce de las balanzas",
+        "intro": "Intro",
+        "path_narrative": _LONG_SCENE,
+        "lesson_narrative": _LONG_LESSON,
+        "challenges": _valid_path_challenges(),
+    }
+    assert DialogueService._path_pack_entry_quality_issue(entry, "fantasy") is None
+
+
+@pytest.mark.unit
+def test_path_pack_quality_soft_warnings_do_not_reject() -> None:
+    entry = {
+        "path_id": "p1",
+        "subject_id": "language",
+        "title": "El salón de las palabras vivas",
+        "intro": "Intro",
+        "path_narrative": "Corta.",
+        "lesson_narrative": "Corta.",
+        "challenges": [
+            {
+                "prompt_text": "¿Qué tipo de palabra es correr?",
+                "item_type": "mcq",
+                "options": [
+                    {"id": "a", "label": "Verbo"},
+                    {"id": "b", "label": "Sustantivo propio"},
+                    {"id": "c", "label": "Adjetivo"},
+                ],
+                "correct_option_id": "b",
+                "explanation": "Correr es una acción, así que es un verbo.",
+            }
+        ]
+        * 3,
+    }
+    # No rechazo duro por lección corta ni explanation desalineada.
+    assert DialogueService._path_pack_entry_quality_issue(entry, "fantasy") is None
+    warns = DialogueService._path_pack_soft_quality_warnings(entry)
+    assert "path_lesson_short" in warns
+    assert "path_explanation_may_mismatch_correct" in warns
+
+
+@pytest.mark.unit
+def test_format_path_intro_text_includes_lesson() -> None:
+    path = {
+        "path_narrative": "Escena breve.",
+        "lesson_narrative": "Lección larga con teoría.",
+        "intro": "Intro",
+        "learning_blurb": "Lógica",
+    }
+    text = DialogueService._format_path_intro_text(path)
+    assert "Escena breve." in text
+    assert "Lección larga con teoría." in text
+
+
+@pytest.mark.unit
+def test_format_path_challenge_text_is_prompt_only() -> None:
+    ch = {
+        "narrative_wrapper": "La puerta brilla.",
+        "teaching_beat": "Miramos el patrón.",
+        "prompt_text": "¿Cuál sigue?",
+    }
+    assert DialogueService._format_path_challenge_text(ch) == "¿Cuál sigue?"
+
+
+@pytest.mark.unit
+def test_path_pitch_description_prefers_blurb() -> None:
+    assert DialogueService._path_pitch_description(
+        {"learning_blurb": "Lógica", "intro": "Intro"}
+    ) == "Lógica"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_path_pack_retries_on_quality_reject(dialogue_svc, mocker) -> None:
+    bad = PathPackEnvelope(
+        agent_text="Elige",
+        paths=[
+            _path_detail(1, title="El bosque de los números"),
+            _path_detail(2),
+            _path_detail(3),
+        ],
+    )
+    good = PathPackEnvelope(
+        agent_text="Elige",
+        paths=[_path_detail(1), _path_detail(2), _path_detail(3)],
+    )
+    run_mock = AsyncMock(side_effect=[(bad, "m1"), (good, "m2")])
+    mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
+
+    pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
+    assert len(pack) == 3
+    assert run_mock.await_count == 2
+    assert "bosque" not in pack[0]["title"].lower()
 
 
 @pytest.mark.unit
@@ -1381,6 +1537,11 @@ async def test_choose_path_valid_selection(dialogue_svc, tmp_path, monkeypatch) 
                     "title": "Bosque",
                     "intro": "Entramos al bosque.",
                     "learning_blurb": "Practicamos lógica.",
+                    "path_narrative": "Rumi te guía al claro.",
+                    "lesson_narrative": (
+                        "Rumi te enseña el truco del bosque con ejemplos claros "
+                        "antes de cualquier reto."
+                    ),
                     "challenges": [],
                 }
             ]
@@ -1402,6 +1563,10 @@ async def test_choose_path_valid_selection(dialogue_svc, tmp_path, monkeypatch) 
     )
     assert effects[0] == {"type": "path_chosen", "value": "p1"}
     assert turns[0]["meta"]["phase"] == "path_intro"
+    dialogue_svc._mentor_turn.assert_awaited_once()
+    mentor_text = dialogue_svc._mentor_turn.await_args[0][4]
+    assert "Rumi te guía al claro." in mentor_text
+    assert "truco del bosque" in mentor_text
     get_settings.cache_clear()
 
 
@@ -1425,6 +1590,8 @@ async def test_path_next_challenge_presents_mcq(dialogue_svc, tmp_path, monkeypa
                 "path_id": "p1",
                 "challenges": [
                     {
+                        "narrative_wrapper": "Sela bloquea el paso.",
+                        "teaching_beat": "Contamos antes de saltar.",
                         "prompt_text": "¿Seguimos?",
                         "item_type": "mcq",
                         "options": [{"id": "a", "label": "Sí"}],
@@ -1448,6 +1615,9 @@ async def test_path_next_challenge_presents_mcq(dialogue_svc, tmp_path, monkeypa
     )
     assert effects == []
     assert turns[0]["meta"]["phase"] == "path_challenge"
+    dialogue_svc._mentor_turn.assert_awaited_once()
+    mentor_text = dialogue_svc._mentor_turn.await_args[0][4]
+    assert mentor_text == "¿Seguimos?"
     get_settings.cache_clear()
 
 
@@ -1483,8 +1653,11 @@ async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monke
         world_theme="fantasy",
     )
     dialogue_svc._mentor_turn = AsyncMock(
-        return_value=DialogueService._turn(
-            sample_turn_row(meta={"phase": "path_intro", "retry": True})
+        side_effect=lambda *args, **kwargs: DialogueService._turn(
+            sample_turn_row(
+                text=args[4] if len(args) > 4 else kwargs.get("text", ""),
+                meta={"phase": "path_intro", "retry": True},
+            )
         )
     )
     child = sample_child(parent_id=PARENT_ID)
@@ -1500,6 +1673,7 @@ async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monke
     )
     assert effects == []
     assert turns[0]["meta"]["retry"] is True
+    assert "«3» no es correcto." in str(turns[0].get("text") or "")
     get_settings.cache_clear()
 
 
@@ -2036,6 +2210,7 @@ async def test_maybe_write_session_summary_fallback(dialogue_svc, tmp_path, monk
         ("choose_path", "_choose_path"),
         ("path_intro", "_path_next_challenge"),
         ("path_challenge", "_path_challenge_answer"),
+        ("adventure_ready", "_start_path_choice"),
     ],
 )
 async def test_submit_turn_routes_onboarding_phases(
@@ -2062,7 +2237,7 @@ async def test_submit_turn_routes_onboarding_phases(
     ).return_value.waiting_copy_from_cache = AsyncMock(return_value=[])
     reply = (
         {"kind": "continue"}
-        if phase in {"handoff_placement", "path_intro"}
+        if phase in {"handoff_placement", "path_intro", "adventure_ready"}
         else {"kind": "text", "text": "valor"}
     )
     result = await dialogue_svc.submit_turn(AUTH_USER_ID, CHILD_ID, SESSION_ID, reply)
@@ -2191,6 +2366,206 @@ def test_normalize_options_uses_description_when_label_is_letter() -> None:
     )
     assert opts is not None
     assert opts[0]["label"] == "240 monedas"
+
+
+@pytest.mark.parametrize(
+    ("mentor_phase", "echo_phase"),
+    [
+        ("placement_item", "placement_choice_echo"),
+        ("choose_path", "path_choice_echo"),
+        ("path_challenge", "path_challenge_echo"),
+    ],
+)
+@pytest.mark.unit
+def test_choice_echo_meta_for_journey_and_placement(
+    mentor_phase: str, echo_phase: str
+) -> None:
+    mentor = DialogueService._turn(
+        {
+            "id": uuid4(),
+            "child_id": CHILD_ID,
+            "session_id": SESSION_ID,
+            "flow_id": "first_run",
+            "sequence": 3,
+            "role": "mentor",
+            "text": "Elige",
+            "options": [
+                {"id": "a", "label": "Ruta A"},
+                {"id": "b", "label": "Ruta B"},
+            ],
+            "meta": {"phase": mentor_phase},
+        }
+    )
+    meta = DialogueService._choice_echo_meta(
+        mentor,
+        selected_id="a",
+        display_label="Ruta A",
+    )
+    assert meta["phase"] == echo_phase
+    assert meta["choice_taken"] == {"id": "a", "label": "Ruta A"}
+    assert meta["choices_discarded"] == [{"id": "b", "label": "Ruta B"}]
+
+
+@pytest.mark.unit
+def test_choice_echo_meta_ignores_non_option_phases() -> None:
+    mentor = DialogueService._turn(
+        {
+            "id": uuid4(),
+            "child_id": CHILD_ID,
+            "session_id": SESSION_ID,
+            "flow_id": "first_run",
+            "sequence": 3,
+            "role": "mentor",
+            "text": "¿Cómo te llamas?",
+            "options": [{"id": "ada", "label": "Ada"}],
+            "meta": {"phase": "choose_name"},
+        }
+    )
+    assert (
+        DialogueService._choice_echo_meta(
+            mentor,
+            selected_id="ada",
+            display_label="Ada",
+        )
+        == {}
+    )
+
+
+@pytest.mark.unit
+def test_choice_echo_meta_marks_incorrect_answer() -> None:
+    mentor = DialogueService._turn(
+        {
+            "id": uuid4(),
+            "child_id": CHILD_ID,
+            "session_id": SESSION_ID,
+            "flow_id": "first_run",
+            "sequence": 3,
+            "role": "mentor",
+            "text": "¿Sinónimo de veloz?",
+            "options": [
+                {"id": "a", "label": "Lento"},
+                {"id": "b", "label": "Rápido"},
+            ],
+            "meta": {"phase": "path_challenge"},
+        }
+    )
+    scoring_item = {
+        "item_type": "mcq",
+        "options": [
+            {"id": "a", "label": "Lento"},
+            {"id": "b", "label": "Rápido"},
+        ],
+        "correct_option_id": "b",
+    }
+    meta = DialogueService._choice_echo_meta(
+        mentor,
+        selected_id="a",
+        display_label="Lento",
+        reply={"option_id": "a"},
+        scoring_item=scoring_item,
+    )
+    assert meta["choice_correct"] is False
+
+
+@pytest.mark.unit
+def test_incorrect_choice_feedback_prefixes_weak_explanation() -> None:
+    item = {
+        "options": [
+            {"id": "a", "label": "Lento"},
+            {"id": "b", "label": "Rápido"},
+        ],
+        "correct_option_id": "b",
+        "explanation": "'Veloz' es lo mismo que rápido.",
+    }
+    text = DialogueService._incorrect_choice_feedback(item, {"option_id": "a"})
+    assert text.startswith("«Lento» no es correcto.")
+    assert "rápido" in text.lower()
+
+
+@pytest.mark.unit
+def test_incorrect_choice_feedback_without_explanation_names_correct() -> None:
+    item = {
+        "options": [
+            {"id": "a", "label": "Sopló"},
+            {"id": "b", "label": "Soplo"},
+        ],
+        "correct_option_id": "a",
+    }
+    text = DialogueService._incorrect_choice_feedback(item, {"option_id": "b"})
+    assert "«Soplo» no es correcto." in text
+    assert "«Sopló»" in text
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_reemit_path_challenge_restores_question(dialogue_svc, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    dialogue_svc.ledger = JourneyLedger(tmp_path)
+    dialogue_svc.ledger.append_event(
+        PARENT_ID,
+        CHILD_ID,
+        SESSION_ID,
+        kind="path_progress",
+        payload={
+            "path_id": "p1",
+            "challenge_index": 1,
+            "path": {
+                "path_id": "p1",
+                "challenges": [
+                    {
+                        "prompt_text": "¿2+2?",
+                        "item_type": "mcq",
+                        "options": [{"id": "a", "label": "3"}, {"id": "b", "label": "4"}],
+                        "correct_option_id": "b",
+                    },
+                    {
+                        "prompt_text": "¿3+3?",
+                        "item_type": "mcq",
+                        "options": [{"id": "a", "label": "5"}, {"id": "b", "label": "6"}],
+                        "correct_option_id": "b",
+                    },
+                ],
+            },
+        },
+        world_theme="fantasy",
+    )
+    dialogue_svc._child = AsyncMock(return_value=sample_child(parent_id=PARENT_ID))
+    dialogue_svc.session.execute = AsyncMock(
+        side_effect=[
+            MagicMock(
+                mappings=MagicMock(
+                    return_value=MagicMock(
+                        first=MagicMock(return_value=sample_session_row())
+                    )
+                )
+            ),
+            MagicMock(scalar=MagicMock(return_value=10)),
+        ]
+    )
+    dialogue_svc._mentor_turn = AsyncMock(
+        return_value=DialogueService._turn(
+            sample_turn_row(
+                sequence=11,
+                meta={"phase": "path_challenge", "challenge_index": 0},
+                text="¿2+2?",
+            )
+        )
+    )
+    turn = await dialogue_svc.reemit_path_challenge(
+        AUTH_USER_ID,
+        CHILD_ID,
+        SESSION_ID,
+        challenge_index=0,
+        path_id="p1",
+    )
+    assert turn is not None
+    assert turn["meta"]["phase"] == "path_challenge"
+    assert turn["meta"]["challenge_index"] == 0
+    assert turn["text"] == "¿2+2?"
+    get_settings.cache_clear()
 
 
 @pytest.mark.unit

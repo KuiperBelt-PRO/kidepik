@@ -6,7 +6,9 @@ from uuid import uuid4
 import pytest
 
 from app.services.journey_rewind import (
+    _anchor_datetime,
     _derive_child_patch,
+    _mentor_regenerate_mode,
     _phase_base_fields,
     _replay_explorer_state,
 )
@@ -30,6 +32,39 @@ def _turn(**overrides):
 
 
 @pytest.mark.unit
+def test_anchor_datetime_parses_iso_z() -> None:
+    dt = _anchor_datetime("2026-08-10T11:58:18.554394Z")
+    assert dt.tzinfo is not None
+    assert dt.year == 2026
+
+
+@pytest.mark.unit
+def test_mentor_regenerate_mode_path_challenge_not_choose_path() -> None:
+    assert _mentor_regenerate_mode("path_challenge", placement_completed=True) == (
+        "path_challenge_reemit"
+    )
+    assert _mentor_regenerate_mode("path_intro", placement_completed=True) == (
+        "path_intro_reemit"
+    )
+    assert _mentor_regenerate_mode("choose_path", placement_completed=True) == (
+        "choose_path_reemit"
+    )
+    assert _mentor_regenerate_mode("placement_feedback", placement_completed=True) == (
+        "choose_path_reemit"
+    )
+
+
+@pytest.mark.unit
+def test_mentor_regenerate_mode_placement_item() -> None:
+    assert _mentor_regenerate_mode("placement_item", placement_completed=True) == (
+        "placement_reemit"
+    )
+    assert _mentor_regenerate_mode("placement_item", placement_completed=False) == (
+        "placement_reemit"
+    )
+
+
+@pytest.mark.unit
 def test_phase_base_fields_choose_world() -> None:
     fields = _phase_base_fields("choose_world")
     assert fields["onboarding_step"] == "choose_world"
@@ -42,6 +77,19 @@ def test_phase_base_fields_placement_item() -> None:
     fields = _phase_base_fields("placement_item")
     assert fields["onboarding_step"] == "placement"
     assert fields["placement_status"] == "in_progress"
+
+
+@pytest.mark.unit
+def test_phase_base_fields_choose_path() -> None:
+    fields = _phase_base_fields("choose_path")
+    assert fields["onboarding_step"] == "complete"
+    assert fields["placement_status"] == "completed"
+
+
+@pytest.mark.unit
+def test_phase_base_fields_path_challenge() -> None:
+    fields = _phase_base_fields("path_challenge")
+    assert fields["placement_status"] == "completed"
 
 
 @pytest.mark.unit

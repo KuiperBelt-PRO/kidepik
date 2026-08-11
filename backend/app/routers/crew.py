@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, Query, status
 
 from app.routers.parents import _claims, _email, _error
 from app.services.crew import CrewService
+from app.services.inventory import InventoryService
 from app.services.parents import ParentAccountService
+from app.services.reward_economy import RewardEconomyService
 
 router = APIRouter(prefix="/api/v1", tags=["crew"])
 
@@ -77,6 +79,46 @@ async def verify_exit_pin(child_id: str, payload: dict[str, Any] | None = None, 
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
     except HTTPException: raise
     except Exception as exc: raise _crew_error(exc) from exc
+
+@router.get("/crew/{child_id}/baggage")
+async def baggage(
+    child_id: str,
+    world_theme: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    auth_id = await _parent(authorization)
+    try:
+        member = await CrewService().get_for_auth_user(auth_id, child_id)
+        theme = world_theme or member.get("world_theme") or member.get("active_world_theme") or "fantasy"
+        settings = member.get("settings") if isinstance(member.get("settings"), dict) else {}
+        learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
+        active = learning.get("active_subjects") if isinstance(learning.get("active_subjects"), list) else []
+        return await InventoryService().get_baggage(
+            child_id,
+            str(theme),
+            active_subjects=[str(s) for s in active],
+            age_band=member.get("age_band") if isinstance(member.get("age_band"), str) else None,
+            show_levels_to_child=bool(learning.get("show_levels_to_child")),
+            audience="tutor",
+        )
+    except Exception as exc:
+        raise _crew_error(exc) from exc
+
+
+@router.get("/crew/{child_id}/wallet")
+async def wallet(
+    child_id: str,
+    world_theme: str | None = Query(default=None),
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    auth_id = await _parent(authorization)
+    try:
+        member = await CrewService().get_for_auth_user(auth_id, child_id)
+        theme = world_theme or member.get("world_theme") or "fantasy"
+        return await RewardEconomyService().get_wallet(child_id, str(theme))
+    except Exception as exc:
+        raise _crew_error(exc) from exc
+
 
 @router.post("/crew/{child_id}/tutor-report")
 async def tutor_report(child_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:

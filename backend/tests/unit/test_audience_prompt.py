@@ -63,3 +63,13 @@ def test_placement_writer_loads_exam_skills_eager() -> None:
     assert by_id["placement-exam"].defer_loading is False
     assert by_id["subject-pedagogy"].defer_loading is False
     assert by_id["original-ip"].defer_loading is True
+
+
+@pytest.mark.unit
+def test_path_composer_loads_exam_skills_eager() -> None:
+    caps = load_skills_for_purpose("path_composer")
+    by_id = {cap.id: cap for cap in caps}
+    assert by_id["placement-exam"].defer_loading is False
+    assert by_id["challenge-design"].defer_loading is False
+    assert by_id["zone-pitches"].defer_loading is False
+    assert by_id["original-ip"].defer_loading is True

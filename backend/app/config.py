@@ -122,6 +122,7 @@ class Settings(BaseSettings):
     glossary_compose_enabled: bool = Field(default=True, alias="GLOSSARY_COMPOSE_ENABLED")
     waiting_data_dir: str = Field(default="/data/waiting", alias="WAITING_DATA_DIR")
     chapters_data_dir: str = Field(default="/data/chapters", alias="CHAPTERS_DATA_DIR")
+    items_data_dir: str = Field(default="/data/items", alias="ITEMS_DATA_DIR")
     ai_summary_every_n: int = Field(default=8, alias="AI_SUMMARY_EVERY_N")
 
     # Legado OpenRouter (PHP / port parcial) — no usar en camino agentic Gemini

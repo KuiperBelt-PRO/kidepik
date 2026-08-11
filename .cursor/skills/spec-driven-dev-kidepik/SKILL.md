@@ -172,6 +172,7 @@ Los diagramas **orientan**; el contrato vive en `.cursor/specify/`. Actualizar e
 | 16 | `16-journey-mechanics-flows.md` | Flujos first-run / prueba / caminos / rangos / espera |
 | 17 | `17-storage-decision-tree.md` | Criterio PG vs archivos vs DuckDB vs código |
 | 18 | `18-parallel-worlds.md` | Mundos fantasy/sci-fi en paralelo y cambio de tema |
+| 19 | `19-rewards-inventory.md` | Recompensas, moneda, equipaje, HUD nivel en play |
 
 Orden de lectura sugerido para onboarding: [diagrams/README.md](../../diagrams/README.md) § Orden de lectura.
 

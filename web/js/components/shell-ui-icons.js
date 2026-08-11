@@ -4,7 +4,7 @@
  */
 
 /** @typedef {'sci-fi' | 'fantasy'} UiIconTheme */
-/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'|'note'|'age'|'pause'|'pending'} UiIconId */
+/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'|'note'|'age'|'pause'|'pending'|'baggage'|'chat'|'currency'} UiIconId */
 
 export const SHELL_UI_ICON_THEMES = Object.freeze(
   /** @type {UiIconTheme[]} */ (["sci-fi", "fantasy"]),
@@ -30,6 +30,9 @@ export const SHELL_UI_ICON_IDS = Object.freeze(
     "age",
     "pause",
     "pending",
+    "baggage",
+    "chat",
+    "currency",
   ]),
 );
 
@@ -833,6 +836,63 @@ function buildGlyphGroups(theme, id) {
               { x: 54, y: 70 },
               { x: 54, y: 80 },
               { x: 46, y: 80 },
+            ],
+          ];
+
+    case "baggage":
+      // Mochila / cofre simplificado
+      return [
+        [
+          { x: 28, y: 38 },
+          { x: 72, y: 38 },
+          { x: 76, y: 78 },
+          { x: 24, y: 78 },
+        ],
+        [
+          { x: 38, y: 38 },
+          { x: 38, y: 28 },
+          { x: 62, y: 28 },
+          { x: 62, y: 38 },
+        ],
+      ];
+
+    case "chat":
+      return [
+        [
+          { x: 22, y: 28 },
+          { x: 78, y: 28 },
+          { x: 78, y: 62 },
+          { x: 42, y: 62 },
+          { x: 30, y: 76 },
+          { x: 34, y: 62 },
+          { x: 22, y: 62 },
+        ],
+      ];
+
+    case "currency":
+      return sci
+        ? [
+            [
+              { x: 50, y: 18 },
+              { x: 72, y: 50 },
+              { x: 50, y: 82 },
+              { x: 28, y: 50 },
+            ],
+            [
+              { x: 44, y: 42 },
+              { x: 56, y: 42 },
+              { x: 56, y: 58 },
+              { x: 44, y: 58 },
+            ],
+          ]
+        : [
+            [
+              { x: 50, y: 20 },
+              { x: 70, y: 30 },
+              { x: 70, y: 70 },
+              { x: 50, y: 80 },
+              { x: 30, y: 70 },
+              { x: 30, y: 30 },
             ],
           ];
 

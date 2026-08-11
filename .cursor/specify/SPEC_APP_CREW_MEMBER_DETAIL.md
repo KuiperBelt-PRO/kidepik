@@ -26,10 +26,11 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 
 ## Objetivo
 
-1. Reorganizar la ficha en **tres pestañas**: **Detalles** · **Viaje** (diario) · **Ajustes**.
+1. Reorganizar la ficha en pestañas: **Viaje** · **Equipaje** · **Ajustes** (y **Detalles** cuando el corte de backlog lo active).
 2. Grid de materias con progreso + activación.
 3. Fix descripción editable; switches glass para booleanos de ajustes.
 4. Exponer progresión legible al tutor (rango + nivel + %).
+5. Equipaje tutor: moneda + objetos — [SPEC_APP_CREW_BAGGAGE_TAB.md](SPEC_APP_CREW_BAGGAGE_TAB.md).
 
 ---
 
@@ -43,7 +44,7 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 ├─────────────────────────────────┤
 │      [ Hero crew-card ]         │
 ├─────────────────────────────────┤
-│ [Detalles] [Viaje] [Ajustes]    │
+│ [Viaje] [Equipaje] [Ajustes]    │
 ├─────────────────────────────────┤
 │  (contenido de pestaña activa)   │
 └─────────────────────────────────┘
@@ -51,15 +52,17 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 
 | Tab | Contenido |
 | --- | --- |
-| **Detalles** | Perfil editable, progreso general, **grid materias** (switch + barra) |
+| **Detalles** | Perfil editable, progreso general, **grid materias** (switch + barra) — cuando el corte Detalles esté activo |
 | **Viaje** | Diario / timeline / summaries (antes en scroll largo) |
+| **Equipaje** | Wallet + grid ítems — [SPEC_APP_CREW_BAGGAGE_TAB.md](SPEC_APP_CREW_BAGGAGE_TAB.md) |
 | **Ajustes** | Permisos, PIN, límites, materias peligrosas / zona peligrosa |
 
-> Delta ago 2026: sustituye el modelo de 2 tabs Viaje|Ajustes. Ver [SPEC_APP_PRODUCT_BACKLOG_AGO2026](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md).
+> Delta ago 2026: además de Viaje|Ajustes, se añade **Equipaje**. Ver [SPEC_APP_PRODUCT_BACKLOG_AGO2026](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) y familia recompensas.
 
 | Pestaña | `data-crew-tab` | Contenido |
 | --- | --- | --- |
 | **Viaje** | `journey` | Identidad, progreso, mapa viaje, diario — **default** si `placement_status=completed` |
+| **Equipaje** | `baggage` | Moneda + hallazgos del mundo |
 | **Ajustes** | `settings` | Permisos, materias, zona peligrosa — **default** si onboarding incompleto |
 
 Persistir última pestaña en `sessionStorage` (`crew-tab:{childId}`) para la sesión del navegador.
@@ -273,12 +276,15 @@ Importar estilos en `web/css/components/crew-progress.css` (nuevo).
 | CREW_MEMBER_CARDS | Hero Fase B obligatoria con rango + L general |
 | CREW_PROGRESS | DTO y fórmulas de barras |
 | CREW_MEMBER_SETTINGS | Contenido pestaña Ajustes |
+| CREW_BAGGAGE_TAB | Pestaña Equipaje (moneda + ítems) |
+| REWARDS_ECONOMY / INVENTORY_BAGGAGE | Fuente de datos del tab Equipaje |
 | PROGRESSION_RANKS | Labels tutor en progreso |
 | JOURNEY_MEMORY | Resumen L2 en ficha |
 
 ## Aprobación
 
-- [ ] Pestañas Viaje / Ajustes
+- [ ] Pestañas Viaje / Equipaje / Ajustes
 - [ ] Tutor ve rango + L* + barras
 - [ ] API progress embebida en crew detail
 - [ ] Mapa viaje + zonas superadas
+- [ ] Tab Equipaje enlazado a CREW_BAGGAGE_TAB

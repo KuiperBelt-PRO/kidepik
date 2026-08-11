@@ -12,6 +12,9 @@ _SCOPE_MODULES = (
     "app.services.parents",
     "app.services.crew_progress",
     "app.services.settings",
+    "app.services.inventory",
+    "app.services.reward_economy",
+    "app.services.baggage_use",
 )
 
 

@@ -54,6 +54,10 @@ Enunciado: «El viento mueve las hojas. ¿Qué ocurre en el bosque?»
 - `short_text` (si la edad lo permite en otros contextos): `expected_answer` obligatorio (`|` para alternativas).
 - `success_feedback`: breve, positivo, sin spoilear el siguiente ítem.
 - `explanation`: solo si el alumno puede fallar; pedagógica, no circular.
+  - Nombra por qué la opción elegida **no encaja** (p. ej. antónimo cuando pedías sinónimo).
+  - Orienta hacia la correcta; no solo definas el concepto sin mencionar el error.
+  - Mal: «Veloz es lo mismo que rápido» (sin decir por qué «Lento» falla).
+  - Bien: «Lento es lo contrario; veloz significa rápido».
 
 ## Paleta del personaje
 

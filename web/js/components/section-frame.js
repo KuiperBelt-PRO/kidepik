@@ -148,9 +148,11 @@ function mountLogoSkeleton(logoMount) {
  * @returns {{
  *   root: HTMLElement;
  *   contentEl: HTMLElement;
+ *   headerEl: HTMLElement;
  *   logoMountEl: HTMLElement;
  *   titleEl: HTMLElement | null;
  *   setTitle: (text: string) => void;
+ *   setHeaderTrailing: (node: HTMLElement | null) => void;
  *   syncLogoSkeleton: (logoWrap?: HTMLElement | null) => void;
  *   destroy: () => Promise<void>;
  * }}
@@ -197,6 +199,9 @@ export function mountSectionFrame(host, options = {}) {
 
   header.appendChild(brand);
 
+  /** @type {HTMLElement | null} */
+  let trailingEl = null;
+
   if (titleEl) {
     root.setAttribute("aria-labelledby", titleId);
   } else {
@@ -234,14 +239,29 @@ export function mountSectionFrame(host, options = {}) {
     titleEl.hidden = next === "";
   }
 
+  /**
+   * Sustituye el slot derecho (forward) por un nodo custom (p. ej. toggle equipaje).
+   * @param {HTMLElement | null} node
+   */
+  function setHeaderTrailing(node) {
+    if (trailingEl?.isConnected) trailingEl.remove();
+    trailingEl = null;
+    if (!(node instanceof HTMLElement)) return;
+    node.classList.add("section-frame__nav-btn", "section-frame__nav-btn--forward");
+    header.appendChild(node);
+    trailingEl = node;
+  }
+
   return {
     root,
     contentEl: content,
+    headerEl: header,
     logoMountEl: logoMount,
     get titleEl() {
       return titleEl;
     },
     setTitle,
+    setHeaderTrailing,
     syncLogoSkeleton(logoWrap) {
       logoSkeleton.syncFromLogo(logoWrap ?? logoMount.querySelector(".loader-logo-wrap"));
     },
@@ -249,6 +269,8 @@ export function mountSectionFrame(host, options = {}) {
       return new Promise((resolve) => {
         navHandle?.destroy();
         navHandle = null;
+        trailingEl?.remove();
+        trailingEl = null;
         logoSkeleton.destroy();
         if (!root.isConnected) {
           resolve();

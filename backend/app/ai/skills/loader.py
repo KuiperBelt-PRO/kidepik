@@ -12,6 +12,10 @@ _EAGER_SKILL_IDS = frozenset({"audience-language", "mentor-prose-clarity"})
 # Skills críticos por purpose (siempre en contexto para ese agente).
 _PURPOSE_EAGER_SKILL_IDS: dict[str, frozenset[str]] = {
     "placement_item_writer": frozenset({"placement-exam", "subject-pedagogy"}),
+    "path_composer": frozenset(
+        {"placement-exam", "challenge-design", "zone-pitches", "subject-pedagogy"}
+    ),
+    "challenge_writer": frozenset({"placement-exam", "challenge-design", "subject-pedagogy"}),
 }
 
 PURPOSE_SKILL_IDS: dict[str, list[str]] = {
@@ -40,6 +44,7 @@ PURPOSE_SKILL_IDS: dict[str, list[str]] = {
     "placement_text_scorer": ["evaluation-rubric"],
     "zone_pitch_writer": ["world-canon", "zone-pitches", "audience-language", "original-ip"],
     "path_composer": [
+        "placement-exam",
         "challenge-design",
         "subject-pedagogy",
         "world-canon",
@@ -64,6 +69,7 @@ PURPOSE_SKILL_IDS: dict[str, list[str]] = {
         "original-ip",
     ],
     "challenge_writer": [
+        "placement-exam",
         "challenge-design",
         "subject-pedagogy",
         "audience-language",

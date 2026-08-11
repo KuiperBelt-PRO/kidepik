@@ -21,7 +21,7 @@ Contrato único del backlog pendiente, priorizado en cortes implementables.
 | --- | --- | --- |
 | B1 | Waiting phrases | JSONL ([SPEC_APP_WAITING_PHRASES](SPEC_APP_WAITING_PHRASES.md)) |
 | B2 | Parquet / DuckDB persistente / ETL | **No** en este horizonte |
-| B3 | Ficha `#/crew/:id` | 3 tabs: **Detalles** · **Viaje** (diario) · **Ajustes** |
+| B3 | Ficha `#/crew/:id` | Tabs: **Viaje** · **Equipaje** · **Ajustes** (+ **Detalles** cuando exista el corte 3→4 tabs del backlog visual) |
 | B4 | Materias en ficha | Grid de tarjetas con progreso + switch ON/OFF |
 | B5 | Niveles en UI tutor | Copy en castellano (evitar solo `L3`); barra con nivel actual → siguiente |
 | B6 | Descripción personaje | Fix bug cursor/caracteres al editar |
@@ -46,6 +46,7 @@ Amplía [SPEC_APP_CREW_MEMBER_DETAIL](SPEC_APP_CREW_MEMBER_DETAIL.md):
 | --- | --- |
 | **Detalles** | Hero + perfil (nombre, edad, mundo, descripción) + progreso general + grid materias |
 | **Viaje** | Diario / timeline / summaries L2 (antes embebido en scroll) |
+| **Equipaje** | Moneda + grid de hallazgos — [SPEC_APP_CREW_BAGGAGE_TAB](SPEC_APP_CREW_BAGGAGE_TAB.md) |
 | **Ajustes** | Permisos, PIN, límites, peligro |
 
 ### Grid materias

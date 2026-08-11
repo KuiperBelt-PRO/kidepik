@@ -71,16 +71,33 @@ class ZonePitchBundle(BaseModel):
     agent_text: str = ""
 
 
+class PathNpc(BaseModel):
+    """NPC del camino: guía que enseña o guardián que pone el reto."""
+
+    npc_id: str
+    name: str
+    role: Literal["guide", "gatekeeper"] = "guide"
+    one_line_voice: str = ""
+
+
 class PathOption(BaseModel):
     path_id: str
     subject_id: str
     title: str
     intro: str
     learning_blurb: str = ""
+    path_narrative: str = ""
+    # Lección narrativa (teoría) mostrada al elegir el camino, antes de cualquier reto.
+    lesson_narrative: str = ""
+    npc: PathNpc | None = None
 
 
 class PathChallengeSeed(BaseModel):
     prompt_text: str
+    # Opcional y breve; la enseñanza vive en path.lesson_narrative, no aquí.
+    narrative_wrapper: str = ""
+    teaching_beat: str = ""
+    npc_id: str | None = None
     item_type: Literal["mcq", "short_text", "true_false"] = "mcq"
     options: list[DialogueOption] = Field(default_factory=list)
     correct_option_id: str | None = None

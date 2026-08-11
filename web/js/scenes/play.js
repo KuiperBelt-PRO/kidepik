@@ -4,7 +4,7 @@
  */
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
-import { mountSectionFrame } from "../components/section-frame.js?v=236";
+import { mountSectionFrame } from "../components/section-frame.js?v=260";
 import {
   bindGlassIconTheme,
   createGlassIconSvg,
@@ -16,7 +16,13 @@ import { navigate } from "../lib/router.js";
 import { navigateShellRoute } from "../lib/shell-navigation.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
-import { openDialogueSession, submitDialogueTurn, loadDialogueHistory } from "../lib/play-api.js?v=244";
+import {
+  openDialogueSession,
+  submitDialogueTurn,
+  loadDialogueHistory,
+  fetchPlayBaggage,
+  usePlayBaggageItem,
+} from "../lib/play-api.js?v=261";
 import { renderDialogueMarkdown } from "../lib/markdown.js?v=2";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
@@ -27,6 +33,10 @@ import { isDebugAiAllowed, isDebugAiClientActive, setDebugAiServerAllowed } from
 import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
 import { postDebugJourneyRewind } from "../lib/debug-journey-api.js?v=256";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=257";
+import { renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=1";
+import { formatLevelLabel } from "../lib/subject-catalog.js?v=253";
+import { renderShellUiIconSvgInner } from "../components/shell-ui-icons.js";
+import { getShellUiTheme } from "../lib/shell-theme.js";
 
 /** Copy canónico de elección de mundo (fallback si el turno no trae description). */
 const WORLD_THEME_HINTS = Object.freeze({
@@ -140,7 +150,9 @@ export function renderPlay(params) {
       session,
       childId,
       frameRoot: frameHandle.root,
+      frameHeader: frameHandle.headerEl,
       setChapterTitle: (text) => frameHandle?.setTitle(text),
+      setHeaderTrailing: (node) => frameHandle?.setHeaderTrailing?.(node),
       sessionOpenPromise,
       onReady(handle) {
         cleanups.push(() => handle.destroy());
@@ -172,7 +184,9 @@ export function renderPlay(params) {
  *   session: import('@supabase/supabase-js').Session;
  *   childId: string;
  *   frameRoot?: HTMLElement;
+ *   frameHeader?: HTMLElement;
  *   setChapterTitle?: (text: string) => void;
+ *   setHeaderTrailing?: (node: HTMLElement | null) => void;
  *   onReady: (h: { destroy: () => void }) => void;
  *   getSessionId: () => string | null;
  *   setSessionId: (id: string) => void;
@@ -198,6 +212,15 @@ async function mountPlayPanel(root, ctx) {
   let sending = false;
   let rewinding = false;
   let debugRewindEnabled = false;
+  /** @type {'dialogue' | 'baggage'} */
+  let playViewMode = "dialogue";
+  /** @type {any} */
+  let baggageCache = null;
+  let baggageDirty = false;
+  /** @type {HTMLElement | null} */
+  let progressHudEl = null;
+  /** @type {HTMLButtonElement | null} */
+  let baggageToggleBtn = null;
   /** @type {{ has_older: boolean, oldest_turn_id: string | null, page_size: number }} */
   let historyMeta = { has_older: false, oldest_turn_id: null, page_size: 24 };
   /** @type {Set<string>} */
@@ -456,8 +479,11 @@ async function mountPlayPanel(root, ctx) {
   }
 
   root.innerHTML = `
-    <div class="play-panel__log" data-log role="log" aria-live="polite"></div>
-    <p class="crew-panel__status play-panel__status" data-status aria-live="polite"></p>
+    <div class="play-dialogue-view" data-play-dialogue>
+      <div class="play-panel__log" data-log role="log" aria-live="polite"></div>
+      <p class="crew-panel__status play-panel__status" data-status aria-live="polite"></p>
+    </div>
+    <div class="play-baggage-view" data-play-baggage hidden></div>
   `;
 
   const footer = document.createElement("div");
@@ -488,10 +514,185 @@ async function mountPlayPanel(root, ctx) {
     root.appendChild(footer);
   }
 
+  const dialogueView = root.querySelector("[data-play-dialogue]");
+  const baggageView = root.querySelector("[data-play-baggage]");
   const logEl = root.querySelector("[data-log]");
   if (logEl instanceof HTMLElement) {
     fillGlassSkeleton(logEl, { preset: "panel", ariaLabel: "Cargando aventura" });
   }
+
+  function paintToggleIcon() {
+    if (!(baggageToggleBtn instanceof HTMLButtonElement)) return;
+    const id = playViewMode === "baggage" ? "chat" : "baggage";
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "section-frame__nav-icon");
+    svg.setAttribute("viewBox", "0 0 20 20");
+    svg.setAttribute("aria-hidden", "true");
+    svg.innerHTML = renderShellUiIconSvgInner({
+      id: /** @type {any} */ (id),
+      theme: getShellUiTheme(),
+      viewSize: 20,
+      fill: "#fff",
+    });
+    baggageToggleBtn.replaceChildren(svg);
+    baggageToggleBtn.setAttribute(
+      "aria-label",
+      playViewMode === "baggage" ? "Volver a la conversación" : "Ver equipaje",
+    );
+    baggageToggleBtn.setAttribute("aria-pressed", String(playViewMode === "baggage"));
+  }
+
+  function mountBaggageToggle() {
+    if (typeof ctx.setHeaderTrailing !== "function") return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "section-frame__nav-btn--baggage-toggle";
+    btn.addEventListener("click", () => {
+      void setPlayViewMode(playViewMode === "dialogue" ? "baggage" : "dialogue");
+    });
+    baggageToggleBtn = btn;
+    paintToggleIcon();
+    ctx.setHeaderTrailing(btn);
+  }
+
+  /**
+   * @param {any} hud
+   */
+  function syncProgressHud(hud) {
+    if (!(ctx.frameHeader instanceof HTMLElement)) return;
+    if (!(progressHudEl instanceof HTMLElement)) {
+      progressHudEl = document.createElement("div");
+      progressHudEl.className = "play-progress-hud";
+      progressHudEl.setAttribute("data-play-progress-hud", "");
+      progressHudEl.hidden = true;
+      ctx.frameHeader.appendChild(progressHudEl);
+    }
+    if (!hud || !hud.visible || !hud.general_progress) {
+      progressHudEl.hidden = true;
+      progressHudEl.innerHTML = "";
+      return;
+    }
+    const gp = hud.general_progress;
+    const percent = Math.max(0, Math.min(100, Number(gp.percent_to_next) || 0));
+    let meta = hud.rank_label_child || "Explorador";
+    if (hud.show_levels_to_child) {
+      const cur = formatLevelLabel(gp.current);
+      const next = formatLevelLabel(gp.next);
+      meta = next ? `${cur} → ${next}` : cur || meta;
+    }
+    progressHudEl.hidden = false;
+    progressHudEl.innerHTML = `
+      <div class="play-progress-hud__meta">
+        <span>${meta.replaceAll("<", "&lt;")}</span>
+        <span>${percent}%</span>
+      </div>
+      <div class="play-progress-hud__bar" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso de nivel">
+        <div class="play-progress-hud__fill" style="width:${percent}%"></div>
+      </div>
+    `;
+  }
+
+  /**
+   * @param {any} bag
+   */
+  function paintPlayBaggage(bag) {
+    if (!(baggageView instanceof HTMLElement)) return;
+    baggageView.innerHTML = renderBaggageHtml(bag, { audience: "child" });
+    baggageView.querySelectorAll("[data-icon]").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      el.replaceChildren(createGlassIconSvg(/** @type {any} */ ("baggage"), { size: 22 }));
+    });
+    baggageView.querySelectorAll("[data-baggage-item]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-baggage-item");
+        const item = (bag.items || []).find((x) => String(x.id) === id);
+        const detail = baggageView.querySelector("[data-baggage-detail]");
+        if (!(detail instanceof HTMLElement) || !item) return;
+        detail.hidden = false;
+        detail.innerHTML = renderBaggageDetailHtml(item, "child", { allowUse: Boolean(sessionId) });
+        detail.querySelector("[data-baggage-detail-close]")?.addEventListener("click", () => {
+          detail.hidden = true;
+          detail.innerHTML = "";
+        });
+        detail.querySelector("[data-baggage-use]")?.addEventListener("click", () => {
+          const effectId = detail
+            .querySelector("[data-baggage-use]")
+            ?.getAttribute("data-effect-id");
+          if (!effectId || !sessionId) return;
+          void (async () => {
+            const res = await usePlayBaggageItem(ctx.session, ctx.childId, String(item.id), {
+              effect_id: effectId,
+              session_id: sessionId,
+            });
+            if (!res.ok || !res.data) {
+              showGlassToast(mapPlayApiError(res.error || "use"), { variant: "error" });
+              return;
+            }
+            if (res.data.baggage) {
+              baggageCache = res.data.baggage;
+              paintPlayBaggage(baggageCache);
+            } else {
+              baggageDirty = true;
+            }
+            if (res.data.hint_text) {
+              showGlassToast(String(res.data.hint_text), { variant: "success" });
+            } else if (res.data.mentor_line) {
+              showGlassToast(String(res.data.mentor_line), { variant: "success" });
+            }
+            if (res.data.challenge_reopened && Array.isArray(res.data.agent_turns)) {
+              await setPlayViewMode("dialogue");
+              for (const t of res.data.agent_turns) {
+                appendMentorTurn(t, mentorLabel);
+              }
+              const pending =
+                res.data.pending_agent_turn ||
+                res.data.agent_turns[res.data.agent_turns.length - 1];
+              if (pending) renderPending(pending);
+              scrollLogToEnd();
+            }
+          })();
+        });
+      });
+    });
+  }
+
+  async function loadPlayBaggage() {
+    if (!(baggageView instanceof HTMLElement)) return;
+    if (baggageCache && !baggageDirty) {
+      paintPlayBaggage(baggageCache);
+      return;
+    }
+    fillGlassSkeleton(baggageView, { preset: "panel", ariaLabel: "Cargando equipaje" });
+    const res = await fetchPlayBaggage(ctx.session, ctx.childId);
+    if (!res.ok || !res.data) {
+      baggageView.innerHTML = `<p class="crew-panel__helper">No se pudo cargar el equipaje.</p>`;
+      return;
+    }
+    baggageCache = res.data;
+    baggageDirty = false;
+    paintPlayBaggage(baggageCache);
+  }
+
+  /**
+   * @param {'dialogue' | 'baggage'} mode
+   */
+  async function setPlayViewMode(mode) {
+    playViewMode = mode;
+    paintToggleIcon();
+    if (dialogueView instanceof HTMLElement) dialogueView.hidden = mode !== "dialogue";
+    if (baggageView instanceof HTMLElement) baggageView.hidden = mode !== "baggage";
+    footer.hidden = mode === "baggage";
+    if (mode === "baggage") {
+      formEl?.setAttribute("hidden", "");
+      optionsEl?.setAttribute("hidden", "");
+      baggageToggleBtn?.classList.remove("is-badge");
+      await loadPlayBaggage();
+    }
+  }
+
+  mountBaggageToggle();
+  localCleanups.push(() => ctx.setHeaderTrailing?.(null));
+  localCleanups.push(() => progressHudEl?.remove());
 
   /**
    * Monta el control de historial en el log (tras quitar el skeleton).
@@ -883,6 +1084,28 @@ async function mountPlayPanel(root, ctx) {
     localCleanups.push(() => scrollEl.removeEventListener("scroll", onScroll));
   }
 
+  /** Fases de turno explorador que muestran eco de opciones descartadas. */
+  const CHOICE_ECHO_PHASES = new Set([
+    "placement_choice_echo",
+    "path_choice_echo",
+    "path_challenge_echo",
+  ]);
+
+  /**
+   * @param {object} meta
+   * @returns {string}
+   */
+  function choiceEchoAriaLabel(meta) {
+    if (meta?.phase === "path_choice_echo") return "Elección de destino";
+    if (
+      meta?.phase === "placement_choice_echo" ||
+      meta?.phase === "path_challenge_echo"
+    ) {
+      return "Respuesta del reto";
+    }
+    return "Elección de destino";
+  }
+
   /**
    * @param {object} meta
    * @returns {HTMLElement | null}
@@ -896,19 +1119,20 @@ async function mountPlayPanel(root, ctx) {
     const panel = document.createElement("div");
     panel.className = "play-choice-echo";
     panel.setAttribute("role", "region");
-    const echoLabel =
-      meta.phase === "placement_choice_echo" ? "Respuesta del reto" : "Elección de destino";
-    panel.setAttribute("aria-label", echoLabel);
+    panel.setAttribute("aria-label", choiceEchoAriaLabel(meta));
 
     if (taken && (taken.label || taken.id)) {
+      const incorrect = meta.choice_correct === false;
       const chosen = document.createElement("div");
-      chosen.className = "play-choice-card play-choice-card--chosen";
+      chosen.className = incorrect
+        ? "play-choice-card play-choice-card--chosen play-choice-card--incorrect"
+        : "play-choice-card play-choice-card--chosen";
       const label = document.createElement("p");
       label.className = "play-choice-card__label";
       label.textContent = String(taken.label || taken.id);
       const tag = document.createElement("p");
       tag.className = "play-choice-card__tag";
-      tag.textContent = "Elegido";
+      tag.textContent = incorrect ? "Incorrecto" : "Elegido";
       chosen.append(label, tag);
       panel.appendChild(chosen);
     }
@@ -1064,7 +1288,7 @@ async function mountPlayPanel(root, ctx) {
     }
     if (
       role === "explorer" &&
-      (turn?.meta?.phase === "placement_choice_echo" || turn?.meta?.choice_taken)
+      (CHOICE_ECHO_PHASES.has(turn?.meta?.phase) || turn?.meta?.choice_taken)
     ) {
       const echo = buildChoiceResolvedEcho(turn.meta);
       if (echo) nodes.push(echo);
@@ -1258,6 +1482,26 @@ async function mountPlayPanel(root, ctx) {
       });
   }
 
+  /**
+   * @param {{ id: string, label?: string, description?: string }[]} opts
+   * @returns {{ id: string, label: string, description: string }[]}
+   */
+  function enrichPathOptions(opts) {
+    return opts.map((opt) => ({
+      id: opt.id,
+      label: opt.label || opt.id,
+      description: opt.description || "Un camino del viaje.",
+    }));
+  }
+
+  /**
+   * @param {object} turn
+   * @returns {boolean}
+   */
+  function isChoosePathTurn(turn) {
+    return turn?.meta?.phase === "choose_path";
+  }
+
   function clearWorldHints() {
     if (!(logEl instanceof HTMLElement)) return;
     logEl.querySelector(".play-world-hints")?.remove();
@@ -1403,10 +1647,13 @@ async function mountPlayPanel(root, ctx) {
 
     const chooseWorld = isChooseWorldTurn(turn);
     const chooseZone = isChooseZoneTurn(turn);
+    const choosePath = isChoosePathTurn(turn);
     if (chooseWorld) {
       renderWorldHints(enrichWorldOptions(opts), "Mundos disponibles");
     } else if (chooseZone) {
       renderWorldHints(enrichZoneOptions(opts), "Destinos del viaje");
+    } else if (choosePath) {
+      renderWorldHints(enrichPathOptions(opts), "Caminos disponibles");
     }
 
     if (mode === "options_only" || mode === "options_or_text" || mode === "continue") {
@@ -1423,6 +1670,9 @@ async function mountPlayPanel(root, ctx) {
           btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
         } else if (chooseZone) {
           const hint = enrichZoneOptions([opt])[0];
+          btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
+        } else if (choosePath) {
+          const hint = enrichPathOptions([opt])[0];
           btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
         }
 
@@ -1492,6 +1742,17 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * @param {string} phase
+   * @returns {string}
+   */
+  function resolveRewindUiPhase(phase) {
+    if (phase === "placement_choice_echo") return "placement_item";
+    if (phase === "path_challenge_echo") return "path_challenge";
+    if (phase === "path_choice_echo") return "choose_path";
+    return phase;
+  }
+
+  /**
    * @param {string} turnId
    * @param {string} [phase]
    */
@@ -1499,13 +1760,22 @@ async function mountPlayPanel(root, ctx) {
     if (rewinding || sending || !debugRewindEnabled) return;
     const sid = ctx.getSessionId();
     if (!sid) return;
+    const uiPhase = resolveRewindUiPhase(phase);
 
     const confirmed = await showGlassConfirm({
       title: "Rebobinar viaje",
       body:
-        phase === "placement_item"
+        uiPhase === "placement_item"
           ? "<p>¿Volver a mostrar esta pregunta del examen? Se mantendrá el mismo examen.</p>"
-          : "<p>¿Rebobinar hasta este mensaje? Se borrará lo posterior y el mentor volverá a redactar esta pregunta.</p>",
+          : uiPhase === "choose_path"
+            ? "<p>¿Volver a la elección de caminos tras el examen? Se borrará lo posterior.</p>"
+            : uiPhase === "path_challenge"
+              ? "<p>¿Volver a mostrar esta pregunta del reto? Se borrará lo posterior.</p>"
+              : uiPhase === "path_intro"
+                ? "<p>¿Volver al inicio de este camino? Se borrará lo posterior.</p>"
+                : uiPhase === "placement_feedback"
+                  ? "<p>¿Volver justo después del examen (elección de caminos)? Se borrará lo posterior.</p>"
+                  : "<p>¿Rebobinar hasta este mensaje? Se borrará lo posterior y el mentor volverá a redactar esta pregunta.</p>",
       footer: "Esta acción no se puede deshacer.",
       danger: true,
       confirmLabel: "Rebobinar",
@@ -1521,9 +1791,9 @@ async function mountPlayPanel(root, ctx) {
     });
 
     removeLogFromTurn(turnId);
-    const thinkingKind = resolveRewindThinkingKind(phase);
+    const thinkingKind = resolveRewindThinkingKind(uiPhase);
     showThinking(thinkingKind);
-    if (phase === "placement_item" && lastPendingTurn?.id === turnId) {
+    if (uiPhase === "placement_item" && lastPendingTurn?.id === turnId) {
       syncExamProgress(lastPendingTurn);
     }
 
@@ -1548,9 +1818,15 @@ async function mountPlayPanel(root, ctx) {
       showGlassToast(
         regenerateMode === "placement_reemit"
           ? "Pregunta del examen restaurada"
-          : rewind?.regenerated
-            ? "Mensaje regenerado"
-            : "Viaje rebobinado",
+          : regenerateMode === "choose_path_reemit"
+            ? "Elección de caminos restaurada"
+            : regenerateMode === "path_challenge_reemit"
+              ? "Pregunta del reto restaurada"
+              : regenerateMode === "path_intro_reemit"
+                ? "Inicio del camino restaurado"
+                : rewind?.regenerated
+                  ? "Mensaje regenerado"
+                  : "Viaje rebobinado",
         { variant: "success" },
       );
     } catch (err) {
@@ -1587,6 +1863,7 @@ async function mountPlayPanel(root, ctx) {
       mentorLabel = data.mentor.display_name;
     }
     applyChapterTitle(data.chapter);
+    if (data.progress_hud) syncProgressHud(data.progress_hud);
     if (data.history && typeof data.history === "object") {
       historyMeta = {
         has_older: Boolean(data.history.has_older),
@@ -1718,6 +1995,14 @@ async function mountPlayPanel(root, ctx) {
       mentorLabel = data.mentor.display_name;
     }
     applyChapterTitle(data.chapter);
+    if (data.progress_hud) syncProgressHud(data.progress_hud);
+    const effects = Array.isArray(data.effects) ? data.effects : [];
+    if (effects.some((e) => e && (e.type === "reward_granted" || e.toast_child))) {
+      baggageDirty = true;
+      baggageToggleBtn?.classList.add("is-badge");
+      const toast = effects.find((e) => e?.toast_child)?.toast_child;
+      if (toast) showGlassToast(String(toast), { variant: "success" });
+    }
     clearOptimisticExplorerBubble();
 
     const turns = Array.isArray(data.agent_turns) ? data.agent_turns : [];

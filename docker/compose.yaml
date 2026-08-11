@@ -6,6 +6,7 @@
 #   data/glossary  -> /data/glossary:ro   (producto, versionado)
 #   data/waiting   -> /data/waiting:ro    (producto, versionado)
 #   data/chapters  -> /data/chapters:ro   (producto, versionado)
+#   data/items     -> /data/items:ro      (catálogo equipaje, versionado)
 #   web/media      -> /var/www/html/media  (subidas; gitignored)
 #   web/logs       -> /var/www/html/logs   (logs API; gitignored)
 # Backup antes de reset: ./scripts/poc-backup-local.ps1
@@ -45,6 +46,7 @@ services:
       - ../data/glossary:/data/glossary:ro
       - ../data/waiting:/data/waiting:ro
       - ../data/chapters:/data/chapters:ro
+      - ../data/items:/data/items:ro
     environment:
       APP_NAME: kidepik-api
       APP_ENV: ${APP_ENV:-local}
@@ -69,6 +71,7 @@ services:
       GLOSSARY_DATA_DIR: ${GLOSSARY_DATA_DIR:-/data/glossary}
       WAITING_DATA_DIR: ${WAITING_DATA_DIR:-/data/waiting}
       CHAPTERS_DATA_DIR: ${CHAPTERS_DATA_DIR:-/data/chapters}
+      ITEMS_DATA_DIR: ${ITEMS_DATA_DIR:-/data/items}
       AI_ENABLED: ${AI_ENABLED:-true}
       AI_PROVIDER: ${AI_PROVIDER:-gemini}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}

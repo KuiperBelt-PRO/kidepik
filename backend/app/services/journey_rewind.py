@@ -38,6 +38,28 @@ PRE_ADVENTURE_PHASES = PRE_PLACEMENT_PHASES | frozenset(
         "placement_compose",
     }
 )
+POST_PLACEMENT_PHASES = frozenset(
+    {
+        "choose_path",
+        "path_intro",
+        "path_challenge",
+        "adventure_ready",
+        "compose_failed",
+    }
+)
+
+MENTOR_REGENERATE_MODES = {
+    "placement_item": "placement_reemit",
+    "choose_path": "choose_path_reemit",
+    "path_challenge": "path_challenge_reemit",
+    "path_intro": "path_intro_reemit",
+}
+
+
+def _mentor_regenerate_mode(anchor_phase: str, *, placement_completed: bool) -> str | None:
+    if anchor_phase == "placement_feedback" and placement_completed:
+        return "choose_path_reemit"
+    return MENTOR_REGENERATE_MODES.get(anchor_phase)
 
 
 @dataclass
@@ -67,6 +89,12 @@ def _iso_z(value: Any) -> str:
         dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
         return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
     return str(value)
+
+
+def _anchor_datetime(value: Any) -> datetime:
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
 
 
 def _parse_turn_row(row: Any) -> dict[str, Any]:
@@ -133,6 +161,11 @@ def _phase_base_fields(phase: str) -> dict[str, Any]:
         return {
             "onboarding_step": "placement",
             "placement_status": "in_progress",
+        }
+    if phase in POST_PLACEMENT_PHASES:
+        return {
+            "onboarding_step": "complete",
+            "placement_status": "completed",
         }
     return {
         "onboarding_step": "complete",
@@ -242,10 +275,13 @@ class JourneyRewindService:
             regenerate = True
             delete_op = ">="
             anchor_phase = str((anchor_turn.get("meta") or {}).get("phase") or "")
-            if anchor_phase == "placement_item":
+            placement_completed = str(child.get("placement_status") or "") == "completed"
+            regenerate_mode = _mentor_regenerate_mode(
+                anchor_phase, placement_completed=placement_completed
+            )
+            if regenerate_mode:
                 pending_turn = anchor_turn
                 ledger_anchor_turn = anchor_turn
-                regenerate_mode = "placement_reemit"
             else:
                 mentor_before = (
                     await self.session.execute(
@@ -280,6 +316,12 @@ class JourneyRewindService:
             if not mentor_before:
                 raise HTTPException(422, "Cannot rewind safely before first mentor turn")
             pending_turn = _parse_turn_row(mentor_before)
+            ledger_anchor_turn = pending_turn
+            pending_phase = str((pending_turn.get("meta") or {}).get("phase") or "")
+            explorer_mode = MENTOR_REGENERATE_MODES.get(pending_phase)
+            if explorer_mode:
+                regenerate = True
+                regenerate_mode = explorer_mode
         else:
             raise HTTPException(422, "Unsupported turn role for rewind")
 
@@ -355,27 +397,65 @@ class JourneyRewindService:
         await self.session.commit()
 
         if regenerate:
-            if regenerate_mode == "placement_reemit":
-                meta = anchor_turn.get("meta") if isinstance(anchor_turn.get("meta"), dict) else {}
-                await self.dialogue.reemit_placement_item(
-                    auth_user_id,
-                    child_id,
-                    session_id,
-                    item_index=int(meta.get("index") or 0),
+            try:
+                source_meta = (
+                    pending_turn.get("meta")
+                    if isinstance(pending_turn.get("meta"), dict)
+                    else {}
                 )
-            elif regenerate_mode == "regenerate_anchor":
-                await self.dialogue.regenerate_anchor_mentor_turn(
-                    auth_user_id,
-                    child_id,
-                    session_id,
-                    phase=str((anchor_turn.get("meta") or {}).get("phase") or ""),
+                if regenerate_mode == "placement_reemit":
+                    await self.dialogue.reemit_placement_item(
+                        auth_user_id,
+                        child_id,
+                        session_id,
+                        item_index=int(source_meta.get("index") or 0),
+                    )
+                elif regenerate_mode == "choose_path_reemit":
+                    await self.dialogue.reemit_choose_path(
+                        auth_user_id,
+                        child_id,
+                        session_id,
+                    )
+                elif regenerate_mode == "path_challenge_reemit":
+                    await self.dialogue.reemit_path_challenge(
+                        auth_user_id,
+                        child_id,
+                        session_id,
+                        challenge_index=int(source_meta.get("challenge_index") or 0),
+                        path_id=str(source_meta.get("path_id") or "") or None,
+                    )
+                elif regenerate_mode == "path_intro_reemit":
+                    await self.dialogue.reemit_path_intro(
+                        auth_user_id,
+                        child_id,
+                        session_id,
+                        path_id=str(source_meta.get("path_id") or "") or None,
+                    )
+                elif regenerate_mode == "regenerate_anchor":
+                    await self.dialogue.regenerate_anchor_mentor_turn(
+                        auth_user_id,
+                        child_id,
+                        session_id,
+                        phase=str((anchor_turn.get("meta") or {}).get("phase") or ""),
+                    )
+                else:
+                    await self.dialogue.replay_last_explorer_reply(
+                        auth_user_id,
+                        child_id,
+                        session_id,
+                    )
+            except Exception as exc:
+                api_log.warning(
+                    "journey_rewind_regenerate_failed",
+                    child_id=child_id,
+                    session_id=session_id,
+                    regenerate_mode=regenerate_mode,
+                    error=f"{type(exc).__name__}: {exc}"[:300],
                 )
-            else:
-                await self.dialogue.replay_last_explorer_reply(
-                    auth_user_id,
-                    child_id,
-                    session_id,
-                )
+                raise HTTPException(
+                    422,
+                    "No se pudo rebobinar de forma segura; usa reset completo del viajero.",
+                ) from exc
 
         api_log.info(
             "journey_rewind_applied",
@@ -411,9 +491,7 @@ class JourneyRewindService:
     async def _trim_related_tables(
         self, child_id: str, anchor_at: Any, pending_phase: str
     ) -> None:
-        anchor_dt = anchor_at
-        if isinstance(anchor_at, str):
-            anchor_dt = anchor_at.replace("Z", "+00:00")
+        anchor_dt = _anchor_datetime(anchor_at)
 
         if pending_phase in PRE_PLACEMENT_PHASES:
             await self.session.execute(
@@ -424,16 +502,26 @@ class JourneyRewindService:
                 text("delete from user_subject_levels where child_id=:cid"),
                 {"cid": child_id},
             )
-        else:
+        elif pending_phase in PRE_ADVENTURE_PHASES:
+            await self.session.execute(
+                text("delete from placement_exams where child_id=:cid"),
+                {"cid": child_id},
+            )
+            await self.session.execute(
+                text("delete from user_subject_levels where child_id=:cid"),
+                {"cid": child_id},
+            )
+        elif pending_phase not in POST_PLACEMENT_PHASES:
             await self.session.execute(
                 text(
-                    "delete from placement_exams where child_id=:cid and created_at > :at"
+                    "delete from placement_exams where child_id=:cid "
+                    "and coalesce(completed_at, started_at) > :at"
                 ),
                 {"cid": child_id, "at": anchor_dt},
             )
             await self.session.execute(
                 text(
-                    "delete from user_subject_levels where child_id=:cid and created_at > :at"
+                    "delete from user_subject_levels where child_id=:cid and updated_at > :at"
                 ),
                 {"cid": child_id, "at": anchor_dt},
             )
@@ -449,17 +537,33 @@ class JourneyRewindService:
                     text(f"delete from {table} where child_id=:cid"),
                     {"cid": child_id},
                 )
-        else:
+        elif pending_phase in POST_PLACEMENT_PHASES:
             for table in (
                 "story_beats",
                 "story_summaries",
                 "journey_decisions",
-                "child_world_progress",
             ):
                 await self.session.execute(
                     text(f"delete from {table} where child_id=:cid and created_at > :at"),
                     {"cid": child_id, "at": anchor_dt},
                 )
+        else:
+            for table in (
+                "story_beats",
+                "story_summaries",
+                "journey_decisions",
+            ):
+                await self.session.execute(
+                    text(f"delete from {table} where child_id=:cid and created_at > :at"),
+                    {"cid": child_id, "at": anchor_dt},
+                )
+            await self.session.execute(
+                text(
+                    "delete from child_world_progress where child_id=:cid "
+                    "and updated_at > :at"
+                ),
+                {"cid": child_id, "at": anchor_dt},
+            )
 
 
 async def rewind_to_turn(

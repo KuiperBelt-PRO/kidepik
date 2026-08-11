@@ -7,10 +7,14 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from app.ai.errors import AiProductError
 from app.db import session_scope
 from app.services.auth import AuthError, SupabaseAuthService
+from app.services.crew import CrewService
 from app.services.dialogue import DialogueService
+from app.services.inventory import InventoryService
 from app.services.journey_memory import JourneyMemoryService
 from app.services.journey_timeline import JourneyTimelineService
 from app.services.parents import ParentAccountService
+from app.services.play_progress_hud import progress_hud_for_child
+from app.services.reward_economy import RewardEconomyService
 
 router = APIRouter(tags=["play"])
 
@@ -44,6 +48,10 @@ def _translate(exc: Exception) -> HTTPException:
     return HTTPException(500, "Internal error")
 
 
+async def _child_member(auth_user_id: str, child_id: str) -> dict[str, Any]:
+    return await CrewService().get_for_auth_user(auth_user_id, child_id)
+
+
 @router.post("/api/v1/play/{child_id}/dialogue/session")
 async def open_session(
     child_id: str,
@@ -53,11 +61,14 @@ async def open_session(
     claims = await _claims(authorization)
     try:
         async with session_scope() as session:
-            return await DialogueService(session).open_session(
+            result = await DialogueService(session).open_session(
                 claims["sub"],
                 child_id,
                 str((payload or {}).get("flow_id") or "first_run"),
             )
+        member = await _child_member(claims["sub"], child_id)
+        result["progress_hud"] = await progress_hud_for_child(member)
+        return result
     except AiProductError:
         raise
     except Exception as exc:
@@ -77,13 +88,20 @@ async def submit_turn(
     claims = await _claims(authorization)
     try:
         async with session_scope() as session:
-            return await DialogueService(session).submit_turn(
+            result = await DialogueService(session).submit_turn(
                 claims["sub"],
                 child_id,
                 session_id,
                 reply,
                 x_kidepik_debug_ai == "1",
             )
+        # Refresh HUD when placement/levels may have changed
+        try:
+            member = await _child_member(claims["sub"], child_id)
+            result["progress_hud"] = await progress_hud_for_child(member)
+        except Exception:
+            pass
+        return result
     except AiProductError:
         raise
     except Exception as exc:
@@ -107,6 +125,91 @@ async def history(
     except AiProductError:
         raise
     except Exception as exc:
+        raise _translate(exc) from exc
+
+
+@router.get("/api/v1/play/{child_id}/baggage")
+async def play_baggage(
+    child_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    claims = await _claims(authorization)
+    try:
+        member = await _child_member(claims["sub"], child_id)
+        theme = member.get("world_theme") or member.get("active_world_theme") or "fantasy"
+        settings = member.get("settings") if isinstance(member.get("settings"), dict) else {}
+        learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
+        active = learning.get("active_subjects") if isinstance(learning.get("active_subjects"), list) else []
+        return await InventoryService().get_baggage(
+            child_id,
+            str(theme),
+            active_subjects=[str(s) for s in active],
+            age_band=member.get("age_band") if isinstance(member.get("age_band"), str) else None,
+            show_levels_to_child=bool(learning.get("show_levels_to_child")),
+            audience="child",
+        )
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+
+@router.get("/api/v1/play/{child_id}/progress")
+async def play_progress(
+    child_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    claims = await _claims(authorization)
+    try:
+        member = await _child_member(claims["sub"], child_id)
+        return await progress_hud_for_child(member)
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+
+@router.get("/api/v1/play/{child_id}/economy")
+async def play_economy(
+    child_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    claims = await _claims(authorization)
+    try:
+        member = await _child_member(claims["sub"], child_id)
+        theme = member.get("world_theme") or "fantasy"
+        wallet = await RewardEconomyService().get_wallet(child_id, str(theme))
+        return {
+            "world_theme": wallet["world_theme"],
+            "wallet": wallet,
+            "pending_offer": None,
+        }
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+
+@router.post("/api/v1/play/{child_id}/baggage/{item_row_id}/use")
+async def play_baggage_use(
+    child_id: str,
+    item_row_id: str,
+    payload: dict[str, Any],
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    claims = await _claims(authorization)
+    effect_id = str((payload or {}).get("effect_id") or "").strip()
+    session_id = str((payload or {}).get("session_id") or "").strip()
+    if not effect_id or not session_id:
+        raise HTTPException(422, "effect_id and session_id required")
+    try:
+        async with session_scope() as session:
+            return await DialogueService(session).use_baggage_item(
+                claims["sub"],
+                child_id,
+                item_row_id,
+                effect_id,
+                session_id,
+            )
+    except Exception as exc:
+        from app.services.baggage_use import UseItemError
+
+        if isinstance(exc, UseItemError):
+            raise HTTPException(exc.status, {"code": exc.code}) from exc
         raise _translate(exc) from exc
 
 

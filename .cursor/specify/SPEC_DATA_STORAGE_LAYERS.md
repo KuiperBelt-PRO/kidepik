@@ -39,6 +39,7 @@ Tras el cutover play → FastAPI + ledger JSONL/MD, hace falta un contrato únic
 | D11 | Mundos | Paralelismo fantasy / sci-fi ([SPEC_APP_PARALLEL_WORLDS](SPEC_APP_PARALLEL_WORLDS.md)) |
 | D12 | Orquestación IA | Orquestador central ([SPEC_AI_CENTRAL_ORCHESTRATOR](SPEC_AI_CENTRAL_ORCHESTRATOR.md)) |
 | D13 | Parquet / `.duckdb` persistente / ETL | **Aplazado** — no implementar en el horizonte del backlog ago 2026 |
+| D14 | Economía / equipaje | Saldo e inventario en **Supabase** (`child_wallets`, `child_inventory_items`); defs en **código/JSON** `data/items/`; grants narrativos en **ledger** — [SPEC_APP_REWARDS_ECONOMY](SPEC_APP_REWARDS_ECONOMY.md), [SPEC_APP_INVENTORY_BAGGAGE](SPEC_APP_INVENTORY_BAGGAGE.md) |
 
 ---
 
@@ -48,6 +49,7 @@ Ante un dato nuevo, preguntar en orden:
 
 1. ¿Auth, ownership, RLS, permisos, PIN, settings tutor? → **Supabase**
 2. ¿Nivel/rango/materias activas que la UI de crew muestra como verdad? → **Supabase**
+2b. ¿Saldo de moneda o posesiones de equipaje? → **Supabase** (defs de ítem → **código/JSON**)
 3. ¿Cola/índice/respuestas de un examen o camino en curso? → **Archivos** (sesión)
 4. ¿Diálogo, evento narrativo, resumen, informe, glosario? → **Archivos**
 5. ¿Agente necesita filtrar/agregar sobre (3)/(4)? → **DuckDB tool** sobre esos archivos
@@ -65,6 +67,7 @@ Ante un dato nuevo, preguntar en orden:
 | `children` | nombre, edad, `age_band`, flags, PIN/permisos, `onboarding_step` mínimo |
 | Progreso canónico | `general_level`, `rank_*`, niveles por materia **oficiales** (fuente UI) |
 | Materias activas + puntos flojos tutor | Config editable |
+| Economía / equipaje | `child_wallets`, `child_inventory_items` (por `world_theme`) |
 | Frases de espera | **JSONL** `data/waiting/{fantasy,sci-fi,neutral}.jsonl` |
 | Legal | `legal_documents` |
 | Puntero de sesión (opcional) | `active_session_id` / mundo activo; **sin** payload del examen |

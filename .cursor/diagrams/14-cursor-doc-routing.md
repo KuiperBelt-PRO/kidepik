@@ -23,6 +23,7 @@ flowchart TB
 | Mecánicas de viaje (flujos de decisión jugables) | **SPEC_APP_JOURNEY_MECHANICS** | **16**, 11 |
 | Dónde guardar datos (PG vs archivos vs DuckDB) | **SPEC_DATA_STORAGE_LAYERS** | **17**, 05 |
 | Mundos en paralelo / cambio fantasy↔sci-fi | **SPEC_APP_PARALLEL_WORLDS** | **18**, 08 |
+| Recompensas / moneda / equipaje / HUD nivel play | **SPEC_APP_REWARDS_ECONOMY** / **SPEC_APP_INVENTORY_BAGGAGE** / **SPEC_APP_ITEM_CATALOG** / **SPEC_APP_CREW_BAGGAGE_TAB** / **SPEC_APP_PLAY_BAGGAGE_TOGGLE** / **SPEC_APP_PLAY_PROGRESS_HUD** (+ EFFECTS / SPENDING futuro) | **19**, 11, 10, 17 |
 | Ruta API nueva | SPEC_FASTAPI_BACKEND_MIGRATION + `backend/app/routers` | 04 |
 | Migración SQL | supabase/migrations + MigrationRunner (Python) | 05, 03 |
 | Media / upload | SPEC_MEDIA_STORAGE | 12 |

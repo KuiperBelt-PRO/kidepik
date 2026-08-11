@@ -378,6 +378,15 @@
   background: rgba(72, 160, 110, 0.22);
 }
 
+.play-choice-card--incorrect {
+  border-color: rgba(255, 120, 120, 0.65);
+  background: rgba(180, 60, 60, 0.28);
+}
+
+.play-choice-card--incorrect .play-choice-card__tag {
+  color: #ffb8b8;
+}
+
 .play-choice-card--discarded {
   opacity: 0.45;
   border-style: dashed;

@@ -1,6 +1,6 @@
 # 10 — Superficies del tutor
 
-**Specs:** [SPEC_APP_ACCOUNT_SECTION.md](../specify/SPEC_APP_ACCOUNT_SECTION.md), [SPEC_APP_SETTINGS_SECTION.md](../specify/SPEC_APP_SETTINGS_SECTION.md), [SPEC_APP_CREW_SECTION.md](../specify/SPEC_APP_CREW_SECTION.md), [SPEC_LEGAL_AUTHENTICATED_SESSION.md](../specify/SPEC_LEGAL_AUTHENTICATED_SESSION.md), [SPEC_APP_SECTION_FRAME.md](../specify/SPEC_APP_SECTION_FRAME.md), [DESIGN.md](../DESIGN.md)
+**Specs:** [SPEC_APP_ACCOUNT_SECTION.md](../specify/SPEC_APP_ACCOUNT_SECTION.md), [SPEC_APP_SETTINGS_SECTION.md](../specify/SPEC_APP_SETTINGS_SECTION.md), [SPEC_APP_CREW_SECTION.md](../specify/SPEC_APP_CREW_SECTION.md), [SPEC_APP_CREW_BAGGAGE_TAB.md](../specify/SPEC_APP_CREW_BAGGAGE_TAB.md), [SPEC_LEGAL_AUTHENTICATED_SESSION.md](../specify/SPEC_LEGAL_AUTHENTICATED_SESSION.md), [SPEC_APP_SECTION_FRAME.md](../specify/SPEC_APP_SECTION_FRAME.md), [DESIGN.md](../DESIGN.md)
 
 ```mermaid
 flowchart TB
@@ -10,10 +10,11 @@ flowchart TB
   Shell --> Home[home welcome]
   Shell --> Acc[account-panel]
   Shell --> Set[settings-panel]
-  Shell --> Crew[crew-panel lista/alta/ficha/diario]
-  Shell --> Play[play-panel diálogo aventura]
+  Shell --> Crew[crew-panel lista/alta/ficha]
+  Shell --> Play[play-panel diálogo + equipaje]
   Shell --> Legal[legal markdown sin marco glass]
 
+  Crew --> Tabs[Viaje / Equipaje / Ajustes]
   Acc --> Frame
   Set --> Frame
   Crew --> Frame
@@ -26,8 +27,8 @@ flowchart TB
 | --- | --- | --- |
 | Cuenta | Implementada; título «Cuenta» en cabecera | `GET/PATCH/DELETE /parents/me` |
 | Ajustes | Fase A gestión; título en cabecera | `GET/PATCH /parents/me/settings` |
-| Tripulación | Fase A + cartas TCG; **ficha v2 propuesta** (pestañas Viaje/Ajustes + progreso) | `/crew`, `/crew/:id`, permissions; `GET …/journey/timeline`; `progress` en crew detail (propuesto) |
-| Play (`#/play/:id`) | Vertical slice; título «Aventura» en cabecera | dialogue session/turn |
+| Tripulación | Fase A + cartas TCG; **ficha v2 propuesta** (Viaje / **Equipaje** / Ajustes + progreso) | `/crew`, `/crew/:id`, permissions; `GET …/baggage`; `progress` en crew detail |
+| Play (`#/play/:id`) | Vertical slice; título capítulo; **propuesta** toggle equipaje + HUD nivel | dialogue session/turn; `GET …/baggage` |
 | Legal autenticado | Shell + vuelta a home; **sin** section-frame | `GET /legal/:slug` |
 
 ## Navegación típica

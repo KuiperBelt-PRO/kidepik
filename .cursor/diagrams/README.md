@@ -45,6 +45,7 @@ Mapa visual canónico de **KidepiK** para agentes de IA. No sustituye las specs:
 | 16 | [16-journey-mechanics-flows.md](16-journey-mechanics-flows.md) | Flujos/decisiones mecánicas de viaje |
 | 17 | [17-storage-decision-tree.md](17-storage-decision-tree.md) | Dónde guardar (PG / archivos / DuckDB) |
 | 18 | [18-parallel-worlds.md](18-parallel-worlds.md) | Mundos fantasy/sci-fi en paralelo |
+| 19 | [19-rewards-inventory.md](19-rewards-inventory.md) | Recompensas, moneda, equipaje, HUD nivel play |
 
 ## Convención de mantenimiento
 

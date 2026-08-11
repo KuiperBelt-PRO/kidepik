@@ -13,8 +13,10 @@ import {
   patchCrewPermissions,
   requestTutorReport,
   verifyCrewExitPin,
-} from "../lib/crew-api.js?v=253";
+  fetchCrewBaggage,
+} from "../lib/crew-api.js?v=260";
 import { fetchJourneyTimeline } from "../lib/play-api.js";
+import { renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=1";
 import { applyCrewMemberWorldTheme } from "../lib/play-theme.js";
 import {
   bindGlassIconTheme,
@@ -605,6 +607,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           : `<div class="crew-panel__tabs" role="tablist" aria-label="Secciones del tripulante">
         <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="details" aria-selected="true">Detalles</button>
         <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="journey" aria-selected="false">Viaje</button>
+        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="baggage" aria-selected="false">Equipaje</button>
         <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="settings" aria-selected="false">Ajustes</button>
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="details">
@@ -622,6 +625,12 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           <pre class="crew-panel__helper" data-tutor-report-preview hidden style="white-space:pre-wrap;max-height:12rem;overflow:auto"></pre>
         </section>
       </div>
+      <div class="crew-panel__tab-panel" data-crew-panel="baggage" hidden>
+        <section class="crew-panel__block">
+          <h2 class="crew-panel__block-title">Equipaje</h2>
+          <div data-crew-baggage-host></div>
+        </section>
+      </div>
       <div class="crew-panel__tab-panel" data-crew-panel="settings" hidden>
         ${permissionsBlock}
         ${dangerBlock}
@@ -635,10 +644,10 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       const defaultTab = member.placement_status === "completed" ? "journey" : "details";
       /** @type {string} */
       let activeTab = sessionStorage.getItem(crewTabStorageKey(member.id)) || defaultTab;
-      if (activeTab === "settings" && !["details", "journey", "settings"].includes(activeTab)) {
-        activeTab = defaultTab;
-      }
-      if (!["details", "journey", "settings"].includes(activeTab)) activeTab = defaultTab;
+      const allowedTabs = ["details", "journey", "baggage", "settings"];
+      if (!allowedTabs.includes(activeTab)) activeTab = defaultTab;
+      /** @type {any} */
+      let baggageCache = null;
       /**
        * @param {string} name
        */
@@ -654,7 +663,58 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           if (!(panel instanceof HTMLElement)) return;
           panel.hidden = panel.getAttribute("data-crew-panel") !== name;
         });
+        if (name === "baggage") void loadBaggageTab();
       };
+      /**
+       * @param {any} bag
+       */
+      const paintBaggage = (bag) => {
+        const host = root.querySelector("[data-crew-baggage-host]");
+        if (!(host instanceof HTMLElement)) return;
+        host.innerHTML = renderBaggageHtml(bag, { audience: "tutor" });
+        host.querySelectorAll("[data-icon]").forEach((el) => {
+          if (!(el instanceof HTMLElement)) return;
+          const id = el.getAttribute("data-icon") || "baggage";
+          el.replaceChildren(
+            createGlassIconSvg(/** @type {any} */ (id === "item-potion" || id === "item-charm" || id === "item-artifact" || id === "item-relic" || id === "item-program" || id === "item-module" || id === "item-tech" ? "baggage" : id), { size: 22 }),
+          );
+        });
+        host.querySelectorAll("[data-baggage-item]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const id = btn.getAttribute("data-baggage-item");
+            const item = (bag.items || []).find((x) => String(x.id) === id);
+            const detail = host.querySelector("[data-baggage-detail]");
+            if (!(detail instanceof HTMLElement) || !item) return;
+            detail.hidden = false;
+            detail.innerHTML = renderBaggageDetailHtml(item, "tutor");
+            detail.querySelector("[data-baggage-detail-close]")?.addEventListener("click", () => {
+              detail.hidden = true;
+              detail.innerHTML = "";
+            });
+          });
+        });
+      };
+      async function loadBaggageTab() {
+        const host = root.querySelector("[data-crew-baggage-host]");
+        if (!(host instanceof HTMLElement)) return;
+        if (baggageCache) {
+          paintBaggage(baggageCache);
+          return;
+        }
+        fillGlassSkeleton(host, { preset: "panel", ariaLabel: "Cargando equipaje" });
+        const res = await fetchCrewBaggage(session, member.id, member.world_theme);
+        if (!res.ok || !res.baggage) {
+          host.innerHTML = `<p class="crew-panel__helper">No se pudo cargar el equipaje.</p>
+            <button type="button" class="crew-panel__btn" data-baggage-retry>Reintentar</button>`;
+          host.querySelector("[data-baggage-retry]")?.addEventListener("click", () => {
+            baggageCache = null;
+            void loadBaggageTab();
+          });
+          return;
+        }
+        baggageCache = res.baggage;
+        paintBaggage(baggageCache);
+      }
       root.querySelectorAll("[data-crew-tab]").forEach((btn) => {
         btn.addEventListener("click", () => {
           const name = btn.getAttribute("data-crew-tab");

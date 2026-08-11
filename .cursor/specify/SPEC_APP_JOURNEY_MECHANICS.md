@@ -24,7 +24,7 @@ La mecánica actual es lenta: mentor demasiado extenso, esperas poco claras, rep
 | M1 | Mentor | Tono del mundo elegido; **breve y dinámico**; no prosa larga |
 | M2 | Esperas | Frases desde **JSONL** `data/waiting/`; rotación cada **8 s**; sin spoilear lugares/personajes de la escena actual |
 | M3 | Prueba de acceso | LLM prepara N preguntas + respuestas + explicaciones; **sin banco estático** |
-| M4 | Caminos | 3 propuestas sobre materias más flojas; cada camino trae intro + 3..N retos + mini-historias de aprendizaje |
+| M4 | Caminos | 3 propuestas sobre materias flojas; pitch + NPC + `lesson_narrative` (teoría antes de retos) + 3 MCQ limpios en **un batch** `path_composer`; sin reenseñar en cada pregunta |
 | M5 | Fallo de camino | Se puede regenerar **solo el camino fallido**; los otros dos se reutilizan |
 | M6 | Persistencia de examen/retos | Ledger archivos ([SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md) D5) |
 | M7 | Subida de nivel/rango | Tras cerrar examen o camino; informe `.md` tutor + mensaje breve al viajero |
@@ -133,9 +133,12 @@ flowchart TD
   N -- NO --> O[Mensaje]
   O --> P[Regenerar solo el camino fallido]
   N -- SI --> Q[Felicitación + continuar viaje]
-  Q --> P2([Nueva elección de caminos / orquestador])
+  Q --> R[RewardOffer: ítem y/o moneda<br/>ver SPEC_APP_REWARDS_ECONOMY]
+  R --> P2([Nueva elección de caminos / orquestador])
   P --> B
 ```
+
+> Delta ago 2026: al superar un camino (o nodos con offer), el servidor puede otorgar recompensas de **equipaje** y/o **moneda del mundo** — [SPEC_APP_REWARDS_ECONOMY](SPEC_APP_REWARDS_ECONOMY.md), [SPEC_APP_INVENTORY_BAGGAGE](SPEC_APP_INVENTORY_BAGGAGE.md). Placement (§4) **no** otorga economía en MVP.
 
 ### 5.2 Generación (orquestador → subagentes)
 
@@ -158,6 +161,20 @@ flowchart TD
 Adaptación obligatoria: mundo + edad + nivel del viajero (dificultad y prosa).
 
 Estado del pack de caminos (textos, retos, progreso) → **ledger**; no `narrative_quests` en PG.
+
+### 5.3 Batch enriquecido + NPCs (ago 2026)
+
+El `path_composer` genera en **una sola llamada** el pack completo:
+
+| Campo | Cuándo se muestra | Contenido |
+| --- | --- | --- |
+| `title` + `learning_blurb` | Elección (`choose_path`) | Chip + hint «de qué va» cada camino |
+| `path_narrative` + `lesson_narrative` + `npc` | Al elegir (`path_intro`) | Escena breve + **lección completa** (teoría con NPC) **antes** de cualquier reto |
+| `prompt_text` + opciones | Cada reto (`path_challenge`) | Solo pregunta MCQ (sin reenseñar); la opción marcada debe ser factualmente correcta |
+
+Sin segunda llamada LLM por reto. La UI de elección muestra hints como en mundos/zonas.
+
+**Calidad:** prioridad en **instrucciones** del `path_composer` (orden lección → MCQ → autorrevisión). Los rechazos duros del compose son solo estructurales (título cliché, conteo de retos, `correct_option_id` ausente / prompt vacío). Avisos suaves (lección corta, explanation poco alineada) se registran en logs sin forzar reintentos ni fallback.
 
 ---
 

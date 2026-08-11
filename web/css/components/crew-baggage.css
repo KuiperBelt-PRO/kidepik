@@ -1,0 +1,180 @@
+/* Equipaje — ficha tutor + play */
+
+.crew-baggage__wallet {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0.35rem 0 0.25rem;
+}
+
+.crew-baggage__wallet-label {
+  font-size: calc(0.95rem * var(--font-scale-ui, 1));
+  opacity: 0.9;
+}
+
+.crew-baggage__wallet-balance {
+  font-size: calc(1.45rem * var(--font-scale-ui, 1));
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.crew-baggage__slots {
+  margin: 0.35rem 0;
+  font-size: calc(0.8rem * var(--font-scale-ui, 1));
+  opacity: 0.85;
+}
+
+.crew-baggage__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.crew-baggage__cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 72px;
+  padding: 0.45rem 0.3rem;
+  border-radius: var(--glass-radius-field, 12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  cursor: pointer;
+}
+
+.crew-baggage__cell--rare {
+  border-color: rgba(255, 214, 120, 0.55);
+}
+
+.crew-baggage__cell--unusable {
+  opacity: 0.55;
+}
+
+.crew-baggage__icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.crew-baggage__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.crew-baggage__qty {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.crew-baggage__name {
+  font-size: calc(0.68rem * var(--font-scale-ui, 1));
+  text-align: center;
+  line-height: 1.15;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crew-baggage__detail-card {
+  margin-top: 0.35rem;
+  padding: 0.75rem;
+  border-radius: var(--glass-radius-field, 12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.crew-baggage__detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.crew-baggage__detail-title {
+  margin: 0 0 0.35rem;
+  font-size: calc(1rem * var(--font-scale-ui, 1));
+}
+
+.section-frame__nav-btn--baggage-toggle.is-badge::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ffd678;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.25);
+}
+
+.play-progress-hud {
+  width: 100%;
+  max-width: min(100%, 18rem);
+  margin: 0.15rem auto 0.1rem;
+  padding: 0 0.5rem;
+}
+
+.play-progress-hud[hidden] {
+  display: none !important;
+}
+
+.play-progress-hud__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+  opacity: 0.92;
+  margin-bottom: 0.2rem;
+}
+
+.play-progress-hud__bar {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  overflow: hidden;
+}
+
+.play-progress-hud__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.72);
+  transition: width 280ms ease;
+}
+
+.section-frame[data-play-theme="fantasy"] .play-progress-hud__fill {
+  background: rgba(186, 220, 255, 0.85);
+}
+
+.section-frame[data-play-theme="sci-fi"] .play-progress-hud__fill {
+  background: rgba(120, 220, 255, 0.9);
+}
+
+.section-frame__header:has(.play-progress-hud:not([hidden])) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: auto;
+  padding-bottom: 0.35rem;
+}
+
+.section-frame__header:has(.play-progress-hud:not([hidden])) .section-frame__brand {
+  position: relative;
+}
+
+.play-baggage-view[hidden] {
+  display: none !important;
+}
+
+.play-dialogue-view[hidden] {
+  display: none !important;
+}

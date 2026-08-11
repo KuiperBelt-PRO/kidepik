@@ -253,3 +253,24 @@ export async function requestTutorReport(session, id) {
     return { ok: false };
   }
 }
+
+/**
+ * @param {import('@supabase/supabase-js').Session} session
+ * @param {string} id
+ * @param {string} [worldTheme]
+ */
+export async function fetchCrewBaggage(session, id, worldTheme) {
+  try {
+    const { config } = await import("../config.js");
+    const q = worldTheme ? `?world_theme=${encodeURIComponent(worldTheme)}` : "";
+    const res = await fetch(
+      `${config.apiUrl}/crew/${encodeURIComponent(id)}/baggage${q}`,
+      { headers: { Authorization: `Bearer ${session.access_token}` } },
+    );
+    if (!res.ok) return { ok: false, status: res.status };
+    return { ok: true, baggage: await res.json() };
+  } catch (err) {
+    console.warn("crew baggage error", err);
+    return { ok: false };
+  }
+}
