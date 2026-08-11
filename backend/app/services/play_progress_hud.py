@@ -16,11 +16,13 @@ def build_play_progress_hud(child: dict[str, Any], progress_bundle: dict[str, An
         progress = {}
     general = progress.get("general_progress")
     rank = progress.get("rank") if isinstance(progress.get("rank"), dict) else None
+    rank_next = progress.get("rank_next") if isinstance(progress.get("rank_next"), dict) else None
     visible = placement == "completed" and isinstance(general, dict)
     return {
         "visible": visible,
         "show_levels_to_child": show_levels,
         "rank_label_child": (rank.get("label_child") if rank else None),
+        "rank_next_label_child": (rank_next.get("label_child") if rank_next else None),
         "general_progress": (
             {
                 "current": general.get("current"),

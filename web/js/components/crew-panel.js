@@ -85,16 +85,42 @@ async function gatePlayNavigation(childId, session, perms) {
 
 /**
  * @param {number} percent
- * @param {string} label
+ * @param {string} leftLabel
+ * @param {string} [rightLabel]
  */
-function renderLevelBar(percent, label) {
+function renderLevelBar(percent, leftLabel, rightLabel = "") {
   const p = Math.max(0, Math.min(100, Number(percent) || 0));
+  const right = rightLabel
+    ? `<span class="crew-progress__rank-next">${escapeHtml(rightLabel)}</span>`
+    : `<span class="crew-progress__rank-next" aria-hidden="true"></span>`;
   return `<div class="crew-progress__row">
-    <div class="crew-progress__row-head"><span>${escapeHtml(label)}</span><span>${p}%</span></div>
-    <div class="crew-progress__bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100">
-      <div class="crew-progress__bar-fill" style="width:${p}%"></div>
+    <div class="crew-progress__track">
+      <span class="crew-progress__rank-current">${escapeHtml(leftLabel)}</span>
+      <div class="crew-progress__bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(leftLabel)}${rightLabel ? ` hacia ${escapeHtml(rightLabel)}` : ""}">
+        <div class="crew-progress__bar-fill" style="width:${p}%"></div>
+      </div>
+      ${right}
     </div>
   </div>`;
+}
+
+/**
+ * @param {any} member
+ */
+function renderRankLegend(member) {
+  const legend = member?.progress?.rank_legend;
+  if (!Array.isArray(legend) || !legend.length) return "";
+  const rows = legend
+    .map(
+      (row) =>
+        `<li><strong>${escapeHtml(row.label)}</strong> · ${escapeHtml(row.level_id)} · ${escapeHtml(row.age_hint || "")}</li>`,
+    )
+    .join("");
+  return `<details class="crew-progress__legend">
+    <summary>Leyenda de rangos y niveles</summary>
+    <p class="crew-panel__helper">El rango narrativo sigue el nivel pedagógico (L1–L5). La edad calibra la dificultad, no el nombre del rango.</p>
+    <ul class="crew-progress__legend-list">${rows}</ul>
+  </details>`;
 }
 
 /**
@@ -111,31 +137,32 @@ function renderProgressSection(member) {
   const gp = prog.general_progress;
   const rank = prog.rank;
   const rankNext = prog.rank_next;
-  let rankLine = rank ? `Rango: ${escapeHtml(rank.label_tutor || rank.label_child)}.` : "";
-  if (rankNext) {
-    rankLine += ` Siguiente: ${escapeHtml(rankNext.label_tutor || rankNext.label_child)} (a partir de ${escapeHtml(rankNext.min_general_level)}).`;
-  }
-  if (prog.rank_eligible_now) {
-    rankLine += " Nuevo rango disponible en la aventura.";
-  }
   const subjects = Array.isArray(prog.subjects) ? prog.subjects : [];
   const subjectBars = subjects
     .filter((s) => s.level_progress)
     .map((s) => {
       const lp = s.level_progress;
       const zone = s.zone_label ? ` · ${s.zone_label}` : "";
-      const cur = formatLevelLabel(lp.current);
-      return renderLevelBar(lp.percent_to_next, `${s.label} · ${cur}${zone}`);
+      const curRank = s.rank_label || formatLevelLabel(lp.current);
+      const nextRank = s.rank_next_label || formatLevelLabel(lp.next);
+      return renderLevelBar(
+        lp.percent_to_next,
+        `${s.label}${zone ? zone : ""} · ${curRank}`,
+        nextRank || "",
+      );
     })
     .join("");
-  const gpCur = formatLevelLabel(gp?.current);
-  const gpNext = formatLevelLabel(gp?.next);
-  const gpLabel = gpNext ? `General ${gpCur} → ${gpNext}` : `General ${gpCur}`;
+  const gpLeft = rank?.label_tutor || rank?.label_child || formatLevelLabel(gp?.current) || "Explorador";
+  const gpRight =
+    rankNext?.label_tutor ||
+    rankNext?.label_child ||
+    formatLevelLabel(gp?.next) ||
+    "";
   return `<section class="crew-panel__block crew-progress">
     <h2 class="crew-panel__block-title">Tu explorador en el viaje</h2>
-    ${gp ? renderLevelBar(gp.percent_to_next, gpLabel) : ""}
+    ${gp ? renderLevelBar(gp.percent_to_next, gpLeft, gpRight) : ""}
     <p class="crew-panel__helper">${escapeHtml(gp?.hint_tutor || "")}</p>
-    ${rankLine ? `<p class="crew-panel__helper">${rankLine}</p>` : ""}
+    ${renderRankLegend(member)}
     ${subjectBars}
   </section>`;
 }

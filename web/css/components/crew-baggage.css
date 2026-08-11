@@ -119,44 +119,79 @@
 
 .play-progress-hud {
   width: 100%;
-  max-width: min(100%, 18rem);
-  margin: 0.15rem auto 0.1rem;
-  padding: 0 0.5rem;
+  max-width: min(100%, 22rem);
+  margin: 0.2rem auto 0.1rem;
+  padding: 0 0.35rem;
 }
 
 .play-progress-hud[hidden] {
   display: none !important;
 }
 
-.play-progress-hud__meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  font-size: calc(0.72rem * var(--font-scale-ui, 1));
-  opacity: 0.92;
-  margin-bottom: 0.2rem;
+/* Ancho: rango | barra | rango. Estrecho: rangos arriba, barra abajo. */
+.play-progress-hud__track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(2.75rem, 38%) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+  font-size: calc(0.7rem * var(--font-scale-ui, 1));
+  line-height: 1.15;
+  opacity: 0.94;
+}
+
+.play-progress-hud__rank {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-progress-hud__rank--current {
+  text-align: left;
+}
+
+.play-progress-hud__rank--next {
+  text-align: right;
+  opacity: 0.82;
 }
 
 .play-progress-hud__bar {
-  height: 7px;
+  height: 0.45rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.12);
   overflow: hidden;
 }
 
 .play-progress-hud__fill {
   height: 100%;
   border-radius: inherit;
-  background: rgba(255, 255, 255, 0.72);
-  transition: width 280ms ease;
-}
-
-.section-frame[data-play-theme="fantasy"] .play-progress-hud__fill {
-  background: rgba(186, 220, 255, 0.85);
+  transition: width 320ms ease;
+  background: linear-gradient(90deg, rgba(120, 200, 255, 0.85), rgba(170, 130, 255, 0.9));
 }
 
 .section-frame[data-play-theme="sci-fi"] .play-progress-hud__fill {
-  background: rgba(120, 220, 255, 0.9);
+  background: linear-gradient(90deg, rgba(90, 220, 255, 0.88), rgba(120, 180, 255, 0.92));
+}
+
+@media (max-width: 360px) {
+  .play-progress-hud__track {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "cur next"
+      "bar bar";
+  }
+
+  .play-progress-hud__rank--current {
+    grid-area: cur;
+  }
+
+  .play-progress-hud__rank--next {
+    grid-area: next;
+  }
+
+  .play-progress-hud__bar {
+    grid-area: bar;
+  }
 }
 
 .section-frame__header:has(.play-progress-hud:not([hidden])) {

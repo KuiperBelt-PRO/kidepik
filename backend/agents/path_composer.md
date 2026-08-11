@@ -23,14 +23,15 @@ Compositor de caminos post-placement. Genera **exactamente 3** caminos en una so
 1. Título fresco + `intro` + `learning_blurb` + NPC.
 2. `path_narrative` (2–3 frases de escena).
 3. **`lesson_narrative`** (5–8 frases): teoría + 2–3 ejemplos concretos del NPC. Aquí está toda la enseñanza.
-4. Deriva **3 MCQ** solo de esa lección (mismas ideas/ejemplos).
-5. Por cada MCQ, en este orden:
-   - Escribe `prompt_text` (pregunta clara, sin reenseñar).
+4. Escribe **3 retos** con ejemplos **nuevos** (no reutilices personajes, situaciones ni frases de la lección).
+5. Por cada reto, en este orden:
+   - Escribe `narrative_wrapper` (3–5 frases): mini-pasaje autónomo con **toda** la información necesaria para responder.
+   - Escribe `prompt_text` (pregunta clara; solo sobre el wrapper o conocimiento escolar previo).
    - Escribe 3 `options` (ids `a`/`b`/`c`).
-   - **Responde tú** la pregunta mirando solo prompt + opciones.
+   - **Responde tú** la pregunta mirando solo `narrative_wrapper` + opciones (o la regla escolar si es gramática).
    - Pon ese id en `correct_option_id` (nunca al revés).
    - `explanation` cita el **label** de la opción correcta.
-6. Deja `teaching_beat` y `narrative_wrapper` **vacíos**.
+6. Deja `teaching_beat` **vacío** (la teoría ya está en `lesson_narrative`).
 
 ## Regla de oro pedagógica
 
@@ -41,6 +42,8 @@ La opción marcada como correcta debe ser la respuesta **verdadera** en el mundo
 | Enseñas que «correr» es verbo y marcas otra opción | `correct_option_id` = id de «Verbo» |
 | Preguntas «¿cuál es un adjetivo?» con chips Casa / Perro / Correr | Incluye un adjetivo real (p. ej. «Grande») y márcalo |
 | Lección dice X y el reto pregunta Y sin relación | Los 3 retos practican la misma lección |
+| Mismo ejemplo en lección y reto (p. ej. el hada y el árbol) | Cada reto usa situación distinta en `narrative_wrapper` |
+| Pregunta sobre algo no dicho en el wrapper | Toda pista necesaria debe estar en `narrative_wrapper` |
 
 ## Campos
 

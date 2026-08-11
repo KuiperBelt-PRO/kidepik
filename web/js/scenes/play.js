@@ -574,20 +574,23 @@ async function mountPlayPanel(root, ctx) {
     }
     const gp = hud.general_progress;
     const percent = Math.max(0, Math.min(100, Number(gp.percent_to_next) || 0));
-    let meta = hud.rank_label_child || "Explorador";
+    const esc = (value) => String(value || "").replaceAll("<", "&lt;");
+    let leftLabel = hud.rank_label_child || "Explorador";
+    let rightLabel = hud.rank_next_label_child || "";
     if (hud.show_levels_to_child) {
       const cur = formatLevelLabel(gp.current);
       const next = formatLevelLabel(gp.next);
-      meta = next ? `${cur} → ${next}` : cur || meta;
+      if (cur) leftLabel = cur;
+      if (next) rightLabel = next;
     }
     progressHudEl.hidden = false;
     progressHudEl.innerHTML = `
-      <div class="play-progress-hud__meta">
-        <span>${meta.replaceAll("<", "&lt;")}</span>
-        <span>${percent}%</span>
-      </div>
-      <div class="play-progress-hud__bar" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso de nivel">
-        <div class="play-progress-hud__fill" style="width:${percent}%"></div>
+      <div class="play-progress-hud__track">
+        <span class="play-progress-hud__rank play-progress-hud__rank--current">${esc(leftLabel)}</span>
+        <div class="play-progress-hud__bar" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso hacia el siguiente rango">
+          <div class="play-progress-hud__fill" style="width:${percent}%"></div>
+        </div>
+        <span class="play-progress-hud__rank play-progress-hud__rank--next">${esc(rightLabel)}</span>
       </div>
     `;
   }
@@ -1546,12 +1549,17 @@ async function mountPlayPanel(root, ctx) {
    */
   function examProgressLabel(turn) {
     const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
-    if (phase !== "placement_item" && phase !== "placement_feedback") return null;
-    const index = Number(turn?.meta?.index);
+    const index = Number(turn?.meta?.index ?? turn?.meta?.challenge_index);
     const total = Number(turn?.meta?.total);
     if (!Number.isFinite(index) || !Number.isFinite(total) || total <= 0) return null;
     const n = index + 1;
-    return playWorldTheme === "sci-fi" ? `Secuencia ${n} de ${total}` : `Reto ${n} de ${total}`;
+    if (phase === "placement_item" || phase === "placement_feedback") {
+      return playWorldTheme === "sci-fi" ? `Secuencia ${n} de ${total}` : `Reto ${n} de ${total}`;
+    }
+    if (phase === "path_challenge") {
+      return playWorldTheme === "sci-fi" ? `Prueba ${n} de ${total}` : `Reto ${n} de ${total}`;
+    }
+    return null;
   }
 
   /**
@@ -1563,7 +1571,10 @@ async function mountPlayPanel(root, ctx) {
     if (label) {
       progressEl.hidden = false;
       progressEl.textContent = label;
-      progressEl.setAttribute("aria-label", `Progreso de la prueba: ${label}`);
+      const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
+      const scope =
+        phase === "path_challenge" ? "del camino" : "de la prueba";
+      progressEl.setAttribute("aria-label", `Progreso ${scope}: ${label}`);
       syncFooterChrome();
       return;
     }

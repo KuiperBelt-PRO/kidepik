@@ -18,13 +18,30 @@
   margin: 0.65rem 0;
 }
 
-.crew-progress__row-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.3rem;
+.crew-progress__track {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(2.5rem, 34%) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.35rem 0.45rem;
   font-size: calc(0.82rem * var(--font-scale-ui, 1));
   opacity: 0.92;
+}
+
+.crew-progress__rank-current {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.crew-progress__rank-next {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+  opacity: 0.82;
 }
 
 .crew-progress__bar {
@@ -38,4 +55,45 @@
   height: 100%;
   border-radius: inherit;
   background: linear-gradient(90deg, rgba(120, 200, 255, 0.85), rgba(170, 130, 255, 0.9));
+  transition: width 280ms ease;
+}
+
+.crew-progress__legend {
+  margin: 0.55rem 0 0.85rem;
+  font-size: calc(0.8rem * var(--font-scale-ui, 1));
+}
+
+.crew-progress__legend summary {
+  cursor: pointer;
+  opacity: 0.9;
+}
+
+.crew-progress__legend-list {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.crew-progress__legend-list li {
+  margin: 0.2rem 0;
+}
+
+@media (max-width: 360px) {
+  .crew-progress__track {
+    grid-template-columns: 1fr 1fr;
+    grid-template-areas:
+      "cur next"
+      "bar bar";
+  }
+
+  .crew-progress__rank-current {
+    grid-area: cur;
+  }
+
+  .crew-progress__rank-next {
+    grid-area: next;
+  }
+
+  .crew-progress__bar {
+    grid-area: bar;
+  }
 }

@@ -100,12 +100,12 @@ function escapeHtml(s) {
 /**
  * @param {SubjectMeta[]} catalog
  * @param {string[]} active
- * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }> }} [opts]
+ * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, rank_label?: string, rank_next_label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }> }} [opts]
  * @returns {string}
  */
 export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
   const activeSet = new Set(active);
-  /** @type {Map<string, { current?: string, next?: string, percent?: number }>} */
+  /** @type {Map<string, { current?: string, next?: string, percent?: number, rank?: string, rankNext?: string }>} */
   const progressById = new Map();
   for (const row of opts.progressSubjects || []) {
     const id = String(row.id || row.subject_id || "");
@@ -115,6 +115,8 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
       current: lp.current,
       next: lp.next,
       percent: Number(lp.percent_to_next) || 0,
+      rank: row.rank_label,
+      rankNext: row.rank_next_label,
     });
   }
   const groups = groupSubjectsByFamily(catalog);
@@ -129,11 +131,11 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
       const on = activeSet.has(s.id);
       const prog = progressById.get(s.id);
       const percent = Math.max(0, Math.min(100, prog?.percent ?? 0));
-      const cur = formatLevelLabel(prog?.current);
-      const next = formatLevelLabel(prog?.next);
+      const curRank = prog?.rank || formatLevelLabel(prog?.current);
+      const nextRank = prog?.rankNext || formatLevelLabel(prog?.next);
       let levelLine = "Sin nivel aún";
-      if (cur && next) levelLine = `${cur} → ${next}`;
-      else if (cur) levelLine = cur;
+      if (curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
+      else if (curRank) levelLine = curRank;
       html += `<div class="crew-subject-card${on ? " is-on" : ""}">
         <div class="crew-subject-card__head">
           <span class="crew-subject-card__label">${escapeHtml(s.label)}</span>

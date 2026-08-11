@@ -1705,7 +1705,25 @@ class DialogueService:
     # Avisos suaves (log); no rechazan el pack ni fuerzan reintentos → fallback.
     _PATH_NARRATIVE_MIN_CHARS = 40
     _PATH_LESSON_MIN_CHARS = 80
+    _PATH_CHALLENGE_WRAPPER_MIN_CHARS = 60
     _PATH_TEACHING_BEAT_MIN_CHARS = 0
+    _STORY_COMPREHENSION_MARKERS = (
+        "dónde",
+        "donde",
+        "cuándo",
+        "cuando",
+        "qué hizo",
+        "que hizo",
+        "qué hace",
+        "que hace",
+        "qué pasó",
+        "que paso",
+        "qué paso",
+        "quién",
+        "quien",
+        "por qué",
+        "porque",
+    )
     _PATH_TITLE_CLICHES = (
         "bosque de los números",
         "torre de las letras",
@@ -1975,12 +1993,110 @@ class DialogueService:
         return str(path.get("title") or "Adelante.")
 
     @staticmethod
+    def _is_story_comprehension_question(text: str) -> bool:
+        lowered = text.lower()
+        return any(marker in lowered for marker in DialogueService._STORY_COMPREHENSION_MARKERS)
+
+    @staticmethod
+    def _label_supported_in_context(label: str, context: str) -> bool:
+        label_tokens = DialogueService._content_tokens(label)
+        context_tokens = DialogueService._content_tokens(context)
+        if not label_tokens:
+            return True
+        if len(label_tokens) == 1:
+            return label_tokens.issubset(context_tokens)
+        overlap = label_tokens & context_tokens
+        return len(overlap) >= max(1, len(label_tokens) // 2)
+
+    @staticmethod
+    def _path_challenge_reuses_lesson(
+        challenge: dict[str, Any], lesson_narrative: str
+    ) -> bool:
+        wrapper = str(challenge.get("narrative_wrapper") or "").strip()
+        prompt = str(challenge.get("prompt_text") or "").strip()
+        lesson = str(lesson_narrative or "").strip()
+        if not lesson:
+            return False
+        challenge_blob = f"{wrapper} {prompt}".lower()
+        lesson_lower = lesson.lower()
+        lesson_tokens = DialogueService._content_tokens(lesson)
+        challenge_tokens = DialogueService._content_tokens(challenge_blob)
+        if not lesson_tokens or not challenge_tokens:
+            return False
+        overlap = len(lesson_tokens & challenge_tokens) / len(lesson_tokens)
+        return overlap >= 0.35
+
+    @staticmethod
+    def _path_challenge_context_issue(
+        challenge: dict[str, Any],
+        *,
+        subject_id: str,
+        lesson_narrative: str = "",
+    ) -> str | None:
+        wrapper = str(challenge.get("narrative_wrapper") or "").strip()
+        prompt = str(challenge.get("prompt_text") or "").strip()
+        if len(wrapper) < DialogueService._PATH_CHALLENGE_WRAPPER_MIN_CHARS:
+            return "path_challenge_missing_wrapper"
+        if DialogueService._path_challenge_reuses_lesson(challenge, lesson_narrative):
+            return "path_challenge_reuses_lesson_example"
+        if str(challenge.get("item_type") or "mcq") != "mcq":
+            return None
+        options = challenge.get("options") if isinstance(challenge.get("options"), list) else []
+        correct_id = DialogueService._resolved_correct_option_id(challenge, options)
+        correct_opt = next(
+            (opt for opt in options if str(opt.get("id")) == str(correct_id or "")),
+            None,
+        )
+        if not correct_opt:
+            return None
+        label = str(correct_opt.get("label") or "").strip()
+        subject = str(subject_id or "").lower()
+        needs_context = subject == "reading" or DialogueService._is_story_comprehension_question(
+            prompt
+        )
+        if needs_context and label:
+            if not DialogueService._label_supported_in_context(label, wrapper):
+                return "path_challenge_answer_not_in_context"
+        return None
+
+    @staticmethod
+    def _format_path_recap_text(path: dict[str, Any], *, passed: bool) -> str:
+        title = str(path.get("title") or "este camino").strip()
+        blurb = str(path.get("learning_blurb") or path.get("intro") or "").strip()
+        npc = path.get("npc") if isinstance(path.get("npc"), dict) else {}
+        npc_name = str(npc.get("name") or "tu guía").strip()
+        challenges = [
+            str(ch.get("prompt_text") or "").strip()
+            for ch in (path.get("challenges") or [])
+            if isinstance(ch, dict) and str(ch.get("prompt_text") or "").strip()
+        ]
+        parts: list[str] = []
+        if passed:
+            parts.append(f"¡Camino superado! Has completado «{title}».")
+        else:
+            parts.append(f"Repaso de «{title}» antes de seguir.")
+        if blurb:
+            parts.append(f"Recordemos: {blurb}")
+        if challenges:
+            recap_items = "; ".join(f"«{q}»" for q in challenges[:3])
+            parts.append(f"Has practicado con estos retos: {recap_items}.")
+        parts.append(
+            f"{npc_name} da por buen trabajo lo aprendido. "
+            "Cuando quieras, elegimos otra ruta."
+        )
+        return "\n\n".join(parts)
+
+    @staticmethod
     def _format_path_challenge_text(
         challenge: dict[str, Any],
         path: dict[str, Any] | None = None,
     ) -> str:
-        # La teoría ya se dio en path_intro (lesson_narrative). Aquí solo la pregunta.
+        wrapper = str(challenge.get("narrative_wrapper") or "").strip()
         prompt = str(challenge.get("prompt_text") or "Reto").strip()
+        if wrapper and prompt:
+            return f"{wrapper}\n\n{prompt}"
+        if wrapper:
+            return wrapper
         return prompt or "Reto"
 
     @staticmethod
@@ -2090,6 +2206,7 @@ class DialogueService:
         if not isinstance(challenges, list) or len(challenges) < DialogueService._PATH_MIN_CHALLENGES:
             return "path_challenge_count"
         subject_id = str(entry.get("subject_id") or "")
+        lesson = str(entry.get("lesson_narrative") or "")
         for challenge in challenges[: DialogueService._PATH_MIN_CHALLENGES]:
             if not isinstance(challenge, dict):
                 return "path_challenge_invalid"
@@ -2097,6 +2214,11 @@ class DialogueService:
             truth_issue = DialogueService._path_challenge_mcq_truth_issue(finalized)
             if truth_issue:
                 return truth_issue
+            context_issue = DialogueService._path_challenge_context_issue(
+                finalized, subject_id=subject_id, lesson_narrative=lesson
+            )
+            if context_issue:
+                return context_issue
             issue = DialogueService._placement_item_quality_issue(
                 DialogueService._path_challenge_quality_item(finalized, subject_id)
             )
@@ -2572,12 +2694,16 @@ class DialogueService:
                 ),
                 {"cid": child_id, "theme": world, "sid": subject},
             )
+        rank_track = "sci-fi" if world == "sci-fi" else "fantasy"
+        from app.services.crew_progress import CrewProgressService
+
+        rank_id = CrewProgressService.RANKS[rank_track][0][0]
         await self.session.execute(
             text(
                 "update children set placement_status='completed',onboarding_step='complete',"
-                "general_level='L1',updated_at=now() where id=:id"
+                "general_level='L1',rank_id=:rid,rank_track=:track,updated_at=now() where id=:id"
             ),
-            {"id": child_id},
+            {"id": child_id, "rid": rank_id, "track": rank_track},
         )
         await self.session.execute(
             text(
@@ -2877,10 +3003,17 @@ class DialogueService:
                 "Orden de escritura POR CAMINO (obligatorio): "
                 "(1) inventa título + pitch + NPC; "
                 "(2) escribe lesson_narrative con la teoría y 2–3 ejemplos concretos; "
-                "(3) deriva 3 preguntas MCQ SOLO de esa lección; "
-                "(4) para cada pregunta, escribe 3 opciones y LUEGO marca correct_option_id "
-                "respondiendo tú la pregunta; "
+                "(3) escribe 3 retos con narrative_wrapper (3–5 frases cada uno) "
+                "usando ejemplos NUEVOS distintos a la lección; "
+                "(4) para cada reto, prompt_text + 3 opciones y LUEGO marca correct_option_id "
+                "respondiendo solo con el wrapper (o la regla escolar si es gramática); "
                 "(5) explanation cita el label de la opción correcta."
+            ),
+            (
+                "Regla de contexto: si preguntas dónde/qué hizo/qué pasó, "
+                "esa información DEBE estar en narrative_wrapper del reto. "
+                "No preguntes hechos que no se hayan dicho. "
+                "No copies ejemplos de lesson_narrative en los retos."
             ),
             (
                 "Regla de oro del MCQ: si enseñas que «correr» es un verbo, la opción "
@@ -2894,7 +3027,8 @@ class DialogueService:
                 "path_narrative (2-3 frases de escena), lesson_narrative (5-8 frases de teoría "
                 "con NPC ANTES de los retos), npc (npc_id, name, role guide|gatekeeper, "
                 "one_line_voice), "
-                f"{DialogueService._PATH_MIN_CHALLENGES} challenges con prompt_text, "
+                f"{DialogueService._PATH_MIN_CHALLENGES} challenges con narrative_wrapper "
+                "(3-5 frases, pasaje autónomo), prompt_text, "
                 "item_type mcq, 3 opciones a/b/c, correct_option_id (verdadera), explanation. "
                 "Castellano de España. Sin franquicias."
             ),
@@ -3203,7 +3337,7 @@ class DialogueService:
         challenges = list(path.get("challenges") or [])
         idx = int(progress.get("challenge_index") or 0)
         if idx >= len(challenges):
-            congrats = "¡Camino superado! Cuando quieras, elegimos otra ruta."
+            recap = DialogueService._format_path_recap_text(path, passed=True)
             parent_id = child.get("parent_id")
             if parent_id:
                 try:
@@ -3230,6 +3364,26 @@ class DialogueService:
             subject_id = str(path.get("subject_id") or "") or None
             if not subject_id and challenges:
                 subject_id = str(challenges[0].get("subject_id") or "") or None
+            progress_effects: list[dict[str, Any]] = []
+            try:
+                from app.services.subject_progress import SubjectProgressService
+
+                learning = (child.get("settings") or {}).get("learning") or {}
+                active = (
+                    learning.get("active_subjects")
+                    if isinstance(learning.get("active_subjects"), list)
+                    else []
+                )
+                progress_effects = await SubjectProgressService(
+                    self.session
+                ).finalize_path_completion(
+                    child_id,
+                    world or "fantasy",
+                    subject_id or "math",
+                    active_subjects=[str(s) for s in active],
+                )
+            except Exception:
+                pass
             path_id = str(path.get("path_id") or "path")
             grant = await self._grant_path_reward(
                 child,
@@ -3244,13 +3398,14 @@ class DialogueService:
                 child_id,
                 session["flow_id"],
                 sequence + 1,
-                congrats,
+                recap,
                 "continue",
                 None,
-                {"phase": "adventure_ready", "path_completed": True},
+                {"phase": "adventure_ready", "path_completed": True, "path_recap": True},
             )
             effects: list[dict[str, Any]] = [
-                {"type": "path_completed", "value": path.get("path_id")}
+                {"type": "path_completed", "value": path.get("path_id")},
+                *progress_effects,
             ]
             if grant:
                 effects.append(grant)
@@ -3297,6 +3452,23 @@ class DialogueService:
         ok = True
         if ch.get("correct_option_id") and reply.get("option_id"):
             ok = reply.get("option_id") == ch.get("correct_option_id")
+        progress_effects: list[dict[str, Any]] = []
+        subject_id = str(path.get("subject_id") or "") or "math"
+        if not subject_id and challenges:
+            subject_id = str(challenges[0].get("subject_id") or "math")
+        try:
+            from app.services.subject_progress import SubjectProgressService
+
+            progress_effects.append(
+                await SubjectProgressService(self.session).record_path_challenge(
+                    child_id,
+                    world or "fantasy",
+                    subject_id,
+                    score=1.0 if ok else 0.0,
+                )
+            )
+        except Exception:
+            pass
         next_idx = idx + 1 if ok else idx
         if parent_id:
             try:
@@ -3332,9 +3504,9 @@ class DialogueService:
                     "retry": True,
                 },
             )
-            return [], [turn]
+            return progress_effects, [turn]
         path_id = str(path.get("path_id") or "path")
-        reward_effects: list[dict[str, Any]] = []
+        reward_effects: list[dict[str, Any]] = list(progress_effects)
         grant = await self._grant_path_reward(
             child,
             session_id=session_id,

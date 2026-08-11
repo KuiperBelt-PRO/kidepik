@@ -1021,10 +1021,18 @@ async def test_compose_path_pack_fallback(dialogue_svc, mocker) -> None:
     assert pack[0]["path_id"] == "path_1"
 
 
+_CHALLENGE_WRAPPER = (
+    "En el mercado del cruce, el guía junta dos manzanas y dos peras en un cesto. "
+    "«Mira», dice, «son cuatro piezas en total si las cuentas juntas.» "
+    "El viajero repite la cuenta en voz baja antes de responder."
+)
+
+
 @pytest.mark.unit
 def _path_challenge_seed(prompt: str = "¿2+2?") -> PathChallengeSeed:
     return PathChallengeSeed(
         prompt_text=prompt,
+        narrative_wrapper=_CHALLENGE_WRAPPER,
         item_type="mcq",
         options=[
             DialogueOption(id="a", label="4"),
@@ -1051,6 +1059,7 @@ _LONG_LESSON = (
 def _valid_path_challenges() -> list[dict[str, Any]]:
     return [
         {
+            "narrative_wrapper": _CHALLENGE_WRAPPER,
             "prompt_text": "¿Cuánto es 2+2?",
             "item_type": "mcq",
             "options": [
@@ -1140,6 +1149,7 @@ def test_path_pack_quality_soft_warnings_do_not_reject() -> None:
         "lesson_narrative": "Corta.",
         "challenges": [
             {
+                "narrative_wrapper": _CHALLENGE_WRAPPER,
                 "prompt_text": "¿Qué tipo de palabra es correr?",
                 "item_type": "mcq",
                 "options": [
@@ -1174,9 +1184,70 @@ def test_format_path_intro_text_includes_lesson() -> None:
 
 
 @pytest.mark.unit
-def test_format_path_challenge_text_is_prompt_only() -> None:
+def test_format_path_challenge_text_includes_wrapper() -> None:
     ch = {
-        "narrative_wrapper": "La puerta brilla.",
+        "narrative_wrapper": "La puerta brilla bajo la luna. El guardián espera una respuesta clara.",
+        "teaching_beat": "Miramos el patrón.",
+        "prompt_text": "¿Cuál sigue?",
+    }
+    text = DialogueService._format_path_challenge_text(ch)
+    assert "La puerta brilla" in text
+    assert "¿Cuál sigue?" in text
+
+
+@pytest.mark.unit
+def test_path_challenge_context_rejects_missing_wrapper() -> None:
+    issue = DialogueService._path_challenge_context_issue(
+        {"prompt_text": "¿Dónde se escondió?", "item_type": "mcq"},
+        subject_id="reading",
+        lesson_narrative=_LONG_LESSON,
+    )
+    assert issue == "path_challenge_missing_wrapper"
+
+
+@pytest.mark.unit
+def test_path_challenge_context_rejects_answer_not_in_wrapper() -> None:
+    issue = DialogueService._path_challenge_context_issue(
+        {
+            "narrative_wrapper": (
+                "El hada se escondió detrás del árbol cuando el viento sopló fuerte. "
+                "No dijo nada más y el bosque quedó en silencio."
+            ),
+            "prompt_text": "¿Qué hizo el hada cuando el viento paró?",
+            "item_type": "mcq",
+            "options": [
+                {"id": "a", "label": "Cantó"},
+                {"id": "b", "label": "Voló"},
+                {"id": "c", "label": "Durmió"},
+            ],
+            "correct_option_id": "a",
+        },
+        subject_id="reading",
+        lesson_narrative=_LONG_LESSON,
+    )
+    assert issue == "path_challenge_answer_not_in_context"
+
+
+@pytest.mark.unit
+def test_format_path_recap_text_includes_blurb_and_questions() -> None:
+    path = {
+        "title": "El Jardín de los Cuentos",
+        "learning_blurb": "Buscar datos en el texto.",
+        "npc": {"name": "El Guardián del Conocimiento"},
+        "challenges": [
+            {"prompt_text": "¿Dónde se escondió?"},
+            {"prompt_text": "¿Quién habló primero?"},
+        ],
+    }
+    recap = DialogueService._format_path_recap_text(path, passed=True)
+    assert "Camino superado" in recap
+    assert "Buscar datos" in recap
+    assert "Guardián" in recap
+
+
+@pytest.mark.unit
+def test_format_path_challenge_text_prompt_only_when_no_wrapper() -> None:
+    ch = {
         "teaching_beat": "Miramos el patrón.",
         "prompt_text": "¿Cuál sigue?",
     }
@@ -1588,11 +1659,14 @@ async def test_path_next_challenge_presents_mcq(dialogue_svc, tmp_path, monkeypa
             "challenge_index": 0,
             "path": {
                 "path_id": "p1",
-                "challenges": [
-                    {
-                        "narrative_wrapper": "Sela bloquea el paso.",
-                        "teaching_beat": "Contamos antes de saltar.",
-                        "prompt_text": "¿Seguimos?",
+                    "challenges": [
+                        {
+                            "narrative_wrapper": (
+                                "Sela bloquea el paso y señala dos piedras en el suelo. "
+                                "«Cuenta antes de saltar», dice con voz firme."
+                            ),
+                            "teaching_beat": "Contamos antes de saltar.",
+                            "prompt_text": "¿Seguimos?",
                         "item_type": "mcq",
                         "options": [{"id": "a", "label": "Sí"}],
                         "correct_option_id": "a",
@@ -1617,7 +1691,8 @@ async def test_path_next_challenge_presents_mcq(dialogue_svc, tmp_path, monkeypa
     assert turns[0]["meta"]["phase"] == "path_challenge"
     dialogue_svc._mentor_turn.assert_awaited_once()
     mentor_text = dialogue_svc._mentor_turn.await_args[0][4]
-    assert mentor_text == "¿Seguimos?"
+    assert "Sela bloquea el paso" in mentor_text
+    assert "¿Seguimos?" in mentor_text
     get_settings.cache_clear()
 
 
@@ -1671,7 +1746,8 @@ async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monke
         {"meta": {"phase": "path_challenge", "challenge_index": 0}},
         child,
     )
-    assert effects == []
+    assert effects and effects[0]["type"] == "record_learning_result"
+    assert effects[0]["score"] == 0.0
     assert turns[0]["meta"]["retry"] is True
     assert "«3» no es correcto." in str(turns[0].get("text") or "")
     get_settings.cache_clear()

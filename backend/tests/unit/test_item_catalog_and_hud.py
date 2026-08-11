@@ -44,6 +44,7 @@ def test_play_progress_hud_visible_after_placement() -> None:
         {
             "progress": {
                 "rank": {"label_child": "Adept"},
+                "rank_next": {"label_child": "Guardian"},
                 "general_progress": {"current": "L3", "next": "L4", "percent_to_next": 62},
             }
         },
@@ -52,3 +53,4 @@ def test_play_progress_hud_visible_after_placement() -> None:
     assert hud["show_levels_to_child"] is True
     assert hud["general_progress"]["percent_to_next"] == 62
     assert hud["rank_label_child"] == "Adept"
+    assert hud["rank_next_label_child"] == "Guardian"
