@@ -16,7 +16,7 @@ import {
   fetchCrewBaggage,
 } from "../lib/crew-api.js?v=260";
 import { fetchJourneyTimeline } from "../lib/play-api.js";
-import { baggageGlyphId, renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=2";
+import { baggageGlyphId, renderBaggageHtml, wireBaggageGrid } from "../lib/baggage-ui.js?v=8";
 import { applyCrewMemberWorldTheme } from "../lib/play-theme.js";
 import {
   bindGlassIconTheme,
@@ -150,7 +150,7 @@ function renderRankLegend(member) {
     })
     .join("");
   return `<div class="crew-progress__legend">
-    <button type="button" class="crew-progress__legend-trigger crew-panel__chip" aria-expanded="false" aria-controls="crew-rank-legend-panel">
+    <button type="button" class="crew-progress__legend-trigger" aria-expanded="false" aria-controls="crew-rank-legend-panel">
       <span class="crew-progress__legend-trigger-icon" data-icon="note" aria-hidden="true"></span>
       <span class="crew-progress__legend-trigger-label">Rangos del viaje</span>
       <span class="crew-progress__legend-chevron" data-icon="chevron" aria-hidden="true"></span>
@@ -712,11 +712,11 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       ${profileBlock}
       ${permissionsBlock}`
           : `<div class="crew-panel__tabs" role="tablist" aria-label="Secciones del tripulante">
-        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="details" aria-selected="true">Detalles</button>
-        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="journey" aria-selected="false">Viaje</button>
-        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="progress" aria-selected="false">Progreso</button>
-        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="baggage" aria-selected="false">Equipaje</button>
-        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="settings" aria-selected="false">Ajustes</button>
+        <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="details" aria-selected="true">Detalles</button>
+        <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="journey" aria-selected="false">Viaje</button>
+        <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="progress" aria-selected="false">Progreso</button>
+        <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="baggage" aria-selected="false">Equipaje</button>
+        <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="settings" aria-selected="false">Ajustes</button>
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="details">
         ${profileBlock}
@@ -785,28 +785,14 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         host.querySelectorAll("[data-icon]").forEach((el) => {
           if (!(el instanceof HTMLElement)) return;
           const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
-          const size = el.classList.contains("crew-baggage__icon") ? 36 : 24;
+          const size = el.classList.contains("crew-baggage__icon")
+            ? 36
+            : el.classList.contains("crew-baggage__section-title-icon")
+              ? 20
+              : 24;
           el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size }));
         });
-        host.querySelectorAll("[data-baggage-item]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const id = btn.getAttribute("data-baggage-item");
-            const item = (bag.items || []).find((x) => String(x.id) === id);
-            const detail = host.querySelector("[data-baggage-detail]");
-            if (!(detail instanceof HTMLElement) || !item) return;
-            detail.hidden = false;
-            detail.innerHTML = renderBaggageDetailHtml(item, "tutor");
-            detail.querySelectorAll("[data-icon]").forEach((el) => {
-              if (!(el instanceof HTMLElement)) return;
-              const glyph = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
-              el.replaceChildren(createGlassIconSvg(/** @type {any} */ (glyph), { size: 40 }));
-            });
-            detail.querySelector("[data-baggage-detail-close]")?.addEventListener("click", () => {
-              detail.hidden = true;
-              detail.innerHTML = "";
-            });
-          });
-        });
+        wireBaggageGrid(host, bag.items || [], { audience: "tutor" });
       };
       async function loadBaggageTab() {
         const host = root.querySelector("[data-crew-baggage-host]");

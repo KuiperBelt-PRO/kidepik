@@ -33,7 +33,7 @@ import { isDebugAiAllowed, isDebugAiClientActive, setDebugAiServerAllowed } from
 import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
 import { postDebugJourneyRewind } from "../lib/debug-journey-api.js?v=256";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=257";
-import { baggageGlyphId, renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=2";
+import { baggageGlyphId, renderBaggageHtml, wireBaggageGrid } from "../lib/baggage-ui.js?v=8";
 import { formatLevelLabel } from "../lib/subject-catalog.js?v=253";
 import { renderShellUiIconSvgInner } from "../components/shell-ui-icons.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
@@ -600,64 +600,55 @@ async function mountPlayPanel(root, ctx) {
    */
   function paintPlayBaggage(bag) {
     if (!(baggageView instanceof HTMLElement)) return;
-    baggageView.innerHTML = renderBaggageHtml(bag, { audience: "child" });
+    baggageView.innerHTML = renderBaggageHtml(bag, { audience: "child", allowUse: Boolean(sessionId) });
     baggageView.querySelectorAll("[data-icon]").forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
       const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
-      const size = el.classList.contains("crew-baggage__icon") ? 36 : 24;
+      const size = el.classList.contains("crew-baggage__icon")
+        ? 36
+        : el.classList.contains("crew-baggage__section-title-icon")
+          ? 20
+          : 24;
       el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size }));
     });
-    baggageView.querySelectorAll("[data-baggage-item]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-baggage-item");
-        const item = (bag.items || []).find((x) => String(x.id) === id);
-        const detail = baggageView.querySelector("[data-baggage-detail]");
-        if (!(detail instanceof HTMLElement) || !item) return;
-        detail.hidden = false;
-        detail.innerHTML = renderBaggageDetailHtml(item, "child", { allowUse: Boolean(sessionId) });
-        detail.querySelector("[data-baggage-detail-close]")?.addEventListener("click", () => {
-          detail.hidden = true;
-          detail.innerHTML = "";
-        });
-        detail.querySelector("[data-baggage-use]")?.addEventListener("click", () => {
-          const effectId = detail
-            .querySelector("[data-baggage-use]")
-            ?.getAttribute("data-effect-id");
-          if (!effectId || !sessionId) return;
-          void (async () => {
-            const res = await usePlayBaggageItem(ctx.session, ctx.childId, String(item.id), {
-              effect_id: effectId,
-              session_id: sessionId,
-            });
-            if (!res.ok || !res.data) {
-              showGlassToast(mapPlayApiError(res.error || "use"), { variant: "error" });
-              return;
+    wireBaggageGrid(baggageView, bag.items || [], {
+      audience: "child",
+      allowUse: Boolean(sessionId),
+      onUse: (item, effectId) => {
+        if (!sessionId) return;
+        void (async () => {
+          const res = await usePlayBaggageItem(ctx.session, ctx.childId, String(item.id), {
+            effect_id: effectId,
+            session_id: sessionId,
+          });
+          if (!res.ok || !res.data) {
+            showGlassToast(mapPlayApiError(res.error || "use"), { variant: "error" });
+            return;
+          }
+          if (res.data.baggage) {
+            baggageCache = res.data.baggage;
+            paintPlayBaggage(baggageCache);
+          } else {
+            baggageDirty = true;
+          }
+          if (res.data.hint_text) {
+            showGlassToast(String(res.data.hint_text), { variant: "success" });
+          } else if (res.data.mentor_line) {
+            showGlassToast(String(res.data.mentor_line), { variant: "success" });
+          }
+          if (res.data.challenge_reopened && Array.isArray(res.data.agent_turns)) {
+            await setPlayViewMode("dialogue");
+            for (const t of res.data.agent_turns) {
+              appendMentorTurn(t, mentorLabel);
             }
-            if (res.data.baggage) {
-              baggageCache = res.data.baggage;
-              paintPlayBaggage(baggageCache);
-            } else {
-              baggageDirty = true;
-            }
-            if (res.data.hint_text) {
-              showGlassToast(String(res.data.hint_text), { variant: "success" });
-            } else if (res.data.mentor_line) {
-              showGlassToast(String(res.data.mentor_line), { variant: "success" });
-            }
-            if (res.data.challenge_reopened && Array.isArray(res.data.agent_turns)) {
-              await setPlayViewMode("dialogue");
-              for (const t of res.data.agent_turns) {
-                appendMentorTurn(t, mentorLabel);
-              }
-              const pending =
-                res.data.pending_agent_turn ||
-                res.data.agent_turns[res.data.agent_turns.length - 1];
-              if (pending) renderPending(pending);
-              scrollLogToEnd();
-            }
-          })();
-        });
-      });
+            const pending =
+              res.data.pending_agent_turn ||
+              res.data.agent_turns[res.data.agent_turns.length - 1];
+            if (pending) renderPending(pending);
+            scrollLogToEnd();
+          }
+        })();
+      },
     });
   }
 

@@ -146,9 +146,10 @@ Tras cerrar: **400 ms** sin reabrir el trigger (evita “ghost click” del popo
 
 - Igual que field; **sin** asa de resize nativa (`resize: none`); scroll vertical con scrollbar fino blanco; min-height ~96 px.
 
-### 9. Progress / meter (reserva)
+### 9. Progress / meter
 
-- Track `0.15` blanco; fill `0.55` blanco (sin color de materia).
+- Track `rgba(255,255,255,0.15)`; fill `rgba(255,255,255,0.55)` (**sin** azul/morado de acento).
+- Anillo de porcentaje (`.crew-progress__ring`): mismo criterio — arco blanco semitransparente, núcleo glass con borde `--glass-border`. Ver §13.
 
 ### 10. Stepper ± (`glass-stepper` + `mountAgeStepper`)
 
@@ -216,7 +217,7 @@ Los botones «Volver» locales en paneles (`crew-panel__link`) se sustituyen por
 
 | Pantalla | Controles glass |
 | --- | --- |
-| **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) · **Diario del viaje** (timeline L1 + summary L2, tokens glass) |
+| **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) · **pestañas** `.crew-panel__tabs` · **progreso** anillo glass + acordeón rangos · **equipaje** secciones monedas/hallazgos · **Diario del viaje** (timeline L1 + summary L2, tokens glass) |
 | **Aventura** `#/play/:childId` | Mismo **loader-chrome + section-frame** que Tripulación; log en burbujas glass; scroll del **marco** (`section-frame__scroll` + fade), sin scroll anidado en el log; pie fijo con compose. |
 | **Ajustes** | `mountDurationSlider` · chips tema UI / texto · botones `save` / `close` |
 | **Cuenta** | Fields · checkboxes · botones (`signout`, etc.) · modales glass (`showGlassConfirm`) |
@@ -276,6 +277,55 @@ Controles **glass** inspirados en inventario de RPG, no un segundo design system
 
 Nombre en slot = `instance_name` (agente). El propósito pedagógico va en el detalle.
 
+### 13. Anillo de progreso (`.crew-progress__ring`)
+
+Indicador circular junto al rango actual en la ficha **Progreso** (tutor).
+
+| Pieza | Valor |
+| --- | --- |
+| Arco activo | `conic-gradient` blanco `0.55` |
+| Arco restante | blanco `0.14` |
+| Núcleo | `--glass-bg` + borde `--glass-border` |
+| Tamaño | ~2.1 rem exterior · texto `%` en núcleo |
+
+**Prohibido:** arco azul/cian (`rgba(120,200,255,…)`) o núcleo oscuro opaco — rompe la cromática glass del marco.
+
+La barra horizontal de la misma fila (`.crew-progress__bar-fill`) usa el mismo fill blanco `0.55`, no degradados de color.
+
+### 14. Acordeón integrado (`.crew-progress__legend`)
+
+Desplegable «Rangos del viaje» en Progreso: **un solo contenedor** glass, no chip + panel separados.
+
+| Estado | Comportamiento |
+| --- | --- |
+| Cerrado | Solo fila trigger (icono `note` + título + chevron) |
+| Abierto | Misma caja; separador `border-bottom` bajo el trigger; lista dentro sin segundo borde/radius |
+
+Clases: `.crew-progress__legend` (caja) · `.crew-progress__legend-trigger` (botón ancho completo, **sin** `.crew-panel__chip`) · `.crew-progress__legend-panel` (contenido, sin blur propio).
+
+### 15. Pestañas ficha tripulante (`.crew-panel__tabs`)
+
+Navegación entre secciones de la ficha (`Detalles`, `Viaje`, `Progreso`, `Equipaje`, `Ajustes`): **barra segmentada**, no chips sueltos.
+
+| Pieza | Valor |
+| --- | --- |
+| Contenedor | `--glass-radius-field`, borde `--glass-border`, fondo `rgba(255,255,255,0.08)`, padding 3px |
+| Pestaña | `.crew-panel__tab` — sin `.crew-panel__chip`; flex + scroll horizontal si no caben |
+| Activa | `aria-selected="true"` → fondo `--glass-bg-selected` + inset blanco |
+
+Patrón ARIA: `role="tablist"` + `role="tab"` + paneles `data-crew-panel` con `hidden`.
+
+### 16. Equipaje por secciones (`.crew-baggage__section`)
+
+En la pestaña **Equipaje**, monedas y hallazgos van en **bloques glass separados** con título claro.
+
+| Sección | Clase | Contenido |
+| --- | --- | --- |
+| Monedas | `.crew-baggage__section--wallet` | Título con icono `currency` · saldo en `.crew-baggage__wallet-card` · helper debajo |
+| Hallazgos | `.crew-baggage__section--findings` | Título + contador `n/m` en `.crew-baggage__section-count` (tutor) · rejilla de slots |
+
+Gap entre secciones: `0.85rem`. Cada bloque: borde `--glass-border`, fondo `--glass-bg`, radius `--glass-radius-field`.
+
 ---
 
 ## Tipografía en controles
@@ -300,6 +350,10 @@ Nombre en slot = `instance_name` (agente). El propósito pedagógico va en el de
 - Listeners de cierre en el marco que no filtran interacción dentro del panel (`composedPath`).
 - Nueva sección autenticada **sin** `section-frame` / mundo animado (fondo plano, shell destruido).
 - Timeline u otros listados con fills negros opacos en lugar de `--glass-bg` / `--glass-border`.
+- Pestañas de ficha tripulante como chips sueltos (`.crew-panel__chip` en `role="tab"`).
+- Anillo de progreso con arco azul/cian o núcleo oscuro opaco.
+- Acordeón «Rangos del viaje» como chip + panel con doble borde.
+- Equipaje sin separar monedas y hallazgos en bloques con título.
 
 ---
 
@@ -314,7 +368,7 @@ Nombre en slot = `instance_name` (agente). El propósito pedagógico va en el de
 | Modales JS | `web/js/components/glass-modal.js` |
 | Toasts JS | `web/js/components/glass-toast.js` |
 | Iconos | `web/js/components/shell-ui-icons.js` |
-| Consumo | `crew-panel.js`, `settings-panel.js`, `account-panel.js`, `scenes/play.js` |
+| Consumo | `crew-panel.js`, `baggage-ui.js`, `settings-panel.js`, `account-panel.js`, `scenes/play.js` |
 | Demo local | `http://localhost:8082/tmp/glass-controls-demo.html` (loader real + `poc-up.ps1`) |
 
 ### Helpers JS exportados

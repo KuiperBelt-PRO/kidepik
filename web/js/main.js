@@ -9,8 +9,8 @@ import { renderHome } from "./scenes/home.js?v=253";
 import { renderAccount } from "./scenes/account.js?v=237";
 import { renderSettings } from "./scenes/settings.js?v=244";
 import { watchNoSpellcheck } from "./components/glass-controls.js?v=227";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=257";
-import { renderPlay } from "./scenes/play.js?v=257";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=260";
+import { renderPlay } from "./scenes/play.js?v=260";
 import { renderLegal } from "./scenes/legal.js?v=256";
 import {
   initDebugAiFromUrl,

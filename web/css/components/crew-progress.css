@@ -1,8 +1,12 @@
+/* Pestañas ficha tripulante — barra segmentada glass (no chips sueltos) */
 .crew-panel__tabs {
   display: flex;
-  gap: 0.4rem;
-  margin: 0.75rem 0 0.35rem;
-  justify-content: flex-start;
+  gap: 2px;
+  margin: 0.75rem 0 0.5rem;
+  padding: 3px;
+  border-radius: var(--glass-radius-field, 12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  background: rgba(255, 255, 255, 0.08);
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -12,12 +16,41 @@
 }
 
 .crew-panel__tab {
-  flex: 0 0 auto;
+  flex: 1 0 auto;
+  min-width: max(4.35rem, 17%);
+  min-height: 40px;
+  padding: 0.4rem 0.55rem;
+  border: 0;
+  border-radius: calc(var(--glass-radius-field, 12px) - 4px);
+  background: transparent;
+  color: var(--glass-text, #fff);
+  font: inherit;
+  font-size: calc(0.78rem * var(--font-scale-ui, 1));
+  font-weight: 600;
+  line-height: 1.15;
+  opacity: 0.82;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 160ms ease,
+    opacity 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.crew-panel__tab:hover {
+  opacity: 0.95;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.crew-panel__tab:focus-visible {
+  outline: 2px solid var(--glass-focus, rgba(255, 255, 255, 0.85));
+  outline-offset: 2px;
 }
 
 .crew-panel__tab[aria-selected="true"] {
-  border-color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.16);
+  opacity: 1;
+  background: var(--glass-bg-selected, rgba(255, 255, 255, 0.28));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28);
 }
 
 .crew-panel__tab-panel[hidden] {
@@ -60,32 +93,36 @@
   white-space: nowrap;
 }
 
+/* Anillo % — tokens glass blancos (DESIGN.md §13) */
 .crew-progress__ring {
   --p: 0;
-  width: 2rem;
-  height: 2rem;
+  width: 2.1rem;
+  height: 2.1rem;
   border-radius: 50%;
   background: conic-gradient(
-    rgba(120, 200, 255, 0.9) calc(var(--p) * 1%),
+    rgba(255, 255, 255, 0.55) calc(var(--p) * 1%),
     rgba(255, 255, 255, 0.14) 0
   );
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
 }
 
 .crew-progress__ring-inner {
-  width: 1.45rem;
-  height: 1.45rem;
+  width: 1.55rem;
+  height: 1.55rem;
   border-radius: 50%;
-  background: rgba(12, 18, 28, 0.72);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-size: calc(0.58rem * var(--font-scale-ui, 1));
   font-weight: 600;
   line-height: 1;
+  color: var(--glass-text, #fff);
 }
 
 .crew-progress__rank-next {
@@ -100,14 +137,14 @@
 .crew-progress__bar {
   height: 0.45rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.15);
   overflow: hidden;
 }
 
 .crew-progress__bar-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(120, 200, 255, 0.85), rgba(170, 130, 255, 0.9));
+  background: rgba(255, 255, 255, 0.55);
   transition: width 280ms ease;
 }
 
@@ -122,19 +159,44 @@
   opacity: 0.95;
 }
 
+/* Acordeón integrado — un solo contenedor glass (DESIGN.md §14) */
 .crew-progress__legend {
   margin: 0.55rem 0 0.85rem;
-  font-size: calc(0.8rem * var(--font-scale-ui, 1));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  border-radius: var(--glass-radius-field, 12px);
+  background: var(--glass-bg, rgba(255, 255, 255, 0.1));
+  overflow: hidden;
 }
 
 .crew-progress__legend-trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 0.4rem;
   width: 100%;
   justify-content: flex-start;
-  padding: 0.45rem 0.65rem;
+  min-height: 48px;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  background: transparent;
+  color: var(--glass-text, #fff);
+  font: inherit;
+  font-weight: 600;
   text-align: left;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.crew-progress__legend-trigger:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.crew-progress__legend-trigger:focus-visible {
+  outline: 2px solid var(--glass-focus, rgba(255, 255, 255, 0.85));
+  outline-offset: -2px;
+}
+
+.crew-progress__legend.is-open .crew-progress__legend-trigger {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .crew-progress__legend-trigger-label {
@@ -153,13 +215,13 @@
 }
 
 .crew-progress__legend-panel {
-  margin-top: 0.45rem;
-  padding: 0.65rem 0.75rem;
-  border-radius: 0.75rem;
-  border: 1px solid var(--glass-panel-border, rgba(255, 255, 255, 0.5));
-  background: var(--glass-panel-tint, rgba(255, 255, 255, 0.1));
-  backdrop-filter: var(--glass-panel-blur, blur(40px) saturate(1.55));
-  -webkit-backdrop-filter: var(--glass-panel-blur, blur(40px) saturate(1.55));
+  margin: 0;
+  padding: 0.65rem 0.75rem 0.75rem;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 .crew-progress__legend-intro {
