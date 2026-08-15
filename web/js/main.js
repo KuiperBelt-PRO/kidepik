@@ -8,13 +8,16 @@ import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
 import { renderHome } from "./scenes/home.js?v=253";
 import { renderAccount } from "./scenes/account.js?v=237";
 import { renderSettings } from "./scenes/settings.js?v=244";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=255";
-import { renderPlay } from "./scenes/play.js?v=256";
+import { watchNoSpellcheck } from "./components/glass-controls.js?v=227";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=257";
+import { renderPlay } from "./scenes/play.js?v=257";
 import { renderLegal } from "./scenes/legal.js?v=256";
 import {
   initDebugAiFromUrl,
 } from "./lib/debug-ai.js?v=243";
 import { ensureDebugAiShellBadge } from "./lib/debug-ai-shell.js?v=1";
+
+watchNoSpellcheck(document.documentElement);
 
 function updateOfflineBanner() {
   const banner = document.getElementById("offline-banner");

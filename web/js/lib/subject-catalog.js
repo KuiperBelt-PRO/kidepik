@@ -34,6 +34,60 @@ export const SUBJECT_FAMILY_LABELS = {
   life: "Vida práctica",
 };
 
+/** Placeholders de notas tutor por materia (información adicional neutral). */
+export const SUBJECT_NOTE_PLACEHOLDERS = {
+  math: "p. ej. Domina tablas de multiplicar; retos más exigentes",
+  language: "p. ej. Ortografía con errores frecuentes; conjugación irregular",
+  reading: "p. ej. Lee con fluidez; prefiere textos más largos",
+  logic: "p. ej. Buen nivel en acertijos; secuencias complejas",
+  science: "p. ej. Curiosidad con experimentos; ya conoce el ciclo del agua",
+  culture: "p. ej. Vocabulario amplio; interés en datos curiosos",
+  geography: "p. ej. Sabe capitales; mapas y coordenadas",
+  history: "p. ej. Interés en Roma; cronologías sencillas",
+  mythology: "p. ej. Interés en mitos griegos; nombres de dioses",
+  ethics: "p. ej. Reflexión sobre dilemas del día a día",
+  communication: "p. ej. Oralidad clara; debates cortos",
+  politics: "p. ej. Preguntas sobre elecciones; ciudadanía básica",
+  arts: "p. ej. Dibuja a menudo; interés en música",
+  sports: "p. ej. Practica natación; hábitos de salud",
+  finance: "p. ej. Entiende monedas; trueque y presupuesto",
+};
+
+export const GENERAL_NOTE_PLACEHOLDER =
+  "p. ej. 8 años pero muy adelantado en general; prefiere retos con historia";
+
+/**
+ * @param {string} subjectId
+ * @returns {string}
+ */
+export function subjectNotePlaceholder(subjectId) {
+  const id = String(subjectId || "").trim();
+  return SUBJECT_NOTE_PLACEHOLDERS[id] || "Nota para el tutor sobre esta materia";
+}
+
+/**
+ * @param {unknown} learning
+ * @returns {string}
+ */
+export function generalNoteFromLearning(learning) {
+  if (!learning || typeof learning !== "object") return "";
+  const raw = /** @type {Record<string, unknown>} */ (learning);
+  if (typeof raw.general_note === "string" && raw.general_note.trim()) {
+    return raw.general_note.trim();
+  }
+  const legacy = raw.weak_spots;
+  if (!Array.isArray(legacy)) return "";
+  const parts = [];
+  for (const item of legacy) {
+    if (typeof item === "string" && item.trim()) {
+      parts.push(item.trim());
+    } else if (item && typeof item === "object" && !item.subject_id && item.note) {
+      parts.push(String(item.note).trim());
+    }
+  }
+  return parts.join("; ");
+}
+
 /** Materias base band_child (default hogar). */
 export const DEFAULT_ACTIVE_SUBJECTS = [
   "math",
@@ -98,13 +152,44 @@ function escapeHtml(s) {
 }
 
 /**
+ * @param {unknown} learning
+ * @returns {Map<string, string>}
+ */
+export function subjectNotesById(learning) {
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  if (!learning || typeof learning !== "object") return out;
+  const raw = /** @type {Record<string, unknown>} */ (learning);
+  const notes = raw.subject_notes;
+  if (Array.isArray(notes)) {
+    for (const item of notes) {
+      if (!item || typeof item !== "object") continue;
+      const sid = String(item.subject_id || "").trim();
+      const note = String(item.note || "").trim();
+      if (sid && note) out.set(sid, note);
+    }
+  }
+  const legacy = raw.weak_spots;
+  if (Array.isArray(legacy)) {
+    for (const item of legacy) {
+      if (!item || typeof item !== "object") continue;
+      const sid = String(item.subject_id || "").trim();
+      const note = String(item.note || "").trim();
+      if (sid && note && !out.has(sid)) out.set(sid, note);
+    }
+  }
+  return out;
+}
+
+/**
  * @param {SubjectMeta[]} catalog
  * @param {string[]} active
- * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, rank_label?: string, rank_next_label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }> }} [opts]
+ * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, rank_label?: string, rank_next_label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }>, subjectNotes?: Map<string, string> }} [opts]
  * @returns {string}
  */
 export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
   const activeSet = new Set(active);
+  const notesById = opts.subjectNotes || new Map();
   /** @type {Map<string, { current?: string, next?: string, percent?: number, rank?: string, rankNext?: string }>} */
   const progressById = new Map();
   for (const row of opts.progressSubjects || []) {
@@ -131,22 +216,48 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
       const on = activeSet.has(s.id);
       const prog = progressById.get(s.id);
       const percent = Math.max(0, Math.min(100, prog?.percent ?? 0));
-      const curRank = prog?.rank || formatLevelLabel(prog?.current);
-      const nextRank = prog?.rankNext || formatLevelLabel(prog?.next);
+      const curRank = prog?.rank || "";
+      const nextRank = prog?.rankNext || "";
       let levelLine = "Sin nivel aún";
       if (curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
       else if (curRank) levelLine = curRank;
-      html += `<div class="crew-subject-card${on ? " is-on" : ""}">
+      const noteText = notesById.get(s.id) || "";
+      const hasNote = Boolean(noteText);
+      const panelId = `crew-subject-note-${escapeHtml(s.id)}`;
+      const notePlaceholder = subjectNotePlaceholder(s.id);
+      html += `<div class="crew-subject-card${on ? " is-on" : ""}${hasNote ? " has-note" : ""}" data-subject-card="${escapeHtml(s.id)}">
         <div class="crew-subject-card__head">
           <span class="crew-subject-card__label">${escapeHtml(s.label)}</span>
-          <label class="glass-switch">
-            <input type="checkbox" role="switch" data-subject="${escapeHtml(s.id)}" ${on ? "checked" : ""} aria-label="Activar ${escapeHtml(s.label)}" />
-            <span class="glass-switch__track" aria-hidden="true"><span class="glass-switch__knob"></span></span>
-          </label>
+          <div class="crew-subject-card__actions">
+            <button
+              type="button"
+              class="crew-subject-card__notes-toggle"
+              data-subject-notes-toggle="${escapeHtml(s.id)}"
+              aria-expanded="false"
+              aria-controls="${panelId}"
+              aria-label="Información adicional de ${escapeHtml(s.label)}"
+            >
+              <span class="crew-subject-card__notes-chevron" aria-hidden="true"></span>
+            </button>
+            <label class="glass-switch">
+              <input type="checkbox" role="switch" data-subject="${escapeHtml(s.id)}" ${on ? "checked" : ""} aria-label="Activar ${escapeHtml(s.label)}" />
+              <span class="glass-switch__track" aria-hidden="true"><span class="glass-switch__knob"></span></span>
+            </label>
+          </div>
         </div>
         <p class="crew-subject-card__level">${escapeHtml(levelLine)}</p>
         <div class="crew-progress__bar" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100">
           <div class="crew-progress__bar-fill" style="width:${percent}%"></div>
+        </div>
+        <div class="crew-subject-card__notes-panel" id="${panelId}" data-subject-notes-panel="${escapeHtml(s.id)}" hidden>
+          <textarea
+            class="crew-panel__input crew-subject-card__notes-input"
+            data-subject-note="${escapeHtml(s.id)}"
+            rows="2"
+            maxlength="200"
+            placeholder="${escapeHtml(notePlaceholder)}"
+            aria-label="Información adicional de ${escapeHtml(s.label)}"
+          >${escapeHtml(noteText)}</textarea>
         </div>
       </div>`;
     }

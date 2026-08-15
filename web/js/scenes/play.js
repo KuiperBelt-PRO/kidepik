@@ -4,13 +4,13 @@
  */
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
-import { mountSectionFrame } from "../components/section-frame.js?v=260";
+import { mountSectionFrame } from "../components/section-frame.js?v=261";
 import {
   bindGlassIconTheme,
   createGlassIconSvg,
   fillGlassSkeleton,
   setGlassButton,
-} from "../components/glass-controls.js?v=221";
+} from "../components/glass-controls.js?v=227";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
 import { navigate } from "../lib/router.js";
 import { navigateShellRoute } from "../lib/shell-navigation.js";
@@ -33,7 +33,7 @@ import { isDebugAiAllowed, isDebugAiClientActive, setDebugAiServerAllowed } from
 import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
 import { postDebugJourneyRewind } from "../lib/debug-journey-api.js?v=256";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=257";
-import { renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=1";
+import { baggageGlyphId, renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=2";
 import { formatLevelLabel } from "../lib/subject-catalog.js?v=253";
 import { renderShellUiIconSvgInner } from "../components/shell-ui-icons.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
@@ -603,7 +603,9 @@ async function mountPlayPanel(root, ctx) {
     baggageView.innerHTML = renderBaggageHtml(bag, { audience: "child" });
     baggageView.querySelectorAll("[data-icon]").forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
-      el.replaceChildren(createGlassIconSvg(/** @type {any} */ ("baggage"), { size: 22 }));
+      const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
+      const size = el.classList.contains("crew-baggage__icon") ? 36 : 24;
+      el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size }));
     });
     baggageView.querySelectorAll("[data-baggage-item]").forEach((btn) => {
       btn.addEventListener("click", () => {

@@ -101,17 +101,21 @@ html[data-shell-theme="fantasy"] .crew-card__title {
 }
 
 .crew-card__status-gem {
-  flex: 0 0 auto;
-  max-width: 42px;
-  padding: 0.12rem 0.3rem;
+  flex: 1 1 68%;
+  max-width: 72%;
+  min-width: 5.5rem;
+  padding: 0.18rem 0.45rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.14);
   font-size: calc(0.58rem * var(--font-scale-ui, 1));
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
   text-align: center;
   letter-spacing: 0.01em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  hyphens: manual;
 }
 
 .crew-card__status-gem--ready {

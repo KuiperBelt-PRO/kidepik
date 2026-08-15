@@ -35,11 +35,11 @@ class CrewProgressService:
     }
     # Orientación tutor: el rango sigue el L*; la edad solo calibra dificultad.
     RANK_AGE_HINTS = {
-        1: "Cualquier edad (inicio del viaje)",
-        2: "Típico tras primeros caminos",
-        3: "Con soltura en varias materias",
-        4: "Dominio amplio; retos exigentes",
-        5: "Tope de progresión del MVP",
+        1: "Inicio del viaje",
+        2: "Primeros caminos",
+        3: "Soltura en varias materias",
+        4: "Retos exigentes",
+        5: "Cumbre del viaje",
     }
 
     async def build_for_child(self, child: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -47,7 +47,7 @@ class CrewProgressService:
         theme = str(child.get("world_theme") or child.get("active_world_theme") or "fantasy")
         settings = child.get("settings") if isinstance(child.get("settings"), dict) else {}
         learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
-        active = self._resolve_active_subjects(child, learning)
+        active = SubjectCatalog.resolve_active_subjects(child, learning)
         levels, quest, completed_at = await self._data(child_id, theme)
         journey_settings = settings.get("journey") if isinstance(settings.get("journey"), dict) else {}
         completed = [
@@ -120,11 +120,7 @@ class CrewProgressService:
             hint = (
                 f"{unevaluated} materias pendientes de examen."
                 if unevaluated
-                else (
-                    f"Nivel general {general} — {percent} % del camino hacia {next_level}."
-                    if next_level
-                    else f"Nivel general {general} — nivel máximo."
-                )
+                else ""
             )
             general_progress = {
                 "current": general,
@@ -167,18 +163,7 @@ class CrewProgressService:
     def _resolve_active_subjects(
         self, child: dict[str, Any], learning: dict[str, Any]
     ) -> list[str]:
-        raw = learning.get("active_subjects")
-        if isinstance(raw, list) and raw:
-            try:
-                return SubjectCatalog.normalize_active_subjects(raw)
-            except ValueError:
-                pass
-        band = (
-            child.get("effective_age_band")
-            or child.get("age_band")
-            or "band_child"
-        )
-        return SubjectCatalog.base_subjects_for_band(str(band))
+        return SubjectCatalog.resolve_active_subjects(child, learning)
 
     def _rank_legend(self, theme: str) -> list[dict[str, Any]]:
         track = "sci-fi" if theme == "sci-fi" else "fantasy"

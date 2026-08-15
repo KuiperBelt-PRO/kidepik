@@ -33,11 +33,13 @@ def test_tutor_report_writes_markdown(tmp_path: Path, monkeypatch: pytest.Monkey
         world_theme="fantasy",
         display_name="Ada",
         progress={"general_level": "L2", "rank": {"label_tutor": "Aprendiz"}, "subjects": []},
-        weak_spots=[{"note": "Restas con llevada"}],
+        subject_notes=[{"subject_id": "math", "note": "Restas con llevada"}],
+        general_note="Muy adelantado en general",
         reason="tutor_request",
     )
     assert out["filename"].startswith("informe-")
     assert "Ada" in out["body"]
     assert "Restas con llevada" in out["body"]
+    assert "Muy adelantado" in out["body"]
     assert Path(out["path"]).is_file()
     get_settings.cache_clear()

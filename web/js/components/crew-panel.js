@@ -16,7 +16,7 @@ import {
   fetchCrewBaggage,
 } from "../lib/crew-api.js?v=260";
 import { fetchJourneyTimeline } from "../lib/play-api.js";
-import { renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=1";
+import { baggageGlyphId, renderBaggageDetailHtml, renderBaggageHtml } from "../lib/baggage-ui.js?v=2";
 import { applyCrewMemberWorldTheme } from "../lib/play-theme.js";
 import {
   bindGlassIconTheme,
@@ -29,16 +29,18 @@ import {
   normalizeSessionMinutes,
   runGlassButtonAction,
   setGlassButton,
-} from "./glass-controls.js?v=226";
+} from "./glass-controls.js?v=227";
 import { showGlassConfirm } from "./glass-modal.js?v=2";
 import { showPinPadModal } from "./pin-pad-modal.js?v=3";
 import { markExitPinVerified } from "../lib/exit-pin-gate.js";
 import {
-  formatLevelLabel,
+  GENERAL_NOTE_PLACEHOLDER,
+  generalNoteFromLearning,
   normalizeActiveSubjects,
   renderSubjectsChecklistHtml,
+  subjectNotesById,
   SUBJECT_CATALOG,
-} from "../lib/subject-catalog.js?v=253";
+} from "../lib/subject-catalog.js?v=256";
 import {
   buildCrewListCardInner,
   buildCrewMemberCardInner,
@@ -87,19 +89,50 @@ async function gatePlayNavigation(childId, session, perms) {
  * @param {number} percent
  * @param {string} leftLabel
  * @param {string} [rightLabel]
+ * @param {{ showRing?: boolean }} [opts]
  */
-function renderLevelBar(percent, leftLabel, rightLabel = "") {
+function renderLevelBar(percent, leftLabel, rightLabel = "", opts = {}) {
   const p = Math.max(0, Math.min(100, Number(percent) || 0));
   const right = rightLabel
     ? `<span class="crew-progress__rank-next">${escapeHtml(rightLabel)}</span>`
     : `<span class="crew-progress__rank-next" aria-hidden="true"></span>`;
+  const ring = opts.showRing
+    ? `<span class="crew-progress__ring" style="--p:${p}" title="${p} %"><span class="crew-progress__ring-inner">${p}%</span></span>`
+    : "";
+  const leftInner = opts.showRing
+    ? `<span class="crew-progress__rank-current crew-progress__rank-current--with-ring">${ring}<span class="crew-progress__rank-name">${escapeHtml(leftLabel)}</span></span>`
+    : `<span class="crew-progress__rank-current">${escapeHtml(leftLabel)}</span>`;
   return `<div class="crew-progress__row">
     <div class="crew-progress__track">
-      <span class="crew-progress__rank-current">${escapeHtml(leftLabel)}</span>
-      <div class="crew-progress__bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(leftLabel)}${rightLabel ? ` hacia ${escapeHtml(rightLabel)}` : ""}">
+      ${leftInner}
+      <div class="crew-progress__bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(leftLabel)}${rightLabel ? ` hacia ${escapeHtml(rightLabel)}` : ""} (${p} %)">
         <div class="crew-progress__bar-fill" style="width:${p}%"></div>
       </div>
       ${right}
+    </div>
+  </div>`;
+}
+
+/**
+ * @param {string} subjectLabel
+ * @param {number} percent
+ * @param {string} currentRank
+ * @param {string} [nextRank]
+ */
+function renderSubjectProgressRow(subjectLabel, percent, currentRank, nextRank = "") {
+  const p = Math.max(0, Math.min(100, Number(percent) || 0));
+  const cur = currentRank || "—";
+  const next = nextRank
+    ? `<span class="crew-progress__rank-next">${escapeHtml(nextRank)}</span>`
+    : `<span class="crew-progress__rank-next" aria-hidden="true"></span>`;
+  return `<div class="crew-progress__row crew-progress__row--subject">
+    <div class="crew-progress__subject-label">${escapeHtml(subjectLabel)}</div>
+    <div class="crew-progress__track">
+      <span class="crew-progress__rank-current">${escapeHtml(cur)}</span>
+      <div class="crew-progress__bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(subjectLabel)}: ${escapeHtml(cur)}${nextRank ? ` hacia ${escapeHtml(nextRank)}` : ""}">
+        <div class="crew-progress__bar-fill" style="width:${p}%"></div>
+      </div>
+      ${next}
     </div>
   </div>`;
 }
@@ -111,16 +144,74 @@ function renderRankLegend(member) {
   const legend = member?.progress?.rank_legend;
   if (!Array.isArray(legend) || !legend.length) return "";
   const rows = legend
-    .map(
-      (row) =>
-        `<li><strong>${escapeHtml(row.label)}</strong> · ${escapeHtml(row.level_id)} · ${escapeHtml(row.age_hint || "")}</li>`,
-    )
+    .map((row) => {
+      const age = row.age_hint ? `<span class="crew-progress__legend-age">${escapeHtml(row.age_hint)}</span>` : "";
+      return `<li class="crew-progress__legend-item"><span class="crew-progress__legend-rank">${escapeHtml(row.label)}</span>${age}</li>`;
+    })
     .join("");
-  return `<details class="crew-progress__legend">
-    <summary>Leyenda de rangos y niveles</summary>
-    <p class="crew-panel__helper">El rango narrativo sigue el nivel pedagógico (L1–L5). La edad calibra la dificultad, no el nombre del rango.</p>
-    <ul class="crew-progress__legend-list">${rows}</ul>
-  </details>`;
+  return `<div class="crew-progress__legend">
+    <button type="button" class="crew-progress__legend-trigger crew-panel__chip" aria-expanded="false" aria-controls="crew-rank-legend-panel">
+      <span class="crew-progress__legend-trigger-icon" data-icon="note" aria-hidden="true"></span>
+      <span class="crew-progress__legend-trigger-label">Rangos del viaje</span>
+      <span class="crew-progress__legend-chevron" data-icon="chevron" aria-hidden="true"></span>
+    </button>
+    <div class="crew-progress__legend-panel" id="crew-rank-legend-panel" hidden>
+      <p class="crew-panel__helper crew-progress__legend-intro">Cada rango marca una etapa del viaje. La edad ajusta la dificultad, no el nombre del rango.</p>
+      <ul class="crew-progress__legend-list">${rows}</ul>
+    </div>
+  </div>`;
+}
+
+/**
+ * @param {ParentNode} host
+ * @returns {() => void}
+ */
+function mountSubjectNoteDisclosures(host) {
+  const toggles = host.querySelectorAll("[data-subject-notes-toggle]");
+  /** @type {(() => void)[]} */
+  const cleanups = [];
+  toggles.forEach((trigger) => {
+    if (!(trigger instanceof HTMLButtonElement)) return;
+    const sid = trigger.getAttribute("data-subject-notes-toggle");
+    if (!sid) return;
+    const panel = host.querySelector(`[data-subject-notes-panel="${sid}"]`);
+    if (!(panel instanceof HTMLElement)) return;
+    const onToggle = () => {
+      const open = trigger.getAttribute("aria-expanded") === "true";
+      trigger.setAttribute("aria-expanded", String(!open));
+      panel.hidden = open;
+      trigger.classList.toggle("is-open", !open);
+    };
+    trigger.addEventListener("click", onToggle);
+    cleanups.push(() => trigger.removeEventListener("click", onToggle));
+  });
+  return () => cleanups.forEach((fn) => fn());
+}
+
+/**
+ * @param {ParentNode} host
+ * @returns {() => void}
+ */
+function mountRankLegend(host) {
+  const root = host.querySelector(".crew-progress__legend");
+  if (!root) return () => {};
+  const trigger = root.querySelector(".crew-progress__legend-trigger");
+  const panel = root.querySelector(".crew-progress__legend-panel");
+  if (!(trigger instanceof HTMLButtonElement) || !(panel instanceof HTMLElement)) return () => {};
+  root.querySelectorAll("[data-icon]").forEach((el) => {
+    if (!(el instanceof HTMLElement)) return;
+    const id = el.getAttribute("data-icon") || "note";
+    const size = id === "chevron" ? 16 : 18;
+    el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size }));
+  });
+  const onToggle = () => {
+    const open = trigger.getAttribute("aria-expanded") === "true";
+    trigger.setAttribute("aria-expanded", String(!open));
+    panel.hidden = open;
+    root.classList.toggle("is-open", !open);
+  };
+  trigger.addEventListener("click", onToggle);
+  return () => trigger.removeEventListener("click", onToggle);
 }
 
 /**
@@ -142,26 +233,21 @@ function renderProgressSection(member) {
     .filter((s) => s.level_progress)
     .map((s) => {
       const lp = s.level_progress;
-      const zone = s.zone_label ? ` · ${s.zone_label}` : "";
-      const curRank = s.rank_label || formatLevelLabel(lp.current);
-      const nextRank = s.rank_next_label || formatLevelLabel(lp.next);
-      return renderLevelBar(
-        lp.percent_to_next,
-        `${s.label}${zone ? zone : ""} · ${curRank}`,
-        nextRank || "",
-      );
+      const curRank = s.rank_label || "";
+      const nextRank = s.rank_next_label || "";
+      return renderSubjectProgressRow(s.label || "", lp.percent_to_next, curRank, nextRank);
     })
     .join("");
-  const gpLeft = rank?.label_tutor || rank?.label_child || formatLevelLabel(gp?.current) || "Explorador";
-  const gpRight =
-    rankNext?.label_tutor ||
-    rankNext?.label_child ||
-    formatLevelLabel(gp?.next) ||
-    "";
+  const gpLeft = rank?.label_tutor || rank?.label_child || "Explorador";
+  const gpRight = rankNext?.label_tutor || rankNext?.label_child || "";
+  const pendingHint =
+    gp?.hint_tutor && String(gp.hint_tutor).includes("materias pendientes")
+      ? `<p class="crew-panel__helper">${escapeHtml(gp.hint_tutor)}</p>`
+      : "";
   return `<section class="crew-panel__block crew-progress">
     <h2 class="crew-panel__block-title">Tu explorador en el viaje</h2>
-    ${gp ? renderLevelBar(gp.percent_to_next, gpLeft, gpRight) : ""}
-    <p class="crew-panel__helper">${escapeHtml(gp?.hint_tutor || "")}</p>
+    ${gp ? renderLevelBar(gp.percent_to_next, gpLeft, gpRight, { showRing: true }) : ""}
+    ${pendingHint}
     ${renderRankLegend(member)}
     ${subjectBars}
   </section>`;
@@ -579,26 +665,20 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     const subjectsBlock = `
       <section class="crew-panel__block" data-subjects-block>
         <h2 class="crew-panel__block-title">Materias de aprendizaje</h2>
-        <p class="crew-panel__helper">Activa o desactiva materias. El nivel del reto se adapta a la edad, no a la materia.</p>
-        <div class="crew-panel__subjects" data-subjects-host></div>
-        <p class="crew-panel__helper" data-subjects-warn hidden>Más de 10 materias: el examen puede ser largo; se puede reanudar.</p>
-        <label class="crew-panel__label">Puntos flojos (para caminos)
+        <p class="crew-panel__helper">Activa materias y añade notas si quieres. Esta información se tendrá en cuenta para generar la historia del viaje, los retos y aprendizajes.</p>
+        <label class="crew-panel__label">Información adicional (general)
           <textarea
             class="crew-panel__input"
-            data-weak-spots
+            data-general-note
             rows="2"
             maxlength="400"
-            placeholder="p. ej. Divisiones de 2 cifras; conjugación de verbos irregulares"
-          >${escapeHtml(
-            Array.isArray(member.settings?.learning?.weak_spots)
-              ? member.settings.learning.weak_spots
-                  .map((w) => (typeof w === "string" ? w : w?.note || ""))
-                  .filter(Boolean)
-                  .join("; ")
-              : "",
-          )}</textarea>
+            placeholder="${escapeAttr(GENERAL_NOTE_PLACEHOLDER)}"
+            aria-label="Información adicional general del explorador"
+          >${escapeHtml(generalNoteFromLearning(member.settings?.learning))}</textarea>
         </label>
-        <p class="crew-panel__helper">El tutor indica focos; se usan al componer caminos.</p>
+        <p class="crew-panel__helper">Contexto del explorador no ligado a una materia (edad, ritmo, intereses).</p>
+        <div class="crew-panel__subjects" data-subjects-host></div>
+        <p class="crew-panel__helper" data-subjects-warn hidden>Más de 10 materias: el examen puede ser largo; se puede reanudar.</p>
         <p class="crew-panel__status" data-subjects-status aria-live="polite"></p>
         <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-subjects></button>
       </section>`;
@@ -634,13 +714,12 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           : `<div class="crew-panel__tabs" role="tablist" aria-label="Secciones del tripulante">
         <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="details" aria-selected="true">Detalles</button>
         <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="journey" aria-selected="false">Viaje</button>
+        <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="progress" aria-selected="false">Progreso</button>
         <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="baggage" aria-selected="false">Equipaje</button>
         <button type="button" class="crew-panel__chip crew-panel__tab" role="tab" data-crew-tab="settings" aria-selected="false">Ajustes</button>
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="details">
         ${profileBlock}
-        ${renderProgressSection(member)}
-        ${subjectsBlock}
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="journey" hidden>
         ${renderJourneyMapSection(member)}
@@ -651,6 +730,10 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           <button type="button" class="crew-panel__btn" data-tutor-report>Generar informe</button>
           <pre class="crew-panel__helper" data-tutor-report-preview hidden style="white-space:pre-wrap;max-height:12rem;overflow:auto"></pre>
         </section>
+      </div>
+      <div class="crew-panel__tab-panel" data-crew-panel="progress" hidden>
+        ${renderProgressSection(member)}
+        ${subjectsBlock}
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="baggage" hidden>
         <section class="crew-panel__block">
@@ -671,7 +754,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       const defaultTab = member.placement_status === "completed" ? "journey" : "details";
       /** @type {string} */
       let activeTab = sessionStorage.getItem(crewTabStorageKey(member.id)) || defaultTab;
-      const allowedTabs = ["details", "journey", "baggage", "settings"];
+      const allowedTabs = ["details", "journey", "progress", "baggage", "settings"];
       if (!allowedTabs.includes(activeTab)) activeTab = defaultTab;
       /** @type {any} */
       let baggageCache = null;
@@ -701,10 +784,9 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         host.innerHTML = renderBaggageHtml(bag, { audience: "tutor" });
         host.querySelectorAll("[data-icon]").forEach((el) => {
           if (!(el instanceof HTMLElement)) return;
-          const id = el.getAttribute("data-icon") || "baggage";
-          el.replaceChildren(
-            createGlassIconSvg(/** @type {any} */ (id === "item-potion" || id === "item-charm" || id === "item-artifact" || id === "item-relic" || id === "item-program" || id === "item-module" || id === "item-tech" ? "baggage" : id), { size: 22 }),
-          );
+          const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
+          const size = el.classList.contains("crew-baggage__icon") ? 36 : 24;
+          el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size }));
         });
         host.querySelectorAll("[data-baggage-item]").forEach((btn) => {
           btn.addEventListener("click", () => {
@@ -714,6 +796,11 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
             if (!(detail instanceof HTMLElement) || !item) return;
             detail.hidden = false;
             detail.innerHTML = renderBaggageDetailHtml(item, "tutor");
+            detail.querySelectorAll("[data-icon]").forEach((el) => {
+              if (!(el instanceof HTMLElement)) return;
+              const glyph = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
+              el.replaceChildren(createGlassIconSvg(/** @type {any} */ (glyph), { size: 40 }));
+            });
             detail.querySelector("[data-baggage-detail-close]")?.addEventListener("click", () => {
               detail.hidden = true;
               detail.innerHTML = "";
@@ -767,7 +854,9 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           progressSubjects: Array.isArray(member.progress?.subjects)
             ? member.progress.subjects
             : [],
+          subjectNotes: subjectNotesById(member.settings?.learning),
         });
+        cleanups.push(mountSubjectNoteDisclosures(host));
       }
       const warn = root.querySelector("[data-subjects-warn]");
       const syncWarn = () => {
@@ -818,6 +907,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     const hero = root.querySelector(".crew-card--hero");
     if (hero instanceof HTMLElement) paintCrewCardIcons(hero, { hero: true });
     cleanups.push(bindGlassIconTheme(root));
+    cleanups.push(mountRankLegend(root));
 
     /** @type {number} */
     let selectedMins = normalizeSessionMinutes(p.max_session_minutes || 10);
@@ -1056,18 +1146,23 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       void runGlassButtonAction(
         btn,
         async () => {
-          const weakEl = root.querySelector("[data-weak-spots]");
-          const weakRaw =
-            weakEl instanceof HTMLTextAreaElement ? weakEl.value.trim() : "";
-          const weak_spots = weakRaw
-            ? weakRaw
-                .split(";")
-                .map((n) => n.trim())
-                .filter(Boolean)
-                .map((note) => ({ subject_id: null, note }))
-            : [];
+          /** @type {Array<{ subject_id: string, note: string }>} */
+          const subject_notes = [];
+          root.querySelectorAll("[data-subject-note]").forEach((el) => {
+            if (!(el instanceof HTMLTextAreaElement)) return;
+            const sid = el.getAttribute("data-subject-note");
+            const note = el.value.trim();
+            if (sid && note) subject_notes.push({ subject_id: sid, note });
+          });
+          const generalEl = root.querySelector("[data-general-note]");
+          const general_note =
+            generalEl instanceof HTMLTextAreaElement ? generalEl.value.trim() : "";
           const res = await patchCrewMember(session, childId, {
-            learning: { active_subjects: selected, weak_spots },
+            learning: {
+              active_subjects: selected,
+              subject_notes,
+              general_note: general_note || null,
+            },
           });
           if (res.ok) {
             Object.assign(member, res.member);

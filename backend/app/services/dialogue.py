@@ -43,6 +43,8 @@ from app.services.mentor_prose import (
     validate_species_options,
     validate_traveler_profile_prose,
 )
+from app.services.crew import CrewService
+from app.services.crew_progress import CrewProgressService
 from app.services.placement import PlacementService
 from app.services.traveler_profile import extract_palette_tokens, palette_is_meaningful
 from app.services.waiting_copy import WaitingCopyService
@@ -2799,25 +2801,45 @@ class DialogueService:
             {"type": "placement_completed", "value": True},
         ], [turn]
 
+    async def _weak_subjects_for_path_pack(self, child: dict[str, Any]) -> list[str]:
+        """Materias más flojas primero (nivel bajo, rolling bajo)."""
+        subjects = PlacementService.active_subjects_for_child(child)
+        fallback = ["math", "language", "logic"]
+        if not subjects:
+            return fallback[:3]
+
+        theme = self._world(child) or "fantasy"
+        rows = (
+            await self.session.execute(
+                text(
+                    "select subject_id, level_id, accuracy_rolling "
+                    "from user_subject_levels "
+                    "where child_id = :id and world_theme = :theme"
+                ),
+                {"id": str(child["id"]), "theme": theme},
+            )
+        ).mappings().all()
+        by_subject = {str(row["subject_id"]): row for row in rows}
+
+        def weakness_key(subject_id: str) -> tuple[int, float]:
+            row = by_subject.get(subject_id)
+            level = str(row["level_id"]) if row and row.get("level_id") else "L1"
+            rolling_raw = row.get("accuracy_rolling") if row else None
+            rolling = float(rolling_raw) if rolling_raw is not None else 0.5
+            return (CrewProgressService._level_index(level), rolling)
+
+        ordered = list(subjects)
+        ordered.sort(key=weakness_key)
+        weak = ordered[:3]
+        return weak if weak else fallback[:3]
+
     async def _compose_path_pack(
         self, child: dict[str, Any], session_id: str
     ) -> list[dict[str, Any]]:
         subjects = PlacementService.active_subjects_for_child(child)[:5]
         learning = (child.get("settings") or {}).get("learning") or {}
-        weak_spots = learning.get("weak_spots") if isinstance(learning.get("weak_spots"), list) else []
-        weak = subjects[:3] or ["math", "language", "logic"]
-        spot_notes = []
-        for spot in weak_spots[:6]:
-            if isinstance(spot, dict) and spot.get("note"):
-                sid = spot.get("subject_id") or ""
-                spot_notes.append(f"{sid}: {spot['note']}".strip(": "))
-            elif isinstance(spot, str) and spot.strip():
-                spot_notes.append(spot.strip())
-        spot_line = (
-            f" Puntos flojos del tutor: {'; '.join(spot_notes)}."
-            if spot_notes
-            else ""
-        )
+        weak = await self._weak_subjects_for_path_pack(child)
+        spot_line = CrewService.subject_notes_prompt_line(learning)
         theme = self._world(child) or "fantasy"
         palette_tokens = self._traveler_palette_tokens(child)
         retries = self.settings.ai_compose_batch_retries
@@ -2998,6 +3020,11 @@ class DialogueService:
             f"Genera PathPackEnvelope con exactamente {path_count} camino(s) "
             f"(paths.length = {path_count}).",
             f"Materias prioritarias (orden): {subjects_line}.{spot_line}",
+            (
+                "Las notas del tutor por materia son información adicional neutral "
+                "(fortalezas, contexto o ritmo); úsalas para calibrar dificultad y "
+                "contenido sin asumir que siempre indican debilidad."
+            ),
             f"Mundo: {theme}. Edad/banda: {child.get('age_years')}/{child.get('age_band')}.",
             (
                 "Orden de escritura POR CAMINO (obligatorio): "
@@ -3281,12 +3308,28 @@ class DialogueService:
         grant_key: str,
         currency_amount: int = 0,
         item_def_id: str | None = None,
+        agent_name: str | None = None,
     ) -> dict[str, Any] | None:
         """Grant idempotente; never raises into the dialogue path."""
         try:
+            from app.catalogs.item_catalog import ItemCatalog
+            from app.catalogs.item_namer import ItemNamer
             from app.services.reward_economy import RewardEconomyService
 
             world = self._world(child) or "fantasy"
+            named = None
+            if item_def_id:
+                defn = ItemCatalog.get(item_def_id)
+                if defn:
+                    named = ItemNamer.propose(
+                        world_theme=world,
+                        kind=str(defn["kind"]),
+                        subject_ids=list(defn["subject_ids"]),
+                        grant_key=grant_key,
+                        agent_name=agent_name,
+                        fallback=str(defn.get("label_child") or ""),
+                        effects=list(defn.get("effects") or []),
+                    )
             result = await RewardEconomyService().grant(
                 str(child["id"]),
                 world,
@@ -3294,6 +3337,8 @@ class DialogueService:
                 offer_id=offer_id,
                 currency_amount=currency_amount,
                 item_def_id=item_def_id,
+                instance_name=named,
+                agent_name=agent_name,
                 age_band=child.get("age_band")
                 if isinstance(child.get("age_band"), str)
                 else None,
@@ -3354,9 +3399,7 @@ class DialogueService:
                             "rank": {"label_tutor": child.get("rank_id")},
                             "subjects": [],
                         },
-                        weak_spots=learning.get("weak_spots")
-                        if isinstance(learning.get("weak_spots"), list)
-                        else [],
+                        subject_notes=CrewService.effective_subject_notes(learning),
                         reason="path_completed",
                     )
                 except Exception:
@@ -3393,6 +3436,8 @@ class DialogueService:
                 currency_amount=25,
                 item_def_id=self._pick_path_reward_item(world or "fantasy", subject_id),
             )
+            if grant and grant.get("toast_child"):
+                recap = f"{recap}\n\n{grant['toast_child']}"
             turn = await self._mentor_turn(
                 session_id,
                 child_id,

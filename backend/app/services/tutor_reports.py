@@ -34,6 +34,8 @@ class TutorReportService:
         world_theme: str | None,
         display_name: str | None,
         progress: dict[str, Any] | None,
+        subject_notes: list[dict[str, Any]] | None = None,
+        general_note: str | None = None,
         weak_spots: list[dict[str, Any]] | None = None,
         reason: str = "tutor_request",
     ) -> dict[str, str]:
@@ -68,16 +70,21 @@ class TutorReportService:
                 lines.append(f"- {label}: {cur}")
         else:
             lines.append("- Sin datos de materias todavía.")
-        lines.extend(["", "## Puntos flojos indicados por el tutor", ""])
-        spots = weak_spots or []
-        if spots:
-            for spot in spots:
+        lines.extend(["", "## Información adicional general (tutor)", ""])
+        if general_note and str(general_note).strip():
+            lines.append(f"- {str(general_note).strip()}")
+        else:
+            lines.append("- Ninguna registrada.")
+        lines.extend(["", "## Información adicional por materia (tutor)", ""])
+        notes = subject_notes or weak_spots or []
+        if notes:
+            for spot in notes:
                 note = spot.get("note") if isinstance(spot, dict) else str(spot)
                 sid = spot.get("subject_id") if isinstance(spot, dict) else None
                 prefix = f"[{sid}] " if sid else ""
                 lines.append(f"- {prefix}{note}")
         else:
-            lines.append("- Ninguno registrado.")
+            lines.append("- Ninguna registrada.")
         lines.extend(
             [
                 "",

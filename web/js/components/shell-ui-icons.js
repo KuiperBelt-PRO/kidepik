@@ -4,7 +4,7 @@
  */
 
 /** @typedef {'sci-fi' | 'fantasy'} UiIconTheme */
-/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'|'note'|'age'|'pause'|'pending'|'baggage'|'chat'|'currency'} UiIconId */
+/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'|'note'|'age'|'pause'|'pending'|'baggage'|'chat'|'currency'|'item-potion'|'item-charm'|'item-scroll'|'item-artifact'|'item-relic'|'item-weapon'|'item-ward'|'item-cloak'|'item-program'|'item-module'|'item-tech'|'item-datapad'|'item-blade'|'item-barrier'|'item-mesh'} UiIconId */
 
 export const SHELL_UI_ICON_THEMES = Object.freeze(
   /** @type {UiIconTheme[]} */ (["sci-fi", "fantasy"]),
@@ -33,6 +33,21 @@ export const SHELL_UI_ICON_IDS = Object.freeze(
     "baggage",
     "chat",
     "currency",
+    "item-potion",
+    "item-charm",
+    "item-scroll",
+    "item-artifact",
+    "item-relic",
+    "item-weapon",
+    "item-ward",
+    "item-cloak",
+    "item-program",
+    "item-module",
+    "item-tech",
+    "item-datapad",
+    "item-blade",
+    "item-barrier",
+    "item-mesh",
   ]),
 );
 
@@ -897,6 +912,7 @@ function buildGlyphGroups(theme, id) {
           ];
 
     default:
+      if (String(id).startsWith("item-")) return buildItemGlyph(id, sci);
       return [
         [
           { x: 40, y: 40 },
@@ -906,6 +922,128 @@ function buildGlyphGroups(theme, id) {
         ],
       ];
   }
+}
+
+/**
+ * @param {string} id
+ * @param {boolean} sci
+ * @returns {Array<Array<{ x: number; y: number }>>}
+ */
+function buildItemGlyph(id, sci) {
+  if (id === "item-potion" || id === "item-program") {
+    return sci
+      ? [
+          [
+            { x: 38, y: 22 },
+            { x: 62, y: 22 },
+            { x: 62, y: 38 },
+            { x: 70, y: 78 },
+            { x: 30, y: 78 },
+            { x: 38, y: 38 },
+          ],
+        ]
+      : [
+          [
+            { x: 42, y: 18 },
+            { x: 58, y: 18 },
+            { x: 58, y: 32 },
+            { x: 70, y: 78 },
+            { x: 30, y: 78 },
+            { x: 42, y: 32 },
+          ],
+        ];
+  }
+  if (id === "item-scroll" || id === "item-datapad") {
+    return [
+      [
+        { x: 28, y: 22 },
+        { x: 72, y: 22 },
+        { x: 72, y: 78 },
+        { x: 28, y: 78 },
+      ],
+      [
+        { x: 36, y: 34 },
+        { x: 64, y: 34 },
+        { x: 64, y: 38 },
+        { x: 36, y: 38 },
+      ],
+      [
+        { x: 36, y: 46 },
+        { x: 58, y: 46 },
+        { x: 58, y: 50 },
+        { x: 36, y: 50 },
+      ],
+    ];
+  }
+  if (id === "item-charm" || id === "item-module") {
+    return [
+      [
+        { x: 50, y: 20 },
+        { x: 72, y: 38 },
+        { x: 64, y: 72 },
+        { x: 36, y: 72 },
+        { x: 28, y: 38 },
+      ],
+    ];
+  }
+  if (id === "item-relic" || id === "item-tech") {
+    return [
+      [
+        { x: 50, y: 18 },
+        { x: 78, y: 50 },
+        { x: 50, y: 82 },
+        { x: 22, y: 50 },
+      ],
+    ];
+  }
+  if (id === "item-weapon" || id === "item-blade") {
+    return [
+      [
+        { x: 46, y: 16 },
+        { x: 54, y: 16 },
+        { x: 54, y: 62 },
+        { x: 46, y: 62 },
+      ],
+      [
+        { x: 36, y: 62 },
+        { x: 64, y: 62 },
+        { x: 64, y: 72 },
+        { x: 36, y: 72 },
+      ],
+    ];
+  }
+  if (id === "item-ward" || id === "item-barrier") {
+    return [
+      [
+        { x: 50, y: 18 },
+        { x: 78, y: 32 },
+        { x: 70, y: 70 },
+        { x: 50, y: 84 },
+        { x: 30, y: 70 },
+        { x: 22, y: 32 },
+      ],
+    ];
+  }
+  if (id === "item-cloak" || id === "item-mesh") {
+    return [
+      [
+        { x: 50, y: 16 },
+        { x: 78, y: 36 },
+        { x: 72, y: 82 },
+        { x: 50, y: 70 },
+        { x: 28, y: 82 },
+        { x: 22, y: 36 },
+      ],
+    ];
+  }
+  return [
+    [
+      { x: 32, y: 28 },
+      { x: 68, y: 28 },
+      { x: 74, y: 72 },
+      { x: 26, y: 72 },
+    ],
+  ];
 }
 
 /**

@@ -5,6 +5,7 @@ from typing import Any
 from sqlalchemy import text
 
 from app.catalogs.item_catalog import ItemCatalog
+from app.catalogs.item_namer import ItemNamer
 from app.db import session_scope
 from app.services.inventory import InventoryService
 
@@ -28,6 +29,9 @@ class RewardEconomyService:
         item_qty: int = 1,
         age_band: str | None = None,
         session_id: str | None = None,
+        instance_name: str | None = None,
+        instance_description: str | None = None,
+        agent_name: str | None = None,
     ) -> dict[str, Any]:
         """Idempotent grant. Returns wallet + items_added + skipped flag."""
         theme = self.inventory.normalize_theme(world_theme)
@@ -58,7 +62,16 @@ class RewardEconomyService:
             items_meta: list[dict[str, Any]] = []
 
             if item_def_id:
-                ItemCatalog.require(item_def_id)
+                defn = ItemCatalog.require(item_def_id)
+                named = ItemNamer.propose(
+                    world_theme=theme,
+                    kind=str(defn["kind"]),
+                    subject_ids=list(defn["subject_ids"]),
+                    grant_key=key,
+                    agent_name=agent_name or instance_name,
+                    fallback=str(defn.get("label_child") or ""),
+                    effects=list(defn.get("effects") or []),
+                )
                 result = await self.inventory.add_item(
                     session,
                     child_id,
@@ -66,9 +79,17 @@ class RewardEconomyService:
                     item_def_id,
                     item_qty,
                     age_band=age_band,
+                    instance_name=named,
+                    instance_description=instance_description,
                 )
                 if result.get("added"):
-                    items_meta.append({"item_def_id": item_def_id, "qty": item_qty})
+                    items_meta.append(
+                        {
+                            "item_def_id": item_def_id,
+                            "qty": item_qty,
+                            "instance_name": named,
+                        }
+                    )
                 else:
                     currency_delta += int(result.get("currency_compensation") or 0)
 
@@ -125,6 +146,7 @@ class RewardEconomyService:
             "balance": int(wallet_row["balance"]),
             "label_child": labels["label_child"],
             "label_tutor": labels["label_tutor"],
+            "icon_id": labels.get("icon_id", "currency"),
         }
         toast = None
         if currency_delta and items_meta:
@@ -132,7 +154,8 @@ class RewardEconomyService:
         elif currency_delta:
             toast = f"¡Has ganado {currency_delta} {labels['label_child'].lower()}!"
         elif items_meta:
-            toast = "¡Nuevo hallazgo en tu equipaje!"
+            shown = items_meta[0].get("instance_name") or "un hallazgo"
+            toast = f"¡Nuevo hallazgo: {shown}!"
 
         return {
             "skipped": False,

@@ -1,6 +1,6 @@
 # Spec: Ficha del tripulante — Viaje y progreso (panel tutor)
 
-> Estado: **propuesta — pendiente de aprobación** (delta ago 2026)  
+> Estado: **aprobada 15 ago 2026** (tabs Detalles / Viaje / Progreso / Equipaje / Ajustes)  
 > Relacionado: [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_CREW_MEMBER_CARDS.md](SPEC_APP_CREW_MEMBER_CARDS.md), [SPEC_APP_CREW_MEMBER_SETTINGS.md](SPEC_APP_CREW_MEMBER_SETTINGS.md), [SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_JOURNEY_MEMORY.md](SPEC_APP_JOURNEY_MEMORY.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md)
 
 ## Contexto
@@ -26,8 +26,8 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 
 ## Objetivo
 
-1. Reorganizar la ficha en pestañas: **Viaje** · **Equipaje** · **Ajustes** (y **Detalles** cuando el corte de backlog lo active).
-2. Grid de materias con progreso + activación.
+1. Reorganizar la ficha en pestañas: **Detalles** · **Viaje** · **Progreso** · **Equipaje** · **Ajustes**.
+2. Grid de materias con progreso + activación en **Progreso**.
 3. Fix descripción editable; switches glass para booleanos de ajustes.
 4. Exponer progresión legible al tutor (rango + nivel + %).
 5. Equipaje tutor: moneda + objetos — [SPEC_APP_CREW_BAGGAGE_TAB.md](SPEC_APP_CREW_BAGGAGE_TAB.md).
@@ -44,7 +44,7 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 ├─────────────────────────────────┤
 │      [ Hero crew-card ]         │
 ├─────────────────────────────────┤
-│ [Viaje] [Equipaje] [Ajustes]    │
+│ [Detalles] [Viaje] [Progreso] [Equipaje] [Ajustes] │
 ├─────────────────────────────────┤
 │  (contenido de pestaña activa)   │
 └─────────────────────────────────┘
@@ -52,20 +52,23 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 
 | Tab | Contenido |
 | --- | --- |
-| **Detalles** | Perfil editable, progreso general, **grid materias** (switch + barra) — cuando el corte Detalles esté activo |
-| **Viaje** | Diario / timeline / summaries (antes en scroll largo) |
+| **Detalles** | Perfil/identidad del explorador (nombre, mundo, edad, personaje) |
+| **Viaje** | Mapa, CTA aventura, diario, informe tutor |
+| **Progreso** | Rango, barras, leyenda, grid materias (switch + guardar) |
 | **Equipaje** | Wallet + grid ítems — [SPEC_APP_CREW_BAGGAGE_TAB.md](SPEC_APP_CREW_BAGGAGE_TAB.md) |
-| **Ajustes** | Permisos, PIN, límites, materias peligrosas / zona peligrosa |
+| **Ajustes** | Permisos, PIN, límites, zona peligrosa |
 
-> Delta ago 2026: además de Viaje|Ajustes, se añade **Equipaje**. Ver [SPEC_APP_PRODUCT_BACKLOG_AGO2026](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) y familia recompensas.
+> Delta 15 ago 2026: **Progreso** propio (antes mezclado en Detalles); **Detalles** solo identidad; **Viaje** solo narrativa del viaje.
 
 | Pestaña | `data-crew-tab` | Contenido |
 | --- | --- | --- |
-| **Viaje** | `journey` | Identidad, progreso, mapa viaje, diario — **default** si `placement_status=completed` |
+| **Detalles** | `details` | Perfil/identidad — **default** si placement incompleto |
+| **Viaje** | `journey` | Mapa, diario, aventura — **default** si placement completado |
+| **Progreso** | `progress` | Rango + materias |
 | **Equipaje** | `baggage` | Moneda + hallazgos del mundo |
-| **Ajustes** | `settings` | Permisos, materias, zona peligrosa — **default** si onboarding incompleto |
+| **Ajustes** | `settings` | Permisos, zona peligrosa |
 
-Persistir última pestaña en `sessionStorage` (`crew-tab:{childId}`) para la sesión del navegador.
+Persistir última pestaña en `sessionStorage` (`crew-tab:{childId}`).
 
 ### 1.2 Hero card (siempre visible)
 

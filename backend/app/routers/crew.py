@@ -4,6 +4,7 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query, status
 
+from app.catalogs.subject_catalog import SubjectCatalog
 from app.routers.parents import _claims, _email, _error
 from app.services.crew import CrewService
 from app.services.inventory import InventoryService
@@ -92,11 +93,10 @@ async def baggage(
         theme = world_theme or member.get("world_theme") or member.get("active_world_theme") or "fantasy"
         settings = member.get("settings") if isinstance(member.get("settings"), dict) else {}
         learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
-        active = learning.get("active_subjects") if isinstance(learning.get("active_subjects"), list) else []
         return await InventoryService().get_baggage(
             child_id,
             str(theme),
-            active_subjects=[str(s) for s in active],
+            active_subjects=SubjectCatalog.resolve_active_subjects(member),
             age_band=member.get("age_band") if isinstance(member.get("age_band"), str) else None,
             show_levels_to_child=bool(learning.get("show_levels_to_child")),
             audience="tutor",
@@ -140,7 +140,8 @@ async def tutor_report(child_id: str, authorization: str | None = Header(default
             world_theme=member.get("world_theme"),
             display_name=member.get("display_name"),
             progress=member.get("progress"),
-            weak_spots=learning.get("weak_spots") if isinstance(learning.get("weak_spots"), list) else [],
+            subject_notes=CrewService.effective_subject_notes(learning),
+            general_note=CrewService.effective_general_note(learning),
             reason="tutor_request",
         )
         return {"ok": True, "filename": report["filename"], "body": report["body"]}

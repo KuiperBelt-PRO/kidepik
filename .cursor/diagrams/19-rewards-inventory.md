@@ -11,6 +11,7 @@ flowchart TB
   Inv --> Items[(child_inventory_items PG)]
   Econ --> Ledger[events.jsonl reward_granted]
   Catalog[ItemCatalog data/items] --> Inv
+  Namer[ItemNamer instance_name] --> Inv
   Wallet --> TutorUI[Tab Equipaje ficha]
   Items --> TutorUI
   Wallet --> PlayUI[Play vista baggage]
@@ -33,6 +34,7 @@ flowchart TB
 ## Anti-errores
 
 - No mezclar wallets fantasy ↔ sci-fi.
-- LLM no inventa `item_def_id` ni cantidades.
+- LLM no inventa `item_def_id` ni cantidades; sí nombra la instancia (`instance_name`) o cae a `ItemNamer`.
+- Un arquetipo puede ligarse a **varias** materias (`subject_ids[]`); usable si ∩ activas ≠ ∅.
 - Placement no otorga economía en MVP.
 - Slot derecha en play = toggle equipaje, no forward.

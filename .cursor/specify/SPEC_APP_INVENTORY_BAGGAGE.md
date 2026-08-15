@@ -1,6 +1,7 @@
 # Spec: Inventario / Equipaje del tripulante
 
 > Estado: **aprobada — implementada parcialmente** (ago 2026)  
+> **Delta 15 ago 2026:** `instance_name` por grant; `usable_now` con el mismo resolver de materias que progreso (lista vacía → fallback de banda); copy «Materia en pausa».  
 > Relacionado: [SPEC_APP_REWARDS_ECONOMY.md](SPEC_APP_REWARDS_ECONOMY.md), [SPEC_APP_ITEM_CATALOG.md](SPEC_APP_ITEM_CATALOG.md), [SPEC_APP_REWARD_EFFECTS.md](SPEC_APP_REWARD_EFFECTS.md), [SPEC_APP_CREW_BAGGAGE_TAB.md](SPEC_APP_CREW_BAGGAGE_TAB.md), [SPEC_APP_PLAY_BAGGAGE_TOGGLE.md](SPEC_APP_PLAY_BAGGAGE_TOGGLE.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PARALLEL_WORLDS.md](SPEC_APP_PARALLEL_WORLDS.md), [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md)  
 > **Diagrama:** [19-rewards-inventory.md](../diagrams/19-rewards-inventory.md)
 
@@ -49,7 +50,9 @@ create table public.child_inventory_items (
   acquired_at timestamptz not null default now(),
   last_used_at timestamptz null,
   meta jsonb not null default '{}'::jsonb,
-  unique (child_id, world_theme, item_def_id)
+  instance_name text null,
+  instance_description text null
+  -- unique (child_id, world_theme, item_def_id) retirada: cada grant nombrado es instancia
 );
 
 create index child_inventory_child_world_idx

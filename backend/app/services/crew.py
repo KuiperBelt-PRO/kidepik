@@ -109,8 +109,28 @@ class CrewService:
                 learning["active_subjects"] = SubjectCatalog.normalize_active_subjects(incoming["active_subjects"]); learning["subjects_locked_by_tutor"] = True
             for key in ("adaptation_policy", "show_levels_to_child", "pause_adaptation"):
                 if key in incoming: learning[key] = incoming[key]
-            if "weak_spots" in incoming:
-                learning["weak_spots"] = self._normalize_weak_spots(incoming["weak_spots"])
+            if "subject_notes" in incoming:
+                learning["subject_notes"] = self._normalize_subject_notes(
+                    incoming["subject_notes"]
+                )
+                learning.pop("weak_spots", None)
+            elif "weak_spots" in incoming:
+                legacy = self._normalize_weak_spots(incoming["weak_spots"])
+                learning["subject_notes"] = [
+                    {"subject_id": str(item["subject_id"]), "note": str(item["note"])}
+                    for item in legacy
+                    if item.get("subject_id") and item.get("note")
+                ]
+                orphan = [
+                    str(item["note"])
+                    for item in legacy
+                    if not item.get("subject_id") and item.get("note")
+                ]
+                if orphan and "general_note" not in incoming:
+                    learning["general_note"] = self._normalize_general_note("; ".join(orphan))
+                learning.pop("weak_spots", None)
+            if "general_note" in incoming:
+                learning["general_note"] = self._normalize_general_note(incoming["general_note"])
             settings["learning"] = learning
         if "tutor_label" in payload or "learning" in payload: fields.append("settings = CAST(:settings AS jsonb)"); params["settings"] = settings
         traits_changed = "character_summary" in payload
@@ -235,6 +255,117 @@ class CrewService:
                 await session.execute(text("update public.child_traits set character_summary = :summary, updated_at = now() where child_id = :id"), {"id": child_id, "summary": summary})
                 if summary is None and str(row["species"]).strip() == "Por definir" and str(row["palette"]).strip() == "Por definir": await session.execute(text("delete from public.child_traits where child_id = :id"), {"id": child_id})
             elif summary is not None: await session.execute(text("insert into public.child_traits (child_id, species, palette, features, vibe, achievements, character_summary, updated_at) values (:id, 'Por definir', 'Por definir', '[]'::jsonb, null, '[]'::jsonb, :summary, now())"), {"id": child_id, "summary": summary})
+    @staticmethod
+    def effective_subject_notes(learning: dict[str, Any] | None) -> list[dict[str, str]]:
+        """Notas del tutor por materia (neutral), con migración suave desde weak_spots."""
+        if not isinstance(learning, dict):
+            return []
+        out: list[dict[str, str]] = []
+        seen: set[str] = set()
+        raw_notes = learning.get("subject_notes")
+        if isinstance(raw_notes, list):
+            for item in raw_notes:
+                if not isinstance(item, dict):
+                    continue
+                sid = str(item.get("subject_id") or "").strip()
+                note = str(item.get("note") or "").strip()
+                if not sid or not note or sid in seen:
+                    continue
+                if sid not in SubjectCatalog.ALL:
+                    continue
+                seen.add(sid)
+                out.append({"subject_id": sid, "note": note})
+        legacy = learning.get("weak_spots")
+        if isinstance(legacy, list):
+            for item in legacy:
+                if isinstance(item, dict):
+                    sid = str(item.get("subject_id") or "").strip()
+                    note = str(item.get("note") or "").strip()
+                elif isinstance(item, str):
+                    sid, note = "", item.strip()
+                else:
+                    continue
+                if not sid or not note or sid in seen:
+                    continue
+                if sid not in SubjectCatalog.ALL:
+                    continue
+                seen.add(sid)
+                out.append({"subject_id": sid, "note": note[:200]})
+        return out
+
+    @staticmethod
+    def effective_general_note(learning: dict[str, Any] | None) -> str | None:
+        if not isinstance(learning, dict):
+            return None
+        raw = learning.get("general_note")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()[:400]
+        legacy = learning.get("weak_spots")
+        if isinstance(legacy, list):
+            parts: list[str] = []
+            for item in legacy:
+                if isinstance(item, str) and item.strip():
+                    parts.append(item.strip()[:200])
+                elif isinstance(item, dict) and not item.get("subject_id"):
+                    note = str(item.get("note") or "").strip()
+                    if note:
+                        parts.append(note[:200])
+            if parts:
+                return "; ".join(parts)[:400]
+        return None
+
+    @staticmethod
+    def tutor_learning_context_line(learning: dict[str, Any] | None) -> str:
+        chunks: list[str] = []
+        general = CrewService.effective_general_note(learning)
+        if general:
+            chunks.append(f" Información adicional general del tutor: {general}.")
+        notes = CrewService.effective_subject_notes(learning)
+        if notes:
+            parts = [f"{row['subject_id']}: {row['note']}" for row in notes[:8]]
+            chunks.append(f" Información adicional por materia: {'; '.join(parts)}.")
+        return "".join(chunks)
+
+    @staticmethod
+    def subject_notes_prompt_line(learning: dict[str, Any] | None) -> str:
+        return CrewService.tutor_learning_context_line(learning)
+
+    @staticmethod
+    def _normalize_general_note(raw: object) -> str | None:
+        if raw is None:
+            return None
+        if not isinstance(raw, str):
+            raise ValueError("learning.general_note invalid")
+        value = raw.strip()
+        if not value:
+            return None
+        if len(value) > 400:
+            raise ValueError("learning.general_note too long")
+        return value
+
+    @staticmethod
+    def _normalize_subject_notes(raw: object) -> list[dict[str, str]]:
+        if raw is None:
+            return []
+        if not isinstance(raw, list):
+            raise ValueError("learning.subject_notes invalid")
+        out: list[dict[str, str]] = []
+        seen: set[str] = set()
+        for item in raw[:16]:
+            if not isinstance(item, dict):
+                continue
+            sid = str(item.get("subject_id") or "").strip()
+            note = str(item.get("note") or "").strip()[:200]
+            if not sid or not note:
+                continue
+            if sid not in SubjectCatalog.ALL:
+                raise ValueError("learning.subject_notes invalid")
+            if sid in seen:
+                continue
+            seen.add(sid)
+            out.append({"subject_id": sid, "note": note})
+        return out
+
     @staticmethod
     def _normalize_weak_spots(raw: object) -> list[dict[str, str | None]]:
         if raw is None:

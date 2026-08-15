@@ -2405,12 +2405,14 @@ async def test_choose_path_falls_back_to_first_pack(dialogue_svc, tmp_path, monk
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_compose_path_pack_with_weak_spots(dialogue_svc, mocker) -> None:
+async def test_compose_path_pack_with_subject_notes(dialogue_svc, mocker) -> None:
     child = sample_child(
         settings={
             "learning": {
                 "active_subjects": ["math", "language", "logic"],
-                "weak_spots": [{"subject_id": "math", "note": "sumas"}],
+                "subject_notes": [
+                    {"subject_id": "math", "note": "Domina tablas de multiplicar"}
+                ],
             }
         }
     )
@@ -2420,6 +2422,49 @@ async def test_compose_path_pack_with_weak_spots(dialogue_svc, mocker) -> None:
     )
     pack = await dialogue_svc._compose_path_pack(child, SESSION_ID)
     assert len(pack) == 3
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_weak_subjects_for_path_pack_prefers_low_levels(dialogue_svc) -> None:
+    child = sample_child(
+        placement_status="completed",
+        settings={
+            "learning": {
+                "active_subjects": ["math", "language", "logic", "reading"],
+            }
+        },
+    )
+    dialogue_svc.session = ScriptedSession(
+        [
+            FakeExecuteResult(
+                rows=[
+                    {"subject_id": "math", "level_id": "L3", "accuracy_rolling": 0.75},
+                    {"subject_id": "language", "level_id": "L1", "accuracy_rolling": 0.4},
+                    {"subject_id": "logic", "level_id": "L2", "accuracy_rolling": 0.55},
+                    {"subject_id": "reading", "level_id": "L1", "accuracy_rolling": 0.35},
+                ]
+            )
+        ]
+    )
+    weak = await dialogue_svc._weak_subjects_for_path_pack(child)
+    assert weak == ["reading", "language", "logic"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_weak_subjects_for_path_pack_ignores_subject_notes(dialogue_svc) -> None:
+    child = sample_child(
+        settings={
+            "learning": {
+                "active_subjects": ["math", "language", "logic"],
+                "subject_notes": [{"subject_id": "logic", "note": "secuencias"}],
+            }
+        },
+    )
+    dialogue_svc.session = ScriptedSession([FakeExecuteResult(rows=[])])
+    weak = await dialogue_svc._weak_subjects_for_path_pack(child)
+    assert weak == ["math", "language", "logic"]
 
 
 @pytest.mark.unit

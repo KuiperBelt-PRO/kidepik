@@ -1,6 +1,7 @@
 # Spec: Catálogo de objetos de equipaje (fantasy / sci-fi)
 
 > Estado: **aprobada — implementada parcialmente** (ago 2026)  
+> **Delta 15 ago 2026:** el catálogo es un **arquetipo** (efecto + `subject_ids[]` ≥1). El **nombre visible** lo elige el agente al otorgar (`instance_name`); `label_child` del JSON es solo fallback. Kinds ampliados (scroll/weapon/ward/cloak y pares sci-fi).  
 > Relacionado: [SPEC_APP_INVENTORY_BAGGAGE.md](SPEC_APP_INVENTORY_BAGGAGE.md), [SPEC_APP_REWARDS_ECONOMY.md](SPEC_APP_REWARDS_ECONOMY.md), [SPEC_APP_REWARD_EFFECTS.md](SPEC_APP_REWARD_EFFECTS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_WORLD_GLOSSARY.md](SPEC_APP_WORLD_GLOSSARY.md)  
 > **Diagrama:** [19-rewards-inventory.md](../diagrams/19-rewards-inventory.md)
 
@@ -33,8 +34,8 @@ Las posesiones del viajero apuntan a **definiciones versionadas** (`item_def_id`
 ## 2. Esquema
 
 ```ts
-type ItemKindFantasy = "potion" | "artifact" | "charm" | "relic";
-type ItemKindScifi = "program" | "artifact" | "module" | "tech";
+type ItemKindFantasy = "potion" | "artifact" | "charm" | "relic" | "scroll" | "weapon" | "ward" | "cloak";
+type ItemKindScifi = "program" | "artifact" | "module" | "tech" | "datapad" | "blade" | "barrier" | "mesh";
 type ItemKind = ItemKindFantasy | ItemKindScifi;
 
 type ItemRarity = "common" | "uncommon" | "rare";
@@ -56,7 +57,7 @@ interface ItemDef {
   description_child: string;     // 1–2 frases, sin spoilers de solución
   description_tutor?: string;
   icon_id: string;
-  subject_ids: string[];         // ≥1; ids de SubjectCatalog
+  subject_ids: string[];         // ≥1; usable si ∩ active_subjects ≠ ∅ (varias materias OK)
   effects: ItemEffectId[];       // ≥1 declarado; puede estar disabled en runtime
   stackable: boolean;            // default true si common
   unique: boolean;               // default false; si true → qty max 1
@@ -146,6 +147,19 @@ backend/app/catalogs/item_catalog.py   # carga + validate + get(id)
 Versionado: bump `v1` → `v2` solo si hay breaking change de ids; labels pueden editarse in-place.
 
 ---
+
+## 5b. Nombre de instancia (agente)
+
+El JSON **no** es el nombre final del objeto en el equipaje.
+
+| Campo | Quién lo decide |
+| --- | --- |
+| `item_def_id`, `kind`, `effects`, `subject_ids`, `icon_id` | Catálogo (fijo) |
+| `label_tutor` | Propósito pedagógico («Reintento · Comprensión lectora») |
+| `label_child` | Fallback si el agente no nombra |
+| `instance_name` / `instance_description` | **Agente** al otorgar (fantasía o sci-fi) |
+
+`ItemNamer.propose(...)`: si hay `agent_name` válido, se usa; si no, nombre diegético determinista por `grant_key` + kind + materias. Persistido en `child_inventory_items.instance_name`. Cada grant con nombre es **fila nueva** (no apilar contra el mismo def).
 
 ## 6. Selección en path planner
 

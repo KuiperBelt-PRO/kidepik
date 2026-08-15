@@ -68,6 +68,13 @@ describe("crew-member-card", () => {
     );
   });
 
+  it("memberCornerStateLabel usa rango diegético cuando existe", () => {
+    assert.equal(
+      memberCornerStateLabel({ ...baseMember, rank_label: "Chispa del reino" }),
+      "Chispa del reino",
+    );
+  });
+
   it("buildCrewMemberCardInner no duplica estado en el pie", async () => {
     const { buildCrewMemberCardInner } = await import("../js/lib/crew-member-card.js");
     const html = buildCrewMemberCardInner(baseMember);

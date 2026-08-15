@@ -7,7 +7,7 @@ import { renderMarkdown } from "../lib/markdown.js";
 import { navigate } from "../lib/router.js";
 import { renderGlassSkeletonHtml } from "../components/glass-controls.js?v=221";
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
-import { mountSectionFrame } from "../components/section-frame.js?v=236";
+import { mountSectionFrame } from "../components/section-frame.js?v=261";
 import { defaultLegalTitle, fetchLegalDoc, mountLegalPanel } from "../components/legal-panel.js?v=256";
 import {
   animateWorldBands,

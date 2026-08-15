@@ -15,6 +15,18 @@ function escapeHtml(s) {
 }
 
 /**
+ * @param {string | null | undefined} iconId
+ * @returns {string}
+ */
+export function baggageGlyphId(iconId) {
+  const id = String(iconId || "").trim();
+  if (!id) return "baggage";
+  if (id === "currency" || id === "baggage") return id;
+  if (id.startsWith("item-")) return id;
+  return "baggage";
+}
+
+/**
  * @param {any} baggage
  * @param {{ audience?: 'tutor' | 'child' }} [opts]
  */
@@ -31,6 +43,10 @@ export function renderBaggageHtml(baggage, opts = {}) {
     audience === "tutor"
       ? `<p class="crew-baggage__slots">Hallazgos (${Number(baggage?.slot_count) || 0}/${Number(baggage?.slot_soft_max) || 20})</p>`
       : "";
+  const emptyPads = items.length === 0 ? 0 : (3 - (items.length % 3)) % 3;
+  const pads = Array.from({ length: Math.min(emptyPads, 2) }, () => {
+    return `<span class="crew-baggage__cell crew-baggage__cell--empty" aria-hidden="true"></span>`;
+  }).join("");
   const grid =
     items.length === 0
       ? `<p class="crew-panel__helper">${
@@ -40,20 +56,23 @@ export function renderBaggageHtml(baggage, opts = {}) {
         }</p>`
       : `<div class="crew-baggage__grid" role="list">${items
           .map((it) => {
-            const name = audience === "child" ? it.label_child : it.label_tutor;
+            const name = it.label || (audience === "child" ? it.label_child : it.label_child || it.label_tutor);
             const unusable = it.usable_now ? "" : " crew-baggage__cell--unusable";
             const rare = it.rarity === "rare" ? " crew-baggage__cell--rare" : "";
             const qty = Number(it.qty) > 1 ? `<span class="crew-baggage__qty">${Number(it.qty)}</span>` : "";
+            const glyph = baggageGlyphId(it.icon_id);
             return `<button type="button" class="crew-baggage__cell${unusable}${rare}" role="listitem" data-baggage-item="${escapeHtml(it.id)}" aria-label="${escapeHtml(name)}">
-              <span class="crew-baggage__icon" data-icon="${escapeHtml(it.icon_id || "baggage")}"></span>
+              <span class="crew-baggage__icon" data-icon="${escapeHtml(glyph)}"></span>
               ${qty}
               <span class="crew-baggage__name">${escapeHtml(name)}</span>
             </button>`;
           })
-          .join("")}</div>`;
+          .join("")}${pads}</div>`;
 
+  const currencyIcon = baggageGlyphId(wallet.icon_id || "currency");
   return `<section class="crew-baggage">
     <div class="crew-baggage__wallet">
+      <span class="crew-baggage__wallet-icon" data-icon="${currencyIcon}" aria-hidden="true"></span>
       <span class="crew-baggage__wallet-label">${escapeHtml(label || "Monedas")}</span>
       <span class="crew-baggage__wallet-balance">${Number(wallet.balance) || 0}</span>
     </div>
@@ -70,13 +89,14 @@ export function renderBaggageHtml(baggage, opts = {}) {
  * @param {{ allowUse?: boolean }} [opts]
  */
 export function renderBaggageDetailHtml(item, audience, opts = {}) {
-  const title = audience === "child" ? item.label_child : item.label_tutor;
+  const title = item.label || (audience === "child" ? item.label_child : item.label_child || item.label_tutor);
   const desc =
     audience === "child"
       ? item.description_child
       : item.description_tutor || item.description_child;
   const subjects = Array.isArray(item.subject_labels) ? item.subject_labels.join(", ") : "";
   const effects = Array.isArray(item.effect_labels) ? item.effect_labels.join(" · ") : "";
+  const purpose = audience === "tutor" && item.label_tutor ? item.label_tutor : "";
   const implemented = Array.isArray(item.effects)
     ? item.effects.find((e) => e === "challenge_hint" || e === "challenge_retry")
     : null;
@@ -86,6 +106,7 @@ export function renderBaggageDetailHtml(item, audience, opts = {}) {
       ? "Listo para usar en el reto."
       : "Usable en play (pista / reintento)."
     : item.use_blocked_reason || "No usable ahora";
+  const glyph = baggageGlyphId(item.icon_id);
   const useBtn =
     audience === "child" && canUse
       ? `<button type="button" class="crew-panel__btn crew-panel__btn--primary" data-baggage-use data-effect-id="${escapeHtml(String(implemented))}">Usar</button>`
@@ -93,8 +114,10 @@ export function renderBaggageDetailHtml(item, audience, opts = {}) {
         ? `<p class="crew-panel__helper">Ábrelo durante un reto para usarlo.</p>`
         : "";
   return `<div class="crew-baggage__detail-card">
+    <span class="crew-baggage__detail-icon" data-icon="${escapeHtml(glyph)}" aria-hidden="true"></span>
     <h3 class="crew-baggage__detail-title">${escapeHtml(title || "")}</h3>
     <p class="crew-panel__helper">${escapeHtml(desc || "")}</p>
+    ${purpose && purpose !== title ? `<p class="crew-panel__helper">${escapeHtml(purpose)}</p>` : ""}
     ${subjects ? `<p class="crew-panel__helper">Materias: ${escapeHtml(subjects)}</p>` : ""}
     ${effects ? `<p class="crew-panel__helper">${escapeHtml(effects)}</p>` : ""}
     <p class="crew-panel__helper">${escapeHtml(status)}</p>

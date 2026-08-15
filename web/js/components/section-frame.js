@@ -11,6 +11,7 @@ import {
 } from "../lib/shell-nav-stack.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 import { inferLogoRevealState, isLogoAssetReady, syncLogoRevealState } from "../lib/logo-reveal.js";
+import { watchNoSpellcheck } from "./glass-controls.js?v=227";
 
 const EXIT_MS = 220;
 let titleSeq = 0;
@@ -217,6 +218,7 @@ export function mountSectionFrame(host, options = {}) {
 
   root.append(header, scroll);
   host.appendChild(root);
+  const stopSpellcheck = watchNoSpellcheck(root);
 
   requestAnimationFrame(() => {
     root.classList.remove("is-entering");
@@ -267,6 +269,7 @@ export function mountSectionFrame(host, options = {}) {
     },
     destroy() {
       return new Promise((resolve) => {
+        stopSpellcheck();
         navHandle?.destroy();
         navHandle = null;
         trailingEl?.remove();

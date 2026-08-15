@@ -16,8 +16,12 @@ _EFFECTS = frozenset(
         "avatar_cosmetic",
     }
 )
-_KINDS_FANTASY = frozenset({"potion", "artifact", "charm", "relic"})
-_KINDS_SCIFI = frozenset({"program", "artifact", "module", "tech"})
+_KINDS_FANTASY = frozenset(
+    {"potion", "artifact", "charm", "relic", "scroll", "weapon", "ward", "cloak"}
+)
+_KINDS_SCIFI = frozenset(
+    {"program", "artifact", "module", "tech", "datapad", "blade", "barrier", "mesh"}
+)
 _RARITIES = frozenset({"common", "uncommon", "rare"})
 _RARITY_ORDER = {"rare": 0, "uncommon": 1, "common": 2}
 

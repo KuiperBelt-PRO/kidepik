@@ -102,6 +102,48 @@ def test_crew_static_validator_errors(method: str, args: tuple, message: str) ->
 
 
 @pytest.mark.unit
+def test_normalize_subject_notes() -> None:
+    notes = CrewService._normalize_subject_notes(
+        [{"subject_id": "math", "note": "Domina tablas de multiplicar"}]
+    )
+    assert notes == [{"subject_id": "math", "note": "Domina tablas de multiplicar"}]
+    with pytest.raises(ValueError, match="learning.subject_notes invalid"):
+        CrewService._normalize_subject_notes([{"subject_id": "invalid", "note": "x"}])
+
+
+@pytest.mark.unit
+def test_effective_subject_notes_merges_legacy_weak_spots() -> None:
+    learning = {
+        "subject_notes": [{"subject_id": "math", "note": "nueva"}],
+        "weak_spots": [{"subject_id": "language", "note": "legacy"}],
+    }
+    merged = CrewService.effective_subject_notes(learning)
+    assert len(merged) == 2
+    assert merged[0]["subject_id"] == "math"
+
+
+@pytest.mark.unit
+def test_subject_notes_prompt_line() -> None:
+    line = CrewService.subject_notes_prompt_line(
+        {
+            "general_note": "8 años, muy adelantado",
+            "subject_notes": [{"subject_id": "math", "note": "tablas"}],
+        }
+    )
+    assert "Información adicional general del tutor" in line
+    assert "Información adicional por materia" in line
+    assert "math: tablas" in line
+
+
+@pytest.mark.unit
+def test_normalize_general_note() -> None:
+    assert CrewService._normalize_general_note(None) is None
+    assert CrewService._normalize_general_note("  nota  ") == "nota"
+    with pytest.raises(ValueError, match="learning.general_note too long"):
+        CrewService._normalize_general_note("x" * 401)
+
+
+@pytest.mark.unit
 def test_normalize_weak_spots() -> None:
     assert CrewService._normalize_weak_spots(None) == []
     assert CrewService._normalize_weak_spots("  nota libre  ") == [

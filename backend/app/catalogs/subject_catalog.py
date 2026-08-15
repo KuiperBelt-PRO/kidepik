@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from app.catalogs.age_band import AgeBand
 
 
@@ -50,6 +52,31 @@ class SubjectCatalog:
     @classmethod
     def base_subjects_for_band(cls, age_band: str) -> list[str]:
         return list(cls.BASE_BY_BAND.get(age_band, cls.BASE_BY_BAND[AgeBand.CHILD]))
+    @classmethod
+    def resolve_active_subjects(
+        cls,
+        child: dict[str, Any] | None = None,
+        learning: dict[str, Any] | None = None,
+    ) -> list[str]:
+        """Return active subject ids; empty/invalid lists fall back to the age band."""
+        child = child if isinstance(child, dict) else {}
+        if learning is None:
+            settings = child.get("settings") if isinstance(child.get("settings"), dict) else {}
+            learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
+        raw = learning.get("active_subjects") if isinstance(learning, dict) else None
+        band = (
+            child.get("effective_age_band")
+            or child.get("age_band")
+            or AgeBand.from_legacy(child.get("age_band"), child.get("age_years"))
+            or AgeBand.CHILD
+        )
+        if isinstance(raw, list) and raw:
+            try:
+                return cls.normalize_active_subjects(raw)
+            except ValueError:
+                pass
+        return cls.base_subjects_for_band(str(band))
+
     @classmethod
     def normalize_active_subjects(cls, raw: list[object]) -> list[str]:
         result: list[str] = []

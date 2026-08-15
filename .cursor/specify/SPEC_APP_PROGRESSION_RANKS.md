@@ -63,21 +63,21 @@ Al elegir `world_theme`, `rank_track` = ese tema. Al completar placement, asigna
 
 | tier | id | label_child | min_general |
 | --- | --- | --- | --- |
-| 1 | `scifi_recruit` | Recluta estelar | L1 |
-| 2 | `scifi_cadet` | Cadete explorador | L2 |
-| 3 | `scifi_ensign` | Alférez de ruta | L3 |
-| 4 | `scifi_lieutenant` | Teniente de nebulosa | L4 |
-| 5 | `scifi_captain` | Capitán del saber | L5 |
+| 1 | `scifi_recruit` | Recluta estelar | L1 | Inicio del viaje |
+| 2 | `scifi_cadet` | Cadete explorador | L2 | Primeros caminos |
+| 3 | `scifi_ensign` | Alférez de ruta | L3 | Soltura en varias materias |
+| 4 | `scifi_lieutenant` | Teniente de nebulosa | L4 | Retos exigentes |
+| 5 | `scifi_captain` | Capitán del saber | L5 | Cumbre del viaje |
 
 ### 2.2 Fantasía
 
 | tier | id | label_child | min_general |
 | --- | --- | --- | --- |
-| 1 | `fantasy_spark` | Chispa del reino | L1 |
-| 2 | `fantasy_apprentice` | Aprendiz de los reinos | L2 |
-| 3 | `fantasy_adept` | Adepto del artefacto | L3 |
-| 4 | `fantasy_guardian` | Guardián del saber | L4 |
-| 5 | `fantasy_archon` | Archón del equilibrio | L5 |
+| 1 | `fantasy_spark` | Chispa del reino | L1 | Inicio del viaje |
+| 2 | `fantasy_apprentice` | Aprendiz de los reinos | L2 | Primeros caminos |
+| 3 | `fantasy_adept` | Adepto del artefacto | L3 | Soltura en varias materias |
+| 4 | `fantasy_guardian` | Guardián del saber | L4 | Retos exigentes |
+| 5 | `fantasy_archon` | Archón del equilibrio | L5 | Cumbre del viaje |
 
 **Regla de asignación:** mayor `tier` cuyo `min_general_level` ≤ `general_level` actual.
 

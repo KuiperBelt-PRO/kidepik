@@ -638,3 +638,67 @@ export async function runGlassButtonAction(btn, run, opts = {}) {
     setGlassButton(btn, iconId, label);
   }
 }
+
+/**
+ * @param {Element} el
+ * @returns {boolean}
+ */
+function isTextishControl(el) {
+  if (el instanceof HTMLTextAreaElement) return true;
+  if (el instanceof HTMLElement && el.isContentEditable) return true;
+  if (!(el instanceof HTMLInputElement)) return false;
+  const type = (el.type || "text").toLowerCase();
+  return ![
+    "hidden",
+    "checkbox",
+    "radio",
+    "password",
+    "file",
+    "range",
+    "color",
+    "button",
+    "submit",
+    "reset",
+    "image",
+  ].includes(type);
+}
+
+/**
+ * Desactiva corrección ortográfica en inputs y textareas (DESIGN.md).
+ * @param {ParentNode | Element} [root]
+ */
+export function applyNoSpellcheck(root = document) {
+  /** @param {Node} node */
+  function scan(node) {
+    if (!(node instanceof Element)) return;
+    if (isTextishControl(node)) {
+      node.setAttribute("spellcheck", "false");
+      node.setAttribute("autocorrect", "off");
+      node.setAttribute("autocapitalize", "off");
+    }
+  }
+  scan(root instanceof Element ? root : document.documentElement);
+  const scope = root instanceof Element || root instanceof Document || root instanceof DocumentFragment
+    ? root
+    : document;
+  scope.querySelectorAll("input, textarea, [contenteditable]").forEach((el) => scan(el));
+}
+
+/**
+ * Observa el árbol y aplica `applyNoSpellcheck` a campos nuevos.
+ * @param {ParentNode | Element} [root]
+ * @returns {() => void}
+ */
+export function watchNoSpellcheck(root = document.documentElement) {
+  applyNoSpellcheck(root);
+  const target = root instanceof Node ? root : document.documentElement;
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      for (const node of mutation.addedNodes) {
+        if (node instanceof Element) applyNoSpellcheck(node);
+      }
+    }
+  });
+  observer.observe(target, { childList: true, subtree: true });
+  return () => observer.disconnect();
+}

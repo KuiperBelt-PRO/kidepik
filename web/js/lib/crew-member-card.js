@@ -131,7 +131,7 @@ export function genderSelectOptions(ageYears) {
  */
 export function memberTypeLine(m) {
   if (m.is_tutor_profile) return "Perfil de tutor";
-  const level = m.general_level ? ` · ${m.general_level}` : "";
+  const level = m.rank_label ? ` · ${m.rank_label}` : "";
   const gender = memberGenderLabel(m);
   const age = memberAgeLabel(m);
   const genderPart = gender && m.age_years != null ? `${gender} · ` : "";

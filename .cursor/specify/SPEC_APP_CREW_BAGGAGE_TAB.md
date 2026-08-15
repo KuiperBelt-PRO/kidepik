@@ -1,6 +1,7 @@
 # Spec: Pestaña Equipaje en ficha de tripulante (tutor)
 
 > Estado: **aprobada — implementada parcialmente** (ago 2026)  
+> **Delta 15 ago 2026:** inventario tipo RPG (slots + glifos por `icon_id` + currency chip). Nombre visible = `instance_name`. Tabs ficha: Detalles / Viaje / Progreso / Equipaje / Ajustes.  
 > Relacionado: [SPEC_APP_CREW_MEMBER_DETAIL.md](SPEC_APP_CREW_MEMBER_DETAIL.md), [SPEC_APP_INVENTORY_BAGGAGE.md](SPEC_APP_INVENTORY_BAGGAGE.md), [SPEC_APP_REWARDS_ECONOMY.md](SPEC_APP_REWARDS_ECONOMY.md), [SPEC_APP_ITEM_CATALOG.md](SPEC_APP_ITEM_CATALOG.md), [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md), [DESIGN.md](../DESIGN.md), [SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md)
 
 ## Contexto
@@ -22,8 +23,9 @@ Sustituye / amplía la matriz de [SPEC_APP_CREW_MEMBER_DETAIL](SPEC_APP_CREW_MEM
 
 | Tab | `data-crew-tab` | Contenido |
 | --- | --- | --- |
-| **Detalles** | `details` | Perfil + progreso + materias (si el modelo 3-tab Detalles existe) |
-| **Viaje** | `journey` | Identidad / mapa / diario |
+| **Detalles** | `details` | Perfil/identidad |
+| **Viaje** | `journey` | Mapa / diario / aventura |
+| **Progreso** | `progress` | Rango + materias |
 | **Equipaje** | `baggage` | Wallet + grid ítems (**esta spec**) |
 | **Ajustes** | `settings` | Permisos, PIN, peligro |
 

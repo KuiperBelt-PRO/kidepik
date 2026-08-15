@@ -54,9 +54,10 @@ Contrato [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §3:
 
 | Elemento | Ubicación correcta |
 | --- | --- |
-| Nombre, edad, mundo | Viaje → Identidad |
-| Descripción personaje / tutor | Viaje → Identidad |
-| Progreso L*, rango, barras | Viaje → Progreso |
+| Nombre, edad, mundo | Detalles → Perfil |
+| Descripción personaje / tutor | Detalles → Perfil |
+| Progreso L*, rango, barras | Progreso |
+| Materias activas | Progreso |
 | Diario del viaje | Viaje → Diario |
 | CTA «Entrar en la aventura» | Viaje → Mapa viaje |
 

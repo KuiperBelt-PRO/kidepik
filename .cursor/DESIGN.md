@@ -55,6 +55,7 @@ Definidos en `web/css/components/glass-controls.css`:
 - Focus: borde + outline blancos (sin glow de color).
 - Number: **ocultar spinners nativos**; usar stepper glass (±) con icono chevron del generador procedural.
 - Placeholder: blanco ~40 % opacidad.
+- **Sin corrección ortográfica:** todo input de texto y textarea lleva `spellcheck="false"` `autocorrect="off"` `autocapitalize="off"`. Helper `applyNoSpellcheck` / `watchNoSpellcheck` en `glass-controls.js` (el marco de sección lo aplica a todo el árbol).
 
 ### 2. Checkbox (`glass-check`)
 
@@ -240,7 +241,7 @@ Cualquier ruta nueva con sesión (play, timeline, wizards tutor, etc.) **debe**:
 
 - `destroyAppShell()` + escena a pantalla completa con gradiente/fondo propio (rompe coherencia y el mundo procedural).
 - Bubbles / botones / inputs con colores de acento (azul, naranja, verde sistema).
-- Inventar un segundo design system «de juego» sin actualizar este documento y `SPEC_APP_SECTION_FRAME`.
+- Inventar un segundo design system «de juego» **con acentos de color de sistema**. El inventario RPG usa los mismos tokens glass; documentar la pieza aquí.
 
 El HUD infantil full-bleed futuro, si existe, será una **spec aparte**; hasta entonces `#/play/:id` se trata como sección de gestión/aventura en marco glass.
 
@@ -261,6 +262,19 @@ El HUD infantil full-bleed futuro, si existe, será una **spec aparte**; hasta e
 | Cuenta | `account` |
 
 Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
+
+### Inventario / equipaje (ago 2026)
+
+Controles **glass** inspirados en inventario de RPG, no un segundo design system de color.
+
+| Pieza | Clase | Uso |
+| --- | --- | --- |
+| Currency chip | `.crew-baggage__wallet` | Icono `currency` + label + saldo entero |
+| Inventory slot | `.crew-baggage__cell` | Celda 3 columnas; glifo grande; qty; rareza en borde |
+| Slot vacío | `.crew-baggage__cell--empty` | Hueco dashed para completar la fila (máx. 2 vacíos) |
+| Item glyph | `item-*` en `UiIconId` | Pociones, pergaminos, amuletos, orbes, programas, módulos… **nunca** caer al saco `baggage` si hay `icon_id` |
+
+Nombre en slot = `instance_name` (agente). El propósito pedagógico va en el detalle.
 
 ---
 

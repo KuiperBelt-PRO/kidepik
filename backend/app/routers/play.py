@@ -5,6 +5,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Query
 
 from app.ai.errors import AiProductError
+from app.catalogs.subject_catalog import SubjectCatalog
 from app.db import session_scope
 from app.services.auth import AuthError, SupabaseAuthService
 from app.services.crew import CrewService
@@ -139,11 +140,10 @@ async def play_baggage(
         theme = member.get("world_theme") or member.get("active_world_theme") or "fantasy"
         settings = member.get("settings") if isinstance(member.get("settings"), dict) else {}
         learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
-        active = learning.get("active_subjects") if isinstance(learning.get("active_subjects"), list) else []
         return await InventoryService().get_baggage(
             child_id,
             str(theme),
-            active_subjects=[str(s) for s in active],
+            active_subjects=SubjectCatalog.resolve_active_subjects(member),
             age_band=member.get("age_band") if isinstance(member.get("age_band"), str) else None,
             show_levels_to_child=bool(learning.get("show_levels_to_child")),
             audience="child",

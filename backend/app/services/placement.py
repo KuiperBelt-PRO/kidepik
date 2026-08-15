@@ -22,18 +22,7 @@ class PlacementService:
 
     @staticmethod
     def active_subjects_for_child(child: dict[str, Any]) -> list[str]:
-        settings = child.get("settings") or {}
-        learning = settings.get("learning") if isinstance(settings, dict) else {}
-        raw = learning.get("active_subjects") if isinstance(learning, dict) else None
-        band = AgeBand.from_legacy(child.get("age_band"), child.get("age_years")) or AgeBand.CHILD
-        try:
-            return (
-                SubjectCatalog.normalize_active_subjects(raw)
-                if isinstance(raw, list)
-                else SubjectCatalog.base_subjects_for_band(band)
-            )
-        except ValueError:
-            return SubjectCatalog.base_subjects_for_band(band)
+        return SubjectCatalog.resolve_active_subjects(child)
 
     async def start_exam(
         self,

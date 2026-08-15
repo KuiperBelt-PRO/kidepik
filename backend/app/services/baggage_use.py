@@ -35,13 +35,7 @@ class BaggageUseService:
         theme = self.inventory.normalize_theme(
             child.get("world_theme") or child.get("active_world_theme")
         )
-        settings = child.get("settings") if isinstance(child.get("settings"), dict) else {}
-        learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
-        active = [
-            str(s)
-            for s in (learning.get("active_subjects") or [])
-            if isinstance(s, str) and SubjectCatalog.is_valid(s)
-        ]
+        active = SubjectCatalog.resolve_active_subjects(child)
 
         async with session_scope() as session:
             row = (

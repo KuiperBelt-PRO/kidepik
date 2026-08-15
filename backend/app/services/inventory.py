@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.catalogs.age_band import AgeBand
 from app.catalogs.item_catalog import ItemCatalog
+from app.catalogs.item_namer import instance_labels
 from app.catalogs.subject_catalog import SubjectCatalog
 from app.db import session_scope
 
@@ -27,11 +28,13 @@ class InventoryService:
                 "currency_kind": "credits",
                 "label_child": "Créditos",
                 "label_tutor": "Créditos de ruta",
+                "icon_id": "currency",
             }
         return {
             "currency_kind": "coins",
             "label_child": "Monedas",
             "label_tutor": "Monedas del reino",
+            "icon_id": "currency",
         }
 
     def normalize_theme(self, world_theme: str | None) -> str:
@@ -51,6 +54,7 @@ class InventoryService:
             "balance": int(row["balance"]),
             "label_child": labels["label_child"],
             "label_tutor": labels["label_tutor"],
+            "icon_id": labels["icon_id"],
         }
 
     async def get_baggage(
@@ -72,7 +76,8 @@ class InventoryService:
                 await session.execute(
                     text(
                         """
-                        select id, item_def_id, qty, acquired_at, last_used_at
+                        select id, item_def_id, qty, acquired_at, last_used_at,
+                               instance_name, instance_description, meta
                         from public.child_inventory_items
                         where child_id = :child_id and world_theme = :theme
                         order by acquired_at desc
@@ -88,6 +93,7 @@ class InventoryService:
             "balance": int(wallet_row["balance"]),
             "label_child": labels["label_child"],
             "label_tutor": labels["label_tutor"],
+            "icon_id": labels["icon_id"],
         }
         items: list[dict[str, Any]] = []
         for row in item_rows:
@@ -137,20 +143,22 @@ class InventoryService:
         can_use = usable and int(row.get("qty") or 0) > 0 and implemented
         blocked = None
         if not usable:
-            blocked = "Materia no activa"
+            blocked = "Materia en pausa"
         elif not implemented:
             blocked = "Próximamente"
-        label = defn["label_tutor"] if audience == "tutor" else defn["label_child"]
+        child_label, purpose, label = instance_labels(defn, row, audience=audience)
+        desc_child = str(row.get("instance_description") or defn["description_child"])
+        desc_tutor = defn.get("description_tutor") or defn["description_child"]
         return {
             "id": str(row["id"]),
             "item_def_id": defn["id"],
             "world_theme": theme,
             "qty": int(row.get("qty") or 1),
-            "label_child": defn["label_child"],
-            "label_tutor": defn["label_tutor"],
+            "label_child": child_label,
+            "label_tutor": purpose,
             "label": label,
-            "description_child": defn["description_child"],
-            "description_tutor": defn.get("description_tutor") or defn["description_child"],
+            "description_child": desc_child,
+            "description_tutor": desc_tutor,
             "kind": defn["kind"],
             "rarity": defn["rarity"],
             "icon_id": defn["icon_id"],
@@ -200,6 +208,8 @@ class InventoryService:
         qty: int = 1,
         *,
         age_band: str | None = None,
+        instance_name: str | None = None,
+        instance_description: str | None = None,
     ) -> dict[str, Any]:
         """Add item inside an open transaction. Returns status + optional currency compensation."""
         theme = self.normalize_theme(world_theme)
@@ -208,12 +218,16 @@ class InventoryService:
             raise ValueError("item world_theme mismatch")
         qty = max(1, int(qty))
         soft_max = self.slot_soft_max(age_band)
+        name = str(instance_name or "").strip() or None
+        desc = str(instance_description or "").strip() or None
         existing = (
             await session.execute(
                 text(
                     """
                     select id, qty from public.child_inventory_items
                     where child_id = :child_id and world_theme = :theme and item_def_id = :def
+                    order by acquired_at desc
+                    limit 1
                     """
                 ),
                 {"child_id": child_id, "theme": theme, "def": item_def_id},
@@ -225,6 +239,8 @@ class InventoryService:
                 "reason": "unique",
                 "currency_compensation": int(defn.get("duplicate_currency") or 0),
             }
+        if name:
+            existing = None
         slot_count = (
             await session.execute(
                 text(
@@ -257,11 +273,20 @@ class InventoryService:
             await session.execute(
                 text(
                     """
-                    insert into public.child_inventory_items (child_id, world_theme, item_def_id, qty)
-                    values (:child_id, :theme, :def, :qty)
+                    insert into public.child_inventory_items
+                      (child_id, world_theme, item_def_id, qty, instance_name, instance_description)
+                    values
+                      (:child_id, :theme, :def, :qty, :name, :desc)
                     """
                 ),
-                {"child_id": child_id, "theme": theme, "def": item_def_id, "qty": qty},
+                {
+                    "child_id": child_id,
+                    "theme": theme,
+                    "def": item_def_id,
+                    "qty": qty,
+                    "name": name,
+                    "desc": desc,
+                },
             )
         return {"added": True, "reason": "ok", "currency_compensation": 0}
 
