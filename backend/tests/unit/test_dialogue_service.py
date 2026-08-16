@@ -23,6 +23,7 @@ from app.ai.journey.ledger import JourneyLedger
 from app.ai.orchestrator.orchestrator import TurnResult
 from app.services.dialogue import DialogueService
 from app.services.mentor_profiles import mentor_profile
+from app.services.path_composer_context import PathComposerContextService
 from app.services.traveler_profile import extract_palette_tokens
 from tests.helpers.db_session import FakeExecuteResult, ScriptedSession
 from tests.helpers.factories import AUTH_USER_ID, CHILD_ID, PARENT_ID
@@ -2453,7 +2454,7 @@ async def test_weak_subjects_for_path_pack_prefers_low_levels(dialogue_svc) -> N
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_weak_subjects_for_path_pack_ignores_subject_notes(dialogue_svc) -> None:
+async def test_weak_subjects_for_path_pack_boosts_tutor_note(dialogue_svc) -> None:
     child = sample_child(
         settings={
             "learning": {
@@ -2462,9 +2463,58 @@ async def test_weak_subjects_for_path_pack_ignores_subject_notes(dialogue_svc) -
             }
         },
     )
-    dialogue_svc.session = ScriptedSession([FakeExecuteResult(rows=[])])
+    dialogue_svc.session = ScriptedSession(
+        [
+            FakeExecuteResult(
+                rows=[
+                    {"subject_id": "math", "level_id": "L2", "accuracy_rolling": 0.5},
+                    {"subject_id": "language", "level_id": "L2", "accuracy_rolling": 0.5},
+                    {"subject_id": "logic", "level_id": "L2", "accuracy_rolling": 0.5},
+                ]
+            )
+        ]
+    )
     weak = await dialogue_svc._weak_subjects_for_path_pack(child)
-    assert weak == ["math", "language", "logic"]
+    assert weak[0] == "logic"
+
+
+@pytest.mark.unit
+def test_path_compose_prompt_includes_structured_tutor_context() -> None:
+    child = sample_child(
+        settings={
+            "learning": {
+                "general_note": "Muy adelantado",
+                "subject_notes": [{"subject_id": "math", "note": "Tablas del 7"}],
+            }
+        }
+    )
+    context = PathComposerContextService.build_context(child)
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._path_compose_prompt(
+        child,
+        ["math", "language", "logic"],
+        context,
+        path_count=3,
+    )
+    assert "## Contexto del tutor" in prompt
+    assert "Tablas del 7" in prompt
+    assert "Camino 1" in prompt
+
+
+@pytest.mark.unit
+def test_placement_compose_prompt_includes_tutor_context() -> None:
+    child = sample_child(
+        settings={
+            "learning": {
+                "general_note": "Necesita ritmo pausado",
+                "subject_notes": [{"subject_id": "math", "note": "Sumas simples"}],
+            }
+        }
+    )
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._placement_compose_prompt(child, ["math", "language"], "band_child")
+    assert "Contexto del tutor" in prompt
+    assert "Sumas simples" in prompt
 
 
 @pytest.mark.unit

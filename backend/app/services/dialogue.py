@@ -43,8 +43,10 @@ from app.services.mentor_prose import (
     validate_species_options,
     validate_traveler_profile_prose,
 )
+from app.services.baggage_offers import BaggageOfferService
 from app.services.crew import CrewService
 from app.services.crew_progress import CrewProgressService
+from app.services.path_composer_context import PathComposerContextService
 from app.services.placement import PlacementService
 from app.services.traveler_profile import extract_palette_tokens, palette_is_meaningful
 from app.services.waiting_copy import WaitingCopyService
@@ -124,7 +126,7 @@ class DialogueService:
         last_phase = (last or {}).get("meta", {}).get("phase")
         chapter = self._resolve_chapter(child, str(row["id"]), last_phase)
         self._record_chapter_if_changed(child, str(row["id"]), chapter)
-        return {
+        payload = {
             "session_id": str(row["id"]),
             "flow_id": str(row["flow_id"]),
             "onboarding_step": child.get("onboarding_step") or "pending_entry",
@@ -141,6 +143,8 @@ class DialogueService:
                 child_id
             ),
         }
+        await self._attach_baggage_offers(payload, child, str(row["id"]))
+        return payload
 
     async def load_history(
         self,
@@ -800,6 +804,7 @@ class DialogueService:
                     "debug_allowed": self.settings.ai_debug_enabled(),
                 }
             }
+        await self._attach_baggage_offers(result, fresh, session_id)
         return result
 
     async def _phase_choose_world(
@@ -2294,6 +2299,7 @@ class DialogueService:
                 "Un ítem por posición en esta lista de materias "
                 f"(respeta orden y subject_id): {subject_slots}."
             ),
+            *PathComposerContextService.placement_tutor_sections(child, subject_slots),
         ]
         if batch_index > 0:
             parts.append(
@@ -2801,54 +2807,62 @@ class DialogueService:
             {"type": "placement_completed", "value": True},
         ], [turn]
 
-    async def _weak_subjects_for_path_pack(self, child: dict[str, Any]) -> list[str]:
-        """Materias más flojas primero (nivel bajo, rolling bajo)."""
-        subjects = PlacementService.active_subjects_for_child(child)
-        fallback = ["math", "language", "logic"]
-        if not subjects:
-            return fallback[:3]
-
+    async def _path_composer_subject_rows(
+        self, child: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         theme = self._world(child) or "fantasy"
-        rows = (
-            await self.session.execute(
-                text(
-                    "select subject_id, level_id, accuracy_rolling "
-                    "from user_subject_levels "
-                    "where child_id = :id and world_theme = :theme"
-                ),
-                {"id": str(child["id"]), "theme": theme},
+        return list(
+            (
+                await self.session.execute(
+                    text(
+                        "select subject_id, level_id, accuracy_rolling "
+                        "from user_subject_levels "
+                        "where child_id = :id and world_theme = :theme"
+                    ),
+                    {"id": str(child["id"]), "theme": theme},
+                )
             )
-        ).mappings().all()
-        by_subject = {str(row["subject_id"]): row for row in rows}
+            .mappings()
+            .all()
+        )
 
-        def weakness_key(subject_id: str) -> tuple[int, float]:
-            row = by_subject.get(subject_id)
-            level = str(row["level_id"]) if row and row.get("level_id") else "L1"
-            rolling_raw = row.get("accuracy_rolling") if row else None
-            rolling = float(rolling_raw) if rolling_raw is not None else 0.5
-            return (CrewProgressService._level_index(level), rolling)
+    async def _path_composer_context(self, child: dict[str, Any]) -> dict[str, Any]:
+        rows = await self._path_composer_subject_rows(child)
+        return PathComposerContextService.build_context(child, subject_rows=rows)
 
-        ordered = list(subjects)
-        ordered.sort(key=weakness_key)
-        weak = ordered[:3]
-        return weak if weak else fallback[:3]
+    async def _weak_subjects_for_path_pack(self, child: dict[str, Any]) -> list[str]:
+        """Materias prioritarias: niveles PG + señales del tutor."""
+        context = await self._path_composer_context(child)
+        return PathComposerContextService.weak_subject_ids(context)
 
     async def _compose_path_pack(
         self, child: dict[str, Any], session_id: str
     ) -> list[dict[str, Any]]:
         subjects = PlacementService.active_subjects_for_child(child)[:5]
-        learning = (child.get("settings") or {}).get("learning") or {}
-        weak = await self._weak_subjects_for_path_pack(child)
-        spot_line = CrewService.subject_notes_prompt_line(learning)
+        composer_context = await self._path_composer_context(child)
+        weak = PathComposerContextService.weak_subject_ids(composer_context)
         theme = self._world(child) or "fantasy"
         palette_tokens = self._traveler_palette_tokens(child)
         retries = self.settings.ai_compose_batch_retries
+        parent_id = child.get("parent_id")
+        if parent_id:
+            try:
+                self.ledger.append_event(
+                    str(parent_id),
+                    str(child["id"]),
+                    session_id,
+                    kind="path_compose_context",
+                    payload={"tutor_context": composer_context},
+                    world_theme=theme,
+                )
+            except Exception:
+                pass
         try:
             return await self._compose_path_pack_with_retry(
                 child,
                 session_id,
                 weak,
-                spot_line,
+                composer_context,
                 subjects,
                 theme,
                 palette_tokens,
@@ -2877,7 +2891,7 @@ class DialogueService:
         child: dict[str, Any],
         session_id: str,
         weak: list[str],
-        spot_line: str,
+        composer_context: dict[str, Any],
         subjects: list[str],
         theme: str,
         palette_tokens: list[str],
@@ -2891,7 +2905,7 @@ class DialogueService:
                     child,
                     session_id,
                     weak,
-                    spot_line,
+                    composer_context,
                     subjects,
                     theme,
                     palette_tokens,
@@ -2926,7 +2940,7 @@ class DialogueService:
         child: dict[str, Any],
         session_id: str,
         weak: list[str],
-        spot_line: str,
+        composer_context: dict[str, Any],
         subjects: list[str],
         theme: str,
         palette_tokens: list[str],
@@ -2935,7 +2949,7 @@ class DialogueService:
         batch_prompt = self._path_compose_prompt(
             child,
             weak,
-            spot_line,
+            composer_context,
             path_count=3,
         )
         bundle, model = await run_purpose(
@@ -3007,7 +3021,7 @@ class DialogueService:
         self,
         child: dict[str, Any],
         subject_slots: list[str],
-        spot_line: str,
+        composer_context: dict[str, Any],
         *,
         path_count: int,
     ) -> str:
@@ -3016,12 +3030,14 @@ class DialogueService:
         catalog_avoid = ", ".join(
             ZoneCatalog.label(theme, zone_id) for zone_id in ZoneCatalog.ZONE_IDS
         )
+        tutor_sections = PathComposerContextService.prompt_sections(composer_context)
         parts = [
             f"Genera PathPackEnvelope con exactamente {path_count} camino(s) "
             f"(paths.length = {path_count}).",
-            f"Materias prioritarias (orden): {subjects_line}.{spot_line}",
+            f"Materias prioritarias (orden): {subjects_line}.",
+            *tutor_sections,
             (
-                "Las notas del tutor por materia son información adicional neutral "
+                "Las notas del tutor son información adicional neutral "
                 "(fortalezas, contexto o ritmo); úsalas para calibrar dificultad y "
                 "contenido sin asumir que siempre indican debilidad."
             ),
@@ -4107,6 +4123,37 @@ class DialogueService:
             rows = rows[-limit:]
         return await self._turns_from_rows(rows, cid)
 
+    async def _attach_baggage_offers(
+        self,
+        payload: dict[str, Any],
+        child: dict[str, Any],
+        session_id: str,
+    ) -> None:
+        last = payload.get("pending_agent_turn")
+        if not isinstance(last, dict):
+            last = await self._last_mentor(session_id)
+        meta = last.get("meta") if isinstance(last, dict) and isinstance(last.get("meta"), dict) else {}
+        phase = str(meta.get("phase") or "")
+        if phase not in {"path_challenge", "path_intro"}:
+            payload["baggage_offers"] = []
+            return
+        parent_id = child.get("parent_id")
+        world = self._world(child) or "fantasy"
+        progress = self._read_path_progress(
+            str(parent_id) if parent_id else None, str(child["id"]), session_id, world
+        )
+        eligible_retry = phase == "path_intro" and bool(meta.get("retry"))
+        if not eligible_retry and progress.get("last_ok") is False:
+            eligible_retry = True
+        offers = await BaggageOfferService().offers_for_play(
+            child,
+            phase=phase,
+            meta=meta,
+            progress=progress,
+            eligible_retry=eligible_retry,
+        )
+        payload["baggage_offers"] = offers
+
     async def use_baggage_item(
         self,
         auth_user_id: str,
@@ -4234,6 +4281,7 @@ class DialogueService:
             # Keep challenge pending; mentor_line is informational only
             result["pending_agent_turn"] = last
 
+        await self._attach_baggage_offers(result, child, session_id)
         return result
 
     async def _last_mentor(self, sid: str) -> dict[str, Any] | None:

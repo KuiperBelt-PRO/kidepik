@@ -76,8 +76,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-  A([Elegir caminos]) --> B[Leer materias flojas PG]
-  B --> C[path_composer: 3 caminos]
+  A([Elegir caminos]) --> B[Ranking híbrido PG + notas tutor]
+  B --> C[path_composer: 3 caminos con nota por slot]
   C --> W[Espera 8s]
   W --> D{¿Pack válido?}
   D -- NO --> C
@@ -85,7 +85,11 @@ flowchart TD
   E --> F[Viajero elige 1 de 3]
   F --> G[Intro camino]
   G --> H[Mini-historia + reto k]
-  H --> I{¿Acierto?}
+  H --> O{¿Ítems usable para materia?}
+  O -- Sí --> P[Chips equipaje en pie diálogo]
+  O -- No --> I
+  P --> I{¿Acierto?}
+  H --> I
   I -- NO --> J[Explicación]
   J --> K
   I -- SI --> K{¿Más retos?}

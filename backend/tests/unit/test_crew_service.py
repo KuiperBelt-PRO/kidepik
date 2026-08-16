@@ -144,6 +144,17 @@ def test_normalize_general_note() -> None:
 
 
 @pytest.mark.unit
+def test_normalize_subject_priorities() -> None:
+    assert CrewService._normalize_subject_priorities(None) == []
+    priorities = CrewService._normalize_subject_priorities(
+        ["math", "math", "invalid", "logic"],
+        active_subjects=["math", "language", "logic"],
+    )
+    assert priorities == ["math", "logic"]
+    with pytest.raises(ValueError, match="learning.subject_priorities invalid"):
+        CrewService._normalize_subject_priorities("x")
+
+
 def test_normalize_weak_spots() -> None:
     assert CrewService._normalize_weak_spots(None) == []
     assert CrewService._normalize_weak_spots("  nota libre  ") == [

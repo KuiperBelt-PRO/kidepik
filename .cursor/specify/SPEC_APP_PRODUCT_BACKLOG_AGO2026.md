@@ -29,7 +29,7 @@ Contrato único del backlog pendiente, priorizado en cortes implementables.
 | B8 | Lista `#/crew` | CTA «Continuar aventura» en carta |
 | B9 | PIN | Modal teclado 3×3 (dígitos) antes de play si `require_exit_pin` |
 | B10 | Informes tutor | Solicitar generación informe evaluación (`.md` + vista) |
-| B11 | Puntos flojos | Tutor indica materia y/o foco (ej. «Divisiones de 2 cifras») → entra en prompt de caminos |
+| B11 | Puntos flojos | Tutor indica materia y/o foco → **implementado** en `path_composer_context` (ranking híbrido + prompt por slot) — [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md) |
 | B12 | Cambio de mundo | UI para cambiar `active_world_theme` (respeta `lock_world_theme`) |
 | B13 | Play — fallo examen | Mensaje + reintentar compose |
 | B14 | Play — fallo camino | Regenerar **solo** el camino fallido; reutilizar los otros dos |

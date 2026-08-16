@@ -518,6 +518,70 @@
   cursor: not-allowed;
 }
 
+.play-baggage-offer {
+  margin: 0 0 0.5rem;
+}
+
+.play-baggage-offer__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.play-baggage-offer__title {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.78;
+  margin-right: 0.15rem;
+}
+
+.play-baggage-offer__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 9.5rem;
+  padding: 0.28rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.play-baggage-offer__chip--blocked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.play-baggage-offer__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-baggage-offer__effect {
+  opacity: 0.72;
+  font-size: 0.7rem;
+}
+
+.play-baggage-offer__more {
+  margin-left: auto;
+  padding: 0.2rem 0.35rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  text-decoration: underline;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
 .play-bubble--thinking {
   border-style: dashed;
   opacity: 0.94;

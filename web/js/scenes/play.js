@@ -34,6 +34,10 @@ import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
 import { postDebugJourneyRewind } from "../lib/debug-journey-api.js?v=256";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=257";
 import { baggageGlyphId, renderBaggageHtml, wireBaggageGrid } from "../lib/baggage-ui.js?v=8";
+import {
+  renderBaggageOfferStripHtml,
+  shouldShowBaggageOfferStrip,
+} from "../lib/play-baggage-offer.js?v=1";
 import { formatLevelLabel } from "../lib/subject-catalog.js?v=253";
 import { renderShellUiIconSvgInner } from "../components/shell-ui-icons.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
@@ -217,6 +221,8 @@ async function mountPlayPanel(root, ctx) {
   /** @type {any} */
   let baggageCache = null;
   let baggageDirty = false;
+  /** @type {any[]} */
+  let lastBaggageOffers = [];
   /** @type {HTMLElement | null} */
   let progressHudEl = null;
   /** @type {HTMLButtonElement | null} */
@@ -397,6 +403,9 @@ async function mountPlayPanel(root, ctx) {
       updateHistoryButtonLabel("idle");
     }
     applyWaitingCopy(data);
+    if (Array.isArray(data.baggage_offers)) {
+      lastBaggageOffers = data.baggage_offers;
+    }
   }
 
   /**
@@ -490,6 +499,7 @@ async function mountPlayPanel(root, ctx) {
   footer.className = "section-frame__footer play-panel__footer";
   footer.innerHTML = `
     <p class="play-panel__footer-progress" data-exam-progress hidden aria-live="polite"></p>
+    <div class="play-baggage-offer" data-baggage-offer hidden aria-label="Equipaje disponible"></div>
     <div class="play-panel__options" data-options role="group" aria-label="Opciones"></div>
     <form class="play-compose" data-form hidden>
       <textarea
@@ -708,6 +718,7 @@ async function mountPlayPanel(root, ctx) {
     updateHistoryButtonLabel("idle");
   }
   const optionsEl = footer.querySelector("[data-options]");
+  const baggageOfferEl = footer.querySelector("[data-baggage-offer]");
   const formEl = footer.querySelector("[data-form]");
   const statusEl = root.querySelector("[data-status]");
   const progressEl = footer.querySelector("[data-exam-progress]");
@@ -1612,6 +1623,106 @@ async function mountPlayPanel(root, ctx) {
   /**
    * @param {object} turn
    */
+  function renderBaggageOfferStrip(turn) {
+    if (!(baggageOfferEl instanceof HTMLElement)) return;
+    const meta = turn?.meta && typeof turn.meta === "object" ? turn.meta : {};
+    const show = shouldShowBaggageOfferStrip(lastBaggageOffers, {
+      phase: meta.phase,
+      retry: meta.retry,
+    });
+    if (!show) {
+      baggageOfferEl.hidden = true;
+      baggageOfferEl.innerHTML = "";
+      return;
+    }
+    baggageOfferEl.innerHTML = renderBaggageOfferStripHtml(lastBaggageOffers);
+    baggageOfferEl.hidden = false;
+    baggageOfferEl.querySelectorAll("[data-icon]").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
+      el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size: 16 }));
+    });
+    baggageOfferEl.querySelectorAll("[data-baggage-offer-chip]").forEach((btn) => {
+      if (!(btn instanceof HTMLButtonElement)) return;
+      btn.addEventListener("click", () => {
+        const rowId = btn.getAttribute("data-baggage-offer-chip");
+        const effectId = btn.getAttribute("data-effect-id") || "challenge_hint";
+        if (!rowId || btn.disabled) return;
+        void useBaggageOffer(rowId, effectId);
+      });
+    });
+    baggageOfferEl.querySelector("[data-baggage-offer-more]")?.addEventListener("click", () => {
+      void setPlayViewMode("baggage");
+    });
+  }
+
+  /**
+   * @param {string} itemRowId
+   * @param {string} effectId
+   */
+  async function useBaggageOffer(itemRowId, effectId) {
+    if (!sessionId) return;
+    const res = await usePlayBaggageItem(ctx.session, ctx.childId, itemRowId, {
+      effect_id: effectId,
+      session_id: sessionId,
+    });
+    if (!res.ok || !res.data) {
+      showGlassToast(mapPlayApiError(res.error || "use"), { variant: "error" });
+      return;
+    }
+    if (Array.isArray(res.data.baggage_offers)) {
+      lastBaggageOffers = res.data.baggage_offers;
+    } else if (res.data.baggage) {
+      baggageCache = res.data.baggage;
+      baggageDirty = false;
+      lastBaggageOffers = (res.data.baggage.items || [])
+        .filter((it) => it?.usable_now && it?.can_use)
+        .slice(0, 3)
+        .flatMap((it) =>
+          (it.effects || [])
+            .filter((fx) => fx === "challenge_hint" || fx === "challenge_retry")
+            .map((fx) => ({
+              item_row_id: it.id,
+              label_child: it.label_child,
+              icon_id: it.icon_id,
+              effect_id: fx,
+              can_use: it.can_use,
+            })),
+        );
+    }
+    if (res.data.baggage) {
+      baggageCache = res.data.baggage;
+      paintPlayBaggage(baggageCache);
+    } else {
+      baggageDirty = true;
+    }
+    if (res.data.hint_text) {
+      const hintBubble = {
+        id: `hint-${Date.now()}`,
+        role: "mentor",
+        content: String(res.data.mentor_line ? `${res.data.mentor_line} ${res.data.hint_text}` : res.data.hint_text),
+        meta: { phase: "baggage_hint" },
+      };
+      appendMentorTurn(hintBubble, mentorLabel);
+    } else if (res.data.mentor_line) {
+      showGlassToast(String(res.data.mentor_line), { variant: "success" });
+    }
+    if (res.data.challenge_reopened && Array.isArray(res.data.agent_turns)) {
+      for (const t of res.data.agent_turns) {
+        appendMentorTurn(t, mentorLabel);
+      }
+      const pending =
+        res.data.pending_agent_turn || res.data.agent_turns[res.data.agent_turns.length - 1];
+      if (pending) renderPending(pending);
+      scrollLogToEnd();
+      return;
+    }
+    if (lastPendingTurn) renderBaggageOfferStrip(lastPendingTurn);
+  }
+
+  /**
+   * @param {object} turn
+   */
   function renderPending(turn) {
     if (!(optionsEl instanceof HTMLElement) || !(formEl instanceof HTMLElement)) return;
     optionsEl.innerHTML = "";
@@ -1711,6 +1822,7 @@ async function mountPlayPanel(root, ctx) {
     }
     syncFooterChrome();
     lastPendingTurn = turn;
+    renderBaggageOfferStrip(turn);
     captureWaitingHints(turn);
     if (turn?.meta?.compose_failed) {
       lastComposeDebug = turn.meta.compose_debug ?? lastComposeDebug;

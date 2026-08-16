@@ -12,6 +12,8 @@
 - **Backend FastAPI (ago 2026 — migración cerrada):** [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) — nginx `:8082`: **toda** `/api/v1/*` → FastAPI; `api/` y `shared/` PHP retirados del repo.
 - **Capas de datos (aprobada ago 2026):** [specify/SPEC_DATA_STORAGE_LAYERS.md](specify/SPEC_DATA_STORAGE_LAYERS.md) — Supabase = producto; archivos = viaje/examen; DuckDB = tools; sin PlacementBank; `traveler.md` sustituye `child_traits`.
 - **Mecánicas de viaje (aprobada ago 2026):** [specify/SPEC_APP_JOURNEY_MECHANICS.md](specify/SPEC_APP_JOURNEY_MECHANICS.md) — flujos espera / first-run / prueba / caminos / rangos.
+- **Contexto tutor en caminos (implementada 15 ago 2026):** [specify/SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](specify/SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md) — notas general/por materia estructuradas + ranking híbrido PG+tutor en `path_composer`.
+- **Equipaje inline en retos (implementada 15 ago 2026):** [specify/SPEC_APP_PLAY_CHALLENGE_BAGGAGE_OFFER.md](specify/SPEC_APP_PLAY_CHALLENGE_BAGGAGE_OFFER.md) — chips en pie del diálogo play; `baggage_offers[]` en open/turn/use.
 - **Orquestador central (aprobada ago 2026 — cableado en play):** [specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md](specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md) — subagentes desde `.md` + tools.
 - **Glosarios mundo (aprobada — seed + tool):** [specify/SPEC_APP_WORLD_GLOSSARY.md](specify/SPEC_APP_WORLD_GLOSSARY.md) — JSONL + DuckDB `glossary_search`.
 - **Glosario en capas y composición (aprobada ago 2026 — implementada):** [specify/SPEC_APP_GLOSSARY_LAYERED_COMPOSITION.md](specify/SPEC_APP_GLOSSARY_LAYERED_COMPOSITION.md) — ingredientes L1 + referencias L2; `glossary_compose`; flag `GLOSSARY_COMPOSE_ENABLED`.

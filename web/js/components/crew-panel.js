@@ -39,6 +39,7 @@ import {
   normalizeActiveSubjects,
   renderSubjectsChecklistHtml,
   subjectNotesById,
+  subjectPrioritiesFromLearning,
   SUBJECT_CATALOG,
 } from "../lib/subject-catalog.js?v=256";
 import {
@@ -841,6 +842,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
             ? member.progress.subjects
             : [],
           subjectNotes: subjectNotesById(member.settings?.learning),
+          subjectPriorities: subjectPrioritiesFromLearning(member.settings?.learning),
         });
         cleanups.push(mountSubjectNoteDisclosures(host));
       }
@@ -1143,11 +1145,19 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           const generalEl = root.querySelector("[data-general-note]");
           const general_note =
             generalEl instanceof HTMLTextAreaElement ? generalEl.value.trim() : "";
+          /** @type {string[]} */
+          const subject_priorities = [];
+          root.querySelectorAll("[data-subject-priority]").forEach((el) => {
+            if (!(el instanceof HTMLInputElement)) return;
+            const sid = el.getAttribute("data-subject-priority");
+            if (sid && el.checked) subject_priorities.push(sid);
+          });
           const res = await patchCrewMember(session, childId, {
             learning: {
               active_subjects: selected,
               subject_notes,
               general_note: general_note || null,
+              subject_priorities,
             },
           });
           if (res.ok) {

@@ -17,6 +17,8 @@ flowchart TB
   Wallet --> PlayUI[Play vista baggage]
   Items --> PlayUI
   PlayUI --> Toggle[Toggle slot forward]
+  PlayUI --> Offer[Franja chips equipaje en reto]
+  Offer --> Use[POST baggage/use]
   Chapter[Título capítulo] --> HUD[play-progress-hud]
   CrewProg[CrewProgressService] --> HUD
 ```

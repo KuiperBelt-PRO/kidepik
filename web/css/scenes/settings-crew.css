@@ -258,6 +258,24 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   padding: 0.45rem 0.55rem;
 }
 
+.crew-subject-card__priority {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+  font-size: 0.78rem;
+  opacity: 0.92;
+}
+
+.crew-subject-card.is-priority .crew-subject-card__label::after {
+  content: " ★";
+  opacity: 0.85;
+}
+
+.crew-subject-card__notes-helper {
+  margin-top: 0.35rem;
+}
+
 .crew-card-wrap {
   display: flex;
   flex-direction: column;
@@ -515,7 +533,7 @@ html[data-font-scale-ui="xl"] {
 
 .section-frame[data-crew-world-theme="fantasy"] .crew-panel__title,
 .section-frame[data-crew-world-theme="fantasy"] .crew-panel__block-title,
-.section-frame[data-crew-world-theme="fantasy"] .crew-card__name {
+.section-frame[data-crew-world-theme="fantasy"] .crew-card__title {
   font-family: "Uncial Antiqua", Cinzel, Georgia, serif;
 }
 
@@ -526,7 +544,7 @@ html[data-font-scale-ui="xl"] {
 
 .section-frame[data-crew-world-theme="sci-fi"] .crew-panel__title,
 .section-frame[data-crew-world-theme="sci-fi"] .crew-panel__block-title,
-.section-frame[data-crew-world-theme="sci-fi"] .crew-card__name {
+.section-frame[data-crew-world-theme="sci-fi"] .crew-card__title {
   font-family: "Bruno Ace", Orbitron, system-ui, sans-serif;
 }
 

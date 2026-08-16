@@ -131,6 +131,12 @@ class CrewService:
                 learning.pop("weak_spots", None)
             if "general_note" in incoming:
                 learning["general_note"] = self._normalize_general_note(incoming["general_note"])
+            if "subject_priorities" in incoming:
+                active_list = learning.get("active_subjects")
+                learning["subject_priorities"] = self._normalize_subject_priorities(
+                    incoming["subject_priorities"],
+                    active_list if isinstance(active_list, list) else None,
+                )
             settings["learning"] = learning
         if "tutor_label" in payload or "learning" in payload: fields.append("settings = CAST(:settings AS jsonb)"); params["settings"] = settings
         traits_changed = "character_summary" in payload
@@ -364,6 +370,28 @@ class CrewService:
                 continue
             seen.add(sid)
             out.append({"subject_id": sid, "note": note})
+        return out
+
+    @staticmethod
+    def _normalize_subject_priorities(
+        raw: object,
+        active_subjects: list[str] | None = None,
+    ) -> list[str]:
+        if raw is None:
+            return []
+        if not isinstance(raw, list):
+            raise ValueError("learning.subject_priorities invalid")
+        active = set(active_subjects or [])
+        out: list[str] = []
+        seen: set[str] = set()
+        for item in raw[:16]:
+            sid = str(item or "").strip()
+            if not sid or sid not in SubjectCatalog.ALL or sid in seen:
+                continue
+            if active and sid not in active:
+                continue
+            seen.add(sid)
+            out.append(sid)
         return out
 
     @staticmethod

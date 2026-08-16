@@ -73,9 +73,8 @@
 .crew-card__header {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 4px;
-  min-height: 0;
+  gap: 6px;
+  flex-shrink: 0;
 }
 
 html[data-shell-theme="sci-fi"] .crew-card__title {
@@ -87,35 +86,34 @@ html[data-shell-theme="fantasy"] .crew-card__title {
 }
 
 .crew-card__title {
-  flex: 1 1 auto;
+  flex: 1 1 0%;
   min-width: 0;
   font-size: calc(0.72rem * var(--font-scale-ui, 1));
   font-weight: 700;
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-wrap: break-word;
+  word-break: normal;
 }
 
 .crew-card__status-gem {
-  flex: 1 1 68%;
-  max-width: 72%;
-  min-width: 5.5rem;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  width: max-content;
+  max-width: 42%;
   padding: 0.18rem 0.45rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.28);
   background: rgba(255, 255, 255, 0.14);
   font-size: calc(0.58rem * var(--font-scale-ui, 1));
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.15;
   text-align: center;
   letter-spacing: 0.01em;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  hyphens: manual;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .crew-card__status-gem--ready {

@@ -8,6 +8,7 @@ import {
   groupSubjectsByFamily,
   normalizeActiveSubjects,
   renderSubjectsChecklistHtml,
+  subjectPrioritiesFromLearning,
   SUBJECT_CATALOG,
 } from "../js/lib/subject-catalog.js";
 
@@ -33,4 +34,17 @@ test("groupSubjectsByFamily and checklist html", () => {
   assert.match(html, /checked/);
   assert.match(html, /Fundamentales/);
   assert.match(html, /Ética/);
+});
+
+test("subject priorities checkbox in checklist", () => {
+  const priorities = subjectPrioritiesFromLearning({
+    subject_priorities: ["math"],
+  });
+  assert.ok(priorities.has("math"));
+  const html = renderSubjectsChecklistHtml(SUBJECT_CATALOG, ["math"], {
+    subjectPriorities: priorities,
+  });
+  assert.match(html, /data-subject-priority="math"/);
+  assert.match(html, /Priorizar en caminos/);
+  assert.match(html, /is-priority/);
 });

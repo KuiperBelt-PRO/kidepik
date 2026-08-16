@@ -182,14 +182,32 @@ export function subjectNotesById(learning) {
 }
 
 /**
+ * @param {unknown} learning
+ * @returns {Set<string>}
+ */
+export function subjectPrioritiesFromLearning(learning) {
+  /** @type {Set<string>} */
+  const out = new Set();
+  if (!learning || typeof learning !== "object") return out;
+  const raw = /** @type {Record<string, unknown>} */ (learning).subject_priorities;
+  if (!Array.isArray(raw)) return out;
+  for (const item of raw) {
+    const sid = String(item || "").trim();
+    if (sid) out.add(sid);
+  }
+  return out;
+}
+
+/**
  * @param {SubjectMeta[]} catalog
  * @param {string[]} active
- * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, rank_label?: string, rank_next_label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }>, subjectNotes?: Map<string, string> }} [opts]
+ * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, rank_label?: string, rank_next_label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }>, subjectNotes?: Map<string, string>, subjectPriorities?: Set<string> }} [opts]
  * @returns {string}
  */
 export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
   const activeSet = new Set(active);
   const notesById = opts.subjectNotes || new Map();
+  const priorities = opts.subjectPriorities || new Set();
   /** @type {Map<string, { current?: string, next?: string, percent?: number, rank?: string, rankNext?: string }>} */
   const progressById = new Map();
   for (const row of opts.progressSubjects || []) {
@@ -223,9 +241,10 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
       else if (curRank) levelLine = curRank;
       const noteText = notesById.get(s.id) || "";
       const hasNote = Boolean(noteText);
+      const prioritized = priorities.has(s.id);
       const panelId = `crew-subject-note-${escapeHtml(s.id)}`;
       const notePlaceholder = subjectNotePlaceholder(s.id);
-      html += `<div class="crew-subject-card${on ? " is-on" : ""}${hasNote ? " has-note" : ""}" data-subject-card="${escapeHtml(s.id)}">
+      html += `<div class="crew-subject-card${on ? " is-on" : ""}${hasNote ? " has-note" : ""}${prioritized ? " is-priority" : ""}" data-subject-card="${escapeHtml(s.id)}">
         <div class="crew-subject-card__head">
           <span class="crew-subject-card__label">${escapeHtml(s.label)}</span>
           <div class="crew-subject-card__actions">
@@ -258,6 +277,11 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
             placeholder="${escapeHtml(notePlaceholder)}"
             aria-label="Información adicional de ${escapeHtml(s.label)}"
           >${escapeHtml(noteText)}</textarea>
+          <label class="crew-subject-card__priority">
+            <input type="checkbox" data-subject-priority="${escapeHtml(s.id)}" ${prioritized ? "checked" : ""} />
+            <span>Priorizar en caminos</span>
+          </label>
+          <p class="crew-panel__helper crew-subject-card__notes-helper">Orienta el examen y los próximos caminos de práctica.</p>
         </div>
       </div>`;
     }
