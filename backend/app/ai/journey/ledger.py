@@ -34,6 +34,7 @@ Kind = Literal[
     "path_pack",
     "path_progress",
     "chapter_opened",
+    "item_used",
 ]
 
 
@@ -398,6 +399,65 @@ class JourneyLedger:
         if limit is not None:
             return rows[-limit:]
         return rows
+
+    def _sessions_dirs(
+        self, parent_id: str, child_id: str, *, world_theme: str | None
+    ) -> list[Path]:
+        dirs: list[Path] = []
+        world_dir = self.world_dir(parent_id, child_id, world_theme)
+        themed = world_dir / "sessions"
+        if themed.is_dir():
+            dirs.append(themed)
+        legacy = self.child_dir(parent_id, child_id) / "sessions"
+        if legacy.is_dir() and legacy not in dirs:
+            dirs.append(legacy)
+        return dirs
+
+    def read_item_used_events(
+        self,
+        parent_id: str,
+        child_id: str,
+        *,
+        world_theme: str | None = None,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Aggregate ``item_used`` events across session ledgers for a world."""
+        cap = max(1, min(int(limit or 50), 200))
+        rows: list[dict[str, Any]] = []
+        for sessions_dir in self._sessions_dirs(
+            parent_id, child_id, world_theme=world_theme
+        ):
+            if not sessions_dir.is_dir():
+                continue
+            for session_path in sessions_dir.iterdir():
+                if not session_path.is_dir():
+                    continue
+                events_file = session_path / "events.jsonl"
+                if not events_file.is_file():
+                    continue
+                session_id = session_path.name
+                with events_file.open(encoding="utf-8") as handle:
+                    for line in handle:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            row = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
+                        if row.get("kind") != "item_used":
+                            continue
+                        payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+                        rows.append(
+                            {
+                                "id": str(row.get("id") or ""),
+                                "used_at": str(row.get("at") or ""),
+                                "session_id": str(row.get("session_id") or session_id),
+                                **payload,
+                            }
+                        )
+        rows.sort(key=lambda r: str(r.get("used_at") or ""), reverse=True)
+        return rows[:cap]
 
     def write_session_summary(
         self,

@@ -38,6 +38,8 @@ flowchart TB
 | Supabase | auth, children, progreso por mundo, wallets, inventory |
 | Archivos | dialogue/events/summary/traveler por mundo; estado examen/caminos; `reward_granted` |
 | DuckDB | tools sobre JSONL (glosario + ledger) |
+
+**Currículo vs lore:** el examen de acceso pregunta **conocimiento escolar previo**; el envoltorio del mundo no es temario. En caminos, lore inventado solo si acaba de enseñarse en el pasaje.
 | Código/JSON | ItemCatalog `data/items/` |
 
 ## Anti-errores

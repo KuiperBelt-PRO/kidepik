@@ -14,6 +14,8 @@ from app.ai.agents.runner import run_dialogue_purpose
 from app.ai.errors import AiProductError
 from app.ai.gemini_gateway import GeminiGateway
 from app.config import GEMINI_LITE_PURPOSES, get_settings
+from app.services.debug_access import debug_capabilities_for_parent
+from app.services.settings import ParentSettingsRepository
 
 # Purposes OpenRouter → Gemini (panel / resolve)
 PURPOSE_ALIASES = {
@@ -50,8 +52,9 @@ class DebugAiService:
         self.settings = get_settings()
         self.gateway = GeminiGateway(self.settings)
 
-    async def status(self) -> dict[str, Any]:
+    async def status(self, parent_id: str, parent_settings: dict[str, Any] | None = None) -> dict[str, Any]:
         models = self.settings.gemini_model_list()
+        capabilities = await debug_capabilities_for_parent(parent_id, parent_settings, settings=self.settings)
         return {
             "enabled": self.settings.ai_enabled,
             "provider": "gemini",
@@ -62,7 +65,9 @@ class DebugAiService:
             "lite_purposes": sorted(GEMINI_LITE_PURPOSES),
             "max_attempts": len(models),
             "app_env": self.settings.app_env,
-            "debug_allowed": self.settings.ai_debug_enabled(),
+            "operator_eligible": capabilities["operator_eligible"],
+            "debug_enabled": capabilities["debug_enabled"],
+            "debug_allowed": capabilities["debug_allowed"],
             "journey_data_dir": self.settings.journey_data_dir,
             # Compat panel antiguo
             "queue_backend": "gemini_env",

@@ -36,7 +36,7 @@ Al niño **no** se le muestra puntuación numérica; solo feedback narrativo. El
 
 | Principio | Decisión |
 | --- | --- |
-| Narrativo, no “examen escolar” | Envoltorio de historia |
+| Narrativo, no “examen escolar” | Envoltorio de historia; la respuesta sigue siendo conocimiento escolar previo, no lore inventado del mundo |
 | Micro por materia | Retos generados por agente (sin banco estático); cola en JSONL — ver [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) |
 | Multi-modal | Opciones, texto, (futuro: otros tipos) |
 | Por materia + general | Ambos persistidos en PG al cerrar |

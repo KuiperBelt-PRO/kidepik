@@ -6,18 +6,17 @@
 import { setAppShellDebugAiBadge } from "../components/app-shell.js?v=186";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=245";
 import {
-  isDebugAiClientActive,
-  setDebugAiClientActive,
-  setDebugAiServerAllowed,
+  isDebugAiAllowed,
+  syncDebugAiCapabilities,
 } from "./debug-ai.js";
 import { fetchDebugAiStatus } from "./debug-ai-api.js";
 import { getValidSession } from "./supabase.js";
 
 /**
- * Sincroniza el badge <> sobre cuenta si el modo debug está activo y permitido.
+ * Sincroniza el badge sobre cuenta si el modo debug está activo y permitido.
  */
 export async function ensureDebugAiShellBadge() {
-  if (!isDebugAiClientActive()) {
+  if (!isDebugAiAllowed()) {
     setAppShellDebugAiBadge(null);
     return;
   }
@@ -26,13 +25,19 @@ export async function ensureDebugAiShellBadge() {
   if (!session) return;
 
   const res = await fetchDebugAiStatus(session);
-  if (!res.ok || !res.data?.debug_allowed) {
-    setDebugAiClientActive(false);
+  if (res.ok && res.data) {
+    syncDebugAiCapabilities({
+      operator_eligible: res.data.operator_eligible,
+      debug_enabled: res.data.debug_enabled,
+      debug_allowed: res.data.debug_allowed,
+    });
+  }
+
+  if (!isDebugAiAllowed()) {
     setAppShellDebugAiBadge(null);
     return;
   }
 
-  setDebugAiServerAllowed(true);
   setAppShellDebugAiBadge(() => {
     void getValidSession().then((nextSession) => {
       if (nextSession) void openDebugAiPanel({ session: nextSession });

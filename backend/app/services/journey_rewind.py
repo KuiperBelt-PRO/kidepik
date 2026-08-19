@@ -538,6 +538,14 @@ class JourneyRewindService:
                     {"cid": child_id},
                 )
         elif pending_phase in POST_PLACEMENT_PHASES:
+            # Retos de camino actualizan user_subject_levels sin created_at;
+            # hay que truncar por updated_at igual que en fases posteriores (SPEC §4.1).
+            await self.session.execute(
+                text(
+                    "delete from user_subject_levels where child_id=:cid and updated_at > :at"
+                ),
+                {"cid": child_id, "at": anchor_dt},
+            )
             for table in (
                 "story_beats",
                 "story_summaries",
@@ -547,6 +555,13 @@ class JourneyRewindService:
                     text(f"delete from {table} where child_id=:cid and created_at > :at"),
                     {"cid": child_id, "at": anchor_dt},
                 )
+            await self.session.execute(
+                text(
+                    "delete from child_world_progress where child_id=:cid "
+                    "and updated_at > :at"
+                ),
+                {"cid": child_id, "at": anchor_dt},
+            )
         else:
             for table in (
                 "story_beats",

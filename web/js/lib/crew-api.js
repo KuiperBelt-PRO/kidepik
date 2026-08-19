@@ -258,11 +258,15 @@ export async function requestTutorReport(session, id) {
  * @param {import('@supabase/supabase-js').Session} session
  * @param {string} id
  * @param {string} [worldTheme]
+ * @param {{ includeUsage?: boolean }} [opts]
  */
-export async function fetchCrewBaggage(session, id, worldTheme) {
+export async function fetchCrewBaggage(session, id, worldTheme, opts = {}) {
   try {
     const { config } = await import("../config.js");
-    const q = worldTheme ? `?world_theme=${encodeURIComponent(worldTheme)}` : "";
+    const params = new URLSearchParams();
+    if (worldTheme) params.set("world_theme", worldTheme);
+    if (opts.includeUsage !== false) params.set("include_usage", "1");
+    const q = params.toString() ? `?${params.toString()}` : "";
     const res = await fetch(
       `${config.apiUrl}/crew/${encodeURIComponent(id)}/baggage${q}`,
       { headers: { Authorization: `Bearer ${session.access_token}` } },

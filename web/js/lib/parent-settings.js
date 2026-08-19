@@ -4,8 +4,10 @@
  */
 
 import { setShellUiTheme, isShellUiTheme } from "./shell-theme.js";
+import { syncDebugAiCapabilities, syncDebugAiFromParentSettings } from "./debug-ai.js";
 
 export const PARENT_SETTINGS_STORAGE_KEY = "kidepik.parent.settings";
+export const DEBUG_CAPABILITIES_STORAGE_KEY = "kidepik.parent.debug_capabilities";
 
 /** @typedef {'md'|'lg'|'xl'} FontScale */
 /** @typedef {'fantasy'|'sci-fi'} UiTheme */
@@ -21,6 +23,7 @@ export const PARENT_SETTINGS_STORAGE_KEY = "kidepik.parent.settings";
  * @property {object} learning
  * @property {object} narrative
  * @property {object} privacy
+ * @property {{ debug_ai_enabled?: boolean }} [diagnostics]
  * @property {number} schema_version
  */
 
@@ -63,6 +66,9 @@ export function defaultParentSettings() {
     privacy: {
       story_retention: "full",
       analytics_opt_in: false,
+    },
+    diagnostics: {
+      debug_ai_enabled: false,
     },
     schema_version: 1,
   };
@@ -123,12 +129,33 @@ export function applyParentSettingsToDom(settings) {
 
 /**
  * @param {ParentSettings} settings
+ * @param {import('./debug-ai.js').DebugCapabilities | null | undefined} [debugCapabilities]
  */
-export function cacheParentSettingsLocal(settings) {
+export function cacheParentSettingsLocal(settings, debugCapabilities) {
   try {
     globalThis.localStorage?.setItem(PARENT_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    if (debugCapabilities && typeof debugCapabilities === "object") {
+      globalThis.localStorage?.setItem(
+        DEBUG_CAPABILITIES_STORAGE_KEY,
+        JSON.stringify(debugCapabilities),
+      );
+      syncDebugAiCapabilities(debugCapabilities);
+    }
+    syncDebugAiFromParentSettings(settings, debugCapabilities);
   } catch {
     /* ignore */
+  }
+}
+
+/** @returns {import('./debug-ai.js').DebugCapabilities | null} */
+export function readCachedDebugCapabilities() {
+  try {
+    const raw = globalThis.localStorage?.getItem(DEBUG_CAPABILITIES_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
   }
 }
 
@@ -137,7 +164,9 @@ export function readCachedParentSettings() {
   try {
     const raw = globalThis.localStorage?.getItem(PARENT_SETTINGS_STORAGE_KEY);
     if (!raw) return null;
-    return mergeParentSettings(JSON.parse(raw));
+    const settings = mergeParentSettings(JSON.parse(raw));
+    syncDebugAiFromParentSettings(settings, readCachedDebugCapabilities());
+    return settings;
   } catch {
     return null;
   }
@@ -157,12 +186,15 @@ export async function fetchParentSettings(session) {
     if (!res.ok) return { ok: false, status: res.status };
     const data = await res.json();
     const settings = mergeParentSettings(data.settings);
-    cacheParentSettingsLocal(settings);
+    const debugCapabilities = data.debug_capabilities ?? null;
+    cacheParentSettingsLocal(settings, debugCapabilities);
     applyParentSettingsToDom(settings);
     return {
       ok: true,
       settings,
       member_count: Number(data.crew_summary?.member_count ?? 0),
+      debug_capabilities: debugCapabilities,
+      account_authorization: data.account_authorization ?? null,
     };
   } catch (err) {
     console.warn("parents/me/settings error", err);
@@ -198,12 +230,15 @@ export async function patchParentSettings(session, patch) {
     }
     const data = await res.json();
     const settings = mergeParentSettings(data.settings);
-    cacheParentSettingsLocal(settings);
+    const debugCapabilities = data.debug_capabilities ?? null;
+    cacheParentSettingsLocal(settings, debugCapabilities);
     applyParentSettingsToDom(settings);
     return {
       ok: true,
       settings,
       member_count: Number(data.crew_summary?.member_count ?? 0),
+      debug_capabilities: debugCapabilities,
+      account_authorization: data.account_authorization ?? null,
     };
   } catch (err) {
     console.warn("parents/me/settings patch error", err);

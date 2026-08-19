@@ -7,29 +7,37 @@ if (!globalThis.document) {
 }
 
 import {
-  initDebugAiFromUrl,
   isDebugAiClientActive,
   setDebugAiClientActive,
   debugAiRequestHeaders,
-  setDebugAiServerAllowed,
+  syncDebugAiCapabilities,
   isDebugAiAllowed,
+  isDebugAiOperatorEligible,
 } from "../js/lib/debug-ai.js";
 
 describe("debug-ai", () => {
   beforeEach(() => {
-    sessionStorage.clear();
-    setDebugAiServerAllowed(false);
+    syncDebugAiCapabilities({
+      operator_eligible: false,
+      debug_enabled: false,
+      debug_allowed: false,
+    });
   });
 
-  it("adds debug header when client active", () => {
-    setDebugAiClientActive(true);
+  it("adds debug header when operator and setting active", () => {
+    syncDebugAiCapabilities({
+      operator_eligible: true,
+      debug_enabled: true,
+      debug_allowed: true,
+    });
     assert.deepEqual(debugAiRequestHeaders(), { "X-Kidepik-Debug-Ai": "1" });
   });
 
-  it("requires server allowed for isDebugAiAllowed", () => {
-    setDebugAiClientActive(true);
-    assert.equal(isDebugAiAllowed(), false);
-    setDebugAiServerAllowed(true);
+  it("requires operator eligibility and enabled setting", () => {
+    syncDebugAiCapabilities({ operator_eligible: true, debug_enabled: true });
+    assert.equal(isDebugAiOperatorEligible(), true);
     assert.equal(isDebugAiAllowed(), true);
+    setDebugAiClientActive(false);
+    assert.equal(isDebugAiClientActive(), false);
   });
 });

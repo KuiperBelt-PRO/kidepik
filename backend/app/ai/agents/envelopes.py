@@ -104,6 +104,18 @@ class PathChallengeSeed(BaseModel):
     expected_answer: str | None = None
     explanation: str = ""
 
+    @model_validator(mode="after")
+    def validate_answer_fields(self) -> PathChallengeSeed:
+        if self.item_type == "mcq":
+            if len(self.options) < 2:
+                raise ValueError("mcq_needs_options")
+            if not str(self.correct_option_id or "").strip():
+                raise ValueError("mcq_missing_correct_option_id")
+        elif self.item_type == "short_text":
+            if not str(self.expected_answer or "").strip():
+                raise ValueError("short_text_missing_expected")
+        return self
+
 
 class PathDetail(BaseModel):
     path: PathOption

@@ -9,6 +9,7 @@ from app.catalogs.subject_catalog import SubjectCatalog
 from app.db import session_scope
 from app.services.auth import AuthError, SupabaseAuthService
 from app.services.crew import CrewService
+from app.services.debug_access import debug_attach_allowed_for_auth_user
 from app.services.dialogue import DialogueService
 from app.services.inventory import InventoryService
 from app.services.journey_memory import JourneyMemoryService
@@ -87,6 +88,10 @@ async def submit_turn(
     if not isinstance(session_id, str) or not isinstance(reply, dict):
         raise HTTPException(422, "session_id and reply required")
     claims = await _claims(authorization)
+    attach_debug = await debug_attach_allowed_for_auth_user(
+        claims,
+        header_debug=x_kidepik_debug_ai == "1",
+    )
     try:
         async with session_scope() as session:
             result = await DialogueService(session).submit_turn(
@@ -94,7 +99,7 @@ async def submit_turn(
                 child_id,
                 session_id,
                 reply,
-                x_kidepik_debug_ai == "1",
+                attach_debug,
             )
         # Refresh HUD when placement/levels may have changed
         try:
@@ -180,6 +185,26 @@ async def play_economy(
             "wallet": wallet,
             "pending_offer": None,
         }
+    except Exception as exc:
+        raise _translate(exc) from exc
+
+
+@router.get("/api/v1/play/{child_id}/baggage/offers")
+async def play_baggage_offers(
+    child_id: str,
+    session_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict[str, Any]:
+    claims = await _claims(authorization)
+    if not session_id.strip():
+        raise HTTPException(422, "session_id required")
+    try:
+        async with session_scope() as session:
+            return await DialogueService(session).baggage_offers_for_session(
+                claims["sub"],
+                child_id,
+                session_id.strip(),
+            )
     except Exception as exc:
         raise _translate(exc) from exc
 

@@ -85,6 +85,7 @@ async def verify_exit_pin(child_id: str, payload: dict[str, Any] | None = None, 
 async def baggage(
     child_id: str,
     world_theme: str | None = Query(default=None),
+    include_usage: bool = Query(default=False),
     authorization: str | None = Header(default=None),
 ) -> dict[str, Any]:
     auth_id = await _parent(authorization)
@@ -93,7 +94,7 @@ async def baggage(
         theme = world_theme or member.get("world_theme") or member.get("active_world_theme") or "fantasy"
         settings = member.get("settings") if isinstance(member.get("settings"), dict) else {}
         learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
-        return await InventoryService().get_baggage(
+        body = await InventoryService().get_baggage(
             child_id,
             str(theme),
             active_subjects=SubjectCatalog.resolve_active_subjects(member),
@@ -101,6 +102,13 @@ async def baggage(
             show_levels_to_child=bool(learning.get("show_levels_to_child")),
             audience="tutor",
         )
+        if include_usage:
+            body["usage_log"] = InventoryService().get_usage_log(
+                auth_id,
+                child_id,
+                str(theme),
+            )
+        return body
     except Exception as exc:
         raise _crew_error(exc) from exc
 

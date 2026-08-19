@@ -105,6 +105,17 @@ class BaggageUseService:
         return result
 
     async def _consume(self, session: Any, row_id: str, qty: int) -> None:
+        usage_sql = """
+            update public.child_inventory_items
+            set meta = jsonb_set(
+                    coalesce(meta, '{}'::jsonb),
+                    '{usage_count}',
+                    to_jsonb(coalesce((meta->>'usage_count')::int, 0) + 1)
+                ),
+                last_used_at = now()
+            where id = :id
+        """
+        await session.execute(text(usage_sql), {"id": row_id})
         if qty <= 1:
             await session.execute(
                 text("delete from public.child_inventory_items where id = :id"),
@@ -115,7 +126,7 @@ class BaggageUseService:
                 text(
                     """
                     update public.child_inventory_items
-                    set qty = qty - 1, last_used_at = now()
+                    set qty = qty - 1
                     where id = :id
                     """
                 ),

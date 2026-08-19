@@ -12,9 +12,20 @@ from tests.helpers.factories import CHILD_ID
 @pytest.mark.asyncio
 async def test_debug_ai_status(mocker) -> None:
     service = DebugAiService(mocker.AsyncMock())
-    body = await service.status()
+    mocker.patch(
+        "app.services.debug_ai.debug_capabilities_for_parent",
+        new=AsyncMock(
+            return_value={
+                "operator_eligible": True,
+                "debug_enabled": True,
+                "debug_allowed": True,
+            }
+        ),
+    )
+    body = await service.status("parent-1", {"diagnostics": {"debug_ai_enabled": True}})
     assert body["provider"] == "gemini"
     assert "models" in body
+    assert body["operator_eligible"] is True
 
 
 @pytest.mark.unit

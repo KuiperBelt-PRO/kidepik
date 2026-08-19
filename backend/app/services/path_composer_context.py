@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.catalogs.age_band import AgeBand
 from app.catalogs.subject_catalog import SubjectCatalog
+from app.services.challenge_difficulty import ChallengeDifficultyService
 from app.services.crew import CrewService
 from app.services.crew_progress import CrewProgressService
 from app.services.placement import PlacementService
@@ -108,13 +110,18 @@ class PathComposerContextService:
             )
             weakness_vals.append(weakness)
             boost_vals.append(boost)
+            row = by_subject.get(subject_id) or {}
+            modifier_raw = row.get("difficulty_modifier")
             scored.append(
                 {
                     "subject_id": subject_id,
-                    "pg_level": str((by_subject.get(subject_id) or {}).get("level_id") or "L1"),
+                    "pg_level": str(row.get("level_id") or "L1"),
                     "accuracy_rolling": float(
-                        (by_subject.get(subject_id) or {}).get("accuracy_rolling") or 0.5
+                        row.get("accuracy_rolling")
+                        if row.get("accuracy_rolling") is not None
+                        else 0.5
                     ),
+                    "difficulty_modifier": float(modifier_raw or 0.0),
                     "tutor_boost": boost,
                     "weakness_pg": weakness,
                     "note": notes.get(subject_id),
@@ -163,6 +170,7 @@ class PathComposerContextService:
                         "subject_id": sid,
                         "pg_level": "L1",
                         "accuracy_rolling": 0.5,
+                        "difficulty_modifier": 0.0,
                         "tutor_boost": cls.tutor_boost_for_note(
                             notes.get(sid, ""),
                             prioritized=sid in priorities,
@@ -185,9 +193,17 @@ class PathComposerContextService:
                 "slot_index": idx,
                 "subject_id": str(row["subject_id"]),
                 "tutor_note": row.get("note"),
+                "pg_level": str(row.get("pg_level") or "L1"),
+                "accuracy_rolling": row.get("accuracy_rolling"),
+                "difficulty_modifier": float(row.get("difficulty_modifier") or 0.0),
             }
             for idx, row in enumerate(ranked[:3])
         ]
+
+    @staticmethod
+    def _age_band_for_child(child: dict[str, Any]) -> str:
+        band = child.get("effective_age_band") or child.get("age_band")
+        return str(band) if AgeBand.is_valid(str(band or "")) else AgeBand.CHILD
 
     @classmethod
     def build_context(
@@ -199,6 +215,7 @@ class PathComposerContextService:
         learning = (child.get("settings") or {}).get("learning") or {}
         ranked = cls.rank_subjects(child, subject_rows=subject_rows, limit=3)
         return {
+            "age_band": cls._age_band_for_child(child),
             "general_note": CrewService.effective_general_note(learning),
             "subject_notes": cls._notes_by_subject(learning),
             "weak_subjects_ranked": ranked,
@@ -207,6 +224,9 @@ class PathComposerContextService:
 
     @classmethod
     def prompt_sections(cls, context: dict[str, Any]) -> list[str]:
+        band = str(context.get("age_band") or AgeBand.CHILD)
+        if not AgeBand.is_valid(band):
+            band = AgeBand.CHILD
         sections: list[str] = ["## Contexto del tutor"]
         general = context.get("general_note")
         if general:
@@ -220,22 +240,43 @@ class PathComposerContextService:
             for sid, note in list(notes.items())[:8]:
                 sections.append(f"- {sid}: «{note}»")
 
+        sample = ChallengeDifficultyService.placement(band)
+        sections.append("## Calibración pedagógica")
+        sections.append(
+            f"Banda efectiva {band}: suelo {sample.floor}, techo {sample.ceiling}. "
+            "Ningún reto puede quedar por debajo del suelo aunque el nivel sea L1."
+        )
+
         sections.append("## Asignación de caminos (obligatorio)")
         slots = context.get("path_slots") if isinstance(context.get("path_slots"), list) else []
         for slot in slots:
             idx = int(slot.get("slot_index") or 0) + 1
             sid = str(slot.get("subject_id") or "math")
+            resolved = ChallengeDifficultyService.resolve(
+                age_band=band,
+                level_id=str(slot.get("pg_level") or "L1"),
+                accuracy_rolling=(
+                    float(slot["accuracy_rolling"])
+                    if slot.get("accuracy_rolling") is not None
+                    else None
+                ),
+                difficulty_modifier=float(slot.get("difficulty_modifier") or 0.0),
+                subject_id=sid,
+            )
+            line = (
+                f"Camino {idx} → materia {sid}. "
+                f"{ChallengeDifficultyService.slot_prompt_line(resolved)}"
+            )
             note = slot.get("tutor_note")
             if note:
-                sections.append(
-                    f"Camino {idx} → materia {sid}. Nota tutor: «{note}». "
-                    "Calibra lesson_narrative y retos a este foco."
-                )
+                line += f" Nota tutor: «{note}». Calibra lesson_narrative y retos a este foco."
             else:
-                sections.append(f"Camino {idx} → materia {sid}. (sin nota específica)")
+                line += " (sin nota específica)"
+            sections.append(line)
 
         sections.append(
-            "Cada entrada de paths[] debe usar el subject_id de su slot asignado."
+            "Cada entrada de paths[] debe usar el subject_id de su slot asignado. "
+            "Los retos deben respetar el objetivo de dificultad y el contenido esperado."
         )
         return sections
 
@@ -250,6 +291,8 @@ class PathComposerContextService:
         priorities = cls._subject_priorities(learning)
         general = CrewService.effective_general_note(learning)
         sections: list[str] = ["## Contexto del tutor (examen de ingreso)"]
+        band = cls._age_band_for_child(child)
+        sections.append(ChallengeDifficultyService.placement_prompt_block(band, subject_slots))
         if general:
             sections.append(f"General: «{general}».")
         for subject_id in subject_slots:

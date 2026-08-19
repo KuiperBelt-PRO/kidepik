@@ -10,11 +10,11 @@ import { renderAccount } from "./scenes/account.js?v=237";
 import { renderSettings } from "./scenes/settings.js?v=244";
 import { watchNoSpellcheck } from "./components/glass-controls.js?v=227";
 import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=260";
-import { renderPlay } from "./scenes/play.js?v=260";
+import { renderPlay } from "./scenes/play.js?v=269";
 import { renderLegal } from "./scenes/legal.js?v=256";
 import {
-  initDebugAiFromUrl,
-} from "./lib/debug-ai.js?v=243";
+  readCachedParentSettings,
+} from "./lib/parent-settings.js?v=245";
 import { ensureDebugAiShellBadge } from "./lib/debug-ai-shell.js?v=1";
 
 watchNoSpellcheck(document.documentElement);
@@ -39,8 +39,8 @@ function boot() {
   initTheme();
   initShellUiTheme();
   void initAppLogger();
-  initDebugAiFromUrl();
-  // Tras ?debugAi=1, conservar query en la URL pero asegurar hash para el router.
+  readCachedParentSettings();
+  // Asegurar hash para el router si falta.
   if (!window.location.hash || window.location.hash === "#") {
     window.location.replace(`${window.location.pathname}${window.location.search}#/loader`);
   }

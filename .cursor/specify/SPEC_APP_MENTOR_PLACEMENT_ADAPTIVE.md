@@ -1,7 +1,7 @@
 # Spec: Placement adaptado por edad y prosa narrativa del mentor
 
-> Estado: **implementada** (31 jul 2026) — **delta A2 implementada** (1 ago 2026): compose paralelo por lotes + copy de espera por mundo/`age_band`  
-> Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md)  
+> Estado: **implementada** (31 jul 2026) — **delta A2** (1 ago 2026) compose paralelo; **delta 19 ago 2026:** suelo de banda + nivel de materia (`ChallengeDifficultyService`).  
+> Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md)  
 > Diagrama: [11-child-adventure-pipeline.md](../diagrams/11-child-adventure-pipeline.md)  
 > **Delta** — catálogo y activación: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md).
 
@@ -70,6 +70,27 @@ Las **materias base por banda** ([SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_
 | `band_senior` | 2–4 | como adult; léxico claro |
 
 Aplica a **todas** las materias activas, incluidas `finance`, `politics`, `mythology`, etc.
+
+### 1.4.1 Suelo de banda + nivel de materia (19 ago 2026)
+
+`difficulty` de la tabla §1.4 es el **rango permitido** (`floor`–`ceil`), no un valor suelto que el LLM elige a ojo.
+
+En **placement** (aún no hay `level_id`): el compositor recibe `floor`, `ceil` y `target` = punto medio del rango. El contenido curricular sigue la banda (p. ej. `math` + `band_teen` ≠ suma `10+5`).
+
+En **caminos**: `target` se calcula en servidor (`ChallengeDifficultyService`) con `effective_age_band` + `level_id` + `accuracy_rolling` + `difficulty_modifier`. Fórmula y criterios: [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md) § Calibración pedagógica.
+
+**Invariante:** L1 no autoriza bajar del suelo de la banda. Un teen en refuerzo practica contenido de 14–17 años simplificado, no currículo de `band_early`.
+
+### 1.5 Conocimiento previo vs lore del mundo (18 ago 2026)
+
+El examen de ingreso **viste** el currículo con prosa del mundo; no convierte el canon inventado en temario.
+
+| Superficie | Qué puede preguntarse |
+| --- | --- |
+| Placement | Solo **conocimiento escolar previo** (edad/banda + materia). Prohibido examinar mitos, héroes o lugares inventados del mundo. En `mythology`: mitos reales (p. ej. Prometeo), no «¿quién trajo el fuego en Binar Star?». |
+| Caminos post-placement | Lore del mundo **solo** si acaba de enseñarse en `lesson_narrative` o en el `narrative_wrapper` de ese reto; si no, conocimiento escolar. |
+
+Contrato de skills: `backend/skills/placement-exam/SKILL.md`, `subject-pedagogy`, `challenge-design`. Prompt de compose: `PLACEMENT_PRIOR_KNOWLEDGE_RULE` / `PATH_LORE_ONLY_IF_TAUGHT_RULE`.
 
 ---
 

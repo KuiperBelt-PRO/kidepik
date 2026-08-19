@@ -34,7 +34,8 @@ async def test_use_hint_consumes_qty(mocker) -> None:
                     }
                 ]
             ),
-            FakeExecuteResult(rows=None),  # update qty
+            FakeExecuteResult(rows=None),  # usage meta + last_used_at
+            FakeExecuteResult(rows=None),  # decrement qty
             # get_baggage after consume
             FakeExecuteResult(
                 rows=[{"balance": 0, "lifetime_earned": 0, "lifetime_spent": 0}]

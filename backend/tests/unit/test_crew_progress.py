@@ -22,7 +22,7 @@ def test_level_progress_and_ranks() -> None:
     svc = CrewProgressService()
     progress = svc._level_progress("L2", 0.85, 5, "Matemáticas")
     assert progress["next"] == "L3"
-    assert progress["percent_to_next"] == 100
+    assert progress["percent_to_next"] == 85
     seed = svc._level_progress("L1", None, 1, "Lengua")
     assert seed["percent_to_next"] == 10
     rank = svc._rank("fantasy", "fantasy", "fantasy_spark", "L2")

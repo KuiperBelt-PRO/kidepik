@@ -136,13 +136,17 @@ situación en el mundo
 
 | Fuente | Uso |
 | --- | --- |
-| `subject_levels[subject_id]` + `effective_age_band` + `difficulty_modifier` | `ChallengePlanner` (PHP) elige ítem del banco determinista |
-| `challenge_writer` (LLM) | Vestido narrativo del ítem ya elegido |
+| `effective_age_band` | **Suelo y techo** curriculares (`difficulty_range`) |
+| `user_subject_levels.level_id` + `accuracy_rolling` + `difficulty_modifier` | Desplazamiento **dentro** del rango de la banda |
+| `ChallengeDifficultyService` (FastAPI) | Calcula `target` e inyecta `curriculum_hint` en `path_composer` / placement |
+| LLM (`path_composer` / `challenge_writer`) | Viste el reto; **no** elige la dificultad ni baja del suelo |
 | Antagonista | Solo tono (`antagonist_pressure`), no unfair |
 
-Si el perfil ya superó sumas simples en placement, **prohibido** reutilizar `5+7` como primer gate de zona math.
+Contrato: [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md) § Calibración pedagógica.
 
-Criterio aceptación: el primer reto de zona usa dificultad **acorde** al nivel de esa materia (tests con fixture L3+ no reciben ítem L1 canónico hardcodeado).
+Si el perfil ya superó sumas simples en placement, **prohibido** reutilizar `5+7` / `10+5` como primer gate de zona math. Un teen de 15 con examen correcto no recibe aritmética de primaria como núcleo.
+
+Criterio aceptación: el primer reto de zona usa dificultad **acorde** al suelo de edad **y** al nivel de esa materia (tests: `band_teen` + L4 no genera hint de sumas de una cifra; `band_teen` + L1 sigue con `target ≥ 2`).
 
 ---
 

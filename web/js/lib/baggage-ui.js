@@ -119,11 +119,78 @@ function rarityBadgeHtml(rarity) {
 }
 
 /**
+ * @param {string | undefined} iso
+ */
+function formatUsageWhen(iso) {
+  const raw = String(iso || "").trim();
+  if (!raw) return "";
+  const when = new Date(raw);
+  if (Number.isNaN(when.getTime())) return raw.slice(0, 10);
+  const diffMs = Date.now() - when.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "Hace un momento";
+  if (mins < 60) return `Hace ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Hace ${hours} h`;
+  const days = Math.floor(hours / 24);
+  if (days < 14) return `Hace ${days} d`;
+  return when.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+}
+
+/**
+ * @param {'inventory' | 'used'} viewMode
+ * @param {boolean} showUsageToggle
+ */
+function renderBaggageFindingsTabs(viewMode, showUsageToggle) {
+  if (!showUsageToggle) return "";
+  return `<div class="crew-baggage__findings-tabs crew-panel__tabs" role="tablist" aria-label="Vista de hallazgos">
+    <button type="button" class="crew-panel__tab" role="tab" data-baggage-view="inventory" aria-selected="${viewMode === "inventory"}">En mochila</button>
+    <button type="button" class="crew-panel__tab" role="tab" data-baggage-view="used" aria-selected="${viewMode === "used"}">Gastados</button>
+  </div>`;
+}
+
+/**
+ * @param {any[]} usageLog
+ */
+function renderBaggageUsageHtml(usageLog) {
+  const rows = Array.isArray(usageLog) ? usageLog : [];
+  if (rows.length === 0) {
+    return `<p class="crew-baggage__section-empty">Aún no ha usado objetos del equipaje en este mundo.</p>`;
+  }
+  return `<ul class="crew-baggage__usage-list" role="list">${rows
+    .map((row) => {
+      const title = escapeHtml(String(row.label_tutor || "Objeto"));
+      const effect = escapeHtml(String(row.effect_label_tutor || row.effect_id || "Uso"));
+      const subjects = Array.isArray(row.subject_labels)
+        ? row.subject_labels.map((s) => `<span class="crew-baggage__usage-subject">${escapeHtml(String(s))}</span>`).join("")
+        : "";
+      const when = escapeHtml(formatUsageWhen(row.used_at));
+      const context = row.context_hint
+        ? `<span class="crew-baggage__usage-context">${escapeHtml(String(row.context_hint))}</span>`
+        : "";
+      return `<li class="crew-baggage__usage-row">
+        <div class="crew-baggage__usage-head">
+          <span class="crew-baggage__usage-title">${title}</span>
+          <span class="crew-baggage__usage-effect">${effect}</span>
+        </div>
+        <div class="crew-baggage__usage-meta">
+          ${subjects}
+          ${context}
+          <time class="crew-baggage__usage-when" datetime="${escapeHtml(String(row.used_at || ""))}">${when}</time>
+        </div>
+      </li>`;
+    })
+    .join("")}</ul>`;
+}
+
+/**
  * @param {any} baggage
- * @param {{ audience?: 'tutor' | 'child', allowUse?: boolean }} [opts]
+ * @param {{ audience?: 'tutor' | 'child', allowUse?: boolean, viewMode?: 'inventory' | 'used', showUsageToggle?: boolean }} [opts]
  */
 export function renderBaggageHtml(baggage, opts = {}) {
   const audience = opts.audience === "child" ? "child" : "tutor";
+  const viewMode = opts.viewMode === "used" ? "used" : "inventory";
+  const showUsageToggle = audience === "tutor" && opts.showUsageToggle !== false;
   const wallet = baggage?.wallet || {};
   const items = Array.isArray(baggage?.items) ? baggage.items : [];
   const label = audience === "child" ? wallet.label_child : wallet.label_tutor;
@@ -152,11 +219,17 @@ export function renderBaggageHtml(baggage, opts = {}) {
             const rare = it.rarity === "rare" ? " crew-baggage__cell--rare" : "";
             const uncommon = it.rarity === "uncommon" ? " crew-baggage__cell--uncommon" : "";
             const qty = Number(it.qty) > 1 ? `<span class="crew-baggage__qty">${Number(it.qty)}</span>` : "";
+            const usedCount = Number(it.usage_count) || 0;
+            const usedBadge =
+              usedCount > 0
+                ? `<span class="crew-baggage__used-badge" title="Usado ${usedCount} veces">Usado ${usedCount}×</span>`
+                : "";
             const glyph = baggageGlyphId(it.icon_id);
             return `<div class="crew-baggage__entry" data-baggage-entry="${escapeHtml(it.id)}" data-baggage-index="${idx}">
               <div class="crew-baggage__cell${unusable}${rare}${uncommon}">
                 <button type="button" class="crew-baggage__compact" data-baggage-item="${escapeHtml(it.id)}" aria-expanded="false" aria-controls="baggage-body-${escapeHtml(it.id)}" aria-label="${escapeHtml(name)}">
                   ${rarityBadgeHtml(it.rarity)}
+                  ${usedBadge}
                   <span class="crew-baggage__icon" data-icon="${escapeHtml(glyph)}"></span>
                   ${qty}
                   <span class="crew-baggage__name">${escapeHtml(name)}</span>
@@ -170,6 +243,12 @@ export function renderBaggageHtml(baggage, opts = {}) {
           .join("")}</div>`;
 
   const currencyIcon = baggageGlyphId(wallet.icon_id || "currency");
+  const findingsTabs = renderBaggageFindingsTabs(viewMode, showUsageToggle);
+  const findingsBlock =
+    viewMode === "used"
+      ? renderBaggageUsageHtml(baggage?.usage_log)
+      : grid;
+  const findingsCountVisible = viewMode === "inventory" ? findingsCount : "";
   return `<section class="crew-baggage">
     <div class="crew-baggage__section crew-baggage__section--wallet">
       <h3 class="crew-baggage__section-title">
@@ -184,9 +263,10 @@ export function renderBaggageHtml(baggage, opts = {}) {
     <div class="crew-baggage__section crew-baggage__section--findings">
       <h3 class="crew-baggage__section-title">
         <span class="crew-baggage__section-title-text">${escapeHtml(findingsTitle)}</span>
-        ${findingsCount}
+        ${findingsCountVisible}
       </h3>
-      <div data-baggage-grid>${grid}</div>
+      ${findingsTabs}
+      <div class="crew-baggage__findings-panel" data-baggage-grid data-baggage-view-panel="${viewMode}">${findingsBlock}</div>
     </div>
   </section>`;
 }
@@ -308,10 +388,28 @@ function flipGrid(grid, mutate) {
 
 /**
  * @param {HTMLElement} host
+ * @param {(mode: 'inventory' | 'used') => void} onChange
+ */
+export function wireBaggageViewToggle(host, onChange) {
+  host.querySelectorAll("[data-baggage-view]").forEach((btn) => {
+    if (!(btn instanceof HTMLButtonElement)) return;
+    btn.addEventListener("click", () => {
+      const mode = btn.getAttribute("data-baggage-view");
+      if (mode === "inventory" || mode === "used") onChange(mode);
+    });
+  });
+}
+
+/**
+ * @param {HTMLElement} host
  * @param {any[]} items
  * @param {{ audience?: 'tutor' | 'child', allowUse?: boolean, onUse?: (item: any, effectId: string) => void }} [opts]
  */
 export function wireBaggageGrid(host, items, opts = {}) {
+  const panel = host.querySelector("[data-baggage-view-panel]");
+  if (panel instanceof HTMLElement && panel.getAttribute("data-baggage-view-panel") === "used") {
+    return;
+  }
   const grid = host.querySelector("[data-baggage-grid-inner]");
   if (!(grid instanceof HTMLElement)) return;
 

@@ -1,6 +1,7 @@
 # Spec: Pestaña Equipaje en ficha de tripulante (tutor)
 
 > Estado: **aprobada — implementada parcialmente** (ago 2026)  
+> **Delta 16 ago 2026:** toggle tutor **En mochila / Gastados**; `usage_log[]` en GET baggage (`include_usage=1`); badge **Usado N×** en ítems con uso parcial (`meta.usage_count`).  
 > **Delta 15 ago 2026:** inventario tipo RPG (slots + glifos por `icon_id` + currency chip). Nombre visible = `instance_name`. Tabs ficha: Detalles / Viaje / Progreso / Equipaje / Ajustes.  
 > Relacionado: [SPEC_APP_CREW_MEMBER_DETAIL.md](SPEC_APP_CREW_MEMBER_DETAIL.md), [SPEC_APP_INVENTORY_BAGGAGE.md](SPEC_APP_INVENTORY_BAGGAGE.md), [SPEC_APP_REWARDS_ECONOMY.md](SPEC_APP_REWARDS_ECONOMY.md), [SPEC_APP_ITEM_CATALOG.md](SPEC_APP_ITEM_CATALOG.md), [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md), [DESIGN.md](../DESIGN.md), [SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md)
 
@@ -90,8 +91,10 @@ Helper: «Se ganan al superar retos en la aventura. El gasto en tienda llegará 
 | Regla | Valor |
 | --- | --- |
 | Columnas | 3 en 390px (`gap` glass) |
-| Celda | Icono + `qty` badge si &gt;1 + rareza borde sutil |
-| Tap | Abre detalle (sheet o bloque expandido bajo el grid) |
+| Celda | Icono + `qty` badge si &gt;1 + rareza borde sutil + badge **Usado N×** si `usage_count &gt; 0` |
+| Toggle tutor | Tabs **En mochila** \| **Gastados** dentro del bloque **Hallazgos** (`crew-panel__tabs`); persistir en `sessionStorage` `crew-baggage-view:{childId}` |
+| Vista Gastados | Lista cronológica desde `usage_log[]` (pista / reintento, materia, fecha, contexto reto) |
+| Tap | Abre detalle (sheet o bloque expandido bajo el grid) — solo en **En mochila** |
 | Vacío | Skeleton → empty state: «Aún no hay hallazgos en este mundo.» |
 | Carga | `fillGlassSkeleton` preset `panel` / filas grid skeleton (3×2) |
 | Scroll | Dentro de `.section-frame__scroll` (no scroll anidado opaco) |
@@ -120,9 +123,10 @@ Cierre: tap fuera / botón «Cerrar» glass.
 
 ## 3. Datos
 
-1. Al activar tab `baggage`: `GET /api/v1/crew/{id}/baggage?world_theme=…`
-2. Error: toast `error` + empty con reintento botón.
-3. No PATCH desde esta pestaña en MVP.
+1. Al activar tab `baggage`: `GET /api/v1/crew/{id}/baggage?world_theme=…&include_usage=1`
+2. Respuesta incluye `usage_log[]` (eventos `item_used` del ledger por mundo).
+3. Error: toast `error` + empty con reintento botón.
+4. No PATCH desde esta pestaña en MVP.
 
 ---
 
@@ -157,7 +161,8 @@ Iconos: ampliar `shell-ui-icons` con `baggage`, `currency-coins`, `currency-cred
 | --- | --- |
 | **T1** | Tab + wallet + grid + empty/skeleton |
 | **T2** | Detalle ítem + filtro por materia |
-| **T3** | Historial de grants (si reward_ledger) |
+| **T3** | Historial usos tutor (toggle + `usage_log`) — **implementada 16 ago 2026** |
+| **T4** | Historial de grants (reward_ledger) |
 
 ## Aprobación
 

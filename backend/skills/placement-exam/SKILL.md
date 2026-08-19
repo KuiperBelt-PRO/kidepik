@@ -7,6 +7,7 @@ description: >
 ---
 
 Castellano de España. Ítems frescos según materia y edad. Sin banco seed fijo.
+El servidor inyecta suelo/techo de la banda y un hint curricular; no bajes de ese suelo.
 
 ## Proceso por ítem (obligatorio)
 
@@ -58,6 +59,20 @@ Enunciado: «El viento mueve las hojas. ¿Qué ocurre en el bosque?»
   - Orienta hacia la correcta; no solo definas el concepto sin mencionar el error.
   - Mal: «Veloz es lo mismo que rápido» (sin decir por qué «Lento» falla).
   - Bien: «Lento es lo contrario; veloz significa rápido».
+  - En series numéricas: explica el patrón (p. ej. +2, −1) y por qué el siguiente término es ese.
+
+## Conocimiento previo (crítico)
+
+El examen de ingreso mide lo que el viajero **ya puede saber** por edad y materia. El mundo (Binar Star, reinos, NPCs) es **envoltorio**, no temario.
+
+- La correcta debe ser respondible **sin haber jugado nunca**: currículo escolar o cultura general de la banda (`conocimiento escolar previo`).
+- **Prohibido:** `lore inventado` (mitos, héroes, artefactos o lugares del mundo que el viajero no puede conocer).
+- **`mythology`:** `mitos reales` (griegos, romanos, egipcios…; p. ej. Prometeo y el fuego) vestidos de sci-fi/fantasía. Nunca trivia del canon del mundo.
+- Pistas de color, horizonte o paleta **no** sustituyen el dato escolar.
+
+Anti-ejemplo (rechazar): «Según las leyendas de Binar Star, ¿quién trajo el fuego tecnológico?» con opciones «El Navegante del Vacío / El Arquitecto de las Chispas / El Guardián de la Red».
+
+Bien: «En la estación recuerdan a un titán de la Tierra que robó el fuego a los dioses. ¿Cómo se llama?» → Prometeo.
 
 ## Paleta del personaje
 
@@ -69,8 +84,9 @@ Enunciado: «El viento mueve las hojas. ¿Qué ocurre en el bosque?»
 
 | Materia | Enfoque válido | Evitar |
 | --- | --- | --- |
-| `math` | Operaciones, problemas con datos completos | Respuesta en el enunciado; obsesión con plateado |
+| `math` | Operaciones y problemas **acordes a la banda** (datos completos) | Respuesta en el enunciado; en `band_teen`+ suma `10+5` como núcleo |
 | `language` | Categoría gramatical, ortografía, sinónimo/antónimo | Acertijos; «llave plata» → usar «llave de plata» |
 | `reading` | Texto breve + pregunta alineada con opciones | «¿Qué ocurre?» con respuesta sin verbo |
 | `logic` | Relaciones, series, materiales | Repetir paleta en cada enunciado |
 | `arts` | Técnica, propósito visual, materiales | Opciones que no explican función cuando preguntas «para qué» |
+| `mythology` | Mitos reales vestidos de mundo | Trivia de lore inventado (héroes/mitos del sector) |

@@ -13,12 +13,22 @@ TURN_ID = "44444444-4444-4444-8444-444444444444"
 
 
 @pytest.fixture
-def debug_ai_enabled(settings, monkeypatch):
+def debug_ai_enabled(settings, monkeypatch, mocker):
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("APP_DEBUG_AI", "true")
     from app.config import get_settings
 
     get_settings.cache_clear()
+    mocker.patch(
+        "app.routers.debug_journey.debug_capabilities_for_auth_user",
+        new=AsyncMock(
+            return_value={
+                "operator_eligible": True,
+                "debug_enabled": True,
+                "debug_allowed": True,
+            }
+        ),
+    )
     yield
     get_settings.cache_clear()
 

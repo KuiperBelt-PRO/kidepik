@@ -16,6 +16,46 @@ def test_require_uuid_rejects_traversal() -> None:
 
 
 @pytest.mark.unit
+def test_read_item_used_events_across_sessions(tmp_path) -> None:
+    ledger = JourneyLedger(tmp_path)
+    parent = str(uuid.uuid4())
+    child = str(uuid.uuid4())
+    session_a = str(uuid.uuid4())
+    session_b = str(uuid.uuid4())
+    ledger.append_event(
+        parent,
+        child,
+        session_a,
+        kind="item_used",
+        payload={
+            "item_def_id": "fantasy_potion_focus_math",
+            "instance_name": "Poción de calma",
+            "effect_id": "challenge_hint",
+            "challenge_index": 0,
+            "path_id": "path-1",
+            "subject_id": "math",
+        },
+        world_theme="fantasy",
+    )
+    ledger.append_event(
+        parent,
+        child,
+        session_b,
+        kind="item_used",
+        payload={
+            "item_def_id": "fantasy_charm_second_chance_math",
+            "effect_id": "challenge_retry",
+            "challenge_index": 2,
+        },
+        world_theme="fantasy",
+    )
+    rows = ledger.read_item_used_events(parent, child, world_theme="fantasy")
+    assert len(rows) == 2
+    assert {r["effect_id"] for r in rows} == {"challenge_hint", "challenge_retry"}
+    assert rows[0]["used_at"] >= rows[1]["used_at"]
+
+
+@pytest.mark.unit
 def test_append_and_read_events(tmp_path) -> None:
     ledger = JourneyLedger(tmp_path)
     parent = str(uuid.uuid4())

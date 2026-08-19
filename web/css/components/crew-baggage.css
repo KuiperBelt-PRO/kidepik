@@ -433,40 +433,43 @@
 
 .play-progress-hud {
   width: 100%;
-  max-width: min(100%, 22rem);
-  margin: 0.2rem auto 0.1rem;
-  padding: 0 0.35rem;
+  max-width: 100%;
+  margin: 0.15rem 0 0.05rem;
+  padding: 0 clamp(40px, 10vw, 48px);
+  box-sizing: border-box;
 }
 
 .play-progress-hud[hidden] {
   display: none !important;
 }
 
-/* Ancho: rango | barra | rango. Estrecho: rangos arriba, barra abajo. */
+/* Ancho: rango | barra | rango. Estrecho: tres filas (rango, barra, rango). */
 .play-progress-hud__track {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(2.75rem, 38%) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(2.5rem, 28%) minmax(0, 1fr);
   align-items: center;
   gap: 0.35rem 0.45rem;
-  font-size: calc(0.7rem * var(--font-scale-ui, 1));
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
   line-height: 1.15;
   opacity: 0.94;
 }
 
 .play-progress-hud__rank {
   min-width: 0;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .play-progress-hud__rank--current {
   text-align: left;
+  padding-left: 0.35rem;
 }
 
 .play-progress-hud__rank--next {
   text-align: right;
   opacity: 0.82;
+  padding-right: 0.35rem;
 }
 
 .play-progress-hud__bar {
@@ -487,41 +490,140 @@
   background: linear-gradient(90deg, rgba(90, 220, 255, 0.88), rgba(120, 180, 255, 0.92));
 }
 
-@media (max-width: 360px) {
+@media (max-width: 560px) {
   .play-progress-hud__track {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr;
     grid-template-areas:
-      "cur next"
-      "bar bar";
+      "cur"
+      "bar"
+      "next";
+    gap: 0.28rem;
+  }
+
+  .play-progress-hud__rank {
+    overflow: visible;
+    text-overflow: clip;
   }
 
   .play-progress-hud__rank--current {
     grid-area: cur;
+    padding: 0 0.4rem;
   }
 
   .play-progress-hud__rank--next {
     grid-area: next;
+    padding: 0 0.4rem;
   }
 
   .play-progress-hud__bar {
     grid-area: bar;
+    margin: 0.05rem 0;
   }
 }
 
 .section-frame__header:has(.play-progress-hud:not([hidden])) {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   min-height: auto;
   padding-bottom: 0.35rem;
 }
 
 .section-frame__header:has(.play-progress-hud:not([hidden])) .section-frame__brand {
   position: relative;
+  align-self: center;
 }
 
 .play-baggage-view[hidden] {
   display: none !important;
+}
+
+/* Tabs tutor dentro de Hallazgos: En mochila / Gastados */
+.crew-baggage__findings-tabs {
+  margin: 0 0 0.65rem;
+}
+
+.crew-baggage__findings-panel {
+  min-height: 0;
+}
+
+.crew-baggage__used-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 2;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.18);
+  font-size: calc(0.62rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.crew-baggage__usage-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.crew-baggage__usage-row {
+  padding: 0.65rem 0.7rem;
+  border-radius: var(--glass-radius-field, 12px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.crew-baggage__usage-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.crew-baggage__usage-title {
+  font-weight: 700;
+  font-size: calc(0.88rem * var(--font-scale-ui, 1));
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.crew-baggage__usage-effect {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  font-size: calc(0.68rem * var(--font-scale-ui, 1));
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.crew-baggage__usage-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  font-size: calc(0.74rem * var(--font-scale-ui, 1));
+  opacity: 0.86;
+}
+
+.crew-baggage__usage-subject {
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.crew-baggage__usage-when {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .play-dialogue-view[hidden] {

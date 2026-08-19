@@ -15,6 +15,7 @@ def test_tutor_boost_for_note_keywords() -> None:
 
 def test_prompt_sections_include_per_path_notes() -> None:
     context = {
+        "age_band": "band_child",
         "general_note": "Muy adelantado",
         "subject_notes": {"math": "Divisiones de 2 cifras"},
         "path_slots": [
@@ -28,6 +29,29 @@ def test_prompt_sections_include_per_path_notes() -> None:
     assert "## Contexto del tutor" in joined
     assert "Divisiones de 2 cifras" in joined
     assert "Camino 1 → materia math" in joined
+    assert "Calibración pedagógica" in joined
+
+
+def test_prompt_sections_calibrate_teen_math_above_primary() -> None:
+    context = {
+        "age_band": "band_teen",
+        "general_note": None,
+        "subject_notes": {},
+        "path_slots": [
+            {
+                "slot_index": 0,
+                "subject_id": "math",
+                "tutor_note": None,
+                "pg_level": "L4",
+                "accuracy_rolling": 0.10,
+            }
+        ],
+    }
+    joined = "\n".join(PathComposerContextService.prompt_sections(context))
+    assert "suelo 2" in joined
+    assert "Dificultad objetivo 4" in joined
+    assert "10+5" in joined
+    assert "porcentaje" in joined.lower() or "ecuacion" in joined.lower() or "ecuación" in joined.lower()
 
 
 def test_placement_tutor_sections() -> None:
@@ -47,6 +71,22 @@ def test_placement_tutor_sections() -> None:
     assert "examen de ingreso" in joined
     assert "Tablas del 7" in joined
     assert "priorizada" in joined
+    assert "Calibración pedagógica" in joined
+
+
+def test_placement_tutor_sections_teen_math_floor() -> None:
+    child = {
+        "age_band": "band_teen",
+        "effective_age_band": "band_teen",
+        "age_years": 15,
+        "settings": {"learning": {}},
+    }
+    joined = "\n".join(
+        PathComposerContextService.placement_tutor_sections(child, ["math", "language"])
+    )
+    assert "2–4" in joined
+    assert "10+5" in joined
+    assert "suelo" in joined
 
 
 def test_rank_subjects_boosts_priority_flag() -> None:

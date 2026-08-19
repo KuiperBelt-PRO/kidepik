@@ -6,10 +6,16 @@ from sqlalchemy import text
 
 from app.catalogs import SubjectCatalog
 from app.db import session_scope
+from app.services.subject_progress_config import (
+    DELTA_PER_CORRECT,
+    SEED_ROLLING,
+    THRESHOLD_UP,
+)
 
 
 class CrewProgressService:
-    THRESHOLD_UP = 0.80
+    THRESHOLD_UP = THRESHOLD_UP
+    SEED_ROLLING = SEED_ROLLING
     ZONES = {
         "zone_math": ("math", "Bosque de los Números", "Nebulosa Matemática"),
         "zone_language": ("language", "Montañas de la Gramática", "Estación Léxico"),
@@ -254,15 +260,16 @@ class CrewProgressService:
                 "hint_tutor": "Nivel máximo en esta materia.",
             }
         next_level = f"L{self._level_index(level) + 1}"
-        # Sin rolling aún: barra semilla (10 %). Con rolling: % hacia umbral 0.80.
+        seed_percent = round(SEED_ROLLING / THRESHOLD_UP * 100)
         if accuracy is None or attempts < 1:
-            percent = 10
+            percent = seed_percent
             hint = f"Nivel {level} en {label} — aún sin práctica en caminos."
         else:
-            percent = round(accuracy / self.THRESHOLD_UP * 100)
-            if accuracy >= self.THRESHOLD_UP and attempts >= 4:
+            percent = round(accuracy / THRESHOLD_UP * 100)
+            near_threshold = accuracy >= THRESHOLD_UP - DELTA_PER_CORRECT
+            if near_threshold and accuracy < THRESHOLD_UP:
                 hint = f"Cerca de subir a {next_level} en {label}."
-            elif accuracy < 0.5:
+            elif accuracy < SEED_ROLLING:
                 hint = "Convendría reforzar en la aventura."
             else:
                 hint = f"Nivel {level} en {label}."

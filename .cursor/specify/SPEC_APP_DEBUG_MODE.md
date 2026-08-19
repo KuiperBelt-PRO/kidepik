@@ -45,17 +45,20 @@ El gateway **sí hace fallback** en código (`AiGateway::complete` recorre la co
 
 | # | Fuente | Cómo |
 | --- | --- | --- |
-| 1 | Env servidor | `APP_DEBUG_AI=true` **y** `APP_ENV` ∈ {`local`,`development`,`test`} |
-| 2 | Query / hash | `?debugAi=1` o `#/…?debugAi=1` (persistir en `sessionStorage` clave `kidepik.debug.ai`) |
-| 3 | Ajustes (solo si 1) | Toggle «Diagnóstico IA» en § Avanzado de Ajustes |
+| 1 | Env servidor | `APP_DEBUG_AI=true` **y** `APP_ENV=local` (POC; en prod el debug está deshabilitado) |
+| 2 | Permiso de cuenta (DB) | Tutor miembro de un grupo con permiso `debug_ai` (`developers`, `admins`) — ver §1.4 |
+| 3 | Ajustes de cuenta (DB) | `parent_accounts.settings.diagnostics.debug_ai_enabled` — toggle «Diagnóstico IA» en Ajustes (sticky) |
 
-**Prod (`APP_ENV=production`):** modo debug **imposible** aunque llegue `?debugAi=1`. El API responde sin `debug` y el front no monta el panel.
+**Prod (`APP_ENV=production`):** modo debug **imposible** aunque el tutor tenga permiso en BD. El API responde sin `debug` y el front no monta el panel.
+
+**Activo en runtime** cuando se cumplen **1 ∧ 2 ∧ 3**. El API expone el resumen en `GET /api/v1/parents/me/settings` → `debug_capabilities` (`operator_eligible`, `debug_enabled`, `debug_allowed`).
 
 ### 1.2 Quién lo ve
 
-- Solo **tutor autenticado** (sesión padre).
-- En `#/play/:childId` el panel es overlay tutor (no burbuja del mentor).
-- En Ajustes: sección «Diagnóstico» expandible.
+- Solo **tutor autenticado** con permiso `debug_ai` (grupo `developers` o `admins` en BD).
+- La sección **«Modo debug»** en Ajustes solo se muestra si `operator_eligible` es true.
+- El toggle **«Activar modo debug»** persiste `settings.diagnostics.debug_ai_enabled` (opt-in del tutor; el permiso en BD no activa el modo solo).
+- En `#/play/:childId` el panel es overlay tutor (no burbuja del mentor); el rebobinado (↺) requiere modo debug activo.
 
 ### 1.3 Señal al API
 
@@ -65,7 +68,45 @@ Cabecera opcional en requests de play/diálogo:
 X-Kidepik-Debug-Ai: 1
 ```
 
-El servidor **ignora** la cabecera si el entorno no permite debug. Si la permite, adjunta bloque `debug` en JSON de respuesta (ver §3).
+El servidor **ignora** la cabecera si no hay `debug_allowed` (entorno + permiso + toggle). Si la permite, adjunta bloque `debug` en JSON de respuesta (ver §3).
+
+### 1.4 Grupos y permisos (PostgreSQL)
+
+Migración: `supabase/migrations/20260818163000_parent_account_groups_permissions.sql`
+
+| Tabla | Rol |
+| --- | --- |
+| `app_groups` | Catálogo (`developers`, `admins`, …) |
+| `app_permissions` | Permisos de producto (`debug_ai`, …) |
+| `app_group_permissions` | Permisos concedidos a cada grupo |
+| `parent_account_groups` | Membresía tutor ↔ grupo |
+| `app_group_bootstrap_emails` | Emails que reciben un grupo al login/bootstrap |
+
+Catálogo inicial:
+
+- Grupos `developers` y `admins` → permiso `debug_ai`.
+- Solo el **API (service role)** escribe membresías; el cliente no puede auto-asignarse grupos.
+
+### 1.5 Operativa local
+
+**Añadir un desarrollador** (cuenta ya existente):
+
+```bash
+docker exec kidepik-poc-api-1 python -m app.scripts.grant_parent_group \
+  --email tutor@example.com --group developers
+```
+
+**Preautorizar email antes del primer login** (persistente en BD):
+
+```sql
+insert into public.app_group_bootstrap_emails (email, group_id)
+select 'nuevo@example.com', g.id from public.app_groups g where g.slug = 'developers'
+on conflict do nothing;
+```
+
+Al siguiente `POST /parents/bootstrap` o cualquier ruta que llame `get_or_bootstrap`, se inserta la membresía en `parent_account_groups`.
+
+**Desarrolladores fundadores (seed):** `edusernalonso@gmail.com` → grupo `developers` (`20260818170000_debug_developer_bootstrap_emails.sql`).
 
 ---
 

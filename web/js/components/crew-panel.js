@@ -16,7 +16,7 @@ import {
   fetchCrewBaggage,
 } from "../lib/crew-api.js?v=260";
 import { fetchJourneyTimeline } from "../lib/play-api.js";
-import { baggageGlyphId, renderBaggageHtml, wireBaggageGrid } from "../lib/baggage-ui.js?v=8";
+import { baggageGlyphId, renderBaggageHtml, wireBaggageGrid, wireBaggageViewToggle } from "../lib/baggage-ui.js?v=10";
 import { applyCrewMemberWorldTheme } from "../lib/play-theme.js";
 import {
   bindGlassIconTheme,
@@ -63,6 +63,10 @@ const CHARACTER_SUMMARY_MAX_HEIGHT_PX = 104;
  */
 function crewTabStorageKey(childId) {
   return `crew-tab:${childId}`;
+}
+
+function crewBaggageViewStorageKey(childId) {
+  return `crew-baggage-view:${childId}`;
 }
 
 /**
@@ -759,6 +763,11 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       if (!allowedTabs.includes(activeTab)) activeTab = defaultTab;
       /** @type {any} */
       let baggageCache = null;
+      /** @type {'inventory' | 'used'} */
+      let baggageViewMode =
+        sessionStorage.getItem(crewBaggageViewStorageKey(member.id)) === "used"
+          ? "used"
+          : "inventory";
       /**
        * @param {string} name
        */
@@ -782,7 +791,10 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       const paintBaggage = (bag) => {
         const host = root.querySelector("[data-crew-baggage-host]");
         if (!(host instanceof HTMLElement)) return;
-        host.innerHTML = renderBaggageHtml(bag, { audience: "tutor" });
+        host.innerHTML = renderBaggageHtml(bag, {
+          audience: "tutor",
+          viewMode: baggageViewMode,
+        });
         host.querySelectorAll("[data-icon]").forEach((el) => {
           if (!(el instanceof HTMLElement)) return;
           const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
@@ -793,7 +805,14 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
               : 24;
           el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size }));
         });
-        wireBaggageGrid(host, bag.items || [], { audience: "tutor" });
+        wireBaggageViewToggle(host, (mode) => {
+          baggageViewMode = mode;
+          sessionStorage.setItem(crewBaggageViewStorageKey(member.id), mode);
+          paintBaggage(bag);
+        });
+        if (baggageViewMode === "inventory") {
+          wireBaggageGrid(host, bag.items || [], { audience: "tutor" });
+        }
       };
       async function loadBaggageTab() {
         const host = root.querySelector("[data-crew-baggage-host]");
@@ -803,7 +822,9 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           return;
         }
         fillGlassSkeleton(host, { preset: "panel", ariaLabel: "Cargando equipaje" });
-        const res = await fetchCrewBaggage(session, member.id, member.world_theme);
+        const res = await fetchCrewBaggage(session, member.id, member.world_theme, {
+          includeUsage: true,
+        });
         if (!res.ok || !res.baggage) {
           host.innerHTML = `<p class="crew-panel__helper">No se pudo cargar el equipaje.</p>
             <button type="button" class="crew-panel__btn" data-baggage-retry>Reintentar</button>`;

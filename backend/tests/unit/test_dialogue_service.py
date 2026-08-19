@@ -7,6 +7,10 @@ from uuid import uuid4
 
 import pytest
 
+from app.ai.agents.curriculum_knowledge import (
+    PATH_LORE_ONLY_IF_TAUGHT_RULE,
+    PLACEMENT_PRIOR_KNOWLEDGE_RULE,
+)
 from app.ai.agents.envelopes import (
     DialogueEnvelope,
     DialogueOption,
@@ -1020,6 +1024,9 @@ async def test_compose_path_pack_fallback(dialogue_svc, mocker) -> None:
     pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
     assert len(pack) == 3
     assert pack[0]["path_id"] == "path_1"
+    assert pack[0]["title"].startswith("Práctica de ")
+    blurbs = {entry["learning_blurb"] for entry in pack}
+    assert len(blurbs) == 3
 
 
 _CHALLENGE_WRAPPER = (
@@ -1109,7 +1116,7 @@ async def test_compose_path_pack_single_batch_call(dialogue_svc, mocker) -> None
 
 
 @pytest.mark.unit
-def test_path_pack_quality_rejects_cliche_title() -> None:
+def test_path_pack_quality_treats_cliche_title_as_soft() -> None:
     entry = {
         "path_id": "p1",
         "subject_id": "math",
@@ -1119,10 +1126,9 @@ def test_path_pack_quality_rejects_cliche_title() -> None:
         "lesson_narrative": _LONG_LESSON,
         "challenges": _valid_path_challenges(),
     }
-    assert (
-        DialogueService._path_pack_entry_quality_issue(entry, "fantasy")
-        == "path_title_cliche"
-    )
+    assert DialogueService._path_pack_entry_quality_issue(entry, "fantasy") is None
+    warns = DialogueService._path_pack_soft_quality_warnings(entry, "fantasy")
+    assert "path_title_cliche" in warns
 
 
 @pytest.mark.unit
@@ -1166,7 +1172,7 @@ def test_path_pack_quality_soft_warnings_do_not_reject() -> None:
     }
     # No rechazo duro por lección corta ni explanation desalineada.
     assert DialogueService._path_pack_entry_quality_issue(entry, "fantasy") is None
-    warns = DialogueService._path_pack_soft_quality_warnings(entry)
+    warns = DialogueService._path_pack_soft_quality_warnings(entry, "fantasy")
     assert "path_lesson_short" in warns
     assert "path_explanation_may_mismatch_correct" in warns
 
@@ -1264,14 +1270,10 @@ def test_path_pitch_description_prefers_blurb() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_compose_path_pack_retries_on_quality_reject(dialogue_svc, mocker) -> None:
+async def test_compose_path_pack_retries_on_pack_count_mismatch(dialogue_svc, mocker) -> None:
     bad = PathPackEnvelope(
         agent_text="Elige",
-        paths=[
-            _path_detail(1, title="El bosque de los números"),
-            _path_detail(2),
-            _path_detail(3),
-        ],
+        paths=[_path_detail(1), _path_detail(2)],
     )
     good = PathPackEnvelope(
         agent_text="Elige",
@@ -1283,7 +1285,26 @@ async def test_compose_path_pack_retries_on_quality_reject(dialogue_svc, mocker)
     pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
     assert len(pack) == 3
     assert run_mock.await_count == 2
-    assert "bosque" not in pack[0]["title"].lower()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_path_pack_accepts_cliche_title_without_retry(
+    dialogue_svc, mocker
+) -> None:
+    bundle = PathPackEnvelope(
+        agent_text="Elige",
+        paths=[
+            _path_detail(1, title="El bosque de los números"),
+            _path_detail(2),
+            _path_detail(3),
+        ],
+    )
+    run_mock = AsyncMock(return_value=(bundle, "m1"))
+    mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
+    pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
+    assert run_mock.await_count == 1
+    assert pack[0]["title"] == "El bosque de los números"
 
 
 @pytest.mark.unit
@@ -1732,7 +1753,7 @@ async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monke
         side_effect=lambda *args, **kwargs: DialogueService._turn(
             sample_turn_row(
                 text=args[4] if len(args) > 4 else kwargs.get("text", ""),
-                meta={"phase": "path_intro", "retry": True},
+                meta=kwargs.get("meta") or (args[7] if len(args) > 7 else {}),
             )
         )
     )
@@ -1750,7 +1771,9 @@ async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monke
     assert effects and effects[0]["type"] == "record_learning_result"
     assert effects[0]["score"] == 0.0
     assert turns[0]["meta"]["retry"] is True
-    assert "«3» no es correcto." in str(turns[0].get("text") or "")
+    assert turns[0]["meta"]["explanation_shown"] is False
+    assert turns[0]["meta"]["challenge_index"] == 0
+    assert "equipaje" in str(turns[0].get("text") or "").lower()
     get_settings.cache_clear()
 
 
@@ -2499,6 +2522,38 @@ def test_path_compose_prompt_includes_structured_tutor_context() -> None:
     assert "## Contexto del tutor" in prompt
     assert "Tablas del 7" in prompt
     assert "Camino 1" in prompt
+    assert PATH_LORE_ONLY_IF_TAUGHT_RULE in prompt
+    assert "explanation enseña la regla" in prompt
+    assert "Ruta de math/language/reading" in prompt
+
+
+@pytest.mark.unit
+def test_path_compose_prompt_calibrates_teen_math_after_strong_placement() -> None:
+    child = sample_child(
+        age_years=15,
+        age_band="band_teen",
+        effective_age_band="band_teen",
+        settings={"learning": {"active_subjects": ["math", "language", "logic"]}},
+    )
+    context = PathComposerContextService.build_context(
+        child,
+        subject_rows=[
+            {"subject_id": "math", "level_id": "L4", "accuracy_rolling": 0.10},
+            {"subject_id": "language", "level_id": "L4", "accuracy_rolling": 0.10},
+            {"subject_id": "logic", "level_id": "L3", "accuracy_rolling": 0.10},
+        ],
+    )
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._path_compose_prompt(
+        child,
+        ["math", "language", "logic"],
+        context,
+        path_count=3,
+    )
+    assert "Calibración pedagógica" in prompt
+    assert "suelo 2" in prompt
+    assert "10+5" in prompt
+    assert "Dificultad objetivo 4" in prompt
 
 
 @pytest.mark.unit
@@ -2515,6 +2570,32 @@ def test_placement_compose_prompt_includes_tutor_context() -> None:
     prompt = svc._placement_compose_prompt(child, ["math", "language"], "band_child")
     assert "Contexto del tutor" in prompt
     assert "Sumas simples" in prompt
+    assert PLACEMENT_PRIOR_KNOWLEDGE_RULE in prompt
+
+
+@pytest.mark.unit
+def test_placement_compose_prompt_calibrates_teen_band() -> None:
+    child = sample_child(
+        age_years=15,
+        age_band="band_teen",
+        effective_age_band="band_teen",
+    )
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._placement_compose_prompt(child, ["math", "language"], "band_teen")
+    assert "2–4" in prompt
+    assert "10+5" in prompt
+    assert "suelo" in prompt
+
+
+@pytest.mark.unit
+def test_placement_compose_prompt_forbids_invented_world_lore() -> None:
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._placement_compose_prompt(
+        sample_child(), ["mythology", "culture"], "band_tween"
+    )
+    assert "lore inventado" in prompt
+    assert "mitos reales" in prompt
+    assert "Prometeo" in prompt
 
 
 @pytest.mark.unit
@@ -2639,6 +2720,241 @@ def test_choice_echo_meta_marks_incorrect_answer() -> None:
 
 
 @pytest.mark.unit
+def test_path_challenge_seed_requires_correct_option_id() -> None:
+    with pytest.raises(ValueError, match="mcq_missing_correct_option_id"):
+        PathChallengeSeed(
+            prompt_text="¿Cuántas flores?",
+            narrative_wrapper=_CHALLENGE_WRAPPER,
+            item_type="mcq",
+            options=[
+                DialogueOption(id="a", label="10"),
+                DialogueOption(id="b", label="24"),
+            ],
+            correct_option_id=None,
+            explanation="La opción correcta es 24.",
+        )
+
+
+@pytest.mark.unit
+def test_path_detail_to_pack_entry_rejects_unscorable_challenge(dialogue_svc) -> None:
+    detail = PathDetail(
+        path=PathOption(
+            path_id="math_path_01",
+            subject_id="math",
+            title="Camino",
+            intro="Intro",
+            learning_blurb="Blurb",
+            path_narrative=_LONG_SCENE,
+            lesson_narrative=_LONG_LESSON,
+        ),
+        challenges=[
+            PathChallengeSeed(
+                prompt_text="¿Cuántas flores?",
+                narrative_wrapper=_CHALLENGE_WRAPPER,
+                item_type="mcq",
+                options=[
+                    DialogueOption(id="a", label="10"),
+                    DialogueOption(id="b", label="24"),
+                ],
+                correct_option_id="z",
+                explanation="Sin pista útil.",
+            )
+            for _ in range(3)
+        ],
+    )
+    parsed = dialogue_svc._path_detail_to_pack_entry(
+        detail, "math", ["math"], 0, "test-model"
+    )
+    assert parsed is None
+
+
+@pytest.mark.unit
+def test_path_detail_to_pack_entry_persists_resolved_correct_option_id(dialogue_svc) -> None:
+    detail = PathDetail(
+        path=PathOption(
+            path_id="math_path_01",
+            subject_id="math",
+            title="Camino",
+            intro="Intro",
+            learning_blurb="Blurb",
+            path_narrative=_LONG_SCENE,
+            lesson_narrative=_LONG_LESSON,
+        ),
+        challenges=[
+            PathChallengeSeed(
+                prompt_text="¿Cuántas flores?",
+                narrative_wrapper=_CHALLENGE_WRAPPER,
+                item_type="mcq",
+                options=[
+                    DialogueOption(id="a", label="10"),
+                    DialogueOption(id="b", label="24"),
+                    DialogueOption(id="c", label="20"),
+                ],
+                correct_option_id="24",
+                explanation="La opción correcta es 24, porque 4 veces 6 es 24.",
+            )
+            for _ in range(3)
+        ],
+    )
+    parsed = dialogue_svc._path_detail_to_pack_entry(
+        detail, "math", ["math"], 0, "test-model"
+    )
+    assert parsed is not None
+    assert parsed["challenges"][0]["correct_option_id"] == "b"
+
+
+@pytest.mark.unit
+def test_finalize_placement_queue_item_infers_from_explanation() -> None:
+    item = DialogueService._finalize_placement_queue_item(
+        {
+            "item_type": "mcq",
+            "options": [
+                {"id": "a", "label": "10"},
+                {"id": "b", "label": "24"},
+            ],
+            "correct_option_id": None,
+            "explanation": "La opción correcta es 24, porque 4 veces 6 es 24.",
+        }
+    )
+    assert item["correct_option_id"] == "b"
+
+
+@pytest.mark.unit
+def test_finalize_path_challenge_infers_correct_option_from_explanation() -> None:
+    challenge = DialogueService._finalize_path_challenge(
+        {
+            "item_type": "mcq",
+            "options": [
+                {"id": "a", "label": "10"},
+                {"id": "b", "label": "24"},
+                {"id": "c", "label": "20"},
+            ],
+            "correct_option_id": None,
+            "explanation": "La opción correcta es 24, porque 4 veces 6 es 24.",
+        }
+    )
+    assert challenge["correct_option_id"] == "b"
+
+
+@pytest.mark.unit
+def test_finalize_path_challenge_normalizes_malformed_option_ids() -> None:
+    challenge = DialogueService._finalize_path_challenge(
+        {
+            "item_type": "mcq",
+            "options": [
+                {"id": "a", "label": "9"},
+                {"id": "b:", "label": "18"},
+                {"id": "c:", "label": "12"},
+            ],
+            "correct_option_id": None,
+            "explanation": "La opción correcta es 18, porque 3 veces 6 es 18.",
+        }
+    )
+    assert [opt["id"] for opt in challenge["options"]] == ["a", "b", "c"]
+    assert challenge["correct_option_id"] == "b"
+
+
+@pytest.mark.unit
+def test_choice_echo_meta_marks_correct_when_llm_omits_correct_option_id() -> None:
+    mentor = DialogueService._turn(
+        {
+            "id": uuid4(),
+            "child_id": CHILD_ID,
+            "session_id": SESSION_ID,
+            "flow_id": "first_run",
+            "sequence": 3,
+            "role": "mentor",
+            "text": "¿Cuántas flores?",
+            "options": [
+                {"id": "a", "label": "10"},
+                {"id": "b", "label": "24"},
+                {"id": "c", "label": "20"},
+            ],
+            "meta": {"phase": "path_challenge"},
+        }
+    )
+    scoring_item = {
+        "item_type": "mcq",
+        "options": [
+            {"id": "a", "label": "10"},
+            {"id": "b", "label": "24"},
+            {"id": "c", "label": "20"},
+        ],
+        "correct_option_id": None,
+        "explanation": "La opción correcta es 24, porque 4 veces 6 es 24.",
+    }
+    meta = DialogueService._choice_echo_meta(
+        mentor,
+        selected_id="b",
+        display_label="24",
+        reply={"option_id": "b"},
+        scoring_item=scoring_item,
+    )
+    assert meta["choice_correct"] is True
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_path_challenge_answer_rejects_wrong_when_correct_id_inferred(
+    dialogue_svc, tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    dialogue_svc.ledger = JourneyLedger(tmp_path)
+    dialogue_svc.ledger.append_event(
+        PARENT_ID,
+        CHILD_ID,
+        SESSION_ID,
+        kind="path_progress",
+        payload={
+            "path_id": "math_path_01",
+            "challenge_index": 0,
+            "path": {
+                "path_id": "math_path_01",
+                "challenges": [
+                    {
+                        "prompt_text": "¿Cuántas flores?",
+                        "item_type": "mcq",
+                        "options": [
+                            {"id": "a", "label": "10"},
+                            {"id": "b", "label": "24"},
+                            {"id": "c", "label": "20"},
+                        ],
+                        "correct_option_id": None,
+                        "explanation": "La opción correcta es 24, porque 4 veces 6 es 24.",
+                    }
+                ],
+            },
+        },
+        world_theme="fantasy",
+    )
+    dialogue_svc._mentor_turn = AsyncMock(
+        side_effect=lambda *args, **kwargs: DialogueService._turn(
+            sample_turn_row(
+                text=args[4] if len(args) > 4 else kwargs.get("text", ""),
+                meta=kwargs.get("meta") or (args[7] if len(args) > 7 else {}),
+            )
+        )
+    )
+    child = sample_child(parent_id=PARENT_ID)
+    effects, turns = await dialogue_svc._path_challenge_answer(
+        CHILD_ID,
+        SESSION_ID,
+        sample_session_row(),
+        1,
+        "a",
+        {"kind": "option", "option_id": "a"},
+        {"meta": {"phase": "path_challenge", "challenge_index": 0}},
+        child,
+    )
+    assert effects[0]["score"] == 0.0
+    assert turns[0]["meta"]["retry"] is True
+    get_settings.cache_clear()
+
+
+@pytest.mark.unit
 def test_incorrect_choice_feedback_prefixes_weak_explanation() -> None:
     item = {
         "options": [
@@ -2665,6 +2981,76 @@ def test_incorrect_choice_feedback_without_explanation_names_correct() -> None:
     text = DialogueService._incorrect_choice_feedback(item, {"option_id": "b"})
     assert "«Soplo» no es correcto." in text
     assert "«Sopló»" in text
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_path_intro_retry_shows_explanation_then_challenge(
+    dialogue_svc, tmp_path, monkeypatch,
+) -> None:
+    monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    dialogue_svc.ledger = JourneyLedger(tmp_path)
+    dialogue_svc.ledger.append_event(
+        PARENT_ID,
+        CHILD_ID,
+        SESSION_ID,
+        kind="path_progress",
+        payload={
+            "path_id": "p1",
+            "challenge_index": 0,
+            "last_ok": False,
+            "last_wrong_reply": {"kind": "option", "option_id": "a"},
+            "path": {
+                "path_id": "p1",
+                "subject_id": "math",
+                "challenges": [
+                    {
+                        "prompt_text": "¿2+2?",
+                        "item_type": "mcq",
+                        "options": [{"id": "a", "label": "3"}, {"id": "b", "label": "4"}],
+                        "correct_option_id": "b",
+                        "explanation": "Casi, prueba otra vez.",
+                    }
+                ],
+            },
+        },
+        world_theme="fantasy",
+    )
+    dialogue_svc._mentor_turn = AsyncMock(
+        side_effect=lambda *args, **kwargs: DialogueService._turn(
+            sample_turn_row(
+                text=args[4] if len(args) > 4 else kwargs.get("text", ""),
+                meta=kwargs.get("meta") or (args[7] if len(args) > 7 else {}),
+            )
+        )
+    )
+    child = sample_child(parent_id=PARENT_ID)
+    last = {
+        "meta": {
+            "phase": "path_intro",
+            "retry": True,
+            "explanation_shown": False,
+            "challenge_index": 0,
+            "path_id": "p1",
+        }
+    }
+    effects, turns = await dialogue_svc._path_intro_retry_continue(
+        CHILD_ID, SESSION_ID, sample_session_row(), 3, child, last
+    )
+    assert not effects
+    assert turns[0]["meta"]["explanation_shown"] is True
+    assert "«3» no es correcto." in str(turns[0].get("text") or "")
+
+    last2 = {"meta": turns[0]["meta"]}
+    effects2, turns2 = await dialogue_svc._path_intro_retry_continue(
+        CHILD_ID, SESSION_ID, sample_session_row(), 4, child, last2
+    )
+    assert turns2[0]["meta"]["phase"] == "path_challenge"
+    assert turns2[0]["meta"]["challenge_index"] == 0
+    get_settings.cache_clear()
 
 
 @pytest.mark.unit

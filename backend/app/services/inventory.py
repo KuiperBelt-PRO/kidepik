@@ -9,7 +9,14 @@ from app.catalogs.age_band import AgeBand
 from app.catalogs.item_catalog import ItemCatalog
 from app.catalogs.item_namer import instance_labels
 from app.catalogs.subject_catalog import SubjectCatalog
+from app.config import get_settings
 from app.db import session_scope
+
+
+USAGE_EFFECT_LABELS_TUTOR = {
+    "challenge_hint": "Pista en reto",
+    "challenge_retry": "Segundo intento",
+}
 
 
 class InventoryService:
@@ -125,6 +132,84 @@ class InventoryService:
             "show_levels_to_child": bool(show_levels_to_child),
         }
 
+    def get_usage_log(
+        self,
+        parent_id: str,
+        child_id: str,
+        world_theme: str,
+        *,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        from app.ai.journey.ledger import JourneyLedger
+
+        theme = self.normalize_theme(world_theme)
+        ledger = JourneyLedger(get_settings().journey_data_dir)
+        raw = ledger.read_item_used_events(
+            parent_id,
+            child_id,
+            world_theme=theme,
+            limit=limit,
+        )
+        out: list[dict[str, Any]] = []
+        for row in raw:
+            hydrated = self._hydrate_usage_entry(row, theme)
+            if hydrated:
+                out.append(hydrated)
+        return out
+
+    def _hydrate_usage_entry(
+        self, row: dict[str, Any], theme: str
+    ) -> dict[str, Any] | None:
+        effect_id = str(row.get("effect_id") or "").strip()
+        if effect_id not in {"challenge_hint", "challenge_retry"}:
+            return None
+        item_def_id = str(row.get("item_def_id") or "").strip()
+        defn = ItemCatalog.get(item_def_id) if item_def_id else None
+        instance_name = str(row.get("instance_name") or "").strip()
+        if defn:
+            fake_row = {"instance_name": instance_name or None}
+            _, purpose, label = instance_labels(defn, fake_row, audience="tutor")
+            subject_ids = list(defn["subject_ids"])
+        else:
+            purpose = "Objeto de equipaje"
+            label = instance_name or purpose
+            subject_ids = []
+        subject_id = str(row.get("subject_id") or "").strip()
+        if subject_id and subject_id in SubjectCatalog.META:
+            subject_labels = [SubjectCatalog.META[subject_id]["label"]]
+        else:
+            subject_labels = [
+                SubjectCatalog.META[s]["label"]
+                for s in subject_ids
+                if s in SubjectCatalog.META
+            ]
+        challenge_index = row.get("challenge_index")
+        path_id = row.get("path_id")
+        context_hint = None
+        if challenge_index is not None:
+            try:
+                idx = int(challenge_index)
+                context_hint = f"Reto {idx + 1}"
+                if path_id:
+                    context_hint = f"{context_hint} · camino"
+            except (TypeError, ValueError):
+                context_hint = None
+        return {
+            "id": str(row.get("id") or ""),
+            "used_at": str(row.get("used_at") or ""),
+            "effect_id": effect_id,
+            "effect_label_tutor": USAGE_EFFECT_LABELS_TUTOR.get(
+                effect_id, ItemCatalog.effect_label(effect_id)
+            ),
+            "item_def_id": item_def_id or None,
+            "label_tutor": label or purpose,
+            "subject_labels": subject_labels,
+            "challenge_index": challenge_index,
+            "path_id": str(path_id) if path_id else None,
+            "context_hint": context_hint,
+            "session_id": str(row.get("session_id") or "") or None,
+        }
+
     def _hydrate_item(
         self,
         row: dict[str, Any],
@@ -149,6 +234,10 @@ class InventoryService:
         child_label, purpose, label = instance_labels(defn, row, audience=audience)
         desc_child = str(row.get("instance_description") or defn["description_child"])
         desc_tutor = defn.get("description_tutor") or defn["description_child"]
+        meta = row.get("meta") if isinstance(row.get("meta"), dict) else {}
+        usage_count = int(meta.get("usage_count") or 0)
+        last_used = row.get("last_used_at")
+        last_used_at = str(last_used) if last_used else None
         return {
             "id": str(row["id"]),
             "item_def_id": defn["id"],
@@ -168,6 +257,8 @@ class InventoryService:
             "effects": effects,
             "effect_labels": [ItemCatalog.effect_label(e) for e in effects],
             "acquired_at": str(row.get("acquired_at") or ""),
+            "last_used_at": last_used_at,
+            "usage_count": usage_count,
             "can_use": can_use,
             "use_blocked_reason": blocked,
         }

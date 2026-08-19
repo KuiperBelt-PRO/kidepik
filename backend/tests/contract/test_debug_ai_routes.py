@@ -9,12 +9,27 @@ from tests.helpers.http import assert_auth_error, assert_status
 
 
 @pytest.fixture
-def debug_ai_enabled(settings, monkeypatch):
+def debug_ai_enabled(settings, monkeypatch, mocker):
     monkeypatch.setenv("APP_ENV", "local")
     monkeypatch.setenv("APP_DEBUG_AI", "true")
     from app.config import get_settings
 
     get_settings.cache_clear()
+    mocker.patch(
+        "app.routers.debug_ai.debug_capabilities_for_auth_user",
+        new=AsyncMock(
+            return_value={
+                "operator_eligible": True,
+                "debug_enabled": True,
+                "debug_allowed": True,
+            }
+        ),
+    )
+    settings_repo = mocker.patch("app.routers.debug_ai.ParentSettingsRepository").return_value
+    settings_repo.parents.get_or_bootstrap = AsyncMock(return_value={"parent_id": "p1"})
+    settings_repo.get_merged_settings_for_parent_id = AsyncMock(
+        return_value={"diagnostics": {"debug_ai_enabled": True}}
+    )
     yield
     get_settings.cache_clear()
 

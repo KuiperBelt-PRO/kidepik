@@ -3,6 +3,7 @@
  * @module parent-account
  */
 
+import { fetchParentSettings } from "./parent-settings.js";
 import { normalizeDisplayNameInput } from "./account-display-name.js";
 
 /**
@@ -25,6 +26,7 @@ export async function bootstrapParentIfNeeded(session) {
       return { ok: false };
     }
     const data = await res.json();
+    void fetchParentSettings(session);
     return { ok: true, created: Boolean(data.created) };
   } catch (err) {
     console.warn("parents/bootstrap error", err);

@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import text
 
 from app.db import session_scope
+from app.services.account_authorization import AccountAuthorizationService
 
 
 class ParentAccountService:
@@ -103,6 +104,10 @@ class ParentAccountService:
         account = await self.find_by_auth_user_id(auth_user_id)
         if not account:
             raise RuntimeError("Failed to load parent account")
+        await AccountAuthorizationService().apply_bootstrap_grants(
+            account["parent_id"],
+            email,
+        )
         return account
 
     async def update_display_name(self, auth_user_id: str, display_name: object) -> dict[str, Any]:

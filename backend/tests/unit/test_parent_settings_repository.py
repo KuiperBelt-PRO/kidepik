@@ -22,7 +22,12 @@ def settings_repo(mocker):
             "email": "tutor@example.com",
         }
     )
-    return ParentSettingsRepository(parents=parents), session
+    authorization = MagicMock()
+    authorization.has_permission = AsyncMock(return_value=False)
+    authorization.list_groups = AsyncMock(return_value=[])
+    authorization.list_permissions = AsyncMock(return_value=[])
+    authorization.authorization_summary = AsyncMock(return_value={"groups": [], "permissions": []})
+    return ParentSettingsRepository(parents=parents, authorization=authorization), session
 
 
 @pytest.mark.unit

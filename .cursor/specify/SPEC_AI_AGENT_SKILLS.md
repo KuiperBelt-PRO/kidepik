@@ -1,6 +1,6 @@
 # Spec: Skills de agentes de producto — Pydantic AI
 
-> Estado: **aprobada** (ago 2026)  
+> Estado: **aprobada** (ago 2026) — **delta 18 ago 2026:** placement-exam / subject-pedagogy / challenge-design: conocimiento escolar previo vs lore inventado.  
 > Hilo: IA agentic FastAPI  
 > Relacionado: [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_ADVENTURE_ZONE_BIBLE.md](SPEC_APP_ADVENTURE_ZONE_BIBLE.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md)
 
@@ -123,9 +123,9 @@ Cuerpo: reglas operativas; `references/` cortos. No pegar specs enteras.
 | `zone-bible` | Mundo | Llegada / between / quest | Constraints `zone_id` |
 | `zone-pitches` | Mundo | Encrucijadas | Variedad pitches / arcos |
 | `npc-scenes` | Mundo | Escenas NPC | Arquetipos; anti-eco opciones |
-| `challenge-design` | Retos | Vestir / resultado | Currículo narrado; success / near_miss |
-| `subject-pedagogy` | Currículo | Retos + placement | Catálogo materias; dificultad por banda |
-| `placement-exam` | Examen | Ítems placement | Formato; ES-ES; sin banco seed si A1 |
+| `challenge-design` | Retos | Vestir / resultado | Currículo narrado; lore del mundo solo si acaba de enseñarse |
+| `subject-pedagogy` | Currículo | Retos + placement | Catálogo materias; dificultad por banda; `mythology` = mitos reales |
+| `placement-exam` | Examen | Ítems placement | Formato; ES-ES; conocimiento escolar previo; sin lore inventado |
 | `evaluation-rubric` | Evaluación | Scorer texto | 0 / 0.5 / 1 + rationale |
 | `journey-summary` | Memoria | Summarizer | MD + front matter; no contradecir JSONL |
 | `waiting-copy` | UX espera | Bubbles | Variantes mundo × audiencia |

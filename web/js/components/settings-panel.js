@@ -19,12 +19,13 @@ import {
   setGlassButton,
 } from "./glass-controls.js?v=221";
 import {
-  isDebugAiClientActive,
   isDebugAiAllowed,
+  isDebugAiClientActive,
+  isDebugAiOperatorEligible,
   setDebugAiClientActive,
-  setDebugAiServerAllowed,
-} from "../lib/debug-ai.js?v=243";
-import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=244";
+  syncDebugAiCapabilities,
+  syncDebugAiFromParentSettings,
+} from "../lib/debug-ai.js";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=245";
 import {
   hideDebugAiShellBadge,
@@ -40,6 +41,15 @@ import {
 function paintBtn(root, sel, iconId, label) {
   const btn = root.querySelector(sel);
   if (btn instanceof HTMLButtonElement) setGlassButton(btn, iconId, label);
+}
+
+/**
+ * @param {{ debugCapabilities?: object | null; accountAuthorization?: object | null } | undefined} meta
+ */
+function canShowDebugSection(meta) {
+  if (meta?.debugCapabilities?.operator_eligible === true) return true;
+  const permissions = meta?.accountAuthorization?.permissions;
+  return Array.isArray(permissions) && permissions.includes("debug_ai");
 }
 
 /**
@@ -62,6 +72,8 @@ export function mountSettingsPanel(container, { session }) {
   let destroySlider = null;
   let memberCount = 0;
   let destroyed = false;
+  /** @type {{ debugCapabilities?: object | null; accountAuthorization?: object | null } | null} */
+  let settingsMeta = null;
 
   const statusEl = () => root.querySelector("[data-save-status]");
 
@@ -74,7 +86,11 @@ export function mountSettingsPanel(container, { session }) {
       return;
     }
     memberCount = res.member_count;
-    paint(res.settings);
+    settingsMeta = {
+      debugCapabilities: res.debug_capabilities ?? null,
+      accountAuthorization: res.account_authorization ?? null,
+    };
+    paint(res.settings, settingsMeta);
     if (el) {
       el.textContent = "Guardado";
       setTimeout(() => {
@@ -85,12 +101,17 @@ export function mountSettingsPanel(container, { session }) {
 
   /**
    * @param {import('../lib/parent-settings.js').ParentSettings} settings
+   * @param {{ debugCapabilities?: object | null; accountAuthorization?: object | null } | null} [meta]
    */
-  function paint(settings) {
+  function paint(settings, meta = settingsMeta) {
     destroySlider?.();
     destroySlider = null;
     unsubIcons?.();
     unsubIcons = null;
+
+    if (meta?.debugCapabilities) syncDebugAiCapabilities(meta.debugCapabilities);
+    syncDebugAiFromParentSettings(settings, meta?.debugCapabilities ?? null);
+    const debugModeOn = settings.diagnostics?.debug_ai_enabled === true;
 
     const theme = settings.ui_theme;
     root.className = "settings-panel";
@@ -165,18 +186,20 @@ export function mountSettingsPanel(container, { session }) {
       </section>
 
       <section class="settings-panel__group" data-debug-section hidden aria-labelledby="set-debug">
-        <h2 id="set-debug" class="settings-panel__group-title">Diagnóstico</h2>
-        <p class="settings-panel__helper">Solo en entornos de desarrollo. Ayuda a ver modelos IA y fallos de compose.</p>
+        <h2 id="set-debug" class="settings-panel__group-title">Modo debug</h2>
+        <p class="settings-panel__helper">
+          Solo cuentas con permiso de desarrollador. Actívalo para ver trazas IA, el panel de diagnóstico y rebobinar viajes en play.
+        </p>
         <label class="settings-panel__check">
-          <input type="checkbox" data-debug-toggle ${isDebugAiClientActive() ? "checked" : ""} />
-          Activar diagnóstico IA en la app
+          <input type="checkbox" data-debug-toggle ${debugModeOn ? "checked" : ""} />
+          Activar modo debug
         </label>
         <button type="button" class="settings-panel__btn" data-open-debug></button>
       </section>
     `;
 
     paintBtn(root, "[data-go-crew]", "crew", "Ver tripulación");
-    paintBtn(root, "[data-open-debug]", "settings", "Abrir diagnóstico IA");
+    paintBtn(root, "[data-open-debug]", "settings", "Abrir panel de diagnóstico");
     unsubIcons = bindGlassIconTheme(root);
 
     const durationHost = root.querySelector("[data-duration-host]");
@@ -207,7 +230,7 @@ export function mountSettingsPanel(container, { session }) {
       preview.replaceChildren(svg);
     }
 
-    bind(settings);
+    bind(settings, meta);
   }
 
   /**
@@ -240,8 +263,9 @@ export function mountSettingsPanel(container, { session }) {
 
   /**
    * @param {import('../lib/parent-settings.js').ParentSettings} settings
+   * @param {{ debugCapabilities?: object | null; accountAuthorization?: object | null } | null} [meta]
    */
-  function bind(settings) {
+  function bind(settings, meta = settingsMeta) {
     root.querySelectorAll("[data-patch-theme]").forEach((btn) => {
       btn.addEventListener("click", () => {
         const theme = /** @type {'fantasy'|'sci-fi'} */ (btn.getAttribute("data-patch-theme"));
@@ -298,40 +322,33 @@ export function mountSettingsPanel(container, { session }) {
     root.querySelector("[data-debug-toggle]")?.addEventListener("change", (ev) => {
       const input = ev.target;
       if (!(input instanceof HTMLInputElement)) return;
-      setDebugAiClientActive(input.checked);
-      if (input.checked) {
-        void fetchDebugAiStatus(session).then((res) => {
-          if (res.ok && res.data?.debug_allowed) {
-            setDebugAiServerAllowed(true);
-            showDebugAiShellBadge(session);
-          }
-        });
+      const checked = input.checked;
+      setDebugAiClientActive(checked);
+      debouncer?.schedule({ diagnostics: { debug_ai_enabled: checked } });
+      if (checked && isDebugAiAllowed()) {
+        showDebugAiShellBadge(session);
       } else {
         hideDebugAiShellBadge();
       }
     });
     root.querySelector("[data-open-debug]")?.addEventListener("click", () => {
       if (!isDebugAiAllowed()) {
+        if (!isDebugAiOperatorEligible()) return;
         setDebugAiClientActive(true);
-        void fetchDebugAiStatus(session).then((res) => {
-          if (res.ok && res.data?.debug_allowed) {
-            setDebugAiServerAllowed(true);
-            showDebugAiShellBadge(session);
-            void openDebugAiPanel({ session });
-          }
-        });
+        debouncer?.schedule({ diagnostics: { debug_ai_enabled: true } });
+        showDebugAiShellBadge(session);
+        void openDebugAiPanel({ session });
         return;
       }
       void openDebugAiPanel({ session });
     });
-    void fetchDebugAiStatus(session).then((res) => {
-      if (res.ok && res.data?.debug_allowed) {
-        setDebugAiServerAllowed(true);
-        const section = root.querySelector("[data-debug-section]");
-        if (section instanceof HTMLElement) section.hidden = false;
-        showDebugAiShellBadge(session);
-      }
-    });
+    if (canShowDebugSection(meta) || isDebugAiOperatorEligible()) {
+      if (meta?.debugCapabilities) syncDebugAiCapabilities(meta.debugCapabilities);
+      syncDebugAiFromParentSettings(settings, meta?.debugCapabilities ?? null);
+      const section = root.querySelector("[data-debug-section]");
+      if (section instanceof HTMLElement) section.hidden = false;
+      if (isDebugAiAllowed()) showDebugAiShellBadge(session);
+    }
   }
 
   debouncer = createSettingsDebouncer((patch) => persist(patch));
@@ -352,14 +369,22 @@ export function mountSettingsPanel(container, { session }) {
         void fetchParentSettings(session).then((r) => {
           if (r.ok) {
             memberCount = r.member_count;
-            paint(r.settings);
+            settingsMeta = {
+              debugCapabilities: r.debug_capabilities ?? null,
+              accountAuthorization: r.account_authorization ?? null,
+            };
+            paint(r.settings, settingsMeta);
           }
         });
       });
       return;
     }
     memberCount = res.member_count;
-    paint(res.settings);
+    settingsMeta = {
+      debugCapabilities: res.debug_capabilities ?? null,
+      accountAuthorization: res.account_authorization ?? null,
+    };
+    paint(res.settings, settingsMeta);
   })();
 
   unsubTheme = subscribeShellUiTheme((theme) => {

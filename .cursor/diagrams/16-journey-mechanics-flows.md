@@ -77,7 +77,8 @@ flowchart TD
 ```mermaid
 flowchart TD
   A([Elegir caminos]) --> B[Ranking híbrido PG + notas tutor]
-  B --> C[path_composer: 3 caminos con nota por slot]
+  B --> B2[Calibrar dificultad: suelo banda + L* + rolling]
+  B2 --> C[path_composer: 3 caminos con nota y target por slot]
   C --> W[Espera 8s]
   W --> D{¿Pack válido?}
   D -- NO --> C

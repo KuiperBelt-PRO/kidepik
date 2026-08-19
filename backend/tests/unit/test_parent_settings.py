@@ -20,6 +20,16 @@ def test_parent_settings_apply_patch_ui_theme() -> None:
 
 
 @pytest.mark.unit
+def test_parent_settings_apply_patch_diagnostics() -> None:
+    current = ParentSettingsService.defaults()
+    merged = ParentSettingsService.apply_patch(
+        current,
+        {"diagnostics": {"debug_ai_enabled": True}},
+    )
+    assert merged["diagnostics"]["debug_ai_enabled"] is True
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "patch,message",
     [

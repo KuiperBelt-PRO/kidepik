@@ -8,6 +8,12 @@ from sqlalchemy.dialects.postgresql import JSONB
 
 from app.catalogs import AgeBand, SubjectCatalog
 from app.db import session_scope
+from app.services.account_authorization import AccountAuthorizationService
+from app.services.debug_access import (
+    assert_debug_diagnostics_patch_allowed,
+    debug_capabilities_for_parent,
+    sanitize_debug_diagnostics,
+)
 from app.services.parents import ParentAccountService
 
 
@@ -21,7 +27,9 @@ class ParentSettingsService:
                 "crew_defaults": {"session_limit_per_day": 3, "max_session_minutes": 10, "require_exit_pin": False, "allow_solo_start": True, "lock_world_theme": True, "font_scale_play": "md"},
                 "learning": {"adaptation_policy": "balanced", "active_subjects": SubjectCatalog.base_subjects_for_band(AgeBand.CHILD), "show_levels_to_child": False, "pause_adaptation": False},
                 "narrative": {"creativity": "balanced", "avoid_themes": [], "resume_mode": "continue"},
-                "privacy": {"story_retention": "full", "analytics_opt_in": False}, "schema_version": cls.SCHEMA_VERSION}
+                "privacy": {"story_retention": "full", "analytics_opt_in": False},
+                "diagnostics": {"debug_ai_enabled": False},
+                "schema_version": cls.SCHEMA_VERSION}
 
     @classmethod
     def merge_with_defaults(cls, stored: object) -> dict[str, Any]:
@@ -63,6 +71,10 @@ class ParentSettingsService:
         if not isinstance(privacy, dict): raise ValueError("privacy invalid")
         cls._enum(privacy.get("story_retention"), ("full", "days_30", "days_90"), "privacy.story_retention")
         if type(privacy.get("analytics_opt_in")) is not bool: raise ValueError("privacy.analytics_opt_in invalid")
+        diagnostics = settings.get("diagnostics")
+        if not isinstance(diagnostics, dict): raise ValueError("diagnostics invalid")
+        if type(diagnostics.get("debug_ai_enabled")) is not bool:
+            raise ValueError("diagnostics.debug_ai_enabled invalid")
 
     @classmethod
     def _deep_merge(cls, base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -78,18 +90,59 @@ class ParentSettingsService:
 
 
 class ParentSettingsRepository:
-    def __init__(self, parents: ParentAccountService | None = None) -> None: self.parents = parents or ParentAccountService()
+    def __init__(
+        self,
+        parents: ParentAccountService | None = None,
+        authorization: AccountAuthorizationService | None = None,
+    ) -> None:
+        self.parents = parents or ParentAccountService()
+        self.authorization = authorization or AccountAuthorizationService()
+
     async def get_for_auth_user(self, auth_user_id: str, email: str, display_name: str | None = None, avatar_url: str | None = None) -> dict[str, Any]:
         account = await self.parents.get_or_bootstrap(auth_user_id, email, display_name, avatar_url)
-        return {"settings": await self.get_merged_settings_for_parent_id(account["parent_id"]), "crew_summary": {"member_count": await self._count(account["parent_id"])}}
+        parent_id = account["parent_id"]
+        settings = await sanitize_debug_diagnostics(
+            parent_id,
+            await self.get_merged_settings_for_parent_id(parent_id),
+            auth=self.authorization,
+        )
+        return {
+            "settings": settings,
+            "crew_summary": {"member_count": await self._count(parent_id)},
+            "debug_capabilities": await debug_capabilities_for_parent(
+                parent_id,
+                settings,
+                auth=self.authorization,
+            ),
+            "account_authorization": await self.authorization.authorization_summary(parent_id),
+        }
+
     async def patch_for_auth_user(self, auth_user_id: str, email: str, patch: dict[str, Any], display_name: str | None = None, avatar_url: str | None = None) -> dict[str, Any]:
         account = await self.parents.get_or_bootstrap(auth_user_id, email, display_name, avatar_url)
-        next_settings = ParentSettingsService.apply_patch(await self.get_merged_settings_for_parent_id(account["parent_id"]), patch)
+        parent_id = account["parent_id"]
+        await assert_debug_diagnostics_patch_allowed(parent_id, patch, auth=self.authorization)
+        next_settings = await sanitize_debug_diagnostics(
+            parent_id,
+            ParentSettingsService.apply_patch(
+                await self.get_merged_settings_for_parent_id(parent_id),
+                patch,
+            ),
+            auth=self.authorization,
+        )
         async with session_scope() as session:
             statement = text("update public.parent_accounts set settings = :settings, updated_at = now() where id = :id").bindparams(bindparam("settings", type_=JSONB))
-            result = await session.execute(statement, {"settings": next_settings, "id": account["parent_id"]})
+            result = await session.execute(statement, {"settings": next_settings, "id": parent_id})
         if not result.rowcount: raise RuntimeError("Parent account not found")
-        return {"settings": next_settings, "crew_summary": {"member_count": await self._count(account["parent_id"])}}
+        return {
+            "settings": next_settings,
+            "crew_summary": {"member_count": await self._count(parent_id)},
+            "debug_capabilities": await debug_capabilities_for_parent(
+                parent_id,
+                next_settings,
+                auth=self.authorization,
+            ),
+            "account_authorization": await self.authorization.authorization_summary(parent_id),
+        }
     async def get_merged_settings_for_parent_id(self, parent_id: str) -> dict[str, Any]:
         async with session_scope() as session:
             value = (await session.execute(text("select settings from public.parent_accounts where id = :id limit 1"), {"id": parent_id})).scalar_one_or_none()

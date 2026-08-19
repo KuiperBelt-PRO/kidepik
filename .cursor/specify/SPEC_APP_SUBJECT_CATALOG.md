@@ -1,6 +1,6 @@
 # Spec: Catálogo de materias (aprendizaje y examen de acceso)
 
-> Estado: **implementada** (31 jul 2026)  
+> Estado: **implementada** (31 jul 2026) — **delta 18 ago 2026:** `mythology` = mitos reales; placement no examina lore inventado del mundo.  
 > Relacionado: [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_APP_SETTINGS_SECTION.md](SPEC_APP_SETTINGS_SECTION.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [docs/kidepik.md](../../docs/kidepik.md) §3  
 > **Fuente de verdad** para ids, labels, pesos y reglas de activación por tripulante.
 
@@ -49,7 +49,7 @@ Principio rector (jul 2026):
 | Materia | Alcance pedagógico (orientativo) |
 | --- | --- |
 | `ethics` | Empatía, dilemas sencillos, convivencia, valores; sin doctrina religiosa |
-| `mythology` | Mitos clásicos y del mundo elegido (fantasy/sci-fi); no confundir con religión |
+| `mythology` | **Mitos reales** (griegos, romanos, egipcios, etc.) vestidos con envoltorio del mundo. **Placement:** la respuesta es conocimiento escolar previo; nunca trivia de lore inventado (Binar Star, reinos, héroes del sector). **Caminos:** lore del mundo solo si acaba de enseñarse en `lesson_narrative` / `narrative_wrapper`. No confundir con religión |
 | `geography` | Mapas, clima, paisajes, países, continentes |
 | `history` | Cronología, civilizaciones, hechos y personajes; relación causa-efecto; tono adaptado por banda |
 | `arts` | Pintura, música, teatro, **cine** (lenguaje audiovisual básico) |

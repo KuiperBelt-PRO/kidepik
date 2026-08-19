@@ -189,7 +189,7 @@ Reglas exactas de subida/bajada L\* (calibrables):
 
 ### 5.2 Adaptación Vygotsky
 
-Dificultad del siguiente ítem = f(`level_id`, `effective_age_band`, `difficulty_modifier`). El Vacío “presiona” (`antagonist_pressure`) solo en **tono**, no endurece unfair el ítem.
+Dificultad del siguiente ítem = f(`effective_age_band`, `level_id`, `accuracy_rolling`, `difficulty_modifier`). La banda fija suelo/techo; el L* y el rolling desplazan **dentro** de ese rango. Fórmula: [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md) § Calibración pedagógica. El Vacío “presiona” (`antagonist_pressure`) solo en **tono**, no endurece unfair el ítem.
 
 ---
 

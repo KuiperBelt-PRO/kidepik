@@ -174,7 +174,7 @@ El `path_composer` genera en **una sola llamada** el pack completo:
 
 Sin segunda llamada LLM por reto. La UI de elección muestra hints como en mundos/zonas.
 
-**Calidad:** prioridad en **instrucciones** del `path_composer` (orden lección → MCQ → autorrevisión). Los rechazos duros del compose son solo estructurales (título cliché, conteo de retos, `correct_option_id` ausente / prompt vacío). Avisos suaves (lección corta, explanation poco alineada) se registran en logs sin forzar reintentos ni fallback.
+**Calidad:** prioridad en **instrucciones** del `path_composer` (títulos en castellano distintos, lección → MCQ → explicación de la regla). Los rechazos duros del compose son **solo estructurales** (conteo de caminos/retos, `correct_option_id` ausente / prompt vacío). Avisos suaves (título cliché o copiado del mapa, lección/wrapper cortos, paleta, leak, explanation poco alineada) se registran en logs **sin** forzar reintentos ni el pack plantilla «Ruta de …».
 
 ---
 

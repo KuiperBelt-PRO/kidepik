@@ -21,23 +21,26 @@ import {
   submitDialogueTurn,
   loadDialogueHistory,
   fetchPlayBaggage,
+  fetchPlayBaggageOffers,
   usePlayBaggageItem,
-} from "../lib/play-api.js?v=261";
+} from "../lib/play-api.js?v=262";
 import { renderDialogueMarkdown } from "../lib/markdown.js?v=2";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
 import { appLog } from "../lib/app-logger.js";
 import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
 import { showGlassConfirm } from "../components/glass-modal.js";
-import { isDebugAiAllowed, isDebugAiClientActive, setDebugAiServerAllowed } from "../lib/debug-ai.js?v=256";
+import { isDebugAiClientActive, syncDebugAiCapabilities } from "../lib/debug-ai.js";
 import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
 import { postDebugJourneyRewind } from "../lib/debug-journey-api.js?v=256";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=257";
-import { baggageGlyphId, renderBaggageHtml, wireBaggageGrid } from "../lib/baggage-ui.js?v=8";
+import { baggageGlyphId, renderBaggageHtml, renderBaggageDetailHtml, wireBaggageGrid } from "../lib/baggage-ui.js?v=8";
 import {
   renderBaggageOfferStripHtml,
   shouldShowBaggageOfferStrip,
-} from "../lib/play-baggage-offer.js?v=1";
+  offerToBaggageItem,
+  escapeHtml,
+} from "../lib/play-baggage-offer.js?v=5";
 import { formatLevelLabel } from "../lib/subject-catalog.js?v=253";
 import { renderShellUiIconSvgInner } from "../components/shell-ui-icons.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
@@ -214,6 +217,8 @@ async function mountPlayPanel(root, ctx) {
   /** @type {object | null} */
   let lastPendingTurn = null;
   let sending = false;
+  /** Ignora resyncs de openSession obsoletos si el usuario envió otro turno. */
+  let sessionSyncGeneration = 0;
   let rewinding = false;
   let debugRewindEnabled = false;
   /** @type {'dialogue' | 'baggage'} */
@@ -231,6 +236,8 @@ async function mountPlayPanel(root, ctx) {
   let historyMeta = { has_older: false, oldest_turn_id: null, page_size: 24 };
   /** @type {Set<string>} */
   const renderedTurnIds = new Set();
+  /** @type {Map<string, number>} */
+  const turnSequenceById = new Map();
   let historyLoading = false;
   let historyControlVisible = false;
   /** @type {HTMLElement | null} */
@@ -610,7 +617,11 @@ async function mountPlayPanel(root, ctx) {
    */
   function paintPlayBaggage(bag) {
     if (!(baggageView instanceof HTMLElement)) return;
-    baggageView.innerHTML = renderBaggageHtml(bag, { audience: "child", allowUse: Boolean(sessionId) });
+    const activeSessionId = ctx.getSessionId();
+    baggageView.innerHTML = renderBaggageHtml(bag, {
+      audience: "child",
+      allowUse: Boolean(activeSessionId),
+    });
     baggageView.querySelectorAll("[data-icon]").forEach((el) => {
       if (!(el instanceof HTMLElement)) return;
       const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
@@ -623,13 +634,14 @@ async function mountPlayPanel(root, ctx) {
     });
     wireBaggageGrid(baggageView, bag.items || [], {
       audience: "child",
-      allowUse: Boolean(sessionId),
+      allowUse: Boolean(activeSessionId),
       onUse: (item, effectId) => {
-        if (!sessionId) return;
+        const sid = ctx.getSessionId();
+        if (!sid) return;
         void (async () => {
           const res = await usePlayBaggageItem(ctx.session, ctx.childId, String(item.id), {
             effect_id: effectId,
-            session_id: sessionId,
+            session_id: sid,
           });
           if (!res.ok || !res.data) {
             showGlassToast(mapPlayApiError(res.error || "use"), { variant: "error" });
@@ -692,6 +704,8 @@ async function mountPlayPanel(root, ctx) {
       formEl?.setAttribute("hidden", "");
       optionsEl?.setAttribute("hidden", "");
       baggageToggleBtn?.classList.remove("is-badge");
+      const sc = scrollContainer();
+      if (sc instanceof HTMLElement) sc.scrollTop = 0;
       await loadPlayBaggage();
     }
   }
@@ -719,6 +733,49 @@ async function mountPlayPanel(root, ctx) {
   }
   const optionsEl = footer.querySelector("[data-options]");
   const baggageOfferEl = footer.querySelector("[data-baggage-offer]");
+  let usingBaggageOffer = false;
+  let baggageHotbarCollapsed = false;
+  /** @type {string | null} */
+  let baggageOfferDetailId = null;
+
+  if (baggageOfferEl instanceof HTMLElement) {
+    baggageOfferEl.addEventListener("click", (ev) => {
+      const target = ev.target;
+      if (!(target instanceof Element)) return;
+      if (target.closest("[data-baggage-hotbar-toggle]")) {
+        baggageHotbarCollapsed = !baggageHotbarCollapsed;
+        if (lastPendingTurn) renderBaggageOfferStrip(lastPendingTurn);
+        return;
+      }
+      if (target.closest("[data-baggage-offer-more]")) {
+        void setPlayViewMode("baggage");
+        return;
+      }
+      if (target.closest("[data-baggage-detail-close]")) {
+        baggageOfferDetailId = null;
+        if (lastPendingTurn) renderBaggageOfferStrip(lastPendingTurn);
+        return;
+      }
+      const previewBtn = target.closest("[data-baggage-offer-preview]");
+      if (previewBtn instanceof HTMLButtonElement) {
+        const slot = previewBtn.closest("[data-baggage-offer-slot]");
+        const rowId = slot?.getAttribute("data-baggage-offer-slot");
+        if (!rowId) return;
+        baggageOfferDetailId = baggageOfferDetailId === rowId ? null : rowId;
+        if (lastPendingTurn) renderBaggageOfferStrip(lastPendingTurn);
+        return;
+      }
+      const useBtn = target.closest("[data-baggage-offer-use], [data-baggage-use]");
+      if (!(useBtn instanceof HTMLButtonElement) || useBtn.disabled || usingBaggageOffer) return;
+      const slot = useBtn.closest("[data-baggage-offer-slot], [data-baggage-offer-detail]");
+      const rowId =
+        slot?.getAttribute("data-baggage-offer-slot") ||
+        slot?.getAttribute("data-baggage-offer-detail");
+      const effectId = useBtn.getAttribute("data-effect-id") || "challenge_hint";
+      if (!rowId) return;
+      void useBaggageOffer(rowId, effectId);
+    });
+  }
   const formEl = footer.querySelector("[data-form]");
   const statusEl = root.querySelector("[data-status]");
   const progressEl = footer.querySelector("[data-exam-progress]");
@@ -864,9 +921,63 @@ async function mountPlayPanel(root, ctx) {
     return turn?.input_mode || "continue";
   }
 
+  /** @type {(() => void) | null} */
+  let clearSyncSkeleton = null;
+
+  function hideSyncSkeleton() {
+    clearSyncSkeleton?.();
+    clearSyncSkeleton = null;
+  }
+
+  /** Skeleton glass mientras llega el siguiente paso (log + chips del footer). */
+  function showSyncSkeleton() {
+    hideSyncSkeleton();
+    if (!(logEl instanceof HTMLElement)) return;
+
+    const group = document.createElement("div");
+    group.className = "play-history-skeleton-group play-sync-skeleton-group";
+    group.setAttribute("role", "status");
+    group.setAttribute("aria-live", "polite");
+    group.setAttribute("aria-label", "Preparando el siguiente paso del viaje");
+
+    const mentorHost = document.createElement("div");
+    mentorHost.className = "play-history-skeleton play-history-skeleton--mentor";
+    mentorHost.setAttribute("aria-hidden", "true");
+    fillGlassSkeleton(mentorHost, { preset: "lines", ariaLabel: "Preparando el siguiente paso" });
+    mentorHost.querySelector(".glass-skeleton")?.removeAttribute("role");
+    group.appendChild(mentorHost);
+    logEl.appendChild(group);
+    scrollLogToEnd({ force: true });
+
+    const footerSk = document.createElement("div");
+    footerSk.className = "play-sync-skeleton-footer";
+    footerSk.setAttribute("aria-hidden", "true");
+    for (let i = 0; i < 3; i += 1) {
+      const chip = document.createElement("div");
+      chip.className = "play-sync-skeleton-chip";
+      fillGlassSkeleton(chip, { preset: "lines", ariaLabel: "Preparando opciones" });
+      chip.querySelector(".glass-skeleton")?.removeAttribute("role");
+      footerSk.appendChild(chip);
+    }
+    if (optionsEl instanceof HTMLElement) {
+      optionsEl.innerHTML = "";
+      optionsEl.appendChild(footerSk);
+      optionsEl.classList.add("play-panel__options--sync-skeleton");
+      syncFooterChrome();
+    }
+
+    clearSyncSkeleton = () => {
+      group.remove();
+      footerSk.remove();
+      optionsEl?.classList.remove("play-panel__options--sync-skeleton");
+      clearSyncSkeleton = null;
+    };
+  }
+
   /** Restaura footer y flags tras rehidratar (rewind, resync). */
   function resetPlayInteractionState() {
     hideThinking();
+    hideSyncSkeleton();
     sending = false;
     if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
     if (inputEl instanceof HTMLTextAreaElement) {
@@ -1064,6 +1175,7 @@ async function mountPlayPanel(root, ctx) {
     }
 
     renderedTurnIds.delete(turnId);
+    turnSequenceById.delete(turnId);
     clearWorldHints();
     if (optionsEl instanceof HTMLElement) optionsEl.innerHTML = "";
     if (formEl instanceof HTMLElement) formEl.hidden = true;
@@ -1240,13 +1352,41 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * @param {object | null | undefined} turn
+   */
+  function rememberTurnSequence(turn) {
+    if (turn?.id && Number.isFinite(Number(turn.sequence))) {
+      turnSequenceById.set(String(turn.id), Number(turn.sequence));
+    }
+  }
+
+  /**
+   * Ancla DOM para insertar un turno antes del siguiente de mayor sequence.
+   * @param {number} sequence
+   * @returns {HTMLElement | null}
+   */
+  function logInsertAnchorForSequence(sequence) {
+    if (!(logEl instanceof HTMLElement) || !Number.isFinite(sequence)) return null;
+    for (const el of logEl.querySelectorAll("[data-turn-id]")) {
+      const id = el.getAttribute("data-turn-id");
+      if (!id) continue;
+      const seq = turnSequenceById.get(id);
+      if (Number.isFinite(seq) && seq > sequence) {
+        return el;
+      }
+    }
+    return null;
+  }
+
+  /**
    * @param {HTMLElement[]} nodes
-   * @param {{ prepend?: boolean, scrollToEnd?: boolean }} [opts]
+   * @param {{ prepend?: boolean, before?: HTMLElement | null, scrollToEnd?: boolean }} [opts]
    */
   function insertLogNodes(nodes, opts = {}) {
     if (!(logEl instanceof HTMLElement) || nodes.length === 0) return;
     const sc = scrollContainer();
     const prepend = Boolean(opts.prepend);
+    const before = opts.before instanceof HTMLElement ? opts.before : null;
     const prevScrollHeight = sc instanceof HTMLElement ? sc.scrollHeight : 0;
     const prevScrollTop = sc instanceof HTMLElement ? sc.scrollTop : 0;
 
@@ -1261,8 +1401,14 @@ async function mountPlayPanel(root, ctx) {
       return;
     }
 
-    for (const node of nodes) {
-      logEl.appendChild(node);
+    if (before) {
+      for (const node of nodes) {
+        logEl.insertBefore(node, before);
+      }
+    } else {
+      for (const node of nodes) {
+        logEl.appendChild(node);
+      }
     }
     if (opts.scrollToEnd === true) {
       scrollLogToEnd({ force: true });
@@ -1284,7 +1430,7 @@ async function mountPlayPanel(root, ctx) {
         : turn.role === "system"
           ? "mentor"
           : "mentor";
-    let text = turn.text || "";
+    let text = turn.text || turn.content || "";
     if (!String(text).trim() && turn?.meta?.compose_failed) {
       text = ADVENTURE_COMPOSE_FAILED_COPY;
     }
@@ -1310,7 +1456,12 @@ async function mountPlayPanel(root, ctx) {
    */
   function renderTurn(turn, who, opts = {}) {
     if (turn?.id && renderedTurnIds.has(String(turn.id))) return;
-    insertLogNodes(buildTurnNodes(turn, who), opts);
+    rememberTurnSequence(turn);
+    const before =
+      Number.isFinite(Number(turn?.sequence)) && !opts.prepend
+        ? logInsertAnchorForSequence(Number(turn.sequence))
+        : null;
+    insertLogNodes(buildTurnNodes(turn, who), { ...opts, before });
   }
 
   /**
@@ -1623,6 +1774,69 @@ async function mountPlayPanel(root, ctx) {
   /**
    * @param {object} turn
    */
+  function paintBaggageOfferIcons() {
+    if (!(baggageOfferEl instanceof HTMLElement)) return;
+    baggageOfferEl.querySelectorAll("[data-icon]").forEach((el) => {
+      if (!(el instanceof HTMLElement)) return;
+      const raw = el.getAttribute("data-icon") || "baggage";
+      const id = raw === "chevron" ? "chevron" : baggageGlyphId(raw);
+      const size = el.classList.contains("play-baggage-hotbar__chevron") ? 14 : 22;
+      const svg = createGlassIconSvg(/** @type {any} */ (id), { size });
+      el.replaceChildren(svg);
+    });
+  }
+
+  /**
+   * @param {any} offer
+   */
+  function paintBaggageOfferDetail(offer) {
+    if (!(baggageOfferEl instanceof HTMLElement)) return;
+    const host = baggageOfferEl.querySelector("[data-baggage-offer-detail]");
+    if (!(host instanceof HTMLElement)) return;
+    if (!offer) {
+      host.hidden = true;
+      host.innerHTML = "";
+      return;
+    }
+    const item = offerToBaggageItem(offer);
+    const effectId = String(offer.effect_id || "challenge_hint");
+    host.innerHTML = `<div class="play-baggage-hotbar__detail" data-baggage-offer-detail="${escapeHtml(String(offer.item_row_id))}">
+      ${renderBaggageDetailHtml(item, "child", { allowUse: Boolean(ctx.getSessionId()) })}
+    </div>`;
+    host.hidden = false;
+    const useBtn = host.querySelector("[data-baggage-use]");
+    if (useBtn instanceof HTMLButtonElement) {
+      useBtn.setAttribute("data-effect-id", effectId);
+      useBtn.textContent = effectId === "challenge_retry" ? "Reintentar" : "Usar ahora";
+    }
+  }
+
+  /** @type {string | null} */
+  let baggageOffersRefreshedForTurn = null;
+
+  /**
+   * @param {object} turn
+   */
+  async function refreshBaggageOffers(turn) {
+    const meta = turn?.meta && typeof turn.meta === "object" ? turn.meta : {};
+    const phase = String(meta.phase || "");
+    const inChallenge =
+      phase === "path_challenge" || (phase === "path_intro" && Boolean(meta.retry));
+    if (!inChallenge) return;
+    const turnId = turn?.id ? String(turn.id) : null;
+    if (!turnId || baggageOffersRefreshedForTurn === turnId) return;
+    const sid = ctx.getSessionId();
+    if (!sid) return;
+    baggageOffersRefreshedForTurn = turnId;
+    const res = await fetchPlayBaggageOffers(ctx.session, ctx.childId, sid);
+    if (!res.ok || !res.data || !Array.isArray(res.data.baggage_offers)) return;
+    lastBaggageOffers = res.data.baggage_offers;
+    renderBaggageOfferStrip(turn);
+  }
+
+  /**
+   * @param {object} turn
+   */
   function renderBaggageOfferStrip(turn) {
     if (!(baggageOfferEl instanceof HTMLElement)) return;
     const meta = turn?.meta && typeof turn.meta === "object" ? turn.meta : {};
@@ -1633,27 +1847,28 @@ async function mountPlayPanel(root, ctx) {
     if (!show) {
       baggageOfferEl.hidden = true;
       baggageOfferEl.innerHTML = "";
+      baggageOfferDetailId = null;
+      if (lastBaggageOffers.length === 0) {
+        void refreshBaggageOffers(turn);
+      }
       return;
     }
-    baggageOfferEl.innerHTML = renderBaggageOfferStripHtml(lastBaggageOffers);
+    if (
+      baggageOfferDetailId &&
+      !lastBaggageOffers.some((o) => String(o.item_row_id) === baggageOfferDetailId)
+    ) {
+      baggageOfferDetailId = null;
+    }
+    baggageOfferEl.innerHTML = renderBaggageOfferStripHtml(lastBaggageOffers, {
+      collapsed: baggageHotbarCollapsed,
+      selectedId: baggageOfferDetailId,
+    });
     baggageOfferEl.hidden = false;
-    baggageOfferEl.querySelectorAll("[data-icon]").forEach((el) => {
-      if (!(el instanceof HTMLElement)) return;
-      const id = baggageGlyphId(el.getAttribute("data-icon") || "baggage");
-      el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size: 16 }));
-    });
-    baggageOfferEl.querySelectorAll("[data-baggage-offer-chip]").forEach((btn) => {
-      if (!(btn instanceof HTMLButtonElement)) return;
-      btn.addEventListener("click", () => {
-        const rowId = btn.getAttribute("data-baggage-offer-chip");
-        const effectId = btn.getAttribute("data-effect-id") || "challenge_hint";
-        if (!rowId || btn.disabled) return;
-        void useBaggageOffer(rowId, effectId);
-      });
-    });
-    baggageOfferEl.querySelector("[data-baggage-offer-more]")?.addEventListener("click", () => {
-      void setPlayViewMode("baggage");
-    });
+    paintBaggageOfferIcons();
+    const selected = baggageOfferDetailId
+      ? lastBaggageOffers.find((o) => String(o.item_row_id) === baggageOfferDetailId)
+      : null;
+    paintBaggageOfferDetail(selected || null);
   }
 
   /**
@@ -1661,13 +1876,26 @@ async function mountPlayPanel(root, ctx) {
    * @param {string} effectId
    */
   async function useBaggageOffer(itemRowId, effectId) {
-    if (!sessionId) return;
+    const sid = ctx.getSessionId();
+    if (!sid) {
+      showGlassToast("No hay sesión activa. Vuelve a entrar en la aventura.", { variant: "error" });
+      return;
+    }
+    if (usingBaggageOffer) return;
+    usingBaggageOffer = true;
+    baggageOfferEl
+      ?.querySelectorAll("[data-baggage-offer-use]")
+      .forEach((btn) => {
+        if (btn instanceof HTMLButtonElement) btn.disabled = true;
+      });
     const res = await usePlayBaggageItem(ctx.session, ctx.childId, itemRowId, {
       effect_id: effectId,
-      session_id: sessionId,
+      session_id: sid,
     });
+    usingBaggageOffer = false;
     if (!res.ok || !res.data) {
       showGlassToast(mapPlayApiError(res.error || "use"), { variant: "error" });
+      if (lastPendingTurn) renderBaggageOfferStrip(lastPendingTurn);
       return;
     }
     if (Array.isArray(res.data.baggage_offers)) {
@@ -1676,17 +1904,19 @@ async function mountPlayPanel(root, ctx) {
       baggageCache = res.data.baggage;
       baggageDirty = false;
       lastBaggageOffers = (res.data.baggage.items || [])
-        .filter((it) => it?.usable_now && it?.can_use)
-        .slice(0, 3)
+        .filter((it) => it?.usable_now)
         .flatMap((it) =>
           (it.effects || [])
             .filter((fx) => fx === "challenge_hint" || fx === "challenge_retry")
             .map((fx) => ({
               item_row_id: it.id,
               label_child: it.label_child,
+              description_child: it.description_child,
               icon_id: it.icon_id,
               effect_id: fx,
               can_use: it.can_use,
+              subject_labels: it.subject_labels,
+              rarity: it.rarity,
             })),
         );
     }
@@ -1700,10 +1930,15 @@ async function mountPlayPanel(root, ctx) {
       const hintBubble = {
         id: `hint-${Date.now()}`,
         role: "mentor",
-        content: String(res.data.mentor_line ? `${res.data.mentor_line} ${res.data.hint_text}` : res.data.hint_text),
+        text: String(
+          res.data.mentor_line
+            ? `${res.data.mentor_line} ${res.data.hint_text}`
+            : res.data.hint_text,
+        ),
         meta: { phase: "baggage_hint" },
       };
       appendMentorTurn(hintBubble, mentorLabel);
+      scrollLogToEnd({ force: true });
     } else if (res.data.mentor_line) {
       showGlassToast(String(res.data.mentor_line), { variant: "success" });
     }
@@ -1822,6 +2057,7 @@ async function mountPlayPanel(root, ctx) {
     }
     syncFooterChrome();
     lastPendingTurn = turn;
+    baggageOffersRefreshedForTurn = null;
     renderBaggageOfferStrip(turn);
     captureWaitingHints(turn);
     if (turn?.meta?.compose_failed) {
@@ -1961,6 +2197,135 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
+   * Pinta al vuelo la respuesta del turn (sin esperar openSession).
+   * @param {object} data
+   * @returns {boolean} true si hay pending usable
+   */
+  function applyTurnResponse(data) {
+    applyDialogueState(data);
+    if (data.mentor?.display_name) {
+      mentorLabel = data.mentor.display_name;
+    }
+    applyChapterTitle(data.chapter);
+    if (data.progress_hud) syncProgressHud(data.progress_hud);
+    const effects = Array.isArray(data.effects) ? data.effects : [];
+    if (effects.some((e) => e && (e.type === "reward_granted" || e.toast_child))) {
+      baggageDirty = true;
+      baggageToggleBtn?.classList.add("is-badge");
+      const toast = effects.find((e) => e?.toast_child)?.toast_child;
+      if (toast) showGlassToast(String(toast), { variant: "success" });
+    }
+
+    const turns = Array.isArray(data.agent_turns) ? data.agent_turns : [];
+    for (const t of turns) {
+      captureWaitingHints(t);
+      appendMentorTurn(t, mentorLabel);
+    }
+    const pending = data.pending_agent_turn || turns[turns.length - 1];
+    if (
+      pending &&
+      (pending.role === "mentor" || pending.role === "agent") &&
+      (!pending.id || !renderedTurnIds.has(String(pending.id)))
+    ) {
+      captureWaitingHints(pending);
+      renderTurn(pending, mentorLabel, { scrollToEnd: false });
+    }
+    if (pending) {
+      const phase = typeof pending.meta?.phase === "string" ? pending.meta.phase : "";
+      if (phase === "placement_item" || phase === "placement_feedback") {
+        onboardingStep = "placement";
+      } else if (phase) {
+        onboardingStep = phase;
+      }
+      if (pending.meta?.compose_failed) {
+        lastComposeDebug = pending.meta.compose_debug ?? data.debug?.compose ?? lastComposeDebug;
+        showComposeDebugChip(lastComposeDebug);
+      }
+      renderPending(pending);
+      scrollLogToEnd({ force: true });
+      return true;
+    }
+    scrollLogToEnd({ force: true });
+    return false;
+  }
+
+  /**
+   * Fusiona openSession en caliente sin vaciar el log (resync en segundo plano).
+   * @param {object} data
+   */
+  function mergeSessionSync(data) {
+    if (!data || typeof data !== "object") return;
+    if (data.session_id) ctx.setSessionId(data.session_id);
+    applyDialogueState(data);
+    applyWaitingCopy(data);
+    if (data.mentor?.display_name) {
+      mentorLabel = data.mentor.display_name;
+    }
+    applyChapterTitle(data.chapter);
+    if (data.progress_hud) syncProgressHud(data.progress_hud);
+    if (data.history && typeof data.history === "object") {
+      historyMeta = {
+        has_older: Boolean(data.history.has_older),
+        oldest_turn_id:
+          typeof data.history.oldest_turn_id === "string" ? data.history.oldest_turn_id : null,
+        page_size: typeof data.history.page_size === "number" ? data.history.page_size : 24,
+      };
+    }
+
+    const turns = Array.isArray(data.turns) ? data.turns : [];
+    for (const t of turns) {
+      if (t?.id && renderedTurnIds.has(String(t.id))) continue;
+      const role =
+        t.role === "explorer" || t.role === "child"
+          ? "explorer"
+          : t.role === "system"
+            ? "mentor"
+            : "mentor";
+      if (role === "mentor") {
+        captureWaitingHints(t);
+      }
+      renderTurn(t, mentorLabel, { scrollToEnd: false });
+      if (role === "explorer") {
+        clearOptimisticExplorerBubble();
+      }
+    }
+
+    const pending =
+      data.pending_agent_turn ||
+      turns.filter((t) => t.role === "mentor" || t.role === "agent").at(-1);
+    if (pending) {
+      const pendingId = String(pending.id || "");
+      const currentId = String(lastPendingTurn?.id || "");
+      if (!pendingId || pendingId !== currentId) {
+        renderPending(pending);
+      } else {
+        renderBaggageOfferStrip(pending);
+      }
+    }
+    syncHistoryControlFromScroll();
+    scrollLogToEnd({ force: true });
+  }
+
+  /**
+   * @param {number} syncGen
+   */
+  async function syncDialogueSessionInBackground(syncGen) {
+    try {
+      const synced = await openDialogueSession(ctx.session, ctx.childId, "first_run");
+      if (ctx.isCancelled() || syncGen !== sessionSyncGeneration) return;
+      if (synced.ok && synced.data) {
+        mergeSessionSync(synced.data);
+        if (lastComposeDebug) showComposeDebugChip(lastComposeDebug);
+      }
+    } finally {
+      if (syncGen === sessionSyncGeneration) {
+        hideSyncSkeleton();
+        hideThinking();
+      }
+    }
+  }
+
+  /**
    * Rehidrata el log y el pending desde openSession (resync tras fallo de transporte).
    * @param {object} data
    */
@@ -1972,6 +2337,7 @@ async function mountPlayPanel(root, ctx) {
       logEl.innerHTML = "";
     }
     renderedTurnIds.clear();
+    turnSequenceById.clear();
     mountHistoryLoadControl();
     applyDialogueState(data);
     applyWaitingCopy(data);
@@ -1990,12 +2356,18 @@ async function mountPlayPanel(root, ctx) {
     }
     const turns = Array.isArray(data.turns) ? data.turns : [];
     for (const t of turns) {
-      const role = t.role === "explorer" || t.role === "child" ? "explorer" : "mentor";
+      const role =
+        t.role === "explorer" || t.role === "child"
+          ? "explorer"
+          : t.role === "system"
+            ? "mentor"
+            : "mentor";
       if (role === "mentor") {
         captureWaitingHints(t);
-        renderTurn(t, mentorLabel, { scrollToEnd: false });
-      } else {
-        insertLogNodes(buildTurnNodes(t, mentorLabel), { scrollToEnd: false });
+      }
+      renderTurn(t, mentorLabel, { scrollToEnd: false });
+      if (role === "explorer") {
+        clearOptimisticExplorerBubble();
       }
     }
     scrollLogToEnd({ force: true });
@@ -2028,6 +2400,8 @@ async function mountPlayPanel(root, ctx) {
     const sid = ctx.getSessionId();
     if (!sid || ctx.isCancelled() || sending) return;
     sending = true;
+    sessionSyncGeneration += 1;
+    const syncGen = sessionSyncGeneration;
     if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = true;
 
     if (reply.kind === "text" && inputEl instanceof HTMLTextAreaElement) {
@@ -2056,7 +2430,13 @@ async function mountPlayPanel(root, ctx) {
     const prevPhase =
       typeof lastPendingTurn?.meta?.phase === "string" ? lastPendingTurn.meta.phase : "";
     const result = await submitDialogueTurn(ctx.session, ctx.childId, sid, reply);
-    if (ctx.isCancelled()) return;
+    if (ctx.isCancelled()) {
+      hideSyncSkeleton();
+      hideThinking();
+      sending = false;
+      if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
+      return;
+    }
     if (!result.ok || !result.data) {
       // El servidor puede haber avanzado aunque el fetch falle (JSON corrupto / transporte).
       if (result.transport || result.error === "invalid_json" || result.status === 0) {
@@ -2066,6 +2446,7 @@ async function mountPlayPanel(root, ctx) {
           const nextPhase =
             typeof pending?.meta?.phase === "string" ? pending.meta.phase : "";
           if (nextPhase && nextPhase !== prevPhase) {
+            hideSyncSkeleton();
             hideThinking();
             hydrateFromSession(synced.data);
             sending = false;
@@ -2083,66 +2464,30 @@ async function mountPlayPanel(root, ctx) {
         inputEl.value = reply.text || "";
         autoGrowTextarea(inputEl);
       }
+      hideSyncSkeleton();
       hideThinking();
       sending = false;
       if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
       return;
     }
 
-    hideThinking();
-
     const data = result.data;
     if (data.debug?.compose) {
       lastComposeDebug = data.debug.compose;
     }
 
-    const synced = await openDialogueSession(ctx.session, ctx.childId, "first_run");
-    if (!ctx.isCancelled() && synced.ok && synced.data) {
-      hydrateFromSession(synced.data);
-      if (lastComposeDebug) showComposeDebugChip(lastComposeDebug);
-      scrollLogToEnd({ force: true });
-      sending = false;
-      if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
-      return;
-    }
+    hideThinking();
+    showSyncSkeleton();
+    applyTurnResponse(data);
+    hideSyncSkeleton();
+    hideThinking();
 
-    applyDialogueState(data);
-    if (data.mentor?.display_name) {
-      mentorLabel = data.mentor.display_name;
-    }
-    applyChapterTitle(data.chapter);
-    if (data.progress_hud) syncProgressHud(data.progress_hud);
-    const effects = Array.isArray(data.effects) ? data.effects : [];
-    if (effects.some((e) => e && (e.type === "reward_granted" || e.toast_child))) {
-      baggageDirty = true;
-      baggageToggleBtn?.classList.add("is-badge");
-      const toast = effects.find((e) => e?.toast_child)?.toast_child;
-      if (toast) showGlassToast(String(toast), { variant: "success" });
-    }
-    clearOptimisticExplorerBubble();
-
-    const turns = Array.isArray(data.agent_turns) ? data.agent_turns : [];
-    for (const t of turns) {
-      captureWaitingHints(t);
-      appendMentorTurn(t, mentorLabel);
-    }
-    const pending = data.pending_agent_turn || turns[turns.length - 1];
-    if (pending) {
-      const phase = typeof pending.meta?.phase === "string" ? pending.meta.phase : "";
-      if (phase === "placement_item" || phase === "placement_feedback") {
-        onboardingStep = "placement";
-      } else if (phase) {
-        onboardingStep = phase;
-      }
-      if (pending.meta?.compose_failed) {
-        lastComposeDebug = pending.meta.compose_debug ?? data.debug?.compose ?? lastComposeDebug;
-        showComposeDebugChip(lastComposeDebug);
-      }
-      renderPending(pending);
-    }
-    scrollLogToEnd();
     sending = false;
     if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
+
+    if (!ctx.isCancelled()) {
+      void syncDialogueSessionInBackground(syncGen);
+    }
   }
 
   formEl?.addEventListener("submit", (ev) => {
@@ -2156,12 +2501,14 @@ async function mountPlayPanel(root, ctx) {
   const opened = await (ctx.sessionOpenPromise ?? openDialogueSession(ctx.session, ctx.childId, "first_run"));
   if (ctx.isCancelled()) return;
 
-  if (isDebugAiClientActive()) {
-    const statusRes = await fetchDebugAiStatus(ctx.session);
-    if (statusRes.ok && statusRes.data?.debug_allowed) {
-      setDebugAiServerAllowed(true);
-      debugRewindEnabled = isDebugAiAllowed();
-    }
+  const statusRes = await fetchDebugAiStatus(ctx.session);
+  if (statusRes.ok && statusRes.data) {
+    syncDebugAiCapabilities({
+      operator_eligible: statusRes.data.operator_eligible,
+      debug_enabled: statusRes.data.debug_enabled,
+      debug_allowed: statusRes.data.debug_allowed,
+    });
+    debugRewindEnabled = statusRes.data.debug_allowed === true;
   }
 
   if (!opened.ok || !opened.data) {

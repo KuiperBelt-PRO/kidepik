@@ -214,6 +214,34 @@ export async function fetchPlayBaggage(_session, childId) {
 /**
  * @param {import('@supabase/supabase-js').Session} _session
  * @param {string} childId
+ * @param {string} sessionId
+ */
+export async function fetchPlayBaggageOffers(_session, childId, sessionId) {
+  try {
+    const session = await requirePlaySession();
+    if (!session) return { ok: false, status: 401, error: "session_expired" };
+    const { config } = await import("../config.js");
+    const q = new URLSearchParams({ session_id: sessionId });
+    const res = await fetch(
+      `${config.apiUrl}/play/${encodeURIComponent(childId)}/baggage/offers?${q}`,
+      {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          ...debugAiRequestHeaders(),
+        },
+      },
+    );
+    if (!res.ok) return { ok: false, status: res.status };
+    return { ok: true, data: await res.json() };
+  } catch (err) {
+    console.warn("play baggage offers error", err);
+    return { ok: false };
+  }
+}
+
+/**
+ * @param {import('@supabase/supabase-js').Session} _session
+ * @param {string} childId
  * @param {string} itemRowId
  * @param {{ effect_id: string, session_id: string }} body
  */
