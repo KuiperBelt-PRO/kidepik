@@ -8,10 +8,12 @@ stateDiagram-v2
   [*] --> loading
   loading --> ready: anillo 100% + hint 0.5s
   ready --> exiting: tap disco central
-  exiting --> home: sesión Supabase válida
+  exiting --> home: sesión tutor
+  exiting --> member: sesión crew
   exiting --> authMorph: sin sesión
   authMorph --> authIdle: morph in-place
-  authIdle --> home: Google OK + bootstrap
+  authIdle --> home: Google OK + bootstrap tutor
+  authIdle --> member: Google OK + bootstrap crew
   authIdle --> legal: enlaces términos/privacidad
 ```
 
@@ -22,7 +24,7 @@ sequenceDiagram
   participant U as Usuario
   participant L as Loader + Gate
   participant SB as Supabase
-  participant API as PHP parents
+  participant API as FastAPI session/parents
 
   U->>L: espera reveal + progreso
   L-->>U: hint Pulsa para comenzar…
@@ -30,16 +32,26 @@ sequenceDiagram
   alt hay sesión
     L->>SB: getSession
     L->>API: bootstrap / me
-    L-->>U: #/home + shell
+    alt role tutor
+      L-->>U: #/home + shell
+    else role crew
+      L-->>U: #/member + shell
+    end
   else sin sesión
     L->>L: auth-morph in-place
     U->>L: Continuar con Google
     L->>SB: OAuth PKCE
     SB-->>L: #/auth/callback → sesión
     L->>API: bootstrap
-    L-->>U: #/home
+    alt role tutor
+      L-->>U: #/home
+    else role crew
+      L-->>U: #/member
+    end
   end
 ```
+
+**Implementado:** [SPEC_APP_CREW_MEMBER_ACCOUNT.md](../specify/SPEC_APP_CREW_MEMBER_ACCOUNT.md) — el bootstrap elige tutor vs tripulante por Gmail invitado.
 
 ## Hechos de producto
 

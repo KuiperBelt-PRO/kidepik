@@ -14,7 +14,8 @@ import {
   requestTutorReport,
   verifyCrewExitPin,
   fetchCrewBaggage,
-} from "../lib/crew-api.js?v=260";
+} from "../lib/crew-api.js?v=280";
+import { fetchMember, fetchMemberBaggage, patchMember } from "../lib/member-api.js";
 import { fetchJourneyTimeline } from "../lib/play-api.js";
 import { baggageGlyphId, renderBaggageHtml, wireBaggageGrid, wireBaggageViewToggle } from "../lib/baggage-ui.js?v=10";
 import { applyCrewMemberWorldTheme } from "../lib/play-theme.js";
@@ -145,6 +146,28 @@ function renderSubjectProgressRow(subjectLabel, percent, currentRank, nextRank =
 /**
  * @param {any} member
  */
+function inviteAccessBlock(member) {
+  return `
+      <section class="crew-panel__block" data-invite-block>
+        <h2 class="crew-panel__block-title">Acceso del tripulante</h2>
+        <p class="crew-panel__helper">Asigna un correo de Gmail distinto al tuyo. Quien entre con ese correo usará esta plaza, no una cuenta de tutor.</p>
+        <label class="crew-panel__label">Gmail del tripulante
+          <input class="crew-panel__input" data-invite-email type="email" inputmode="email" autocomplete="off" value="${escapeAttr(member.invite_email || "")}" placeholder="tucorreoelectronico@gmail.com" />
+        </label>
+        <p class="crew-panel__status" data-invite-status aria-live="polite"></p>
+        <button type="button" class="crew-panel__btn crew-panel__btn--primary" data-save-invite></button>
+      </section>`;
+}
+
+function renderSubjectsReadOnly(member) {
+  const active = Array.isArray(member.active_subjects) ? member.active_subjects : [];
+  const labels = active.map((id) => escapeHtml(String(id))).join(", ");
+  return `<section class="crew-panel__block">
+    <h2 class="crew-panel__block-title">Materias</h2>
+    <p class="crew-panel__helper">${labels || "Tu tutor elige las materias activas."}</p>
+  </section>`;
+}
+
 function renderRankLegend(member) {
   const legend = member?.progress?.rank_legend;
   if (!Array.isArray(legend) || !legend.length) return "";
@@ -222,7 +245,8 @@ function mountRankLegend(host) {
 /**
  * @param {any} member
  */
-function renderProgressSection(member) {
+function renderProgressSection(member, opts = {}) {
+  const selfView = opts.viewer === "self";
   const prog = member.progress;
   if (!prog || member.placement_status !== "completed") {
     return `<section class="crew-panel__block">
@@ -243,8 +267,12 @@ function renderProgressSection(member) {
       return renderSubjectProgressRow(s.label || "", lp.percent_to_next, curRank, nextRank);
     })
     .join("");
-  const gpLeft = rank?.label_tutor || rank?.label_child || "Explorador";
-  const gpRight = rankNext?.label_tutor || rankNext?.label_child || "";
+  const gpLeft = selfView
+    ? rank?.label_child || rank?.label_tutor || "Explorador"
+    : rank?.label_tutor || rank?.label_child || "Explorador";
+  const gpRight = selfView
+    ? rankNext?.label_child || rankNext?.label_tutor || ""
+    : rankNext?.label_tutor || rankNext?.label_child || "";
   const pendingHint =
     gp?.hint_tutor && String(gp.hint_tutor).includes("materias pendientes")
       ? `<p class="crew-panel__helper">${escapeHtml(gp.hint_tutor)}</p>`
@@ -252,8 +280,8 @@ function renderProgressSection(member) {
   return `<section class="crew-panel__block crew-progress">
     <h2 class="crew-panel__block-title">Tu explorador en el viaje</h2>
     ${gp ? renderLevelBar(gp.percent_to_next, gpLeft, gpRight, { showRing: true }) : ""}
-    ${pendingHint}
-    ${renderRankLegend(member)}
+    ${selfView ? "" : pendingHint}
+    ${selfView ? "" : renderRankLegend(member)}
     ${subjectBars}
   </section>`;
 }
@@ -498,7 +526,7 @@ export function mountCrewNewPanel(container, { session }) {
  * @param {HTMLElement} container
  * @param {{ session: import('@supabase/supabase-js').Session; childId: string; onTitleChange?: (title: string) => void }} options
  */
-export function mountCrewDetailPanel(container, { session, childId, onTitleChange }) {
+export function mountCrewDetailPanel(container, { session, childId, onTitleChange, viewer = "tutor" }) {
   const root = document.createElement("div");
   root.className = "crew-panel";
   container.appendChild(root);
@@ -514,7 +542,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
   async function load() {
     resetCleanups();
     fillGlassSkeleton(root, { preset: "panel", ariaLabel: "Cargando tripulante" });
-    const res = await fetchCrewMember(session, childId);
+    const res = viewer === "self" ? await fetchMember(session) : await fetchCrewMember(session, childId);
     if (destroyed) return;
     if (!res.ok) {
       root.innerHTML = `
@@ -522,7 +550,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         <button type="button" class="crew-panel__btn" data-back></button>`;
       paintBtn(root, "[data-back]", "chevron", "Volver");
       cleanups.push(bindGlassIconTheme(root));
-      root.querySelector("[data-back]")?.addEventListener("click", () => navigateShellRoute("/crew"));
+      root.querySelector("[data-back]")?.addEventListener("click", () => navigateShellRoute(viewer === "self" ? "/member" : "/crew"));
       return;
     }
     paint(res.member);
@@ -536,6 +564,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       tutor_label: member.settings?.tutor_label ?? member.tutor_label ?? "",
       is_tutor_profile: Boolean(member.is_tutor_profile),
     }));
+    const isSelf = viewer === "self";
     const p = member.permissions || {};
     const isTutor = Boolean(member.is_tutor_profile);
     const tutorLabel = member.settings?.tutor_label ?? member.tutor_label ?? "";
@@ -571,14 +600,18 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         <label class="crew-panel__label">${isTutor ? "Tu nombre en la tripulación" : "Nombre de tripulación"}
           <input class="crew-panel__input" data-profile="display_name" value="${escapeAttr(member.display_name || "")}" maxlength="24" />
         </label>
-        <label class="crew-panel__label">Descripción (solo para ti)
+        ${
+          isSelf
+            ? ""
+            : `<label class="crew-panel__label">Descripción (solo para ti)
           <input class="crew-panel__input" data-profile="tutor_label" value="${escapeAttr(String(tutorLabel))}" maxlength="40" placeholder="${isTutor ? "p. ej. Tu perfil de tutor" : "p. ej. El de Marta"}" />
         </label>
         <p class="crew-panel__helper">${
           isTutor
             ? "Esta nota solo la ves tú en el listado."
             : "Esta nota solo la ves tú; ayuda a identificar al tripulante en el listado."
-        }</p>
+        }</p>`
+        }
         ${
           !isTutor
             ? `<section class="crew-panel__block crew-panel__block--nested">
@@ -620,6 +653,12 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         ${
           isTutor
             ? ""
+            : isSelf
+            ? `<p class="crew-panel__helper">Mundo de juego: ${escapeHtml(member.world_theme === "sci-fi" ? "Ciencia ficción" : member.world_theme === "fantasy" ? "Fantasía" : "Sin mundo aún")}</p>
+        <p class="crew-panel__helper">Edad: ${member.age_years != null ? `${member.age_years} años` : "Pendiente"}</p>
+        <label class="crew-panel__label">Sexo
+          <div data-gender-host></div>
+        </label>`
             : `<label class="crew-panel__label">Mundo de juego
           <div class="crew-panel__segment" data-world-segment>
             <button type="button" class="crew-panel__chip" data-world="fantasy" aria-pressed="false">Fantasía</button>
@@ -629,7 +668,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         </label>`
         }
         ${
-          isTutor
+          isTutor || isSelf
             ? ""
             : `<label class="crew-panel__label">Edad
           <div data-age-host></div>
@@ -721,7 +760,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="journey" aria-selected="false">Viaje</button>
         <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="progress" aria-selected="false">Progreso</button>
         <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="baggage" aria-selected="false">Equipaje</button>
-        <button type="button" class="crew-panel__tab" role="tab" data-crew-tab="settings" aria-selected="false">Ajustes</button>
+        ${isSelf ? "" : `<button type="button" class="crew-panel__tab" role="tab" data-crew-tab="settings" aria-selected="false">Ajustes</button>`}
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="details">
         ${profileBlock}
@@ -729,16 +768,20 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       <div class="crew-panel__tab-panel" data-crew-panel="journey" hidden>
         ${renderJourneyMapSection(member)}
         ${journeyPlayBlock}
-        <section class="crew-panel__block">
+        ${
+          isSelf
+            ? ""
+            : `<section class="crew-panel__block">
           <h2 class="crew-panel__block-title">Informe para el tutor</h2>
           <p class="crew-panel__helper">Genera un resumen de evaluación en el ledger del viaje.</p>
           <button type="button" class="crew-panel__btn" data-tutor-report>Generar informe</button>
           <pre class="crew-panel__helper" data-tutor-report-preview hidden style="white-space:pre-wrap;max-height:12rem;overflow:auto"></pre>
-        </section>
+        </section>`
+        }
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="progress" hidden>
-        ${renderProgressSection(member)}
-        ${subjectsBlock}
+        ${renderProgressSection(member, { viewer })}
+        ${isSelf ? renderSubjectsReadOnly(member) : subjectsBlock}
       </div>
       <div class="crew-panel__tab-panel" data-crew-panel="baggage" hidden>
         <section class="crew-panel__block">
@@ -746,10 +789,16 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           <div data-crew-baggage-host></div>
         </section>
       </div>
-      <div class="crew-panel__tab-panel" data-crew-panel="settings" hidden>
+      ${
+        isSelf
+          ? ""
+          : `<div class="crew-panel__tab-panel" data-crew-panel="settings" hidden>
+        ${inviteAccessBlock(member)}
         ${permissionsBlock}
         ${dangerBlock}
       </div>`
+      }
+      `
       }
     `;
 
@@ -759,7 +808,9 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       const defaultTab = member.placement_status === "completed" ? "journey" : "details";
       /** @type {string} */
       let activeTab = sessionStorage.getItem(crewTabStorageKey(member.id)) || defaultTab;
-      const allowedTabs = ["details", "journey", "progress", "baggage", "settings"];
+      const allowedTabs = isSelf
+        ? ["details", "journey", "progress", "baggage"]
+        : ["details", "journey", "progress", "baggage", "settings"];
       if (!allowedTabs.includes(activeTab)) activeTab = defaultTab;
       /** @type {any} */
       let baggageCache = null;
@@ -822,7 +873,9 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           return;
         }
         fillGlassSkeleton(host, { preset: "panel", ariaLabel: "Cargando equipaje" });
-        const res = await fetchCrewBaggage(session, member.id, member.world_theme, {
+        const res = isSelf
+          ? await fetchMemberBaggage(session)
+          : await fetchCrewBaggage(session, member.id, member.world_theme, {
           includeUsage: true,
         });
         if (!res.ok || !res.baggage) {
@@ -847,6 +900,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     }
     paintBtn(root, "[data-save-profile]", "save", "Guardar perfil");
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
+    paintBtn(root, "[data-save-invite]", "save", "Guardar correo");
     if (!isTutor) {
       paintBtn(root, "[data-save-subjects]", "save", "Guardar materias");
       const catalog =
@@ -1041,6 +1095,49 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           const nameInput = root.querySelector('[data-profile="display_name"]');
           const descInput = root.querySelector('[data-profile="tutor_label"]');
           const summaryInput = root.querySelector('[data-profile="character_summary"]');
+          if (isSelf) {
+            /** @type {Record<string, unknown>} */
+            const selfPatch = {
+              explorer_gender: selectedGender,
+            };
+            if (nameInput instanceof HTMLInputElement) {
+              selfPatch.display_name = nameInput.value.trim() || null;
+            }
+            if (summaryInput instanceof HTMLTextAreaElement) {
+              selfPatch.character_summary = summaryInput.value.trim() || null;
+            }
+            const speciesInput = root.querySelector('[data-traveler="species"]');
+            const paletteInput = root.querySelector('[data-traveler="palette"]');
+            const featuresInput = root.querySelector('[data-traveler="features"]');
+            const descriptionInput = root.querySelector('[data-traveler="description_md"]');
+            /** @type {Record<string, unknown>} */
+            const travelerPatch = {};
+            if (speciesInput instanceof HTMLInputElement) {
+              travelerPatch.species = speciesInput.value.trim();
+            }
+            if (paletteInput instanceof HTMLInputElement) {
+              travelerPatch.palette = paletteInput.value.trim();
+            }
+            if (featuresInput instanceof HTMLTextAreaElement) {
+              travelerPatch.features = featuresInput.value
+                .split("\n")
+                .map((line) => line.trim())
+                .filter(Boolean);
+            }
+            if (descriptionInput instanceof HTMLTextAreaElement) {
+              travelerPatch.description_md = descriptionInput.value.trim();
+            }
+            if (Object.keys(travelerPatch).length > 0) {
+              selfPatch.traveler_profile = travelerPatch;
+            }
+            const res = await patchMember(session, selfPatch);
+            if (res.ok) {
+              Object.assign(member, res.member);
+              if (res.member.traits) member.traits = res.member.traits;
+              if (res.member.traveler_profile) member.traveler_profile = res.member.traveler_profile;
+            }
+            return { ok: res.ok, error: res.ok ? undefined : "No hemos podido guardar el perfil." };
+          }
           /** @type {Record<string, unknown>} */
           const patch = {
             age_years: ageStepper?.getValue() ?? null,
@@ -1101,6 +1198,35 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           return { ok: res.ok, error: res.ok ? undefined : "No hemos podido guardar el perfil." };
         },
         { successMessage: "Perfil guardado" },
+      );
+    });
+
+    root.querySelector("[data-save-invite]")?.addEventListener("click", () => {
+      const btn = root.querySelector("[data-save-invite]");
+      if (!(btn instanceof HTMLButtonElement)) return;
+      void runGlassButtonAction(
+        btn,
+        async () => {
+          const input = root.querySelector("[data-invite-email]");
+          const value = input instanceof HTMLInputElement ? input.value.trim() : "";
+          const res = await patchCrewMember(session, childId, {
+            invite_email: value || null,
+          });
+          if (res.ok) {
+            Object.assign(member, res.member);
+            return { ok: true };
+          }
+          const map = {
+            invite_email_not_gmail: "Usa un correo Gmail (@gmail.com).",
+            invite_email_same_as_tutor: "No puede ser el mismo Gmail que el tuyo.",
+            invite_email_is_tutor: "Ese correo ya es una cuenta de tutor.",
+            invite_email_taken: "Ese Gmail ya está asignado a otro tripulante.",
+            invite_email_tutor_profile: "El perfil de tutor no admite Gmail de tripulante.",
+          };
+          const error = map[res.error] || res.error || "No hemos podido guardar el correo.";
+          return { ok: false, error };
+        },
+        { successMessage: "Correo guardado" },
       );
     });
 

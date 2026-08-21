@@ -9,7 +9,7 @@ import { mountSpaceOrbitLayer } from "./loader-space-orbit.js?v=183";
 import { startLoaderRevealSequence } from "./loader-reveal-sequence.js";
 import { mountLoaderLogoMaskSync, syncLoaderLogoMask } from "./loader-logo-mask.js";
 import { mountLoaderGate } from "./loader-gate.js?v=162";
-import { mountAuthPanel } from "./auth-panel.js?v=162";
+import { mountAuthPanel } from "./auth-panel.js?v=280";
 import { mountStaticAuthBrand } from "./loader-auth-morph.js?v=162";
 import { mountHomeWelcomePanel } from "./home-welcome-panel.js?v=162";
 import {

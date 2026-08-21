@@ -13,6 +13,18 @@ import {
   fetchParentMe,
   updateParentDisplayName,
 } from "../lib/parent-account.js";
+import { isCrewSession, bootstrapSession, getCachedSessionAccount } from "../lib/session-account.js";
+import { unlinkMemberAccount, patchMember, fetchMember } from "../lib/member-api.js";
+import { patchParentSettings } from "../lib/parent-settings.js";
+import { fetchDebugAiStatus } from "../lib/debug-ai-api.js";
+import {
+  isDebugAiAllowed,
+  syncDebugAiCapabilities,
+  syncDebugAiFromParentSettings,
+} from "../lib/debug-ai.js";
+import { openDebugAiPanel } from "./debug-ai-panel.js?v=245";
+import { setAppShellDebugAiBadge } from "./app-shell.js?v=280";
+import { ensureDebugAiShellBadge } from "../lib/debug-ai-shell.js?v=1";
 import { getShellUiTheme } from "../lib/shell-theme.js";
 import { GLASS_ICON_FILL, runGlassButtonAction, setGlassButton } from "./glass-controls.js?v=225";
 import { closeGlassModal, showGlassConfirm } from "./glass-modal.js?v=2";
@@ -83,15 +95,82 @@ export function mountAccountPanel(container, { session, onDeleted }) {
   let cancelled = false;
 
   /**
-   * @param {import('../lib/parent-account.js').ParentAccountDto} parent
+   * @param {{ operator_eligible?: boolean; debug_enabled?: boolean } | null | undefined} debugCaps
+   * @returns {HTMLElement[]}
    */
-  function renderForm(parent) {
+  function buildDebugSectionNodes(debugCaps) {
+    if (!debugCaps?.operator_eligible) return [];
+
+    syncDebugAiCapabilities(debugCaps);
+    syncDebugAiFromParentSettings(
+      { diagnostics: { debug_ai_enabled: debugCaps.debug_enabled === true } },
+      debugCaps,
+    );
+
+    const debugDivider = document.createElement("hr");
+    debugDivider.className = "account-panel__divider";
+    const debugTitle = document.createElement("p");
+    debugTitle.className = "account-panel__label";
+    debugTitle.textContent = "Modo debug";
+    const debugHelper = document.createElement("p");
+    debugHelper.className = "account-panel__helper";
+    debugHelper.textContent =
+      "Solo desarrolladores. Actívalo para ver trazas IA, el panel de diagnóstico y rebobinar viajes en play.";
+    const debugCheck = document.createElement("label");
+    debugCheck.className = "account-panel__helper";
+    const debugToggle = document.createElement("input");
+    debugToggle.type = "checkbox";
+    debugToggle.checked = debugCaps.debug_enabled === true;
+    debugCheck.append(debugToggle, document.createTextNode(" Activar modo debug"));
+    const openDebugBtn = document.createElement("button");
+    openDebugBtn.type = "button";
+    openDebugBtn.className = "account-panel__btn";
+    setLabeledButton(openDebugBtn, "settings", "Abrir panel de diagnóstico");
+
+    debugToggle.addEventListener("change", () => {
+      void (async () => {
+        const enabled = debugToggle.checked;
+        const result = isCrewSession()
+          ? await patchMember(session, { diagnostics: { debug_ai_enabled: enabled } })
+          : await patchParentSettings(session, { diagnostics: { debug_ai_enabled: enabled } });
+        if (!result.ok) {
+          debugToggle.checked = !enabled;
+          return;
+        }
+        const caps = isCrewSession()
+          ? result.member?.debug_capabilities
+          : result.debug_capabilities;
+        if (caps) syncDebugAiCapabilities(caps);
+        syncDebugAiFromParentSettings({ diagnostics: { debug_ai_enabled: enabled } }, caps ?? null);
+        if (isDebugAiAllowed()) {
+          void ensureDebugAiShellBadge();
+        } else {
+          setAppShellDebugAiBadge(null);
+        }
+      })();
+    });
+
+    openDebugBtn.addEventListener("click", () => {
+      if (!isDebugAiAllowed()) return;
+      void openDebugAiPanel({ session });
+    });
+
+    return [debugDivider, debugTitle, debugHelper, debugCheck, openDebugBtn];
+  }
+
+  /**
+   * @param {import('../lib/parent-account.js').ParentAccountDto} parent
+   * @param {{ operator_eligible?: boolean; debug_enabled?: boolean } | null} [debugCaps]
+   */
+  function renderForm(parent, debugCaps = null) {
     root.classList.remove("account-panel--skeleton");
     root.replaceChildren();
 
     const subtitle = document.createElement("p");
     subtitle.className = "account-panel__subtitle";
-    subtitle.textContent = "Cuenta de padre, madre o tutor";
+    subtitle.textContent = isCrewSession()
+      ? "Cuenta de tripulante"
+      : "Cuenta de padre, madre o tutor";
 
     const avatar = document.createElement("div");
     avatar.className = "account-panel__avatar";
@@ -188,6 +267,42 @@ export function mountAccountPanel(container, { session, onDeleted }) {
     deleteBtn.className = "account-panel__btn";
     setLabeledButton(deleteBtn, "danger", "Eliminar cuenta", { dangerIcon: true });
 
+    if (isCrewSession()) {
+      const unlinkBtn = document.createElement("button");
+      unlinkBtn.type = "button";
+      unlinkBtn.className = "account-panel__btn";
+      setLabeledButton(unlinkBtn, "danger", "Desvincular Gmail", { dangerIcon: true });
+
+      const crewNodes = [
+        subtitle,
+        avatar,
+        googleField,
+        emailField,
+        providerField,
+        ...buildDebugSectionNodes(debugCaps),
+      ];
+      crewNodes.push(divider, dangerTitle, unlinkBtn);
+      root.append(...crewNodes);
+      unlinkBtn.addEventListener("click", () => {
+        void showGlassConfirm({
+          title: "¿Desvincular este Gmail?",
+          body: "<p>Saldrás de esta sesión. Seguirás en la tripulación y podrás volver a entrar con el mismo correo. Esta acción no elimina tu viaje.</p>",
+          footer: "Podrás volver cuando quieras.",
+          size: "md",
+          danger: true,
+          confirmLabel: "Desvincular",
+          onConfirm: async () => {
+            const result = await unlinkMemberAccount(session);
+            if (!result.ok) {
+              throw new Error("No hemos podido desvincular. Inténtalo de nuevo.");
+            }
+            await onDeleted();
+          },
+        });
+      });
+      return;
+    }
+
     root.append(
       subtitle,
       avatar,
@@ -195,6 +310,7 @@ export function mountAccountPanel(container, { session, onDeleted }) {
       googleField,
       emailField,
       providerField,
+      ...buildDebugSectionNodes(debugCaps),
       divider,
       dangerTitle,
       deleteBtn,
@@ -268,13 +384,46 @@ export function mountAccountPanel(container, { session, onDeleted }) {
 
   async function load() {
     root.classList.add("account-panel--skeleton");
-    const result = await fetchParentMe(session);
+    const boot = await bootstrapSession(session);
+    if (cancelled) return;
+
+    /** @type {{ operator_eligible?: boolean; debug_enabled?: boolean } | null} */
+    let debugCaps = boot.account?.debug_capabilities ?? getCachedSessionAccount()?.debug_capabilities ?? null;
+
+    if (!debugCaps?.operator_eligible && isCrewSession()) {
+      const memberRes = await fetchMember(session);
+      if (memberRes.ok && memberRes.member?.debug_capabilities) {
+        debugCaps = memberRes.member.debug_capabilities;
+      }
+    }
+
+    if (!debugCaps?.operator_eligible) {
+      const debugRes = await fetchDebugAiStatus(session);
+      if (debugRes.ok && debugRes.data) {
+        debugCaps = debugRes.data;
+      }
+    }
+
+    const crew = isCrewSession();
+    const result = crew
+      ? {
+          ok: true,
+          parent: {
+            parent_id: "",
+            auth_user_id: session.user?.id || "",
+            email: session.user?.email || "",
+            display_name: session.user?.user_metadata?.full_name || session.user?.email || "",
+            avatar_url: session.user?.user_metadata?.avatar_url || null,
+            provider: "google",
+          },
+        }
+      : await fetchParentMe(session);
     if (cancelled) return;
     if (!result.ok) {
       renderError();
       return;
     }
-    renderForm(result.parent);
+    renderForm(result.parent, debugCaps);
   }
 
   void load();

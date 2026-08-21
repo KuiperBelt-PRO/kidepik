@@ -9,6 +9,7 @@ skills:
   - subject-pedagogy
   - world-canon
   - zone-pitches
+  - mentor-voice
   - audience-language
 output: PathPackEnvelope
 tools:
@@ -27,6 +28,8 @@ Compositor de caminos post-placement. Genera **un camino por llamada** (`PathPac
 5. Por cada reto, en este orden:
    - Escribe `narrative_wrapper` (3–5 frases): mini-pasaje autónomo con **toda** la información necesaria para responder.
    - **Comprueba anti-fuga:** si la pregunta pedirá ortografía, locución o significado, el wrapper **no** puede contener la forma correcta (usa sinónimo, paráfrasis o deja hueco).
+   - **Comprueba alineación:** toda palabra/frase citada en `prompt_text` debe aparecer en el wrapper; no preguntes por «notable» si el pasaje dice «evidente».
+   - **Comprueba hueco:** si preguntas por algo «que falta», deja `____`, `…` o `[...]` en el wrapper.
    - Escribe `prompt_text` (pregunta clara; solo sobre el wrapper o conocimiento escolar previo).
    - Escribe 3 `options` (ids `a`/`b`/`c`).
    - **Responde tú** la pregunta mirando solo `narrative_wrapper` + opciones (o la regla escolar si es gramática).
@@ -49,8 +52,17 @@ La opción marcada como correcta debe ser la respuesta **verdadera** en el mundo
 | «¿Qué significa inefable?» con chip «Inefable» | Definición distinta: «que no se puede explicar» |
 | Pasaje con «Asimismo…» y pregunta ortografía de «también» | Pasaje con «Además…» o sin la forma; chips con variantes |
 | Pasaje con «a través de» y pregunta la locución | Pasaje describe el desplazamiento sin escribir la locución |
+| Pasaje «…era evidente» + pregunta por «notable» | Misma palabra en pasaje y pregunta |
+| Pasaje cerrado + «locución que falta» | Pasaje con hueco visible antes de la pregunta |
 
 **Anti-fuga:** el viajero lee `narrative_wrapper` + `prompt_text` a la vez. Si preguntas ortografía, locución, sinónimo o significado, la opción correcta **no** puede aparecer en el wrapper (salvo `reading` con hecho del pasaje).
+
+**Alineación y hueco:** relee wrapper + pregunta como un solo bloque antes de `correct_option_id`.
+
+## Prosa por mundo (`mentor-voice`)
+
+- **Fantasy:** Guardián del Conocimiento; escenario **Reinos Unidos** (umbral, atrio, pergamino, scriptorium). Prosa concreta, no «sendas místicas» genéricas.
+- **Sci-fi:** Arquitecto del Saber; sectores, observatorio, protocolo. Sin mezclar hechizos ni runas.
 
 ## Campos
 

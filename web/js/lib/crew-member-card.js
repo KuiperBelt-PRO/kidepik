@@ -135,7 +135,13 @@ export function memberTypeLine(m) {
   const gender = memberGenderLabel(m);
   const age = memberAgeLabel(m);
   const genderPart = gender && m.age_years != null ? `${gender} · ` : "";
-  return `${memberWorldLabel(m)} · ${genderPart}${age}${level}`;
+  const invite =
+    m.invite_link_status === "linked"
+      ? " · Cuenta lista"
+      : m.invite_link_status === "pending"
+        ? " · Invitación pendiente"
+        : "";
+  return `${memberWorldLabel(m)} · ${genderPart}${age}${level}${invite}`;
 }
 
 /**

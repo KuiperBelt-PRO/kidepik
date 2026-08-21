@@ -7,10 +7,8 @@ from fastapi import APIRouter, Header, HTTPException, Query
 from app.config import get_settings
 from app.db import session_scope
 from app.services.auth import AuthError, SupabaseAuthService
-from app.services.debug_access import debug_capabilities_for_auth_user
+from app.services.debug_access import debug_capabilities_for_claims
 from app.services.debug_ai import DEFAULT_PURPOSE, DebugAiService
-from app.services.parents import ParentAccountService
-from app.services.settings import ParentSettingsRepository
 
 router = APIRouter(tags=["debug-ai"])
 
@@ -22,36 +20,22 @@ async def _auth(authorization: str | None, *, require_active: bool = False) -> d
         claims = await SupabaseAuthService().validate_bearer(authorization)
     except AuthError as exc:
         raise HTTPException(401, exc.message) from exc
-    email = claims.get("email")
-    if not email:
+    if not claims.get("email"):
         raise HTTPException(422, "Email required")
-    await ParentAccountService().get_or_bootstrap(
-        claims["sub"],
-        email,
-        claims.get("display_name"),
-        claims.get("avatar_url"),
-    )
-    capabilities = await debug_capabilities_for_auth_user(claims)
+    capabilities = await debug_capabilities_for_claims(claims)
     if not capabilities["operator_eligible"]:
         raise HTTPException(404, "Not Found")
     if require_active and not capabilities["debug_allowed"]:
         raise HTTPException(404, "Not Found")
+    claims["_debug_capabilities"] = capabilities
     return claims
 
 
 @router.get("/api/v1/debug/ai/status")
 async def status(authorization: str | None = Header(default=None)) -> dict[str, Any]:
     claims = await _auth(authorization)
-    settings_repo = ParentSettingsRepository()
-    account = await settings_repo.parents.get_or_bootstrap(
-        claims["sub"],
-        str(claims["email"]),
-        claims.get("display_name"),
-        claims.get("avatar_url"),
-    )
-    parent_settings = await settings_repo.get_merged_settings_for_parent_id(account["parent_id"])
     async with session_scope() as s:
-        return await DebugAiService(s).status(account["parent_id"], parent_settings)
+        return await DebugAiService(s).status_from_capabilities(claims["_debug_capabilities"])
 
 
 @router.get("/api/v1/debug/ai/queues")

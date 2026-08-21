@@ -11,10 +11,11 @@ import {
   fillGlassSkeleton,
   setGlassButton,
 } from "../components/glass-controls.js?v=227";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=280";
 import { navigate } from "../lib/router.js";
 import { navigateShellRoute } from "../lib/shell-navigation.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
+import { isCrewSession } from "../lib/session-account.js";
 import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 import {
   openDialogueSession,
@@ -119,7 +120,8 @@ export function renderPlay(params) {
     frameHandle.contentEl?.appendChild(root);
     fillGlassSkeleton(root, { preset: "panel", ariaLabel: "Cargando aventura" });
 
-    // PIN gate (B9): verificar antes de abrir sesión de diálogo
+    // PIN gate: no se pide en sesión de tripulante.
+    if (!isCrewSession()) {
     try {
       const { fetchCrewMember, verifyCrewExitPin } = await import("../lib/crew-api.js");
       const { showPinPadModal } = await import("../components/pin-pad-modal.js?v=3");
@@ -127,7 +129,7 @@ export function renderPlay(params) {
       const detail = await fetchCrewMember(session, childId);
       const perms = detail.ok ? detail.member?.permissions : null;
       const pinAlreadyOk = consumeExitPinVerified(childId);
-      if (perms?.require_exit_pin && perms?.exit_pin_set && !pinAlreadyOk) {
+      if (!isCrewSession() && perms?.require_exit_pin && perms?.exit_pin_set && !pinAlreadyOk) {
         const ok = await showPinPadModal({
           title: "Introduce el PIN",
           verify: async (pin) => {
@@ -142,6 +144,7 @@ export function renderPlay(params) {
       }
     } catch {
       /* si falla el gate, seguimos (permisos no bloquean por error de red) */
+    }
     }
 
     const sessionOpenPromise = openDialogueSession(session, childId, "first_run");

@@ -6,7 +6,7 @@ import pytest
 from httpx import AsyncClient
 
 from app.ai.errors import AiProductError
-from tests.helpers.factories import CHILD_ID
+from tests.helpers.factories import CHILD_ID, sample_crew_member
 from tests.helpers.http import assert_auth_error, assert_status
 
 SESSION_ID = "33333333-3333-4333-8333-333333333333"
@@ -27,9 +27,16 @@ def mock_play_services(mocker, mock_session_scope):
     memory.latest_summary_text = AsyncMock(return_value="Resumen corto")
     timeline = mocker.patch("app.routers.play.JourneyTimelineService").return_value
     timeline.page = AsyncMock(return_value={"items": [], "next_cursor": None})
-    mocker.patch(
-        "app.routers.play.ParentAccountService"
-    ).return_value.get_or_bootstrap = AsyncMock(return_value={"parent_id": "p1"})
+    crew = mocker.patch("app.routers.play.CrewService").return_value
+    crew.ensure_tutor_profile_for_auth_user = AsyncMock(return_value=None)
+    crew.get_accessible_for_auth_user = AsyncMock(return_value=sample_crew_member())
+    crew.get_for_auth_user = AsyncMock(return_value=sample_crew_member())
+    parent = mocker.patch("app.routers.play.ParentAccountService").return_value
+    parent.get_or_bootstrap = AsyncMock(return_value={"parent_id": "p1"})
+    parent.bootstrap = AsyncMock(
+        return_value={"parent_id": "p1", "created": False, "auth_user_id": "u1", "email": "tutor@example.com"}
+    )
+    parent.find_by_auth_user_id = AsyncMock(return_value={"parent_id": "p1", "email": "tutor@example.com"})
     return dialogue
 
 
@@ -212,7 +219,7 @@ async def test_play_parent_bootstrap_unavailable(
 ) -> None:
     mocker.patch(
         "app.routers.play.ParentAccountService"
-    ).return_value.get_or_bootstrap = AsyncMock(
+    ).return_value.bootstrap = AsyncMock(
         side_effect=RuntimeError("Database unavailable")
     )
     body = assert_status(

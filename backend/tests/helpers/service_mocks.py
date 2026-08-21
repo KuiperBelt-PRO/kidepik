@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pytest_mock import MockerFixture
@@ -19,8 +19,9 @@ _PARENT_PATHS = (
     "app.routers.parents.ParentAccountService",
     "app.routers.crew.ParentAccountService",
     "app.routers.play.ParentAccountService",
-    "app.routers.debug_ai.ParentAccountService",
-    "app.routers.debug_journey.ParentAccountService",
+    "app.routers.settings.ParentAccountService",
+    "app.routers.session.ParentAccountService",
+    "app.routers.member.ParentAccountService",
 )
 
 
@@ -37,25 +38,17 @@ def _configure_parent_service(service: Any) -> Any:
 
 @pytest.fixture
 def mock_parent_service(mocker: MockerFixture) -> Any:
-    services = []
+    shared = _configure_parent_service(MagicMock())
     for path in _PARENT_PATHS:
-        services.append(_configure_parent_service(mocker.patch(path).return_value))
-    return services[0]
+        mocker.patch(path, return_value=shared)
+    return shared
 
 
 @pytest.fixture
 def mock_crew_service(mocker: MockerFixture) -> Any:
     ensure_tutor = AsyncMock(return_value=None)
-    services = []
-    for path in (
-        "app.routers.crew.CrewService",
-        "app.routers.parents.CrewService",
-        "app.routers.play.CrewService",
-    ):
-        service = mocker.patch(path).return_value
-        service.ensure_tutor_profile_for_auth_user = ensure_tutor
-        services.append(service)
-    crew = services[0]
+    crew = MagicMock()
+    crew.ensure_tutor_profile_for_auth_user = ensure_tutor
     crew.list_for_auth_user = AsyncMock(return_value=sample_crew_list())
     crew.create_for_auth_user = AsyncMock(return_value=sample_crew_member())
     crew.get_for_auth_user = AsyncMock(return_value=sample_crew_member())
@@ -65,17 +58,25 @@ def mock_crew_service(mocker: MockerFixture) -> Any:
     )
     crew.soft_delete_for_auth_user = AsyncMock(return_value={"deleted": True})
     crew.verify_exit_pin_for_auth_user = AsyncMock(return_value={"ok": True})
+    crew.get_for_linked_crew = AsyncMock(return_value=sample_crew_member())
+    crew.get_accessible_for_auth_user = AsyncMock(return_value=sample_crew_member())
+    crew.update_self_profile = AsyncMock(return_value=sample_crew_member())
+    crew.unlink_keep_invite = AsyncMock(return_value=True)
+    crew.to_self_view = lambda detail: {**detail, "viewer": "self"}
     crew._ensure_tutor = ensure_tutor
-    # Keep play router's CrewService in sync with the primary mock
-    if len(services) > 2:
-        play_crew = services[2]
-        play_crew.get_for_auth_user = crew.get_for_auth_user
-        play_crew.list_for_auth_user = crew.list_for_auth_user
+    for path in (
+        "app.routers.crew.CrewService",
+        "app.routers.parents.CrewService",
+        "app.routers.play.CrewService",
+        "app.routers.session.CrewService",
+        "app.routers.member.CrewService",
+    ):
+        mocker.patch(path, return_value=crew)
     return crew
 
 
 @pytest.fixture
-def mock_settings_repo(mocker: MockerFixture) -> Any:
+def mock_settings_repo(mocker: MockerFixture, mock_parent_service) -> Any:
     repo = mocker.patch("app.routers.settings.ParentSettingsRepository").return_value
     repo.get_for_auth_user = AsyncMock(return_value=sample_settings_payload())
     repo.patch_for_auth_user = AsyncMock(return_value=sample_settings_payload())

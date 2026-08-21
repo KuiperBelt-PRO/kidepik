@@ -171,6 +171,40 @@ def simple_character_agent_text(explorer_choice: str) -> str:
     return f"Perfecto: eres {choice}. ¿Empezamos tu prueba de ingreso?"
 
 
+def path_compose_exhausted_mentor_text(child: dict[str, Any] | None) -> str:
+    """Prosa del mentor cuando falla la composición de caminos (sin plantilla)."""
+    data = child or {}
+    theme = str(data.get("world_theme") or data.get("active_world_theme") or "fantasy")
+    name = str(data.get("display_name") or "").strip()
+    if theme == "sci-fi":
+        if name:
+            return (
+                f"{name}, el observatorio ha devuelto un trazado inconsistente: "
+                f"el relato y la prueba no encajan en la misma ruta. "
+                f"No pasa nada — cuando pulses Reintentar, reabriré el mapa "
+                f"y trazaré tres caminos nuevos desde cero."
+            )
+        return (
+            "El cartografiado de las rutas de práctica se ha desalineado: "
+            "algo en el pasaje no cuadra con la prueba que debía seguirle. "
+            "Respira un momento. Al pulsar Reintentar, volveré a trazar "
+            "tres senderos limpios desde el observatorio."
+        )
+    if name:
+        return (
+            f"{name}, el pergamino de las tres sendas se ha desdibujado: "
+            f"el relato del camino y su prueba no van al unísono. "
+            f"No importa — cuando pulses Reintentar, consultaré de nuevo "
+            f"las runas y abriré tres senderos claros en la niebla."
+        )
+    return (
+        "Las runas no dibujan bien el tríbulo de caminos: "
+        "el pasaje contado y la prueba que debía seguirle no encajan. "
+        "Respira hondo. Al pulsar Reintentar, volveré a trazar "
+        "tres senderos limpios desde la encrucijada."
+    )
+
+
 def validate_traveler_profile_prose(
     *,
     agent_text: str,

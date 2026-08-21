@@ -19,7 +19,7 @@ export function normalizeShellPath(path = "") {
 export function shouldCompressWorldBands(path = "") {
   const normalized = normalizeShellPath(path);
   if (normalized === "" || normalized === "home") return false;
-  if (normalized === "account") return true;
+  if (normalized === "account" || normalized === "member") return true;
   if (normalized.startsWith("legal/")) return true;
   if (
     normalized === "crew" ||

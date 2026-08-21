@@ -3,6 +3,8 @@
  * @module supabase
  */
 
+import { clearSessionAccount } from "./session-account.js";
+
 /** @typedef {import('@supabase/supabase-js').SupabaseClient} SupabaseClient */
 /** @typedef {import('@supabase/supabase-js').Session} Session */
 
@@ -205,6 +207,7 @@ export async function signInWithGoogle() {
  * @returns {Promise<void>}
  */
 export async function signOut() {
+  clearSessionAccount();
   try {
     const supabase = await getSupabaseClient();
     await supabase.auth.signOut();

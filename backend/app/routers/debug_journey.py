@@ -8,9 +8,8 @@ from pydantic import BaseModel, Field
 from app.config import get_settings
 from app.db import session_scope
 from app.services.auth import AuthError, SupabaseAuthService
-from app.services.debug_access import debug_capabilities_for_auth_user
+from app.services.debug_access import debug_capabilities_for_claims
 from app.services.journey_rewind import JourneyRewindService
-from app.services.parents import ParentAccountService
 
 router = APIRouter(tags=["debug-journey"])
 
@@ -30,13 +29,7 @@ async def _auth(authorization: str | None) -> str:
         raise HTTPException(401, exc.message) from exc
     if not claims.get("email"):
         raise HTTPException(422, "Email required")
-    await ParentAccountService().get_or_bootstrap(
-        claims["sub"],
-        claims["email"],
-        claims.get("display_name"),
-        claims.get("avatar_url"),
-    )
-    capabilities = await debug_capabilities_for_auth_user(claims)
+    capabilities = await debug_capabilities_for_claims(claims)
     if not capabilities["debug_allowed"]:
         raise HTTPException(404, "Not Found")
     return str(claims["sub"])

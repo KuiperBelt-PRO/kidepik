@@ -16,7 +16,7 @@ def debug_ai_enabled(settings, monkeypatch, mocker):
 
     get_settings.cache_clear()
     mocker.patch(
-        "app.routers.debug_ai.debug_capabilities_for_auth_user",
+        "app.routers.debug_ai.debug_capabilities_for_claims",
         new=AsyncMock(
             return_value={
                 "operator_eligible": True,
@@ -25,11 +25,6 @@ def debug_ai_enabled(settings, monkeypatch, mocker):
             }
         ),
     )
-    settings_repo = mocker.patch("app.routers.debug_ai.ParentSettingsRepository").return_value
-    settings_repo.parents.get_or_bootstrap = AsyncMock(return_value={"parent_id": "p1"})
-    settings_repo.get_merged_settings_for_parent_id = AsyncMock(
-        return_value={"diagnostics": {"debug_ai_enabled": True}}
-    )
     yield
     get_settings.cache_clear()
 
@@ -37,14 +32,13 @@ def debug_ai_enabled(settings, monkeypatch, mocker):
 @pytest.fixture
 def mock_debug_ai_service(mocker, mock_session_scope):
     service = mocker.patch("app.routers.debug_ai.DebugAiService").return_value
-    service.status = AsyncMock(return_value={"enabled": False, "provider": "gemini"})
+    service.status_from_capabilities = AsyncMock(
+        return_value={"enabled": False, "provider": "gemini", "operator_eligible": True}
+    )
     service.queues = AsyncMock(return_value=[{"purpose": "mentor_guide", "model": "gemini"}])
     service.resolve = AsyncMock(return_value={"purpose": "mentor_guide", "models": ["gemini"]})
     service.attempts = AsyncMock(return_value=[])
     service.ping = AsyncMock(return_value={"ok": True})
-    mocker.patch(
-        "app.routers.debug_ai.ParentAccountService"
-    ).return_value.get_or_bootstrap = AsyncMock(return_value={"parent_id": "p1"})
     return service
 
 

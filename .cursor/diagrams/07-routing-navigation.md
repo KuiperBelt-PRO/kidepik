@@ -1,7 +1,7 @@
 # 07 — Rutas y navegación
 
 **Código:** `web/js/main.js`, `web/js/lib/router.js`, `web/js/lib/shell-navigation.js`  
-**Specs:** [SPEC_APP_SHELL_CHROME.md](../specify/SPEC_APP_SHELL_CHROME.md), [SPEC_APP_SECTION_FRAME.md](../specify/SPEC_APP_SECTION_FRAME.md)
+**Specs:** [SPEC_APP_SHELL_CHROME.md](../specify/SPEC_APP_SHELL_CHROME.md), [SPEC_APP_SECTION_FRAME.md](../specify/SPEC_APP_SECTION_FRAME.md), [SPEC_APP_CREW_MEMBER_ACCOUNT.md](../specify/SPEC_APP_CREW_MEMBER_ACCOUNT.md) (ruta `#/member`)
 
 ## Hash routes registradas
 
@@ -11,9 +11,12 @@ flowchart TB
   AuthHash["#/auth"] --> L
   L --> CB[auth/callback]
   L --> Home[home]
+  L --> Member[member]
   Home --> Acc[account]
   Home --> Set[settings]
   Home --> Crew[crew]
+  Member --> Acc
+  Member --> PlayMember["play/:ownId"]
   Crew --> CrewNew[crew/new]
   Crew --> CrewId[crew/:id]
   Home --> LegT[legal/terminos]
@@ -28,7 +31,8 @@ flowchart TB
 | `#/home` | home | Post-login + shell |
 | `#/account` | account | Marco sección |
 | `#/settings` | settings | Fase A gestión |
-| `#/crew`, `#/crew/new`, `#/crew/:id` | crew | Fase A gestión |
+| `#/crew`, `#/crew/new`, `#/crew/:id` | crew | Fase A gestión (solo `role=tutor`) |
+| `#/member` | member | Ficha propia `role=crew` — [SPEC_APP_CREW_MEMBER_ACCOUNT](../specify/SPEC_APP_CREW_MEMBER_ACCOUNT.md) |
 | `#/legal/terminos\|privacidad` | legal | Con o sin shell según sesión |
 | `#/play/:childId` | — | **Contrato** (aún no registrado en main.js) |
 
@@ -38,7 +42,8 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-  FABs[FABs glass: menú / tema UI / cuenta] --> Drawer[Drawer: Inicio Tripulación Legal Ajustes Cuenta Logout]
+  FABs[FABs glass: menú / tema UI / cuenta] --> Drawer[Drawer tutor: Inicio Tripulación Legal Ajustes Cuenta Logout]
+  FABs --> DrawerCrew[Drawer crew: Inicio Tripulante Legal Cuenta Logout]
   Drawer --> Nav[navigate hash]
   Frame[section-frame bandas + glass + logo] --> Content[Panel de sección]
 ```

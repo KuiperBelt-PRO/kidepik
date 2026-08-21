@@ -20,11 +20,25 @@ No uses como título (ni casi igual) nombres del mapa de zonas ni estas fórmula
 
 ## Cómo nombrar bien
 
-- Evoca la **materia** (`subject_id`) con metáfora **nueva**: «El cruce de las balanzas», «La cueva de los acertijos», «El observatorio de las señales».
-- Mezcla **lugar + actividad** o **objeto + misterio**, no solo «lugar + materia escolar».
-- Los tres títulos del pack deben ser **claramente distintos** entre sí (sin repetir la misma plantilla).
+### Fantasy — patrones sí (elige variantes nuevas)
+
+- «La cámara de…», «El umbral de…», «El cruce de las balanzas»
+- «La linterna del archivista», «El sendero de…», «La torre de campanas»
+- «El scriptorium de…», «El arroyo de…», «La encrucijada de…»
+- Mezcla **lugar concreto + actividad de la materia**, no solo «bosque + math».
+
+### Sci-fi — patrones sí
+
+- «El observatorio de…», «La cartografía de…», «El nexo de…»
+- «El laboratorio de…», «La estación de…», «El sector de…»
+
+### Ambos mundos
+
+- Evoca la **materia** (`subject_id`) con metáfora **nueva**.
+- Los tres títulos del pack deben ser **claramente distintos** entre sí.
 
 ## Tono
 
 - Alinea dificultad a la banda de edad (`audience-language`).
 - Coherente con `world_theme` (fantasy vs sci-fi) sin mezclar vocabulario de otro mundo.
+- Lee `mentor-voice` para léxico permitido por mundo.

@@ -83,6 +83,7 @@ Reutilizar el mecanismo actual de legal (`animateWorldBands` / `setWorldBandLayo
 | `#/legal/privacidad` (sesión) | **Compacto** | **Sí** |
 | `#/settings` | **Compacto** | **Sí** |
 | `#/crew`, `#/crew/new`, `#/crew/:id` | **Compacto** | **Sí** |
+| `#/member` | **Compacto** | **Sí** (ficha propia del tripulante — [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md)) |
 | `#/play/:childId` | **Compacto** | **Sí** (aventura en marco glass; ver [DESIGN.md](../DESIGN.md)) |
 | Otras gestión futuras | **Compacto** | **Sí** (por defecto) |
 | `#/loader`, `#/auth/*` | N/A (sin shell de gestión) | No |

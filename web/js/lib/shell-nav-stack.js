@@ -4,6 +4,7 @@
  */
 
 import { normalizeShellPath } from "./world-band-layout.js";
+import { isCrewSession } from "./session-account.js";
 
 /** Máximo de entradas en la pila «atrás» (no infinito). */
 export const SHELL_NAV_STACK_MAX = 16;
@@ -158,8 +159,9 @@ export function inferShellNavParent(path) {
   if (root === "crew") {
     return child ? "crew" : "home";
   }
+  if (root === "member") return "home";
   if (root === "play" && child) {
-    return `crew/${child}`;
+    return isCrewSession() ? "member" : `crew/${child}`;
   }
   if (root === "settings" || root === "account") return "home";
   return null;

@@ -109,6 +109,7 @@ def product_error(
     retryable: bool | None = None,
     http_status: int | None = None,
     compose_debug: dict[str, Any] | None = None,
+    detail: str | None = None,
 ) -> AiProductError:
     defaults = {
         "ai_quota_exhausted": (503, False),
@@ -119,9 +120,10 @@ def product_error(
         "ai_safety_blocked": (422, False),
     }
     status, retry = defaults.get(error_code, (503, False))
+    message = detail or COPY.get(error_code, COPY["ai_provider_unavailable"])
     return AiProductError(
         error_code,
-        COPY.get(error_code, COPY["ai_provider_unavailable"]),
+        message,
         http_status=http_status if http_status is not None else status,
         model=model,
         models_tried=models_tried,

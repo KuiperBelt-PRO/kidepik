@@ -247,7 +247,7 @@ Cada fila:
 | id | Label | Icono semántico | Tipo | Sub-ítems |
 | --- | --- | --- | --- | --- |
 | `home` | Inicio | Casa / portal | link → `#/home` | — |
-| `crew` | Tripulación | Grupo / siluetas | stub «Próximamente» | — |
+| `crew` | Tripulación | Grupo / siluetas | stub «Próximamente» | — *(delta: solo `role=tutor`; crew ve `member` — [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md))* |
 | `legal` | Legal | Pergamino / chip | accordion | `Términos` → `#/legal/terminos`, `Privacidad` → `#/legal/privacidad` |
 | `settings` | Ajustes | Engranaje / runa | stub «Próximamente» | — |
 | `account` | Cuenta | Busto adulto | link → `#/account` | — |
@@ -370,7 +370,7 @@ API propuesta:
 ```js
 /**
  * @typedef {"sci-fi"|"fantasy"} UiIconTheme
- * @typedef {"menu"|"theme-to-fantasy"|"theme-to-scifi"|"account"|"home"|"crew"|"settings"|"legal"|"signout"|"chevron"} UiIconId
+ * @typedef {"menu"|"theme-to-fantasy"|"theme-to-scifi"|"account"|"home"|"crew"|"member"|"settings"|"legal"|"signout"|"chevron"} UiIconId
  *
  * renderShellUiIconSvgInner({ id: UiIconId, theme: UiIconTheme, viewSize?: number, fill?: string }): string
  */
@@ -384,6 +384,7 @@ API propuesta:
 | `account` | Busto adulto |
 | `home` | Casa / portal |
 | `crew` | 2–3 siluetas (tripulación) |
+| `member` | 1 silueta explorador (cuenta crew) |
 | `settings` | Engranaje / runa hexagonal |
 | `legal` | Documento / pergamino |
 | `signout` | Puerta / flecha salida |
@@ -487,6 +488,9 @@ stateDiagram-v2
 | `shell.account` | Cuenta |
 | `shell.menu.home` | Inicio |
 | `shell.menu.crew` | Tripulación |
+| `shell.menu.member` | Tripulante |
+| `shell.menu.member.sheet` | Mi ficha |
+| `shell.menu.member.play` | Entrar al viaje |
 | `shell.menu.legal` | Legal |
 | `shell.menu.legal.terms` | Términos |
 | `shell.menu.legal.privacy` | Privacidad |

@@ -16,6 +16,7 @@ describe("world-band-layout", () => {
 
   it("account y legal comprimen", () => {
     assert.equal(shouldCompressWorldBands("account"), true);
+    assert.equal(shouldCompressWorldBands("member"), true);
     assert.equal(shouldCompressWorldBands("legal/terminos"), true);
     assert.equal(shouldCompressWorldBands("legal/privacidad"), true);
   });

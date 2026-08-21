@@ -5,7 +5,9 @@
 
 ## Contexto
 
-El drawer etiqueta **Tripulación** (`#/crew`). La cuenta es del **tutor**; los niños no tienen credenciales propias en el MVP. Cada niño es un **perfil / miembro** cuyo **mundo, nombre de tripulación, edad y niveles** se completan en el **primer acceso a la aventura** mediante diálogo con IA ([SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md)), no en un formulario largo del tutor.
+El drawer etiqueta **Tripulación** (`#/crew`) **para el tutor**. Cada niño es un **perfil / miembro** cuyo **mundo, nombre de tripulación, edad y niveles** se completan en el **primer acceso a la aventura** mediante diálogo con IA ([SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md)), no en un formulario largo del tutor.
+
+**Delta (propuesta):** el tutor puede asignar un Gmail distinto al de su cuenta; ese login es `role=crew`, no una segunda cuenta tutor. Contrato: [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md). Mientras esa spec no esté aprobada e implementada, el JWT de play sigue siendo el del tutor.
 
 Esta spec define la **gestión adulta**: listado, alta de *plaza*, ficha, permisos y borrado. El motor de diálogo, examen y aventura viven en specs hermanas.
 
@@ -259,7 +261,7 @@ Body vacío o `{ "tutor_label": "…" }`. Respuesta DTO completo con permisos.
 Como en la propuesta previa, con campos nullable y:
 
 - `PATCH` puede corregir `display_name`, `age_years`, `explorer_gender` ([SPEC_APP_EXPLORER_GENDER.md](SPEC_APP_EXPLORER_GENDER.md)), `world_theme` (respetando lock) y `character_summary` (solo exploradores; persiste en `child_traits.character_summary`).
-- Endpoints de **play/onboarding** (escribir mundo/nombre/edad desde el diálogo) viven en [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md) — autenticados con JWT del **tutor** (el dispositivo está en sesión adulta; el niño no tiene token propio).
+- Endpoints de **play/onboarding** (escribir mundo/nombre/edad desde el diálogo) viven en [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md) — autenticados con JWT del **tutor** en el dispositivo del hogar, o con JWT **crew** de esa plaza cuando exista vínculo Gmail ([SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md)).
 
 ### 4.4 apply-defaults
 

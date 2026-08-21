@@ -55,6 +55,13 @@ class DebugAiService:
     async def status(self, parent_id: str, parent_settings: dict[str, Any] | None = None) -> dict[str, Any]:
         models = self.settings.gemini_model_list()
         capabilities = await debug_capabilities_for_parent(parent_id, parent_settings, settings=self.settings)
+        return self._status_body(capabilities)
+
+    async def status_from_capabilities(self, capabilities: dict[str, bool]) -> dict[str, Any]:
+        return self._status_body(capabilities)
+
+    def _status_body(self, capabilities: dict[str, bool]) -> dict[str, Any]:
+        models = self.settings.gemini_model_list()
         return {
             "enabled": self.settings.ai_enabled,
             "provider": "gemini",

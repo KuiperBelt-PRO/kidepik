@@ -1,6 +1,6 @@
 # 05 — Auth y modelo de datos
 
-**Specs:** [SPEC_APP_AUTH.md](../specify/SPEC_APP_AUTH.md), [SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md](../specify/SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md), [SPEC_DATA_STORAGE_LAYERS.md](../specify/SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PARALLEL_WORLDS.md](../specify/SPEC_APP_PARALLEL_WORLDS.md), [SPEC_APP_WAITING_PHRASES.md](../specify/SPEC_APP_WAITING_PHRASES.md), migraciones en `supabase/migrations/`
+**Specs:** [SPEC_APP_AUTH.md](../specify/SPEC_APP_AUTH.md), [SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md](../specify/SPEC_APP_AUTH_GOOGLE_IMPLEMENTATION.md), [SPEC_APP_CREW_MEMBER_ACCOUNT.md](../specify/SPEC_APP_CREW_MEMBER_ACCOUNT.md) (rol crew), [SPEC_DATA_STORAGE_LAYERS.md](../specify/SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PARALLEL_WORLDS.md](../specify/SPEC_APP_PARALLEL_WORLDS.md), [SPEC_APP_WAITING_PHRASES.md](../specify/SPEC_APP_WAITING_PHRASES.md), migraciones en `supabase/migrations/`
 
 ## Capas (ago 2026)
 
@@ -42,17 +42,20 @@ sequenceDiagram
   U->>Web: Google OAuth PKCE
   Web->>SB: signInWithOAuth
   SB-->>Web: session JWT
-  Web->>API: POST /parents/bootstrap Bearer
+  Web->>API: POST /session/bootstrap Bearer
   API->>SB: GET /auth/v1/user
   API->>PG: upsert parent_accounts
   API-->>Web: parent profile
 ```
 
+**Delta:** login Google puede resolver `role=crew` si el email canónico está en `children.invite_email_canonical` — no crear `parent_accounts`. Bootstrap: `POST /api/v1/session/bootstrap`. Ver [SPEC_APP_CREW_MEMBER_ACCOUNT.md](../specify/SPEC_APP_CREW_MEMBER_ACCOUNT.md).
+
 ## Modelo relacional (tablas clave de producto)
 
 ```mermaid
 erDiagram
-  auth_users ||--|| parent_accounts : "auth_user_id"
+  auth_users ||--o| parent_accounts : "tutor"
+  auth_users ||--o| children : "linked_auth_user_id crew"
   parent_accounts ||--o{ children : "parent_id"
   children ||--|| child_permissions : "child_id"
   children ||--o{ child_world_progress : "por mundo"
@@ -76,6 +79,9 @@ erDiagram
     text active_world_theme
     text onboarding_step
     text status
+    text invite_email
+    text invite_email_canonical
+    uuid linked_auth_user_id
   }
 ```
 

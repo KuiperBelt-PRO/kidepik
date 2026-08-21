@@ -55,7 +55,7 @@ El gateway **sí hace fallback** en código (`AiGateway::complete` recorre la co
 
 ### 1.2 Quién lo ve
 
-- Solo **tutor autenticado** con permiso `debug_ai` (grupo `developers` o `admins` en BD).
+- Solo **tutor autenticado** (`role=tutor`) con permiso `debug_ai` (grupo `developers` o `admins` en BD). Sesión `role=crew`: 403, sin panel ([SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md)).
 - La sección **«Modo debug»** en Ajustes solo se muestra si `operator_eligible` es true.
 - El toggle **«Activar modo debug»** persiste `settings.diagnostics.debug_ai_enabled` (opt-in del tutor; el permiso en BD no activa el modo solo).
 - En `#/play/:childId` el panel es overlay tutor (no burbuja del mentor); el rebobinado (↺) requiere modo debug activo.

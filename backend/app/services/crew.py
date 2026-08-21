@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from typing import Any
 
@@ -25,7 +26,7 @@ class CrewService:
         await self.ensure_tutor_profile_for_auth_user(auth_user_id)
         parent_id = await self._parent_id(auth_user_id)
         async with session_scope() as session:
-            rows = (await session.execute(text("""select id, display_name, age_years, age_band, world_theme, explorer_gender, status, onboarding_step, placement_status, settings, is_tutor_profile, updated_at from public.children where parent_id = :parent_id and status <> 'deleted' order by is_tutor_profile desc, created_at asc"""), {"parent_id": parent_id})).mappings().all()
+            rows = (await session.execute(text("""select id, display_name, age_years, age_band, world_theme, explorer_gender, status, onboarding_step, placement_status, settings, is_tutor_profile, updated_at, invite_email, invite_email_canonical, linked_auth_user_id from public.children where parent_id = :parent_id and status <> 'deleted' order by is_tutor_profile desc, created_at asc"""), {"parent_id": parent_id})).mappings().all()
         members = [self._list_item(row) for row in rows]
         return {"members": members, "member_count": sum(not x["is_tutor_profile"] for x in members), "member_limit": self.MEMBER_LIMIT, "has_tutor_profile": any(x["is_tutor_profile"] for x in members)}
 
@@ -98,6 +99,8 @@ class CrewService:
             if detail["permissions"]["lock_world_theme"] and payload.get("unlock_world") is not True and theme != detail["world_theme"]: raise ValueError("world_theme locked")
             fields.append("world_theme = :world_theme"); params["world_theme"] = theme
         settings = dict(detail["settings"])
+        if "invite_email" in payload:
+            await self._apply_invite_email(auth_user_id, detail, payload["invite_email"], fields, params)
         if "tutor_label" in payload: settings["tutor_label"] = self._tutor_label(payload["tutor_label"])
         if "learning" in payload:
             if detail["is_tutor_profile"]: raise ValueError("Cannot set learning on tutor profile")
@@ -203,7 +206,7 @@ class CrewService:
     async def soft_delete_for_auth_user(self, auth_user_id: str, child_id: str, confirm: bool) -> dict[str, bool]:
         if not confirm: raise ValueError("confirm required")
         if (await self.get_for_auth_user(auth_user_id, child_id))["is_tutor_profile"]: raise ValueError("Cannot delete tutor profile")
-        async with session_scope() as session: await session.execute(text("update public.children set status = 'deleted', deleted_at = now(), updated_at = now() where id = :id"), {"id": child_id})
+        async with session_scope() as session: await session.execute(text("update public.children set status = 'deleted', deleted_at = now(), updated_at = now(), invite_email = null, invite_email_canonical = null, linked_auth_user_id = null, linked_at = null where id = :id"), {"id": child_id})
         return {"deleted": True}
 
     async def verify_exit_pin_for_auth_user(self, auth_user_id: str, child_id: str, pin: str) -> dict[str, bool]:
@@ -245,12 +248,16 @@ class CrewService:
     @staticmethod
     def _string(value: object) -> str | None: return value if isinstance(value, str) and value else None
     def _list_item(self, row: Any) -> dict[str, Any]:
-        settings = self._json(row["settings"]); return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "world_theme": self._string(row["world_theme"]), "explorer_gender": self._string(row.get("explorer_gender")), "explorer_gender_label": display_label_for_gender(self._string(row.get("explorer_gender")), int(row["age_years"]) if row["age_years"] is not None else None), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "tutor_label": self._string(settings.get("tutor_label")), "is_tutor_profile": bool(row["is_tutor_profile"]), "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
+        from app.services.session_accounts import invite_link_status
+        settings = self._json(row["settings"]); invite = self._string(row.get("invite_email")); linked = str(row["linked_auth_user_id"]) if row.get("linked_auth_user_id") else None; return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "world_theme": self._string(row["world_theme"]), "explorer_gender": self._string(row.get("explorer_gender")), "explorer_gender_label": display_label_for_gender(self._string(row.get("explorer_gender")), int(row["age_years"]) if row["age_years"] is not None else None), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "tutor_label": self._string(settings.get("tutor_label")), "is_tutor_profile": bool(row["is_tutor_profile"]), "invite_email": invite, "invite_link_status": invite_link_status(invite, linked), "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
     def _detail(self, row: Any) -> dict[str, Any]:
         settings, learning, hours = self._json(row["settings"]), self._json(row["learning_overrides"]), row["allowed_hours"]
         band = AgeBand.from_legacy(row["age_band"], int(row["age_years"]) if row["age_years"] is not None else None) or AgeBand.CHILD
         active = settings.get("learning", {}).get("active_subjects") if isinstance(settings.get("learning"), dict) else None
-        return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "effective_age_band": self._string(row["effective_age_band"]), "birth_year": int(row["birth_year"]) if row["birth_year"] is not None else None, "world_theme": self._string(row["world_theme"]), "explorer_gender": self._string(row.get("explorer_gender")), "explorer_gender_label": display_label_for_gender(self._string(row.get("explorer_gender")), int(row["age_years"]) if row["age_years"] is not None else None), "locale": str(row["locale"] or "es-ES"), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "is_tutor_profile": bool(row["is_tutor_profile"]), "settings": settings, "subject_catalog": SubjectCatalog.list_for_ui(), "active_subjects": active if isinstance(active, list) else SubjectCatalog.base_subjects_for_band(band), "permissions": {"allow_solo_start": bool(row["allow_solo_start"]), "require_exit_pin": bool(row["require_exit_pin"]), "exit_pin_set": bool(row["exit_pin_hash"]), "session_limit_per_day": row["session_limit_per_day"], "max_session_minutes": int(row["max_session_minutes"] or 10), "allowed_hours": hours, "can_choose_story_branch": bool(row["can_choose_story_branch"]), "lock_world_theme": bool(row["lock_world_theme"]), "font_scale_play": str(row["font_scale_play"] or "md"), "learning_overrides": learning}, "traits": None, "created_at": str(row["created_at"]) if row["created_at"] else None, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
+        from app.services.session_accounts import invite_link_status
+        invite = self._string(row.get("invite_email"))
+        linked = str(row["linked_auth_user_id"]) if row.get("linked_auth_user_id") else None
+        return {"id": str(row["id"]), "display_name": self._string(row["display_name"]), "age_years": int(row["age_years"]) if row["age_years"] is not None else None, "age_band": self._string(row["age_band"]), "effective_age_band": self._string(row["effective_age_band"]), "birth_year": int(row["birth_year"]) if row["birth_year"] is not None else None, "world_theme": self._string(row["world_theme"]), "explorer_gender": self._string(row.get("explorer_gender")), "explorer_gender_label": display_label_for_gender(self._string(row.get("explorer_gender")), int(row["age_years"]) if row["age_years"] is not None else None), "locale": str(row["locale"] or "es-ES"), "status": str(row["status"]), "onboarding_step": str(row["onboarding_step"]), "placement_status": str(row["placement_status"]), "is_tutor_profile": bool(row["is_tutor_profile"]), "settings": settings, "subject_catalog": SubjectCatalog.list_for_ui(), "active_subjects": active if isinstance(active, list) else SubjectCatalog.base_subjects_for_band(band), "permissions": {"allow_solo_start": bool(row["allow_solo_start"]), "require_exit_pin": bool(row["require_exit_pin"]), "exit_pin_set": bool(row["exit_pin_hash"]), "session_limit_per_day": row["session_limit_per_day"], "max_session_minutes": int(row["max_session_minutes"] or 10), "allowed_hours": hours, "can_choose_story_branch": bool(row["can_choose_story_branch"]), "lock_world_theme": bool(row["lock_world_theme"]), "font_scale_play": str(row["font_scale_play"] or "md"), "learning_overrides": learning}, "traits": None, "invite_email": invite, "invite_link_status": invite_link_status(invite, linked), "created_at": str(row["created_at"]) if row["created_at"] else None, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
     def _traits(self, row: Any) -> dict[str, Any]:
         species, palette = str(row["species"] or ""), str(row["palette"] or ""); features = [x for x in row["features"] or [] if isinstance(x, str) and x.strip()]; achievements = [x for x in row["achievements"] or [] if isinstance(x, str) and x.strip()]; summary = self._string(row["character_summary"]) or (CharacterSummaryBuilder.build(species, palette, features, self._string(row["vibe"])) if species else None)
         return {"species": species, "palette": palette, "features": features, "vibe": self._string(row["vibe"]), "achievements": achievements, "character_summary": summary, "updated_at": str(row["updated_at"]) if row["updated_at"] else None}
@@ -448,3 +455,277 @@ class CrewService:
         email = parent.get("email", "")
         if isinstance(email, str) and "@" in email: return email.split("@", 1)[0].replace(".", " ").replace("_", " ").replace("-", " ").title().strip() or "Tutor"
         return "Tutor"
+
+    async def get_accessible_for_auth_user(self, auth_user_id: str, child_id: str) -> dict[str, Any]:
+        parent = await self.parents.find_by_auth_user_id(auth_user_id)
+        if parent:
+            return await self.get_for_auth_user(auth_user_id, child_id)
+        return await self.get_for_linked_crew(auth_user_id, child_id)
+
+    async def get_for_linked_crew(self, auth_user_id: str, child_id: str) -> dict[str, Any]:
+        async with session_scope() as session:
+            row = (await session.execute(text("""select c.*, p.allow_solo_start, p.require_exit_pin, p.exit_pin_hash, p.session_limit_per_day, p.max_session_minutes, p.allowed_hours, p.can_choose_story_branch, p.lock_world_theme, p.font_scale_play, p.learning_overrides from public.children c join public.child_permissions p on p.child_id = c.id where c.id = :id and c.linked_auth_user_id = :auth and c.status <> 'deleted' limit 1"""), {"id": child_id, "auth": auth_user_id})).mappings().first()
+            if not row: raise RuntimeError("Crew member not found")
+            detail = self._detail(row)
+            parent_id = str(row["parent_id"])
+            traits = (await session.execute(text("select species, palette, features, vibe, achievements, character_summary, updated_at from public.child_traits where child_id = :id limit 1"), {"id": child_id})).mappings().first()
+        if traits: detail["traits"] = self._traits(traits)
+        if not detail["is_tutor_profile"]:
+            traveler = TravelerProfileService().read_for_child(parent_id, child_id)
+            if traveler:
+                detail["traveler_profile"] = traveler
+            from app.services.crew_progress import CrewProgressService
+            built = await CrewProgressService().build_for_child(dict(row, settings=detail["settings"]))
+            detail.update({"progress": built["progress"], "journey": built["journey"], "general_level": built["progress"].get("general_level"), "rank_id": self._string(row.get("rank_id")), "rank": built["progress"].get("rank")})
+        return detail
+
+    def to_self_view(self, detail: dict[str, Any]) -> dict[str, Any]:
+        progress = detail.get("progress")
+        if isinstance(progress, dict):
+            progress = dict(progress)
+            progress.pop("general_level", None)
+            rank = progress.get("rank")
+            if isinstance(rank, dict):
+                progress["rank"] = {
+                    "id": rank.get("id"),
+                    "label_child": rank.get("label_child") or rank.get("label_tutor"),
+                    "tier": rank.get("tier"),
+                }
+            rank_next = progress.get("rank_next")
+            if isinstance(rank_next, dict):
+                progress["rank_next"] = {
+                    "id": rank_next.get("id"),
+                    "label_child": rank_next.get("label_child") or rank_next.get("label_tutor"),
+                    "tier": rank_next.get("tier"),
+                }
+        learning = (detail.get("settings") or {}).get("learning") if isinstance(detail.get("settings"), dict) else {}
+        active = learning.get("active_subjects") if isinstance(learning, dict) else detail.get("active_subjects")
+        return {
+            "id": detail["id"],
+            "display_name": detail.get("display_name"),
+            "age_years": detail.get("age_years"),
+            "age_band": detail.get("age_band"),
+            "world_theme": detail.get("world_theme"),
+            "explorer_gender": detail.get("explorer_gender"),
+            "explorer_gender_label": detail.get("explorer_gender_label"),
+            "status": detail.get("status"),
+            "onboarding_step": detail.get("onboarding_step"),
+            "placement_status": detail.get("placement_status"),
+            "traits": detail.get("traits"),
+            "traveler_profile": detail.get("traveler_profile"),
+            "progress": progress,
+            "journey": detail.get("journey"),
+            "rank": (progress or {}).get("rank") if isinstance(progress, dict) else detail.get("rank"),
+            "active_subjects": active,
+            "viewer": "self",
+        }
+
+    MEMBER_SELF_FIELDS = frozenset({"display_name", "explorer_gender", "character_summary", "traveler_profile", "diagnostics"})
+
+    async def patch_crew_diagnostics(
+        self, auth_user_id: str, child_id: str, email: str, diagnostics: dict[str, Any]
+    ) -> dict[str, Any]:
+        from app.services.debug_access import assert_crew_debug_diagnostics_patch_allowed
+
+        await assert_crew_debug_diagnostics_patch_allowed(email, child_id, {"diagnostics": diagnostics})
+        if not isinstance(diagnostics.get("debug_ai_enabled"), bool):
+            raise ValueError("diagnostics.debug_ai_enabled invalid")
+        detail = await self.get_for_linked_crew(auth_user_id, child_id)
+        settings = dict(detail.get("settings") or {})
+        merged = dict(settings.get("diagnostics") or {})
+        merged["debug_ai_enabled"] = diagnostics["debug_ai_enabled"]
+        settings["diagnostics"] = merged
+        async with session_scope() as session:
+            await session.execute(
+                text(
+                    """
+                    update public.children
+                    set settings = cast(:settings as jsonb), updated_at = now()
+                    where id = :id and linked_auth_user_id = :auth and status <> 'deleted'
+                    """
+                ),
+                {
+                    "id": child_id,
+                    "auth": auth_user_id,
+                    "settings": json.dumps(settings),
+                },
+            )
+        return await self.get_for_linked_crew(auth_user_id, child_id)
+
+    async def update_self_profile(
+        self,
+        auth_user_id: str,
+        child_id: str,
+        payload: dict[str, Any],
+        *,
+        email: str = "",
+    ) -> dict[str, Any]:
+        if "diagnostics" in payload:
+            await self.patch_crew_diagnostics(
+                auth_user_id,
+                child_id,
+                email,
+                payload["diagnostics"],
+            )
+            payload = {k: v for k, v in payload.items() if k != "diagnostics"}
+        unknown = set(payload) - self.MEMBER_SELF_FIELDS
+        if unknown:
+            raise ValueError("field_forbidden")
+        if not payload:
+            return await self.get_for_linked_crew(auth_user_id, child_id)
+        return await self.update_profile_for_auth_user_self(auth_user_id, child_id, payload)
+
+    async def update_profile_for_auth_user_self(
+        self, auth_user_id: str, child_id: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        detail = await self.get_for_linked_crew(auth_user_id, child_id)
+        fields, params = [], {"id": child_id}
+        if "display_name" in payload:
+            fields.append("display_name = :display_name")
+            params["display_name"] = self._display_name(payload["display_name"])
+        if "explorer_gender" in payload:
+            fields.append("explorer_gender = :explorer_gender")
+            params["explorer_gender"] = assert_explorer_gender(str(payload["explorer_gender"]))
+        traits_changed = "character_summary" in payload
+        traveler_changed = "traveler_profile" in payload
+        if traveler_changed:
+            parent_id = await self._parent_id_for_child(child_id)
+            TravelerProfileService().update_for_child(
+                parent_id,
+                child_id,
+                child_snapshot=detail,
+                patch=payload["traveler_profile"] or {},
+            )
+        if traits_changed:
+            await self._upsert_summary(child_id, self._summary(payload["character_summary"]))
+        if not fields and not traits_changed and not traveler_changed:
+            raise ValueError("No updatable fields")
+        async with session_scope() as session:
+            if fields:
+                await session.execute(
+                    text(f"update public.children set {', '.join(fields)}, updated_at = now() where id = :id and status <> 'deleted'"),
+                    params,
+                )
+            elif traits_changed or traveler_changed:
+                await session.execute(
+                    text("update public.children set updated_at = now() where id = :id and status <> 'deleted'"),
+                    {"id": child_id},
+                )
+        return await self.get_for_linked_crew(auth_user_id, child_id)
+
+    async def unlink_keep_invite(self, auth_user_id: str) -> bool:
+        async with session_scope() as session:
+            result = await session.execute(
+                text(
+                    """
+                    update public.children
+                    set linked_auth_user_id = null, linked_at = null, updated_at = now()
+                    where linked_auth_user_id = :auth and status <> 'deleted'
+                    """
+                ),
+                {"auth": auth_user_id},
+            )
+            try:
+                await session.execute(text("delete from auth.users where id = :auth"), {"auth": auth_user_id})
+            except Exception:
+                pass
+        return True
+
+    async def _parent_id_for_child(self, child_id: str) -> str:
+        async with session_scope() as session:
+            row = (await session.execute(text("select parent_id from public.children where id = :id"), {"id": child_id})).mappings().first()
+        if not row:
+            raise RuntimeError("Crew member not found")
+        return str(row["parent_id"])
+
+    async def _apply_invite_email(
+        self,
+        auth_user_id: str,
+        detail: dict[str, Any],
+        raw: object,
+        fields: list[str],
+        params: dict[str, Any],
+    ) -> None:
+        from app.services.gmail_canonical import InviteEmailError, canonicalize_gmail, display_invite_email
+
+        if detail.get("is_tutor_profile"):
+            raise ValueError("invite_email_tutor_profile")
+        display = display_invite_email(raw)
+        canonical = canonicalize_gmail(raw)
+        fields.extend(
+            (
+                "invite_email = :invite_email",
+                "invite_email_canonical = :invite_email_canonical",
+            )
+        )
+        params["invite_email"] = display
+        params["invite_email_canonical"] = canonical
+        previous = detail.get("invite_email")
+        prev_canonical = None
+        if previous:
+            try:
+                prev_canonical = canonicalize_gmail(previous)
+            except InviteEmailError:
+                prev_canonical = None
+        if canonical is None or canonical != prev_canonical:
+            fields.extend(("linked_auth_user_id = null", "linked_at = null"))
+        if canonical is None:
+            return
+        parent = await self.parents.find_by_auth_user_id(auth_user_id)
+        tutor_email = parent.get("email") if parent else None
+        if tutor_email:
+            try:
+                tutor_canonical = canonicalize_gmail(tutor_email)
+            except InviteEmailError:
+                tutor_canonical = str(tutor_email).strip().lower()
+            if tutor_canonical == canonical:
+                raise ValueError("invite_email_same_as_tutor")
+        clash = await self._invite_conflicts(canonical, str(detail["id"]))
+        if clash == "tutor":
+            raise ValueError("invite_email_is_tutor")
+        if clash == "taken":
+            raise ValueError("invite_email_taken")
+
+    async def _invite_conflicts(self, canonical: str, child_id: str) -> str | None:
+        async with session_scope() as session:
+            parent_row = (
+                await session.execute(
+                    text(
+                        """
+                        select email from public.parent_accounts
+                        where lower(email) = :canonical
+                           or lower(email) like '%@gmail.com'
+                           or lower(email) like '%@googlemail.com'
+                        """
+                    ),
+                    {"canonical": canonical},
+                )
+            ).mappings().all()
+            other = (
+                await session.execute(
+                    text(
+                        """
+                        select id from public.children
+                        where invite_email_canonical = :canonical
+                          and id <> :id
+                          and status <> 'deleted'
+                        limit 1
+                        """
+                    ),
+                    {"canonical": canonical, "id": child_id},
+                )
+            ).mappings().first()
+        from app.services.gmail_canonical import InviteEmailError, canonicalize_gmail
+
+        for row in parent_row:
+            email = str(row["email"] or "")
+            try:
+                other_c = canonicalize_gmail(email)
+            except InviteEmailError:
+                other_c = email.strip().lower()
+            if other_c == canonical:
+                return "tutor"
+        if other:
+            return "taken"
+        return None
+

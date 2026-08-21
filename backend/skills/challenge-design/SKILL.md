@@ -20,12 +20,14 @@ Orden obligatorio:
 
 1. `narrative_wrapper` con pasaje autónomo (3–5 frases) y ejemplo **distinto** al de la lección.
 2. **Autorrevisión anti-fuga:** si preguntarás ortografía, locución o significado, relee el wrapper: la opción correcta **no** puede estar ya escrita ahí.
-3. Pregunta explícita en `prompt_text` (solo sobre el wrapper o regla escolar).
-4. Tres opciones del mismo tipo (`a`/`b`/`c`).
-5. Responde tú la pregunta mirando el wrapper.
-6. `correct_option_id` = esa respuesta.
-7. Si ninguna opción es verdadera → reescribe opciones (no marques una incorrecta).
-8. `explanation` enseña la **regla** (por qué es esa opción), no solo nombra el label. En series numéricas: escribe las diferencias y el siguiente término; si ese término no está entre las opciones, reescribe las opciones.
+3. **Autorrevisión pasaje↔pregunta:** relee wrapper + `prompt_text` juntos. Toda palabra o frase citada en la pregunta (**«notable»**, *«La diferencia era notable»*) debe existir **en el pasaje**, no en otra versión con sinónimos.
+4. **Autorrevisión de hueco:** si preguntas por algo «que falta», el pasaje debe mostrar `____`, `…` o `[...]` donde va la respuesta. Si el pasaje ya está completo, cambia la pregunta o abre el hueco.
+5. Pregunta explícita en `prompt_text` (solo sobre el wrapper o regla escolar).
+6. Tres opciones del mismo tipo (`a`/`b`/`c`).
+7. Responde tú la pregunta mirando **solo** el wrapper (o la regla escolar si es gramática pura).
+8. `correct_option_id` = esa respuesta.
+9. Si ninguna opción es verdadera → reescribe opciones (no marques una incorrecta).
+10. `explanation` enseña la **regla** (por qué es esa opción), no solo nombra el label. En series numéricas: escribe las diferencias y el siguiente término; si ese término no está entre las opciones, reescribe las opciones.
 
 ### Ejemplos
 
@@ -65,8 +67,17 @@ El viajero ve `narrative_wrapper` + `prompt_text` juntos. Si la pregunta pide **
 | Pasaje: «**Asimismo**, el sistema redujo…» → pregunta: escritura de «también» → chip «Asimismo» | Pasaje: «**Además**, el protocolo cambió…» o deja hueco; chips: Asi mismo / Asimismo / A sí mismo |
 | Pasaje: «navegar **a través de** la nube» → pregunta: locución de desplazamiento → chip «a través de» | Pasaje: «cruzaron la densa nube de escombros» sin la locución; chips con variantes |
 | Pasaje usa la palabra correcta y preguntas su significado con chip = esa palabra | Pasaje usa la palabra; chips son definiciones distintas |
+| Pasaje: «…era evidente» → pregunta categoría de «notable» | Pasaje usa la **misma** palabra citada en la pregunta |
+| Pasaje completo + «¿locución causal que falta?» | Pasaje con hueco `____` o frase incompleta antes de preguntar |
 
-**Autorrevisión por reto:** escribe wrapper → pregunta → opciones → comprueba que la correcta **no** aparece en el wrapper (salvo `reading` con pregunta de **hecho**: «¿qué ocurre?»).
+### Ejemplo fantasy — `narrative_wrapper` (Reinos Unidos)
+
+Reto de language: wrapper «En el scriptorium del Umbral, la archivista dejó un pergamino a medias: «El aprendiz guardó la linterna ____ la repisa de piedra».» + pregunta «¿Qué locución causal completa la frase?» → chips: en / sobre / bajo.
+
+- ✅ Hueco visible; la correcta no está escrita completa en el pasaje.
+- ❌ Pasaje cerrado «…guardó la linterna sobre la repisa» + «¿locución que falta?»
+
+**Autorrevisión por reto:** escribe wrapper → pregunta → opciones → comprueba (1) que la correcta **no** aparece en el wrapper salvo reading/hecho; (2) que toda cita «…» de la pregunta está en el pasaje; (3) que hay hueco visible si preguntas por algo que falta.
 
 ## Prohibido
 
@@ -74,6 +85,8 @@ El viajero ve `narrative_wrapper` + `prompt_text` juntos. Si la pregunta pide **
 - Copiar ejemplos de `lesson_narrative` en los retos.
 - Poner en `narrative_wrapper` la forma correcta cuando la pregunta pide ortografía, locución o significado.
 - Preguntar hechos no mencionados en `narrative_wrapper` (salvo `conocimiento escolar previo`).
+- Citar en la pregunta una palabra o frase que **no** aparece en el `narrative_wrapper`.
+- Preguntar por algo «que falta» cuando el pasaje ya está completo (sin hueco visible).
 - Preguntar `lore inventado` del mundo que **no** acaba de enseñarse en `lesson_narrative` ni en el `narrative_wrapper` de ese reto.
 - Inventar un mito del mundo y examinarlo como si el viajero lo conociera de casa.
 - Marcar `correct_option_id` antes de comprobar la respuesta.

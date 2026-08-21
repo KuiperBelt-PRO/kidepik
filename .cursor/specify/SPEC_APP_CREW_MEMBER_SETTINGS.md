@@ -13,6 +13,10 @@ Principio: todo lo que **configura límites del dispositivo y del aprendizaje** 
 
 ## 1. Bloques (orden)
 
+### 1.0 Acceso del tripulante (Gmail)
+
+**Propuesta:** campo Gmail distinto al del tutor + estado de vínculo. Contrato completo: [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md) §5.1. No aplica a `is_tutor_profile`.
+
 ### 1.1 Permisos y límites
 
 Contrato sin cambio respecto a [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md) §5:

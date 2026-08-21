@@ -122,6 +122,28 @@ class AccountAuthorizationService:
             return False
         return await self.grant_group(str(parent_id), group_slug)
 
+    async def has_bootstrap_email_permission(self, email: str, permission_slug: str) -> bool:
+        """Permiso vía email preautorizado (developers/admins), sin parent_account_groups."""
+        async with session_scope() as session:
+            value = (
+                await session.execute(
+                    text(
+                        """
+                        select 1
+                        from public.app_group_bootstrap_emails b
+                        join public.app_groups g on g.id = b.group_id
+                        join public.app_group_permissions agp on agp.group_id = g.id
+                        join public.app_permissions p on p.id = agp.permission_id
+                        where lower(b.email) = lower(:email)
+                          and p.slug = :permission_slug
+                        limit 1
+                        """
+                    ),
+                    {"email": email, "permission_slug": permission_slug},
+                )
+            ).scalar_one_or_none()
+        return value is not None
+
     async def apply_bootstrap_grants(self, parent_id: str, email: str) -> None:
         """Aplica app_group_bootstrap_emails para este tutor (idempotente)."""
         async with session_scope() as session:

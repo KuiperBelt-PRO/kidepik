@@ -39,6 +39,19 @@ Enunciado: pasaje «Debieron navegar **a través de** la nube de escombros» + �
 - ❌ Correcta: «a través de» (ya visible en el pasaje)
 - ✅ Pasaje: «cruzaron la densa nube de escombros» sin la locución; chips con variantes ortográficas
 
+### Ejemplo fantasy — envoltorio + locución (Reinos Unidos)
+
+Enunciado: pasaje «En el atrio del Umbral, la archivista leyó: «El aprendiz cruzó el arroyo **a traves de** las piedras lisas».» + «¿Cuál es la forma correcta de la locución de desplazamiento?».
+
+- ❌ Correcta: «a traves de» (ya visible en el pasaje)
+- ✅ Pasaje: «…cruzó el arroyo entre las piedras lisas» sin la locución; chips: a traves de / a través de / atraves de
+
+Enunciado fantasy — significado: pasaje «El pergamino describe un hallazgo **inefable**» + «¿Cuál es el significado preciso de «inefable»?»
+
+- ✅ Correcta: «Que no se puede explicar con palabras»
+- ❌ Chip «Inefable» (tautología)
+- ❌ Pasaje con «inefable» + pregunta por ortografía de «inefable» sin hueco
+
 ## Alinear pregunta ↔ opciones (crítico)
 
 El fallo más grave es desajustar el tipo de pregunta y el tipo de respuesta.

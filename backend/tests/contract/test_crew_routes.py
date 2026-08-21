@@ -110,6 +110,30 @@ async def test_crew_update_ok(
 
 @pytest.mark.contract
 @pytest.mark.asyncio
+async def test_crew_update_invite_email_not_gmail(
+    client: AsyncClient,
+    mock_auth,
+    auth_headers,
+    mock_parent_service,
+    mock_crew_service,
+    mocker,
+) -> None:
+    mock_crew_service.update_profile_for_auth_user = mocker.AsyncMock(
+        side_effect=ValueError("invite_email_not_gmail")
+    )
+    body = assert_status(
+        await client.patch(
+            f"/api/v1/crew/{CHILD_ID}",
+            json={"invite_email": "nina@hotmail.com"},
+            headers=auth_headers,
+        ),
+        422,
+    )
+    assert body["detail"] == "invite_email_not_gmail"
+
+
+@pytest.mark.contract
+@pytest.mark.asyncio
 async def test_crew_verify_exit_pin_forbidden(
     client: AsyncClient,
     mock_auth,

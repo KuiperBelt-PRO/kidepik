@@ -471,3 +471,35 @@ async def test_upsert_summary_insert(crew_svc) -> None:
     session._results = [FakeExecuteResult(rows=None), FakeExecuteResult()]
     await svc._upsert_summary(CHILD_ID, "Resumen corto")
     assert len(session.executed) == 2
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_unlink_keep_invite_does_not_clear_email(crew_svc) -> None:
+    svc, session = crew_svc
+    session._results = [FakeExecuteResult(rowcount=1), FakeExecuteResult()]
+    ok = await svc.unlink_keep_invite(AUTH_USER_ID)
+    assert ok is True
+    update_sql = str(session.executed[0][0])
+    assert "linked_auth_user_id = null" in update_sql
+    assert "invite_email" not in update_sql
+    assert "delete from auth.users" in str(session.executed[1][0]).lower()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_apply_invite_email_sets_canonical(crew_svc) -> None:
+    svc, session = crew_svc
+    session._results = [FakeExecuteResult(rows=[]), FakeExecuteResult(rows=None)]
+    fields: list[str] = []
+    params: dict = {"id": CHILD_ID}
+    await svc._apply_invite_email(
+        AUTH_USER_ID,
+        {"id": CHILD_ID, "is_tutor_profile": False, "invite_email": None},
+        "Nina.Viajera@gmail.com",
+        fields,
+        params,
+    )
+    assert params["invite_email"] == "Nina.Viajera@gmail.com"
+    assert params["invite_email_canonical"] == "ninaviajera@gmail.com"
+    assert "linked_auth_user_id = null" in fields

@@ -17,6 +17,8 @@
  * @property {string} placement_status
  * @property {string | null} tutor_label
  * @property {boolean} [is_tutor_profile]
+ * @property {string | null} [invite_email]
+ * @property {'none' | 'pending' | 'linked'} [invite_link_status]
  */
 
 /**

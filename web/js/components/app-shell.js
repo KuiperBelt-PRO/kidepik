@@ -12,6 +12,7 @@ import {
   initShellUiTheme,
   toggleShellUiTheme,
 } from "../lib/shell-theme.js";
+import { getCachedSessionAccount, getCachedSessionRole } from "../lib/session-account.js";
 import { renderShellUiIconSvgInner } from "./shell-ui-icons.js";
 import { bindShellFrame, unbindShellFrame, scheduleShellFrameSync } from "../lib/shell-frame.js";
 import {
@@ -64,9 +65,25 @@ export function setAppShellDebugAiBadge(onOpen) {
  * @param {string} [path]
  * @returns {boolean}
  */
+/**
+ * @param {string} href
+ */
+function resolveDrawerHref(href) {
+  if (href === "/play-self") {
+    const childId = getCachedSessionAccount()?.child_id;
+    return childId ? `/play/${childId}` : "/member";
+  }
+  return href;
+}
+
+/**
+ * @param {string} [path]
+ * @returns {boolean}
+ */
 export function isShellRoutePath(path = hashRoutePath()) {
   return (
     path === "home" ||
+    path === "member" ||
     path === "account" ||
     path === "settings" ||
     path === "crew" ||
@@ -192,8 +209,35 @@ export function mountAppShell(options) {
   /** @type {Set<string>} */
   const expanded = new Set();
 
+  const role = getCachedSessionRole();
   /** @type {{ id: string; label: string; icon: UiIconId; kind: 'link'|'stub'|'action'|'accordion'; href?: string; action?: string; children?: { id: string; label: string; href: string }[] }[]} */
-  const items = [
+  const items =
+    role === "crew"
+      ? [
+          {
+            id: "member",
+            label: "Tripulante",
+            icon: "crew",
+            kind: "accordion",
+            children: [
+              { id: "member-sheet", label: "Mi ficha", href: "/member" },
+              { id: "member-play", label: "Entrar al viaje", href: "/play-self" },
+            ],
+          },
+          {
+            id: "legal",
+            label: "Legal",
+            icon: "legal",
+            kind: "accordion",
+            children: [
+              { id: "terms", label: "Términos", href: "/legal/terminos" },
+              { id: "privacy", label: "Privacidad", href: "/legal/privacidad" },
+            ],
+          },
+          { id: "account", label: "Cuenta", icon: "account", kind: "link", href: "/account" },
+          { id: "signout", label: "Cerrar sesión", icon: "signout", kind: "action", action: "signout" },
+        ]
+      : [
     { id: "home", label: "Inicio", icon: "home", kind: "link", href: "/home" },
     { id: "crew", label: "Tripulación", icon: "crew", kind: "link", href: "/crew" },
     {
@@ -322,7 +366,7 @@ export function mountAppShell(options) {
         link.addEventListener("click", (ev) => {
           ev.preventDefault();
           closeDrawer();
-          void navigateShellRoute(child.href);
+          void navigateShellRoute(resolveDrawerHref(child.href));
         });
         childLi.appendChild(link);
         panel.appendChild(childLi);
@@ -459,11 +503,16 @@ export function ensureAppShell(options) {
     destroyAppShell();
     return null;
   }
+  const role = getCachedSessionRole();
   if (shellHandle) {
-    scheduleShellFrameSync();
-    return shellHandle;
+    if (shellHandle.role === role) {
+      scheduleShellFrameSync();
+      return shellHandle;
+    }
+    destroyAppShell();
   }
   const handle = mountAppShell(options);
+  handle.role = role;
   void import("../lib/debug-ai-shell.js?v=1").then(({ ensureDebugAiShellBadge }) => {
     void ensureDebugAiShellBadge();
   });

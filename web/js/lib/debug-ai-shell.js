@@ -3,7 +3,7 @@
  * @module debug-ai-shell
  */
 
-import { setAppShellDebugAiBadge } from "../components/app-shell.js?v=186";
+import { setAppShellDebugAiBadge } from "../components/app-shell.js?v=280";
 import { openDebugAiPanel } from "../components/debug-ai-panel.js?v=245";
 import {
   isDebugAiAllowed,

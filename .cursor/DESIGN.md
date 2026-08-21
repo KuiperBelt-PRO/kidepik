@@ -255,6 +255,7 @@ El HUD infantil full-bleed futuro, si existe, será una **spec aparte**; hasta e
 | Guardar | `save` |
 | Eliminar / warning | `danger` |
 | Tripulación | `crew` |
+| Tripulante (ficha propia) | `member` |
 | Añadir | `add` |
 | Cancelar / cerrar | `close` |
 | Volver | `chevron` (rotado 90°) |

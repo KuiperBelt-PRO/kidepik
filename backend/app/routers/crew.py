@@ -10,14 +10,20 @@ from app.services.crew import CrewService
 from app.services.inventory import InventoryService
 from app.services.parents import ParentAccountService
 from app.services.reward_economy import RewardEconomyService
+from app.services.session_accounts import CrewRoleError, SessionAccountService
 
 router = APIRouter(prefix="/api/v1", tags=["crew"])
 
 async def _parent(authorization: str | None) -> str:
     claims = await _claims(authorization)
     try:
-        await ParentAccountService().get_or_bootstrap(claims["sub"], _email(claims), claims.get("display_name"), claims.get("avatar_url"))
+        parents = ParentAccountService()
+        await SessionAccountService(parents=parents).require_tutor(
+            claims["sub"], _email(claims), claims.get("display_name"), claims.get("avatar_url")
+        )
         return str(claims["sub"])
+    except CrewRoleError as exc:
+        raise HTTPException(403, exc.detail) from exc
     except HTTPException: raise
     except Exception as exc: raise _error(exc) from exc
 def _crew_error(exc: Exception) -> HTTPException:

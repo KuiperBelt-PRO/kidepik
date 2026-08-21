@@ -8,8 +8,10 @@ from pytest_mock import MockerFixture
 from tests.helpers.db_session import ScriptedSession
 
 _SCOPE_MODULES = (
-    "app.services.crew",
+    "app.services.session_accounts",
     "app.services.parents",
+    "app.services.account_authorization",
+    "app.services.crew",
     "app.services.crew_progress",
     "app.services.settings",
     "app.services.inventory",

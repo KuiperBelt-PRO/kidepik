@@ -8,10 +8,12 @@ from uuid import uuid4
 import pytest
 
 from app.ai.agents.curriculum_knowledge import (
-    MEANING_QUESTION_NO_ECHO_RULE,
     ANSWER_LEAK_IN_STIMULUS_RULE,
+    GAP_QUESTION_IN_STIMULUS_RULE,
+    MEANING_QUESTION_NO_ECHO_RULE,
     PATH_LORE_ONLY_IF_TAUGHT_RULE,
     PLACEMENT_PRIOR_KNOWLEDGE_RULE,
+    STIMULUS_PROMPT_ALIGNMENT_RULE,
 )
 from app.ai.agents.envelopes import (
     DialogueEnvelope,
@@ -1167,17 +1169,13 @@ async def test_compose_placement_queue_rejects_incomplete_batch(dialogue_svc, mo
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_compose_path_pack_fallback(dialogue_svc, mocker) -> None:
+async def test_compose_path_pack_raises_when_slots_exhausted(dialogue_svc, mocker) -> None:
     mocker.patch(
         "app.services.dialogue.run_purpose",
         new=AsyncMock(side_effect=RuntimeError("fallo")),
     )
-    pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
-    assert len(pack) == 3
-    assert pack[0]["path_id"] == "path_1"
-    assert pack[0]["title"].startswith("Práctica de ")
-    blurbs = {entry["learning_blurb"] for entry in pack}
-    assert len(blurbs) == 3
+    with pytest.raises(AiProductError):
+        await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
 
 
 _CHALLENGE_WRAPPER = (
@@ -1329,6 +1327,107 @@ def test_path_pack_quality_soft_warnings_do_not_reject() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "challenge,issue",
+    [
+        (
+            {
+                "narrative_wrapper": (
+                    "La sonda autónoma realizó el escaneo orbital. Se detectó una señal "
+                    "anómala, y los sistemas de seguridad se activaron de forma automática."
+                ),
+                "prompt_text": (
+                    "¿Cuál es la forma correcta de escribir la locución causal que falta "
+                    "en el pasaje?"
+                ),
+                "item_type": "mcq",
+                "options": [
+                    {"id": "a", "label": "Por el cual"},
+                    {"id": "b", "label": "Por lo cual"},
+                    {"id": "c", "label": "Porlo cual"},
+                ],
+                "correct_option_id": "b",
+            },
+            "path_challenge_missing_gap",
+        ),
+        (
+            {
+                "narrative_wrapper": (
+                    "El capitán revisó la tripulación. La diferencia entre ambos grupos "
+                    "era evidente."
+                ),
+                "prompt_text": (
+                    "¿Qué categoría gramatical tiene la palabra «notable» en la frase "
+                    "«La diferencia entre ambos grupos era notable»?"
+                ),
+                "item_type": "mcq",
+                "options": [
+                    {"id": "a", "label": "Adjetivo"},
+                    {"id": "b", "label": "Sustantivo"},
+                    {"id": "c", "label": "Verbo"},
+                ],
+                "correct_option_id": "a",
+            },
+            "path_challenge_quote_not_in_wrapper",
+        ),
+        (
+            {
+                "narrative_wrapper": (
+                    "El protocolo cambió ____ cuando llegó la alerta."
+                ),
+                "prompt_text": (
+                    "¿Cuál es la forma correcta de escribir la locución causal que falta "
+                    "en el pasaje?"
+                ),
+                "item_type": "mcq",
+                "options": [
+                    {"id": "a", "label": "Por el cual"},
+                    {"id": "b", "label": "Por lo cual"},
+                    {"id": "c", "label": "Porlo cual"},
+                ],
+                "correct_option_id": "b",
+            },
+            None,
+        ),
+    ],
+)
+def test_path_challenge_stimulus_coherence_issue(
+    challenge: dict[str, Any], issue: str | None
+) -> None:
+    assert (
+        DialogueService._path_challenge_stimulus_coherence_issue(
+            challenge, subject_id="language"
+        )
+        == issue
+    )
+
+
+@pytest.mark.unit
+def test_compose_failed_mentor_text_for_path_pack_sci_fi() -> None:
+    child = {"world_theme": "sci-fi", "display_name": "Binar Star"}
+    exc = AiProductError("ai_compose_failed", "detalle técnico ignorado")
+    text = DialogueService._compose_failed_mentor_text(
+        exc, retry_action="path_pack", child=child
+    )
+    assert "Binar Star" in text
+    assert "observatorio" in text.lower()
+    assert "Reintentar" in text
+    assert "detalle técnico" not in text
+
+
+@pytest.mark.unit
+def test_compose_failed_mentor_text_for_path_pack_fantasy() -> None:
+    child = {"world_theme": "fantasy", "display_name": "Aleria"}
+    exc = AiProductError("ai_compose_failed", "fallo")
+    text = DialogueService._compose_failed_mentor_text(
+        exc, retry_action="path_pack", child=child
+    )
+    assert "Aleria" in text
+    assert "pergamino" in text.lower() or "runas" in text.lower()
+    assert "niebla" in text.lower() or "encrucijada" in text.lower()
+
+
+@pytest.mark.unit
 def test_format_path_intro_text_includes_lesson() -> None:
     path = {
         "path_narrative": "Escena breve.",
@@ -1444,14 +1543,23 @@ async def test_compose_path_slot_retries_before_fallback(dialogue_svc, mocker) -
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_compose_path_pack_partial_slot_fallback(dialogue_svc, mocker) -> None:
-    good = {"path_id": "ok", "subject_id": "math", "title": "LLM", "model_used": "m1", "challenges": [{}] * 3}
-    fallback = dialogue_svc._path_pack_fallback_entry("language", 1)
+async def test_compose_path_pack_parallel_propagates_slot_failure(dialogue_svc, mocker) -> None:
+    good = {
+        "path_id": "ok",
+        "subject_id": "math",
+        "title": "LLM",
+        "model_used": "m1",
+        "challenges": [{}] * 3,
+    }
 
     async def slot_side_effect(*args, **kwargs):
         slot_index = args[2]
         if slot_index == 1:
-            return fallback
+            raise dialogue_svc._path_compose_error(
+                issue="path_challenge_missing_gap",
+                path_index=1,
+                subject_id="language",
+            )
         return good
 
     mocker.patch.object(
@@ -1459,20 +1567,17 @@ async def test_compose_path_pack_partial_slot_fallback(dialogue_svc, mocker) -> 
         "_compose_path_slot_with_retry",
         new=AsyncMock(side_effect=slot_side_effect),
     )
-    pack = await dialogue_svc._compose_path_pack_parallel(
-        sample_child(),
-        SESSION_ID,
-        ["math", "language", "reading"],
-        await dialogue_svc._path_composer_context(sample_child()),
-        ["math", "language", "reading"],
-        "fantasy",
-        [],
-        retries=0,
-    )
-    assert len(pack) == 3
-    assert pack[0]["model_used"] == "m1"
-    assert pack[1]["title"].startswith("Práctica de ")
-    assert pack[1].get("model_used") is None
+    with pytest.raises(AiProductError):
+        await dialogue_svc._compose_path_pack_parallel(
+            sample_child(),
+            SESSION_ID,
+            ["math", "language", "reading"],
+            await dialogue_svc._path_composer_context(sample_child()),
+            ["math", "language", "reading"],
+            "fantasy",
+            [],
+            retries=0,
+        )
 
 
 @pytest.mark.unit
@@ -2679,9 +2784,13 @@ async def test_compose_path_pack_with_subject_notes(dialogue_svc, mocker) -> Non
             }
         }
     )
+    bundle = PathPackEnvelope(
+        agent_text="Elige tu camino",
+        paths=[_path_detail(1)],
+    )
     mocker.patch(
         "app.services.dialogue.run_purpose",
-        new=AsyncMock(side_effect=RuntimeError("fallo")),
+        new=AsyncMock(return_value=(bundle, "gemini-3.1-flash-lite")),
     )
     pack = await dialogue_svc._compose_path_pack(child, SESSION_ID)
     assert len(pack) == 3
@@ -2764,6 +2873,8 @@ def test_path_compose_prompt_includes_structured_tutor_context() -> None:
     assert PATH_LORE_ONLY_IF_TAUGHT_RULE in prompt
     assert MEANING_QUESTION_NO_ECHO_RULE in prompt
     assert ANSWER_LEAK_IN_STIMULUS_RULE in prompt
+    assert STIMULUS_PROMPT_ALIGNMENT_RULE in prompt
+    assert GAP_QUESTION_IN_STIMULUS_RULE in prompt
     assert "explanation enseña la regla" in prompt
     assert "Ruta de math/language/reading" in prompt
 
@@ -2839,6 +2950,42 @@ def test_placement_compose_prompt_forbids_invented_world_lore() -> None:
     assert "lore inventado" in prompt
     assert "mitos reales" in prompt
     assert "Prometeo" in prompt
+
+
+@pytest.mark.unit
+def test_placement_compose_prompt_includes_fantasy_world_prose() -> None:
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._placement_compose_prompt(
+        sample_child(world_theme="fantasy"), ["math", "language"], "band_child"
+    )
+    assert "Regla de voz fantasy" in prompt
+    assert "Reinos Unidos" in prompt
+    assert "Guardián del Conocimiento" in prompt
+
+
+@pytest.mark.unit
+def test_placement_compose_prompt_includes_scifi_world_prose() -> None:
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._placement_compose_prompt(
+        sample_child(world_theme="sci-fi"), ["math", "language"], "band_child"
+    )
+    assert "Regla de voz sci-fi" in prompt
+    assert "Arquitecto del Saber" in prompt
+    assert "Reinos Unidos" not in prompt
+
+
+@pytest.mark.unit
+def test_path_compose_prompt_includes_fantasy_title_guidance() -> None:
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._path_compose_prompt(
+        sample_child(world_theme="fantasy"),
+        ["math", "language", "reading"],
+        {},
+        path_count=1,
+    )
+    assert "Regla de voz fantasy" in prompt
+    assert "Títulos de camino fantasy" in prompt
+    assert "linterna del archivista" in prompt
 
 
 @pytest.mark.unit

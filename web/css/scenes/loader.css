@@ -1229,6 +1229,16 @@
   text-align: center;
 }
 
+.auth-panel__helper {
+  margin: 0;
+  font-family: "Nunito", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+  text-align: center;
+  line-height: 1.35;
+}
+
 .auth-panel__error {
   margin: 0;
   width: 100%;

@@ -10,6 +10,8 @@ Este documento es la **guía de implementación** (infra, cliente, API, BD, test
 
 **Registro = login en MVP:** el primer acceso con Google crea el usuario en `auth.users` (Supabase); accesos posteriores reutilizan la sesión.
 
+**Delta (propuesta):** el bootstrap **no** crea siempre `parent_accounts`. Si el email canónico coincide con `children.invite_email_canonical`, la sesión es `role=crew`. Ver [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md).
+
 ---
 
 ## Alcance por fases

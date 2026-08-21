@@ -5,10 +5,11 @@
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
 import { mountSectionFrame } from "../components/section-frame.js?v=261";
-import { mountCrewListPanel, mountCrewNewPanel, mountCrewDetailPanel } from "../components/crew-panel.js?v=260";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
+import { mountCrewListPanel, mountCrewNewPanel, mountCrewDetailPanel } from "../components/crew-panel.js?v=281";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=280";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
+import { wrongRoleRedirect } from "../lib/session-account.js";
 import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
 
 /**
@@ -45,6 +46,11 @@ function renderCrewMode(mode, opts = {}) {
     if (!session) {
       destroyAppShell();
       navigate("/loader");
+      return;
+    }
+    const bounce = wrongRoleRedirect(mode === "detail" ? `crew/${opts.childId || ""}` : "crew");
+    if (bounce) {
+      navigate(bounce);
       return;
     }
 

@@ -5,6 +5,7 @@
 
 import { navigate } from "../lib/router.js";
 import { getValidSession } from "../lib/supabase.js";
+import { bootstrapParentIfNeeded } from "../lib/parent-account.js";
 import {
   GATE_COPY,
   isSessionValid,
@@ -12,7 +13,7 @@ import {
   resolveGateMorphDuration,
 } from "./loader-gate-constants.js";
 import { runLoaderAuthMorph } from "./loader-auth-morph.js?v=162";
-import { mountAuthPanel } from "./auth-panel.js?v=162";
+import { mountAuthPanel } from "./auth-panel.js?v=280";
 import { bindLegalLinkTransitions } from "../scenes/legal.js";
 
 /** @typedef {'loading' | 'ready' | 'exiting' | 'auth-morph' | 'auth-idle'} GateState */
@@ -176,7 +177,8 @@ export function mountLoaderGate({
 
     if (isSessionValid(session)) {
       authPanel.destroy();
-      navigate("/home");
+      const boot = await bootstrapParentIfNeeded(session);
+      navigate(boot.role === "crew" ? "/member" : "/home");
       return;
     }
 

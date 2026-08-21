@@ -45,3 +45,58 @@ ANSWER_LEAK_IN_STIMULUS_RULE = (
     "Excepción: en reading, si preguntas un hecho del pasaje («¿qué ocurre?»), "
     "la respuesta puede estar en el texto."
 )
+
+STIMULUS_PROMPT_ALIGNMENT_RULE = (
+    "Regla de alineación pasaje↔pregunta (obligatoria): el viajero solo ve "
+    "narrative_wrapper + prompt_text. Si citas una palabra o frase entre "
+    "comillas («…») en la pregunta, esa palabra o frase DEBE aparecer tal "
+    "cual en el pasaje. No preguntes por «notable» si el pasaje dice "
+    "«evidente». Relee wrapper y pregunta juntos antes de emitir."
+)
+
+GAP_QUESTION_IN_STIMULUS_RULE = (
+    "Regla de hueco visible (obligatoria): si la pregunta pide ortografía, "
+    "locución o palabra «que falta» / «que completa» el pasaje, el "
+    "narrative_wrapper DEBE dejar un hueco visible (____, …, [...] o frase "
+    "claramente incompleta). Prohibido preguntar por algo que falta cuando "
+    "el pasaje ya está completo y cerrado."
+)
+
+FANTASY_WORLD_PROSE_RULE = (
+    "Regla de voz fantasy (obligatoria cuando world_theme=fantasy): "
+    "Eres el Guardián del Conocimiento — sereno, concreto, sin arcaísmos ni "
+    "cadenas de metáforas. Cada pasaje: situación concreta → problema claro "
+    "→ acción o pregunta. "
+    "Escenario: los Reinos Unidos (continente del aprendizaje), no un «mundo "
+    "genérico». Usa umbral, encrucijada, pergamino, sendero, atrio, cruce de "
+    "balanzas, linterna del archivista, arroyo junto al camino, torre de "
+    "campanas, scriptorium. "
+    "Puedes usar con moderación (máx. 1 por pasaje): niebla, runa, fragmento "
+    "del equilibrio, pergamino antiguo. "
+    "Prohibido: onírico, empyreo, pergeñar, «equilibrio tiembla», "
+    "«chispa del destino», «forjar tu camino», susurros místicos vacíos, "
+    "mezclar vocabulario sci-fi (protocolo, observatorio, cartografiado, sonda). "
+    "Mal (genérico): «Las sendas se cruzaron mal». "
+    "Bien: «En el atrio del Umbral, el pergamino muestra tres senderos; "
+    "el primero se desdibujó antes de la prueba.»"
+)
+
+FANTASY_PATH_TITLE_GUIDANCE = (
+    "Títulos de camino fantasy: NO copies literalmente del mapa de zonas "
+    "(Bosque de los Números, Torre de las Letras, Biblioteca secreta…). "
+    "SÍ inventa con patrones frescos y concretos: «La cámara de las tablas», "
+    "«El umbral de las palabras», «El cruce de las balanzas», "
+    "«La linterna del archivista», «El sendero de los acertijos», "
+    "«La torre de campanas». Materia + lugar + actividad; tres títulos "
+    "claramente distintos."
+)
+
+SCI_FI_WORLD_PROSE_RULE = (
+    "Regla de voz sci-fi (obligatoria cuando world_theme=sci-fi): "
+    "Eres el Arquitecto del Saber — técnico suave, claro, sin alarmismo. "
+    "Escenario: Sistemas Libres, academia espacial o sector orbital. "
+    "Usa observatorio, trazado, cartografiado, sonda, puente, protocolo, "
+    "baliza, telemetría, hiperespacio (con moderación). "
+    "Prohibido mezclar vocabulario fantasy (hechizo, runa, reino, senda "
+    "mística). Situación → problema → acción en cada pasaje."
+)

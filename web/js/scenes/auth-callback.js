@@ -34,9 +34,9 @@ export function renderAuthCallback() {
     if (cancelled) return;
     window.clearTimeout(timeoutId);
     if (session) {
-      await bootstrapParentIfNeeded(session);
+      const boot = await bootstrapParentIfNeeded(session);
       if (cancelled) return;
-      navigate("/home");
+      navigate(boot.role === "crew" ? "/member" : "/home");
     } else {
       navigate("/loader");
     }

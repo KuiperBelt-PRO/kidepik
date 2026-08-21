@@ -10,9 +10,9 @@ describe("parent-account api", () => {
 
   it("bootstrapParentIfNeeded", async () => {
     mock.method(globalThis, "fetch", async (url, opts) => {
-      assert.match(String(url), /parents\/bootstrap$/);
+      assert.match(String(url), /session\/bootstrap$/);
       assert.equal(opts?.method, "POST");
-      return { ok: true, json: async () => ({ created: true }) };
+      return { ok: true, json: async () => ({ role: "tutor", created: true, parent_id: "p1" }) };
     });
     const { bootstrapParentIfNeeded } = await import("../js/lib/parent-account.js");
     const res = await bootstrapParentIfNeeded(session);

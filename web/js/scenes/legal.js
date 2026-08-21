@@ -41,7 +41,7 @@ import {
 import {
   renderWorldArrowFabSvgInner,
 } from "../components/loader-world-arrows.js";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=280";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import {
   resolveLegalBackNavigation,

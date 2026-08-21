@@ -1,45 +1,36 @@
 /**
- * Pantalla de cuenta padre/tutor.
- * @module scenes/account
+ * Ficha propia del tripulante (#/member).
+ * @module scenes/member
  */
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
 import { mountSectionFrame } from "../components/section-frame.js?v=261";
-import { mountAccountPanel } from "../components/account-panel.js?v=283";
+import { mountCrewDetailPanel } from "../components/crew-panel.js?v=281";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=280";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { applySectionEnter } from "../lib/shell-section-transition.js?v=236";
+import { getCachedSessionAccount } from "../lib/session-account.js";
 
-/**
- * @returns {{ destroy: () => void }}
- */
-export function renderAccount() {
+export function renderMember() {
   const app = document.getElementById("app");
   if (!app) return { destroy() {} };
 
-  /** @type {{ destroy: () => void; sectionHost?: HTMLElement } | null} */
+  /** @type {{ destroy: (o?: object) => void; sectionHost?: HTMLElement } | null} */
   let chromeHandle = null;
   /** @type {{
    *   destroy: () => Promise<void>;
    *   contentEl?: HTMLElement;
    *   logoMountEl?: HTMLElement;
+   *   setTitle?: (text: string) => void;
    *   syncLogoSkeleton?: (logoWrap?: HTMLElement | null) => void;
    * } | null} */
   let frameHandle = null;
   /** @type {{ destroy: () => void } | null} */
   let panelHandle = null;
-  /** @type {HTMLElement | null} */
-  let sceneEl = null;
   let cancelled = false;
 
   async function doSignOut() {
-    destroyAppShell();
-    await signOut();
-    navigate("/loader");
-  }
-
-  async function afterDeleted() {
     destroyAppShell();
     await signOut();
     navigate("/loader");
@@ -54,20 +45,25 @@ export function renderAccount() {
       return;
     }
 
-    ensureAppShell({ onSignOut: doSignOut });
-
-    chromeHandle = mountLoaderChrome(app, { compactSection: true });
-    sceneEl = app.querySelector(".scene-loader");
-    const host = chromeHandle.sectionHost;
-    if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) {
-      console.warn("account: missing section host or scene");
+    const cached = getCachedSessionAccount();
+    const childId = cached?.child_id;
+    if (!childId) {
+      navigate("/home");
       return;
     }
 
-    frameHandle = mountSectionFrame(host, { title: "Cuenta", ariaLabel: "Cuenta" });
-    panelHandle = mountAccountPanel(frameHandle.contentEl, {
+    ensureAppShell({ onSignOut: doSignOut });
+    chromeHandle = mountLoaderChrome(app, { compactSection: true });
+    const sceneEl = app.querySelector(".scene-loader");
+    const host = chromeHandle.sectionHost;
+    if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) return;
+
+    frameHandle = mountSectionFrame(host, { title: "Mi ficha", ariaLabel: "Mi ficha" });
+    panelHandle = mountCrewDetailPanel(frameHandle.contentEl, {
       session,
-      onDeleted: afterDeleted,
+      childId,
+      viewer: "self",
+      onTitleChange: (next) => frameHandle?.setTitle?.(next),
     });
 
     await applySectionEnter({
@@ -87,7 +83,6 @@ export function renderAccount() {
       frameHandle = null;
       chromeHandle?.destroy(options);
       chromeHandle = null;
-      sceneEl = null;
     },
   };
 }

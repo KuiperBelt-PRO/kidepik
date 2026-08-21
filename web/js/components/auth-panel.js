@@ -6,7 +6,8 @@
 import { signInWithGoogle } from "../lib/supabase.js";
 
 export const AUTH_COPY = {
-  subtitle: "Cuenta de padre, madre o tutor",
+  subtitle: "Entra con Google",
+  helper: "Si tu tutor te asignó un Gmail, entra con esa misma cuenta. Si no, crea la cuenta de tutor.",
   google: "Continuar con Google",
   errorGeneric: "No hemos podido iniciar sesión. Inténtalo de nuevo.",
   errorOffline: "Necesitas conexión para continuar con Google.",
@@ -31,6 +32,10 @@ export function mountAuthPanel(container, { embedded = false, deferredReveal = f
   const subtitle = document.createElement("p");
   subtitle.className = "auth-panel__subtitle";
   subtitle.textContent = AUTH_COPY.subtitle;
+
+  const helper = document.createElement("p");
+  helper.className = "auth-panel__helper";
+  helper.textContent = AUTH_COPY.helper;
 
   const errorEl = document.createElement("p");
   errorEl.className = "auth-panel__error";
@@ -67,7 +72,7 @@ export function mountAuthPanel(container, { embedded = false, deferredReveal = f
   legal.innerHTML =
     'Al continuar, aceptas los <a class="auth-panel__legal-link" href="#/legal/terminos">Términos</a> y la <a class="auth-panel__legal-link" href="#/legal/privacidad">Política de privacidad</a>.';
 
-  root.append(subtitle, errorEl, button, legal);
+  root.append(subtitle, helper, errorEl, button, legal);
   container.appendChild(root);
 
   let busy = false;

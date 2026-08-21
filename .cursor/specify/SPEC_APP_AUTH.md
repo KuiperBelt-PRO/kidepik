@@ -30,7 +30,8 @@ Registro e inicio de sesión son el **mismo flujo**: el primer acceso con Google
 | **Email + contraseña** | Fase 1.1 si hay demanda de padres sin Google |
 | **Apple** | Obligatorio antes de publicar en App Store (Capacitor iOS) |
 | **Magic link** | Opcional junto con email |
-| Facebook, Microsoft, SMS, cuenta del niño | No previstos |
+| Facebook, Microsoft, SMS | No previstos |
+| **Cuenta de tripulante (Google)** | **Sí — propuesta** [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md): el tutor asigna un Gmail distinto; ese login **no** crea `parent_accounts` |
 
 ## Principios UX
 
@@ -40,7 +41,7 @@ Registro e inicio de sesión son el **mismo flujo**: el primer acceso con Google
 | Google único | Botón primario «Continuar con Google» (brand guidelines Google) |
 | Legal visible | Texto «Al continuar aceptas…» con enlaces (placeholders hasta legal) |
 | Errores humanos | Mensajes en español, sin códigos técnicos |
-| Menores | Copy explícito: «Cuenta de padre, madre o tutor» |
+| Menores | Copy del panel auth genérico (tutor y tripulante comparten CTA). Cuenta tutor: «Cuenta de padre, madre o tutor» en `#/account`. Tripulante: [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md) |
 
 ## Composición visual (estado `auth-idle`)
 
@@ -102,7 +103,8 @@ Si el loader detecta sesión válida, **no muestra** esta pantalla; va directo a
 
 | Condición | Destino |
 | --- | --- |
-| Sesión OK (MVP) | `#/home` — placeholder «Bienvenido, {email}» |
+| Sesión OK, `role=tutor` | `#/home` |
+| Sesión OK, `role=crew` | `#/member` — [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md) |
 | Onboarding (futuro) | `#/onboarding` cuando exista spec de alta de niño + selector de mundo |
 
 ## Contratos técnicos
@@ -144,15 +146,16 @@ No bloquea la UI de auth; la UI navega a `#/home` con JWT en cliente hasta exist
 | --- | --- |
 | Tokens | Solo `anon` key en cliente; nunca `service_role` |
 | Almacenamiento | `localStorage` Supabase (default) |
-| Menores | UI de auth solo para adulto |
+| Menores | Mismo CTA Google; el rol (tutor vs crew) se decide en bootstrap. Ver [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md) |
 | RGPD | Texto «Al continuar aceptas…» con enlaces placeholder |
-| COPPA / LOPDGDD | Cuenta del tutor verificada vía Google antes de crear perfil menor (onboarding) |
+| COPPA / LOPDGDD | Cuenta del tutor verificada vía Google antes de crear perfil menor; el Gmail del tripulante lo asigna el tutor (consentimiento del responsable) |
 
 ## Copy (español)
 
 | ID | Texto |
 | --- | --- |
-| `auth.subtitle` | Cuenta de padre, madre o tutor |
+| `auth.subtitle` | Entra con Google |
+| `auth.subtitle.helper` | Tutores y tripulantes usan el mismo botón. Si tu tutor te asignó un Gmail, entra con ese correo. |
 | `auth.google` | Continuar con Google |
 | `auth.legal` | Al continuar, aceptas los [Términos] y la [Política de privacidad]. |
 | `auth.error.generic` | No hemos podido iniciar sesión. Inténtalo de nuevo. |

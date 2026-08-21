@@ -4,13 +4,14 @@ import { initTheme } from "./lib/theme.js";
 import { initShellUiTheme } from "./lib/shell-theme.js";
 import { initAppLogger } from "./lib/app-logger.js";
 import { renderLoader } from "./scenes/loader.js?v=236";
-import { renderAuthCallback } from "./scenes/auth-callback.js?v=184";
-import { renderHome } from "./scenes/home.js?v=253";
-import { renderAccount } from "./scenes/account.js?v=237";
-import { renderSettings } from "./scenes/settings.js?v=244";
+import { renderAuthCallback } from "./scenes/auth-callback.js?v=280";
+import { renderHome } from "./scenes/home.js?v=280";
+import { renderAccount } from "./scenes/account.js?v=280";
+import { renderSettings } from "./scenes/settings.js?v=280";
 import { watchNoSpellcheck } from "./components/glass-controls.js?v=227";
-import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=260";
-import { renderPlay } from "./scenes/play.js?v=270";
+import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=280";
+import { renderMember } from "./scenes/member.js?v=1";
+import { renderPlay } from "./scenes/play.js?v=280";
 import { renderLegal } from "./scenes/legal.js?v=256";
 import {
   readCachedParentSettings,
@@ -51,6 +52,7 @@ function boot() {
   registerRoute("auth", () => renderLoader());
   registerRoute("auth/callback", () => renderAuthCallback());
   registerRoute("home", () => renderHome());
+  registerRoute("member", () => renderMember());
   registerRoute("account", () => renderAccount());
   registerRoute("settings", () => renderSettings());
   registerRoute("crew", () => renderCrew());

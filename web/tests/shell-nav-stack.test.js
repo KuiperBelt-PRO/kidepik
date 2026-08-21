@@ -71,6 +71,7 @@ describe("shell-nav-stack", () => {
     assert.equal(inferShellNavParent("crew"), "home");
     assert.equal(inferShellNavParent("crew/new"), "crew");
     assert.equal(inferShellNavParent("settings"), "home");
+    assert.equal(inferShellNavParent("member"), "home");
     assert.equal(inferShellNavParent("home"), null);
   });
 

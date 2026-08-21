@@ -5,10 +5,11 @@
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
 import { resolveDisplayName } from "../components/home-welcome-panel.js";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=186";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=280";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { fetchParentMe } from "../lib/parent-account.js?v=183";
+import { isCrewSession, getCachedSessionAccount } from "../lib/session-account.js";
 import { resolveAccountDisplayName } from "../lib/account-display-name.js?v=183";
 
 /**
@@ -40,15 +41,19 @@ export function renderHome() {
 
     // Montar YA con el nombre de sesión: no bloquear el handoff del mundo
     // esperando /parents/me (eso provocaba #app vacío → parpadeo negro).
-    const displayName = resolveDisplayName(session);
+    const displayName = isCrewSession()
+      ? (getCachedSessionAccount()?.display_name || resolveDisplayName(session))
+      : resolveDisplayName(session);
     ensureAppShell({ onSignOut: doSignOut });
 
     chromeHandle = mountLoaderChrome(app, {
       welcomeHome: {
         displayName,
+        lineFantasy: isCrewSession() ? "tu ficha y tu viaje te esperan" : undefined,
       },
     });
 
+    if (!isCrewSession()) {
     void fetchParentMe(session).then((me) => {
       if (cancelled || !me.ok) return;
       const next = resolveAccountDisplayName(me.parent, session);
@@ -61,6 +66,7 @@ export function renderHome() {
         }
       }
     });
+    }
   })();
 
   return {

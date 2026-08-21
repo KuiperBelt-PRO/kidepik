@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Header, HTTPException
 from app.services.auth import AuthError, SupabaseAuthService
 from app.services.crew import CrewService
 from app.services.parents import ParentAccountService
+from app.services.session_accounts import CrewRoleError, SessionAccountService, SessionConflictError
 
 router = APIRouter(tags=["parents"])
 
@@ -50,13 +51,18 @@ async def bootstrap(authorization: str | None = Header(default=None)) -> dict[st
     if not email:
         raise HTTPException(status_code=422, detail="Email required")
     try:
-        result = await ParentAccountService().bootstrap(
+        result = await SessionAccountService(parents=ParentAccountService()).bootstrap(
             claims["sub"],
             email,
             claims.get("display_name"),
             claims.get("avatar_url"),
         )
-        await CrewService().ensure_tutor_profile_for_auth_user(claims["sub"])
+        if result.get("role") == "tutor":
+            await CrewService().ensure_tutor_profile_for_auth_user(claims["sub"])
+    except CrewRoleError as exc:
+        raise HTTPException(status_code=403, detail=exc.detail) from exc
+    except SessionConflictError as exc:
+        raise HTTPException(status_code=409, detail=exc.detail) from exc
     except RuntimeError as exc:
         raise _map_runtime(exc) from exc
     except Exception as exc:
@@ -71,12 +77,20 @@ async def me(authorization: str | None = Header(default=None)) -> dict[str, Any]
     if not email:
         raise HTTPException(status_code=422, detail="Email required")
     try:
+        await SessionAccountService(parents=ParentAccountService()).require_tutor(
+            claims["sub"],
+            email,
+            claims.get("display_name"),
+            claims.get("avatar_url"),
+        )
         return await ParentAccountService().get_or_bootstrap(
             claims["sub"],
             email,
             claims.get("display_name"),
             claims.get("avatar_url"),
         )
+    except CrewRoleError as exc:
+        raise HTTPException(status_code=403, detail=exc.detail) from exc
     except RuntimeError as exc:
         raise _map_runtime(exc) from exc
     except Exception as exc:
@@ -96,6 +110,12 @@ async def update_me(
         raise HTTPException(status_code=422, detail="Email required")
     try:
         service = ParentAccountService()
+        await SessionAccountService(parents=service).require_tutor(
+            claims["sub"],
+            email,
+            claims.get("display_name"),
+            claims.get("avatar_url"),
+        )
         await service.get_or_bootstrap(
             claims["sub"],
             email,
@@ -103,6 +123,8 @@ async def update_me(
             claims.get("avatar_url"),
         )
         return await service.update_display_name(claims["sub"], body["display_name"])
+    except CrewRoleError as exc:
+        raise HTTPException(status_code=403, detail=exc.detail) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -114,8 +136,19 @@ async def update_me(
 @router.delete("/api/v1/parents/me")
 async def delete_me(authorization: str | None = Header(default=None)) -> dict[str, bool]:
     claims = await _claims(authorization)
+    email = claims.get("email") or ""
+    if not email:
+        raise HTTPException(status_code=422, detail="Email required")
     try:
+        await SessionAccountService(parents=ParentAccountService()).require_tutor(
+            claims["sub"],
+            email,
+            claims.get("display_name"),
+            claims.get("avatar_url"),
+        )
         await ParentAccountService().delete_account(claims["sub"])
+    except CrewRoleError as exc:
+        raise HTTPException(status_code=403, detail=exc.detail) from exc
     except RuntimeError as exc:
         raise _map_runtime(exc) from exc
     except Exception as exc:

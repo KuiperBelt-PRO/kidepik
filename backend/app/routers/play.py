@@ -16,6 +16,7 @@ from app.services.journey_memory import JourneyMemoryService
 from app.services.journey_timeline import JourneyTimelineService
 from app.services.parents import ParentAccountService
 from app.services.play_progress_hud import progress_hud_for_child
+from app.services.session_accounts import CrewRoleError, SessionAccountService
 from app.services.reward_economy import RewardEconomyService
 
 router = APIRouter(tags=["play"])
@@ -29,12 +30,18 @@ async def _claims(authorization: str | None) -> dict[str, Any]:
     if not claims.get("email"):
         raise HTTPException(422, "Email required")
     try:
-        await ParentAccountService().get_or_bootstrap(
+        session = await SessionAccountService(parents=ParentAccountService()).bootstrap(
             claims["sub"],
             claims["email"],
             claims.get("display_name"),
             claims.get("avatar_url"),
         )
+        claims["session_role"] = session.get("role")
+        claims["session_child_id"] = session.get("child_id")
+        if session.get("role") == "tutor":
+            await CrewService().ensure_tutor_profile_for_auth_user(claims["sub"])
+    except CrewRoleError as exc:
+        raise HTTPException(403, exc.detail) from exc
     except RuntimeError as exc:
         if str(exc) in {"DATABASE_URL not configured", "Database unavailable"}:
             raise HTTPException(503, str(exc)) from exc
@@ -45,13 +52,18 @@ async def _claims(authorization: str | None) -> dict[str, Any]:
 def _translate(exc: Exception) -> HTTPException:
     if str(exc) in {"Crew member not found", "Dialogue session not found or closed"}:
         return HTTPException(404, str(exc))
+    if str(exc) == "child_paused":
+        return HTTPException(403, "child_paused")
     if isinstance(exc, ValueError):
         return HTTPException(422, str(exc))
     return HTTPException(500, "Internal error")
 
 
-async def _child_member(auth_user_id: str, child_id: str) -> dict[str, Any]:
-    return await CrewService().get_for_auth_user(auth_user_id, child_id)
+async def _child_member(auth_user_id: str, child_id: str, claims: dict[str, Any] | None = None) -> dict[str, Any]:
+    if claims and claims.get("session_role") == "crew":
+        if str(claims.get("session_child_id") or "") != str(child_id):
+            raise HTTPException(403, "crew_child_mismatch")
+    return await CrewService().get_accessible_for_auth_user(auth_user_id, child_id)
 
 
 @router.post("/api/v1/play/{child_id}/dialogue/session")
@@ -68,10 +80,15 @@ async def open_session(
                 child_id,
                 str((payload or {}).get("flow_id") or "first_run"),
             )
-        member = await _child_member(claims["sub"], child_id)
-        result["progress_hud"] = await progress_hud_for_child(member)
+        member = await _child_member(claims["sub"], child_id, claims)
+        try:
+            result["progress_hud"] = await progress_hud_for_child(member)
+        except Exception:
+            pass
         return result
     except AiProductError:
+        raise
+    except HTTPException:
         raise
     except Exception as exc:
         raise _translate(exc) from exc
@@ -103,7 +120,7 @@ async def submit_turn(
             )
         # Refresh HUD when placement/levels may have changed
         try:
-            member = await _child_member(claims["sub"], child_id)
+            member = await _child_member(claims["sub"], child_id, claims)
             result["progress_hud"] = await progress_hud_for_child(member)
         except Exception:
             pass
@@ -141,7 +158,7 @@ async def play_baggage(
 ) -> dict[str, Any]:
     claims = await _claims(authorization)
     try:
-        member = await _child_member(claims["sub"], child_id)
+        member = await _child_member(claims["sub"], child_id, claims)
         theme = member.get("world_theme") or member.get("active_world_theme") or "fantasy"
         settings = member.get("settings") if isinstance(member.get("settings"), dict) else {}
         learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
@@ -164,7 +181,7 @@ async def play_progress(
 ) -> dict[str, Any]:
     claims = await _claims(authorization)
     try:
-        member = await _child_member(claims["sub"], child_id)
+        member = await _child_member(claims["sub"], child_id, claims)
         return await progress_hud_for_child(member)
     except Exception as exc:
         raise _translate(exc) from exc
@@ -177,7 +194,7 @@ async def play_economy(
 ) -> dict[str, Any]:
     claims = await _claims(authorization)
     try:
-        member = await _child_member(claims["sub"], child_id)
+        member = await _child_member(claims["sub"], child_id, claims)
         theme = member.get("world_theme") or "fantasy"
         wallet = await RewardEconomyService().get_wallet(child_id, str(theme))
         return {

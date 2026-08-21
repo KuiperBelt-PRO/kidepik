@@ -42,7 +42,7 @@ Definir la sección **Cuenta** autenticada:
 | Tema | Notas |
 | --- | --- |
 | Email/contraseña u otros OAuth | Fuera de MVP ([SPEC_APP_AUTH.md](SPEC_APP_AUTH.md)) |
-| Desvincular Google sin borrar cuenta | No en esta fase |
+| Desvincular Google sin borrar cuenta | **Tutor:** no en esta spec. **Tripulante:** sí — [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md) (`POST /member/unlink`; no elimina la plaza) |
 | Perfiles de niño / tripulación | Ver [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md); el modal de borrado de cuenta debe mencionar pérdida de tripulación y progreso |
 | Cambio de email | El email lo aporta Google; solo lectura |
 | Avatar upload propio | Solo mostrar avatar del proveedor si existe |
@@ -54,7 +54,7 @@ Definir la sección **Cuenta** autenticada:
 
 | Principio | Decisión |
 | --- | --- |
-| Cuenta = adulto | Copy «Cuenta de padre, madre o tutor» |
+| Cuenta = adulto | Copy «Cuenta de padre, madre o tutor» (sesión `role=tutor`). Variante crew: [SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md) §5.7 |
 | Google = identidad | Proveedor visible; no simular otros métodos |
 | Alias opcional | Si vacío, fallback amable (nombre Google o parte local del email) |
 | Borrado consciente | Doble paso: aviso explícito + Continuar / Cancelar; sin undo |

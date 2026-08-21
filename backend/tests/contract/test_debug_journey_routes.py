@@ -20,7 +20,7 @@ def debug_ai_enabled(settings, monkeypatch, mocker):
 
     get_settings.cache_clear()
     mocker.patch(
-        "app.routers.debug_journey.debug_capabilities_for_auth_user",
+        "app.routers.debug_journey.debug_capabilities_for_claims",
         new=AsyncMock(
             return_value={
                 "operator_eligible": True,
@@ -47,9 +47,6 @@ def mock_journey_rewind(mocker, mock_session_scope):
             None,
         )
     )
-    mocker.patch(
-        "app.routers.debug_journey.ParentAccountService"
-    ).return_value.get_or_bootstrap = AsyncMock(return_value={"parent_id": "p1"})
     return service
 
 
@@ -131,9 +128,6 @@ async def test_debug_journey_rewind_dry_run_ok(
             RewindReport(anchor_turn_id=TURN_ID, deleted_turns=5, dry_run=True),
         )
     )
-    mocker.patch(
-        "app.routers.debug_journey.ParentAccountService"
-    ).return_value.get_or_bootstrap = AsyncMock(return_value={"parent_id": "p1"})
 
     body = assert_status(
         await client.post(

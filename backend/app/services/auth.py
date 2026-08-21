@@ -73,10 +73,23 @@ class SupabaseAuthService:
         return {
             "sub": user_id,
             "role": "authenticated",
-            "email": str(user["email"]) if user.get("email") else None,
+            "email": self._extract_email(user),
             "display_name": self._extract_display_name(user),
             "avatar_url": self._extract_avatar_url(user),
         }
+
+    @staticmethod
+    def _extract_email(user: dict[str, Any]) -> str | None:
+        direct = user.get("email")
+        if isinstance(direct, str) and direct.strip():
+            return direct.strip()
+        meta = user.get("user_metadata")
+        if isinstance(meta, dict):
+            for key in ("email", "email_address"):
+                value = meta.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return None
 
     @staticmethod
     def _extract_display_name(user: dict[str, Any]) -> str | None:

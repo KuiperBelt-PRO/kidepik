@@ -5,6 +5,8 @@ from typing import Any
 from fastapi import APIRouter, Body, Header, HTTPException
 
 from app.services.auth import AuthError, SupabaseAuthService
+from app.services.parents import ParentAccountService
+from app.services.session_accounts import CrewRoleError, SessionAccountService
 from app.services.settings import ParentSettingsRepository
 
 router = APIRouter(tags=["settings"])
@@ -36,12 +38,20 @@ async def show_settings(authorization: str | None = Header(default=None)) -> dic
     if not email:
         raise HTTPException(status_code=422, detail="Email required")
     try:
+        await SessionAccountService(parents=ParentAccountService()).require_tutor(
+            claims["sub"],
+            email,
+            claims.get("display_name"),
+            claims.get("avatar_url"),
+        )
         return await ParentSettingsRepository().get_for_auth_user(
             claims["sub"],
             email,
             claims.get("display_name"),
             claims.get("avatar_url"),
         )
+    except CrewRoleError as exc:
+        raise HTTPException(status_code=403, detail=exc.detail) from exc
     except RuntimeError as exc:
         raise _map_runtime(exc) from exc
     except Exception as exc:
@@ -58,6 +68,12 @@ async def patch_settings(
     if not email:
         raise HTTPException(status_code=422, detail="Email required")
     try:
+        await SessionAccountService(parents=ParentAccountService()).require_tutor(
+            claims["sub"],
+            email,
+            claims.get("display_name"),
+            claims.get("avatar_url"),
+        )
         return await ParentSettingsRepository().patch_for_auth_user(
             claims["sub"],
             email,
@@ -65,6 +81,8 @@ async def patch_settings(
             claims.get("display_name"),
             claims.get("avatar_url"),
         )
+    except CrewRoleError as exc:
+        raise HTTPException(status_code=403, detail=exc.detail) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:

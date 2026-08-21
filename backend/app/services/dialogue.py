@@ -11,9 +11,14 @@ from sqlalchemy import text
 
 from app.ai.agents.curriculum_knowledge import (
     ANSWER_LEAK_IN_STIMULUS_RULE,
+    FANTASY_PATH_TITLE_GUIDANCE,
+    FANTASY_WORLD_PROSE_RULE,
+    GAP_QUESTION_IN_STIMULUS_RULE,
     MEANING_QUESTION_NO_ECHO_RULE,
     PATH_LORE_ONLY_IF_TAUGHT_RULE,
     PLACEMENT_PRIOR_KNOWLEDGE_RULE,
+    SCI_FI_WORLD_PROSE_RULE,
+    STIMULUS_PROMPT_ALIGNMENT_RULE,
 )
 from app.ai.agents.deps import AudienceContext, RunDeps
 from app.ai.agents.envelopes import (
@@ -45,6 +50,7 @@ from app.services.chapter_titles import read_latest_chapter_opened, resolve_chap
 from app.services.mentor_profiles import mentor_for_child, mentor_profile, resolve_mentor_key
 from app.services.mentor_prose import (
     franchise_violations_in_text,
+    path_compose_exhausted_mentor_text,
     simple_character_agent_text,
     validate_species_options,
     validate_traveler_profile_prose,
@@ -95,6 +101,8 @@ class DialogueService:
         self, auth_user_id: str, child_id: str, flow_id: str = "first_run"
     ) -> dict[str, Any]:
         child = await self._child(auth_user_id, child_id)
+        if child.get("status") == "paused":
+            raise PermissionError("child_paused")
         row = (
             await self.session.execute(
                 text(
@@ -797,13 +805,16 @@ class DialogueService:
                 compose_debug.setdefault("model", exc.model)
             if exc.models_tried:
                 compose_debug.setdefault("models_tried", exc.models_tried)
+            mentor_text = DialogueService._compose_failed_mentor_text(
+                exc, retry_action=retry_action, child=child
+            )
             turns = [
                 await self._mentor_turn(
                     session_id,
                     child_id,
                     str(session["flow_id"]),
                     sequence + 1,
-                    f"{exc.detail} Pulsa continuar para reintentar.",
+                    mentor_text,
                     "continue",
                     [{"id": "continue", "label": "Reintentar"}],
                     {
@@ -1731,24 +1742,7 @@ class DialogueService:
         }
     )
     _PATH_MIN_CHALLENGES = 3
-    _PATH_FALLBACK_BLURBS = {
-        "math": "Practicamos cantidades y operaciones de este tramo.",
-        "language": "Practicamos palabras, frases y formas del castellano.",
-        "reading": "Leemos un pasaje breve y buscamos lo que dice el texto.",
-        "logic": "Buscamos el patrón o la regla que cierra la serie.",
-        "science": "Observamos causas y efectos del mundo natural.",
-        "culture": "Repasamos hechos y costumbres que ya puedes conocer.",
-        "geography": "Situamos lugares, climas y mapas.",
-        "history": "Ordenamos hechos y causas del pasado.",
-        "mythology": "Recordamos mitos reales vestidos de viaje.",
-        "ethics": "Pensamos qué es justo en una situación concreta.",
-        "communication": "Elegimos un mensaje claro y respetuoso.",
-        "politics": "Reconocemos una idea básica de convivencia cívica.",
-        "arts": "Miramos para qué sirve una técnica o un material.",
-        "sports": "Cuidamos el cuerpo y el juego limpio.",
-        "finance": "Pensamos en ahorro, trueque o presupuesto sencillo.",
-    }
-    # Avisos suaves (log); no rechazan el pack ni fuerzan reintentos → fallback.
+    # Avisos suaves (log); no rechazan el pack ni fuerzan reintentos.
     _PATH_NARRATIVE_MIN_CHARS = 40
     _PATH_LESSON_MIN_CHARS = 80
     _PATH_CHALLENGE_WRAPPER_MIN_CHARS = 60
@@ -1770,6 +1764,19 @@ class DialogueService:
         "por qué",
         "porque",
     )
+    _GAP_QUESTION_MARKERS = (
+        "que falta",
+        "qué falta",
+        "completa el hueco",
+        "completa la frase",
+        "completa el pasaje",
+        "locución causal",
+        "locucion causal",
+        "forma correcta de escribir",
+        "escritura correcta",
+        "ortografía correcta",
+        "ortografia correcta",
+    )
     _PATH_TITLE_CLICHES = (
         "bosque de los números",
         "torre de las letras",
@@ -1782,6 +1789,107 @@ class DialogueService:
         "archivos del reino",
         "biblioteca de mundos",
     )
+
+    @staticmethod
+    def _world_narrative_rules(theme: str) -> list[str]:
+        normalized = str(theme or "fantasy").strip().lower()
+        if normalized == "fantasy":
+            return [FANTASY_WORLD_PROSE_RULE, FANTASY_PATH_TITLE_GUIDANCE]
+        if normalized == "sci-fi":
+            return [SCI_FI_WORLD_PROSE_RULE]
+        return []
+
+    @staticmethod
+    def _compose_failed_mentor_text(
+        exc: AiProductError,
+        *,
+        retry_action: str,
+        child: dict[str, Any] | None = None,
+    ) -> str:
+        if retry_action == "path_pack":
+            return path_compose_exhausted_mentor_text(child)
+        detail = str(exc.detail or "").strip()
+        if detail:
+            return f"{detail} Pulsa continuar para reintentar."
+        return "No se pudo generar la respuesta. Pulsa continuar para reintentar."
+
+    @staticmethod
+    def _normalize_challenge_text(text: str) -> str:
+        lowered = str(text or "").lower()
+        lowered = lowered.replace("«", "").replace("»", "").replace('"', "")
+        lowered = re.sub(r"\s+", " ", lowered).strip()
+        return lowered
+
+    @staticmethod
+    def _quoted_spans_in_prompt(prompt: str) -> list[str]:
+        spans: list[str] = []
+        for match in re.finditer(r"«([^»]+)»", str(prompt or "")):
+            token = match.group(1).strip()
+            if token:
+                spans.append(token)
+        for match in re.finditer(r'"([^"]+)"', str(prompt or "")):
+            token = match.group(1).strip()
+            if token:
+                spans.append(token)
+        return spans
+
+    @staticmethod
+    def _path_prompt_asks_for_gap(prompt: str) -> bool:
+        lowered = str(prompt or "").lower()
+        if any(marker in lowered for marker in DialogueService._GAP_QUESTION_MARKERS):
+            return True
+        if "locución" in lowered or "locucion" in lowered:
+            if any(
+                token in lowered
+                for token in ("escrib", "forma correcta", "ortograf", "ortografía")
+            ):
+                return True
+        return False
+
+    @staticmethod
+    def _wrapper_has_visible_gap(wrapper: str) -> bool:
+        text = str(wrapper or "")
+        if re.search(r"_{3,}", text):
+            return True
+        if "…" in text or "..." in text:
+            return True
+        if re.search(r"\[\s*\.{2,}\s*\]|\[\s*\]", text):
+            return True
+        return False
+
+    @staticmethod
+    def _path_challenge_stimulus_coherence_issue(
+        challenge: dict[str, Any], *, subject_id: str
+    ) -> str | None:
+        wrapper = str(challenge.get("narrative_wrapper") or "").strip()
+        prompt = str(challenge.get("prompt_text") or "").strip()
+        if not wrapper or not prompt:
+            return None
+        quality_item = DialogueService._path_challenge_quality_item(
+            challenge, subject_id
+        )
+        leak_issue = DialogueService._placement_item_quality_issue(quality_item)
+        if leak_issue:
+            return leak_issue
+        if DialogueService._path_prompt_asks_for_gap(prompt):
+            if not DialogueService._wrapper_has_visible_gap(wrapper):
+                return "path_challenge_missing_gap"
+        wrapper_norm = DialogueService._normalize_challenge_text(wrapper)
+        for quote in DialogueService._quoted_spans_in_prompt(prompt):
+            quote_norm = DialogueService._normalize_challenge_text(quote)
+            if len(quote_norm) < 3:
+                continue
+            word_count = len(quote_norm.split())
+            if word_count >= 5:
+                if quote_norm not in wrapper_norm:
+                    return "path_challenge_quote_not_in_wrapper"
+                continue
+            if not re.search(
+                rf"\b{re.escape(quote_norm)}\b",
+                wrapper_norm,
+            ):
+                return "path_challenge_quote_not_in_wrapper"
+        return None
 
     @staticmethod
     def _is_purpose_question(text: str) -> bool:
@@ -1985,6 +2093,7 @@ class DialogueService:
         path_index: int | None = None,
         subject_id: str | None = None,
         quality_fallback_pack: list[dict[str, Any]] | None = None,
+        detail: str | None = None,
     ) -> AiProductError:
         debug: dict[str, Any] = {
             "outcome": "failed",
@@ -1998,7 +2107,12 @@ class DialogueService:
             debug["subject_id"] = subject_id
         if model:
             debug["model"] = model
-        err = product_error("ai_compose_failed", model=model, compose_debug=debug)
+        err = product_error(
+            "ai_compose_failed",
+            model=model,
+            compose_debug=debug,
+            detail=detail,
+        )
         if quality_fallback_pack:
             err.quality_fallback_pack = list(quality_fallback_pack)
         return err
@@ -2215,11 +2329,13 @@ class DialogueService:
     def _path_challenge_quality_item(
         challenge: dict[str, Any], subject_id: str
     ) -> dict[str, Any]:
+        wrapper = str(challenge.get("narrative_wrapper") or "").strip()
         prompt = str(challenge.get("prompt_text") or "").strip()
+        presentation = f"{wrapper}\n{prompt}".strip() if wrapper else prompt
         return {
             "subject_id": subject_id,
             "item_type": challenge.get("item_type") or "mcq",
-            "presentation_text": prompt,
+            "presentation_text": presentation,
             "prompt_text": prompt,
             "options": challenge.get("options"),
             "correct_option_id": challenge.get("correct_option_id"),
@@ -2424,6 +2540,10 @@ class DialogueService:
         parts.append(
             f"Mundo activo: {child.get('world_theme') or child.get('active_world_theme')}."
         )
+        theme = str(
+            child.get("world_theme") or child.get("active_world_theme") or "fantasy"
+        )
+        parts.extend(DialogueService._world_narrative_rules(theme))
         parts.append(
             f"Edad cronológica: {child.get('age_years')}. Banda pedagógica: {age_band}."
         )
@@ -3251,12 +3371,17 @@ class DialogueService:
                     error=f"{type(exc).__name__}: {exc}"[:300],
                 )
         compose_log.warning(
-            "path_compose_slot_fallback",
+            "path_compose_slot_exhausted",
             slot_index=slot_index,
             subject_id=subject_id,
             issue=last_issue,
         )
-        return self._path_pack_fallback_entry(subject_id, slot_index)
+        raise self._path_compose_error(
+            issue=last_issue or "path_compose_exhausted",
+            path_index=slot_index,
+            subject_id=subject_id,
+            detail=path_compose_exhausted_mentor_text(child),
+        )
 
     async def _compose_path_slot(
         self,
@@ -3365,6 +3490,7 @@ class DialogueService:
                 "contenido sin asumir que siempre indican debilidad."
             ),
             f"Mundo: {theme}. Edad/banda: {child.get('age_years')}/{child.get('age_band')}.",
+            *DialogueService._world_narrative_rules(theme),
             (
                 "Orden de escritura POR CAMINO (obligatorio): "
                 "(1) inventa título + pitch + NPC; "
@@ -3390,6 +3516,8 @@ class DialogueService:
             PATH_LORE_ONLY_IF_TAUGHT_RULE,
             MEANING_QUESTION_NO_ECHO_RULE,
             ANSWER_LEAK_IN_STIMULUS_RULE,
+            STIMULUS_PROMPT_ALIGNMENT_RULE,
+            GAP_QUESTION_IN_STIMULUS_RULE,
             (
                 "Regla de oro del MCQ: si enseñas que «correr» es un verbo, la opción "
                 "«Verbo» DEBE ser correct_option_id. Si preguntas «¿cuál es un adjetivo?», "
@@ -3487,6 +3615,19 @@ class DialogueService:
                         prompt=str(finalized.get("prompt_text") or "")[:120],
                     )
                     return None, truth_issue
+            coherence_issue = DialogueService._path_challenge_stimulus_coherence_issue(
+                finalized, subject_id=subject
+            )
+            if coherence_issue:
+                compose_log.warning(
+                    "path_compose_challenge_stimulus_issue",
+                    issue=coherence_issue,
+                    path_index=index,
+                    subject_id=subject,
+                    model=model,
+                    prompt=str(finalized.get("prompt_text") or "")[:120],
+                )
+                return None, coherence_issue
             challenges.append(finalized)
         if len(challenges) < DialogueService._PATH_MIN_CHALLENGES:
             return None, "path_challenge_count_short"
@@ -3525,51 +3666,6 @@ class DialogueService:
             },
             None,
         )
-
-    def _path_pack_fallback_entry(self, subject: str, index: int) -> dict[str, Any]:
-        guide_name = "Rumi" if index % 2 == 0 else "Sela"
-        meta = SubjectCatalog.META.get(subject) or {}
-        label = str(meta.get("label") or subject)
-        blurb = DialogueService._PATH_FALLBACK_BLURBS.get(subject) or (
-            f"Practicamos {label.lower()} en este tramo."
-        )
-        return {
-            "path_id": f"path_{index + 1}",
-            "subject_id": subject,
-            "title": f"Práctica de {label}",
-            "intro": f"Un tramo corto para practicar {label.lower()}.",
-            "learning_blurb": blurb,
-            "path_narrative": (
-                f"El sendero se estrecha junto a un arroyo. {guide_name} se detiene "
-                f"y te hace señas para escuchar con atención."
-            ),
-            "lesson_narrative": (
-                f"{guide_name} te muestra dos montones de fruta y cuenta en voz alta. "
-                f"«Si juntas lo mismo en cada lado, el trueque sale justo», dice. "
-                f"Te explica que en este tramo practicarás ideas de {subject} con "
-                f"ejemplos claros antes de cada prueba. Cuando entiendas el truco, "
-                f"los retos te pedirán demostrarlo sin repetir la teoría."
-            ),
-            "npc": {
-                "npc_id": f"path_guide_{index + 1}",
-                "name": guide_name,
-                "role": "guide",
-                "one_line_voice": "Habla claro y anima sin prisa.",
-            },
-            "challenges": [
-                {
-                    "prompt_text": "¿Seguimos con el reto?",
-                    "item_type": "mcq",
-                    "options": [
-                        {"id": "a", "label": "Sí"},
-                        {"id": "b", "label": "Un momento"},
-                        {"id": "c", "label": "Más tarde"},
-                    ],
-                    "correct_option_id": "a",
-                    "explanation": "Sí es la opción para continuar ahora.",
-                }
-            ],
-        }
 
     @staticmethod
     def _ledger_events_for_session(
@@ -4331,8 +4427,11 @@ class DialogueService:
         row = (
             await self.session.execute(
                 text(
-                    "select c.* from children c join parent_accounts p on p.id=c.parent_id "
-                    "where c.id=:child and p.auth_user_id=:auth and c.status<>'deleted'"
+                    "select c.* from children c "
+                    "where c.id=:child and c.status<>'deleted' and ("
+                    " exists (select 1 from parent_accounts p where p.id=c.parent_id and p.auth_user_id=:auth)"
+                    " or c.linked_auth_user_id=:auth"
+                    ")"
                 ),
                 {"child": child, "auth": auth},
             )

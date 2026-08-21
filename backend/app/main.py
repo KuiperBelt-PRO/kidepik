@@ -75,6 +75,8 @@ def create_app() -> FastAPI:
 
     for module_name in (
         "app.routers.parents",
+        "app.routers.session",
+        "app.routers.member",
         "app.routers.settings",
         "app.routers.crew",
         "app.routers.play",

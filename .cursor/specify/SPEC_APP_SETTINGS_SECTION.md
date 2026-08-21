@@ -33,7 +33,7 @@ Definir la sección **Ajustes** autenticada del tutor:
 | Requisito | Detalle |
 | --- | --- |
 | Ruta | `#/settings` (deja de ser stub) |
-| Guard | Sin sesión → `#/loader` |
+| Guard | Sin sesión → `#/loader`. Sesión `role=crew` → `#/member` + API 403 ([SPEC_APP_CREW_MEMBER_ACCOUNT.md](SPEC_APP_CREW_MEMBER_ACCOUNT.md)) |
 | Shell | Montado; drawer «Ajustes» navega aquí |
 | Marco | `mountSectionFrame` + contenido de ajustes |
 | Tema UI tutor | Control + estado visible; sync bidireccional con FAB shell |
