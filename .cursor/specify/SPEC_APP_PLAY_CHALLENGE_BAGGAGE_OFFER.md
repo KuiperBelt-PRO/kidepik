@@ -11,8 +11,8 @@ El viajero puede tener ítems ligados a materias. El toggle equipaje existe pero
 ## Objetivo
 
 1. `baggage_offers[]` en respuestas `open` / `submit_turn` / `baggage/use`.
-2. Franja compacta sobre opciones MCQ en play.
-3. Máx. 3 chips + «Ver todo» → vista baggage.
+2. Franja compacta en el pie de play (**plegada por defecto**; cuerpo = tira de iconos). Contrato UI: [SPEC_APP_PLAY_COMPOSE_COMPACT.md](SPEC_APP_PLAY_COMPOSE_COMPACT.md).
+3. Máx. 3 slots + «Ver equipaje completo» (solo con hotbar expandida) → vista baggage.
 4. Idempotencia por `challenge_ref` vía `path_progress.helps`.
 
 ## Decisiones

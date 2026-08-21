@@ -8,6 +8,8 @@ from uuid import uuid4
 import pytest
 
 from app.ai.agents.curriculum_knowledge import (
+    MEANING_QUESTION_NO_ECHO_RULE,
+    ANSWER_LEAK_IN_STIMULUS_RULE,
     PATH_LORE_ONLY_IF_TAUGHT_RULE,
     PLACEMENT_PRIOR_KNOWLEDGE_RULE,
 )
@@ -428,6 +430,114 @@ def test_read_path_pack_and_progress(dialogue_svc, tmp_path, monkeypatch) -> Non
     progress = dialogue_svc._read_path_progress(PARENT_ID, CHILD_ID, SESSION_ID, "fantasy")
     assert pack[0]["path_id"] == "p1"
     assert progress["current_index"] == 2
+    get_settings.cache_clear()
+
+
+@pytest.mark.unit
+def test_completed_path_ids_from_events() -> None:
+    challenges = [{"prompt_text": "a"}, {"prompt_text": "b"}, {"prompt_text": "c"}]
+    events = [
+        {
+            "kind": "path_progress",
+            "payload": {
+                "path_id": "path_geo",
+                "challenge_index": 3,
+                "last_ok": True,
+                "path": {"path_id": "path_geo", "challenges": challenges},
+            },
+        },
+        {
+            "kind": "path_progress",
+            "payload": {
+                "path_id": "path_lang",
+                "challenge_index": 1,
+                "last_ok": True,
+                "path": {"path_id": "path_lang", "challenges": challenges},
+            },
+        },
+    ]
+    completed = DialogueService._completed_path_ids_from_events(events)
+    assert completed == {"path_geo"}
+    assert DialogueService._latest_completed_path_id(events) == "path_geo"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_reemit_choose_path_excludes_completed_path(
+    dialogue_svc, mocker, tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    child = sample_child(parent_id=PARENT_ID)
+    dialogue_svc.ledger = JourneyLedger(tmp_path)
+    challenges = [{"prompt_text": f"q{i}"} for i in range(3)]
+    pack = [
+        {"path_id": "path_a", "title": "Nexo sintaxis", "subject_id": "language"},
+        {"path_id": "path_b", "title": "Observatorio", "subject_id": "reading"},
+        {
+            "path_id": "path_geo",
+            "title": "Cartografía de Sectores Inexplorados",
+            "subject_id": "geography",
+        },
+    ]
+    dialogue_svc.ledger.append_event(
+        PARENT_ID,
+        CHILD_ID,
+        SESSION_ID,
+        kind="path_pack",
+        payload={"pack": pack},
+        world_theme="fantasy",
+    )
+    dialogue_svc.ledger.append_event(
+        PARENT_ID,
+        CHILD_ID,
+        SESSION_ID,
+        kind="path_progress",
+        payload={
+            "path_id": "path_geo",
+            "challenge_index": 3,
+            "last_ok": True,
+            "path": {"path_id": "path_geo", "challenges": challenges},
+        },
+        world_theme="fantasy",
+    )
+    refreshed = [
+        {"path_id": "path_a", "title": "Nexo sintaxis", "subject_id": "language"},
+        {"path_id": "path_b", "title": "Observatorio", "subject_id": "reading"},
+        {"path_id": "path_new", "title": "Nuevo camino", "subject_id": "math"},
+    ]
+    mocker.patch.object(
+        dialogue_svc,
+        "_refresh_path_pack_after_complete",
+        new=AsyncMock(return_value=(refreshed, {"compose_mode": "refresh_after_complete"})),
+    )
+    dialogue_svc.session = ScriptedSession(
+        [
+            FakeExecuteResult(rows=child),
+            FakeExecuteResult(rows=sample_session_row()),
+            FakeExecuteResult(scalar=10),
+        ]
+    )
+    mentor_mock = mocker.patch.object(
+        dialogue_svc,
+        "_mentor_turn",
+        new=AsyncMock(return_value=sample_turn_row(meta={"phase": "choose_path"})),
+    )
+    mocker.patch(
+        "app.services.dialogue.pick_waiting_batch",
+        new=AsyncMock(return_value=[]),
+    )
+
+    await dialogue_svc.reemit_choose_path("auth", CHILD_ID, SESSION_ID)
+
+    mentor_mock.assert_awaited_once()
+    options = mentor_mock.await_args.args[6]
+    labels = [opt["label"] for opt in options]
+    assert "Cartografía de Sectores Inexplorados" not in labels
+    assert "Nuevo camino" in labels
+    assert "Camino superado" in mentor_mock.await_args.args[4]
     get_settings.cache_clear()
 
 
@@ -984,6 +1094,47 @@ async def test_compose_placement_queue_from_llm(dialogue_svc, mocker) -> None:
     prompt = run_mock.await_args.args[1]
     assert "math" in prompt and "language" in prompt
     assert "Aleria" in prompt
+    assert MEANING_QUESTION_NO_ECHO_RULE in prompt
+    assert ANSWER_LEAK_IN_STIMULUS_RULE in prompt
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_placement_batch_does_not_retry_on_meaning_echo(
+    dialogue_svc, mocker
+) -> None:
+    bundle = PlacementQueueEnvelope(
+        items=[
+            PlacementItemEnvelope(
+                subject_id="reading",
+                item_key="q1",
+                prompt_text="¿Cuál es el significado preciso de 'inefable'?",
+                presentation_text=(
+                    "El registro mostraba una anomalía inefable. "
+                    "¿Cuál es el significado preciso de 'inefable'?"
+                ),
+                options=[
+                    {"id": "a", "label": "Inefable"},
+                    {"id": "b", "label": "Frecuente"},
+                    {"id": "c", "label": "Mesurable"},
+                ],
+                correct_option_id="a",
+            )
+        ]
+    )
+    run_mock = AsyncMock(return_value=(bundle, "gemini-test"))
+    mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
+    child = sample_child(
+        settings={"learning": {"active_subjects": ["reading"]}},
+        age_band="band_teen",
+        effective_age_band="band_teen",
+        age_years=15,
+    )
+    items = await dialogue_svc._compose_placement_batch(
+        child, SESSION_ID, ["reading"], "band_teen"
+    )
+    assert run_mock.await_count == 1
+    assert items[0]["options"][0]["label"] == "Inefable"
 
 
 @pytest.mark.unit
@@ -1098,17 +1249,17 @@ def _path_detail(i: int, *, title: str | None = None) -> PathDetail:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_compose_path_pack_single_batch_call(dialogue_svc, mocker) -> None:
+async def test_compose_path_pack_parallel_calls(dialogue_svc, mocker) -> None:
     bundle = PathPackEnvelope(
         agent_text="Elige tu camino",
-        paths=[_path_detail(1), _path_detail(2), _path_detail(3)],
+        paths=[_path_detail(1)],
     )
     run_mock = AsyncMock(return_value=(bundle, "gemini-3.1-flash-lite"))
     mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
 
     pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
     assert len(pack) == 3
-    assert run_mock.await_count == 1
+    assert run_mock.await_count == 3
     assert pack[0]["title"] == "El cruce de las balanzas 1"
     assert len(pack[0]["challenges"]) == 3
     assert pack[0]["lesson_narrative"]
@@ -1270,21 +1421,112 @@ def test_path_pitch_description_prefers_blurb() -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_compose_path_pack_retries_on_pack_count_mismatch(dialogue_svc, mocker) -> None:
-    bad = PathPackEnvelope(
-        agent_text="Elige",
-        paths=[_path_detail(1), _path_detail(2)],
-    )
-    good = PathPackEnvelope(
-        agent_text="Elige",
-        paths=[_path_detail(1), _path_detail(2), _path_detail(3)],
-    )
+async def test_compose_path_slot_retries_before_fallback(dialogue_svc, mocker) -> None:
+    bad = PathPackEnvelope(agent_text="Elige", paths=[])
+    good = PathPackEnvelope(agent_text="Elige", paths=[_path_detail(1)])
     run_mock = AsyncMock(side_effect=[(bad, "m1"), (good, "m2")])
     mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
 
-    pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
-    assert len(pack) == 3
+    entry = await dialogue_svc._compose_path_slot_with_retry(
+        sample_child(),
+        SESSION_ID,
+        0,
+        "math",
+        await dialogue_svc._path_composer_context(sample_child()),
+        ["math"],
+        "fantasy",
+        [],
+        retries=1,
+    )
+    assert entry["model_used"] == "m2"
     assert run_mock.await_count == 2
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_compose_path_pack_partial_slot_fallback(dialogue_svc, mocker) -> None:
+    good = {"path_id": "ok", "subject_id": "math", "title": "LLM", "model_used": "m1", "challenges": [{}] * 3}
+    fallback = dialogue_svc._path_pack_fallback_entry("language", 1)
+
+    async def slot_side_effect(*args, **kwargs):
+        slot_index = args[2]
+        if slot_index == 1:
+            return fallback
+        return good
+
+    mocker.patch.object(
+        dialogue_svc,
+        "_compose_path_slot_with_retry",
+        new=AsyncMock(side_effect=slot_side_effect),
+    )
+    pack = await dialogue_svc._compose_path_pack_parallel(
+        sample_child(),
+        SESSION_ID,
+        ["math", "language", "reading"],
+        await dialogue_svc._path_composer_context(sample_child()),
+        ["math", "language", "reading"],
+        "fantasy",
+        [],
+        retries=0,
+    )
+    assert len(pack) == 3
+    assert pack[0]["model_used"] == "m1"
+    assert pack[1]["title"].startswith("Práctica de ")
+    assert pack[1].get("model_used") is None
+
+
+@pytest.mark.unit
+def test_pick_refresh_subject_avoids_reused_material() -> None:
+    reused = [
+        {"path_id": "a", "subject_id": "language"},
+        {"path_id": "b", "subject_id": "reading"},
+    ]
+    context = {
+        "weak_subjects_ranked": [
+            {"subject_id": "language"},
+            {"subject_id": "reading"},
+            {"subject_id": "geography"},
+        ]
+    }
+    assert DialogueService._pick_refresh_subject(reused, context) == "geography"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_refresh_path_pack_after_complete_reuses_two_paths(dialogue_svc, mocker, tmp_path) -> None:
+    child = sample_child()
+    parent_id = str(child["parent_id"])
+    world = "fantasy"
+    pack = [
+        {"path_id": "path_a", "subject_id": "language", "title": "A"},
+        {"path_id": "path_b", "subject_id": "reading", "title": "B"},
+        {"path_id": "path_c", "subject_id": "geography", "title": "C"},
+    ]
+
+    def fake_read_events(parent, cid, sid, world_theme=None):
+        return [{"kind": "path_pack", "payload": {"pack": pack}}]
+
+    mocker.patch.object(dialogue_svc.ledger, "read_events", side_effect=fake_read_events)
+    new_path = {
+        "path_id": "path_d",
+        "subject_id": "math",
+        "title": "Nuevo",
+        "model_used": "gemini-test",
+        "challenges": [{}] * 3,
+    }
+    mocker.patch.object(
+        dialogue_svc,
+        "_compose_path_slot_with_retry",
+        new=AsyncMock(return_value=new_path),
+    )
+
+    refreshed, meta = await dialogue_svc._refresh_path_pack_after_complete(
+        child, SESSION_ID, "path_c"
+    )
+    assert [p["path_id"] for p in refreshed] == ["path_a", "path_b", "path_d"]
+    assert meta["compose_mode"] == "refresh_after_complete"
+    assert meta["reused_path_ids"] == ["path_a", "path_b"]
+    assert meta["new_subject_id"] == "math"
 
 
 @pytest.mark.unit
@@ -1294,17 +1536,14 @@ async def test_compose_path_pack_accepts_cliche_title_without_retry(
 ) -> None:
     bundle = PathPackEnvelope(
         agent_text="Elige",
-        paths=[
-            _path_detail(1, title="El bosque de los números"),
-            _path_detail(2),
-            _path_detail(3),
-        ],
+        paths=[_path_detail(1, title="El bosque de los números")],
     )
     run_mock = AsyncMock(return_value=(bundle, "m1"))
     mocker.patch("app.services.dialogue.run_purpose", new=run_mock)
     pack = await dialogue_svc._compose_path_pack(sample_child(), SESSION_ID)
-    assert run_mock.await_count == 1
+    assert len(pack) == 3
     assert pack[0]["title"] == "El bosque de los números"
+    assert run_mock.await_count == 3
 
 
 @pytest.mark.unit
@@ -2523,6 +2762,8 @@ def test_path_compose_prompt_includes_structured_tutor_context() -> None:
     assert "Tablas del 7" in prompt
     assert "Camino 1" in prompt
     assert PATH_LORE_ONLY_IF_TAUGHT_RULE in prompt
+    assert MEANING_QUESTION_NO_ECHO_RULE in prompt
+    assert ANSWER_LEAK_IN_STIMULUS_RULE in prompt
     assert "explanation enseña la regla" in prompt
     assert "Ruta de math/language/reading" in prompt
 
@@ -2571,6 +2812,8 @@ def test_placement_compose_prompt_includes_tutor_context() -> None:
     assert "Contexto del tutor" in prompt
     assert "Sumas simples" in prompt
     assert PLACEMENT_PRIOR_KNOWLEDGE_RULE in prompt
+    assert MEANING_QUESTION_NO_ECHO_RULE in prompt
+    assert ANSWER_LEAK_IN_STIMULUS_RULE in prompt
 
 
 @pytest.mark.unit
@@ -2762,10 +3005,11 @@ def test_path_detail_to_pack_entry_rejects_unscorable_challenge(dialogue_svc) ->
             for _ in range(3)
         ],
     )
-    parsed = dialogue_svc._path_detail_to_pack_entry(
+    parsed, issue = dialogue_svc._path_detail_to_pack_entry(
         detail, "math", ["math"], 0, "test-model"
     )
     assert parsed is None
+    assert issue == "path_mcq_invalid_correct_option"
 
 
 @pytest.mark.unit
@@ -2796,11 +3040,33 @@ def test_path_detail_to_pack_entry_persists_resolved_correct_option_id(dialogue_
             for _ in range(3)
         ],
     )
-    parsed = dialogue_svc._path_detail_to_pack_entry(
+    parsed, issue = dialogue_svc._path_detail_to_pack_entry(
         detail, "math", ["math"], 0, "test-model"
     )
     assert parsed is not None
+    assert issue is None
     assert parsed["challenges"][0]["correct_option_id"] == "b"
+
+
+@pytest.mark.unit
+def test_path_detail_to_pack_entry_reports_short_challenge_count(dialogue_svc) -> None:
+    detail = PathDetail(
+        path=PathOption(
+            path_id="math_path_01",
+            subject_id="math",
+            title="Camino",
+            intro="Intro",
+            learning_blurb="Blurb",
+            path_narrative=_LONG_SCENE,
+            lesson_narrative=_LONG_LESSON,
+        ),
+        challenges=[_path_challenge_seed("¿2+2?") for _ in range(2)],
+    )
+    parsed, issue = dialogue_svc._path_detail_to_pack_entry(
+        detail, "math", ["math"], 0, "test-model"
+    )
+    assert parsed is None
+    assert issue == "path_challenge_count_short"
 
 
 @pytest.mark.unit

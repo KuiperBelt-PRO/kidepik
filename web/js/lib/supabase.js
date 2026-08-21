@@ -14,6 +14,60 @@ let clientFactory = null;
 
 const SUPABASE_CDN = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 const OAUTH_QUERY_KEYS = ["code", "state", "error", "error_description"];
+const LOCAL_SUPABASE_PORT = 54321;
+
+/**
+ * @param {string} host
+ * @returns {boolean}
+ */
+function isPrivateIpv4Host(host) {
+  const match = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host || "");
+  if (!match) return false;
+  const a = Number(match[1]);
+  const b = Number(match[2]);
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 192 && b === 168) ||
+    (a === 172 && b >= 16 && b <= 31)
+  );
+}
+
+/**
+ * Google OAuth rechaza redirect_uri con IP privada; nip.io resuelve al mismo host.
+ * @param {string} host
+ * @returns {string}
+ */
+function oauthFriendlyHost(host) {
+  if (isPrivateIpv4Host(host)) {
+    return `${host}.nip.io`;
+  }
+  return host;
+}
+
+/**
+ * Misma máquina: localhost:54321. Dispositivo en LAN: host de la página + :54321.
+ * Evita depender de config.js con IP fija (SW/cache) al probar en tablet/móvil.
+ * @param {string | undefined} configured
+ * @returns {string}
+ */
+export function resolveSupabaseUrl(configured) {
+  const host = window.location.hostname;
+  if (!host || host === "localhost" || host === "127.0.0.1") {
+    return configured || `http://localhost:${LOCAL_SUPABASE_PORT}`;
+  }
+  return `http://${oauthFriendlyHost(host)}:${LOCAL_SUPABASE_PORT}`;
+}
+
+/**
+ * Origen de la app para redirectTo OAuth (misma regla nip.io en LAN).
+ * @returns {string}
+ */
+export function resolveAppOrigin() {
+  const url = new URL(window.location.href);
+  url.hostname = oauthFriendlyHost(url.hostname);
+  return url.origin;
+}
 
 /**
  * Inyecta un factory (tests / mocks).
@@ -38,11 +92,12 @@ export async function getSupabaseClient() {
   const { config } = await import("../config.js");
   const { createClient } = await import(/* @vite-ignore */ SUPABASE_CDN);
 
-  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+  const supabaseUrl = resolveSupabaseUrl(config.supabaseUrl);
+  if (!supabaseUrl || !config.supabaseAnonKey) {
     throw new Error("Supabase no configurado (supabaseUrl / supabaseAnonKey)");
   }
 
-  client = createClient(config.supabaseUrl, config.supabaseAnonKey, {
+  client = createClient(supabaseUrl, config.supabaseAnonKey, {
     auth: {
       detectSessionInUrl: true,
       persistSession: true,
@@ -133,7 +188,7 @@ export async function signInWithGoogle() {
 
   try {
     const supabase = await getSupabaseClient();
-    const redirectTo = `${window.location.origin}/#/auth/callback`;
+    const redirectTo = `${resolveAppOrigin()}/#/auth/callback`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo },

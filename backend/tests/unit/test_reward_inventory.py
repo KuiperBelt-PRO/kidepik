@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.services.inventory import InventoryService
-from app.services.reward_economy import RewardEconomyService
+from app.services.reward_economy import RewardEconomyService, format_child_reward_toast
 from tests.helpers.db_session import FakeExecuteResult, ScriptedSession
 from tests.helpers.factories import CHILD_ID
 from tests.helpers.session_scope import patch_session_scope
@@ -99,3 +99,57 @@ async def test_grant_idempotent(mocker) -> None:
     )
     assert second["skipped"] is True
     assert second["currency_delta"] == 0
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("currency_delta", "items_meta", "label", "expected"),
+    [
+        (
+            25,
+            [{"instance_name": "Sonda de observación"}],
+            "Créditos",
+            "¡Has encontrado Sonda de observación y 25 créditos!",
+        ),
+        (
+            10,
+            [{"instance_name": "Pergamino de la segunda voz"}],
+            "Monedas",
+            "¡Has encontrado Pergamino de la segunda voz y 10 monedas!",
+        ),
+        (
+            0,
+            [{"instance_name": "Holopad de bitácora"}],
+            "Créditos",
+            "¡Has encontrado Holopad de bitácora!",
+        ),
+        (25, [], "Créditos", "¡Has ganado 25 créditos!"),
+        (
+            25,
+            [{"instance_name": ""}],
+            "Créditos",
+            "¡Has encontrado un hallazgo y 25 créditos!",
+        ),
+        (
+            15,
+            [
+                {"instance_name": "Sonda de observación"},
+                {"instance_name": "Módulo de reintento"},
+            ],
+            "Créditos",
+            "¡Has encontrado Sonda de observación y Módulo de reintento y 15 créditos!",
+        ),
+        (0, [], "Créditos", None),
+    ],
+)
+def test_format_child_reward_toast_names_finding_first(
+    currency_delta: int,
+    items_meta: list[dict],
+    label: str,
+    expected: str | None,
+) -> None:
+    toast = format_child_reward_toast(currency_delta, items_meta, label)
+    assert toast == expected
+    if expected and items_meta and any(it.get("instance_name") for it in items_meta):
+        assert not toast.startswith("¡Has ganado")
+        assert "un hallazgo" not in toast

@@ -58,6 +58,7 @@ if (-not (Test-Path $envFile)) {
     Write-Host "Creado .env.poc desde plantilla." -ForegroundColor Green
 }
 
+& (Join-Path $Root "scripts\sync-lan-auth.ps1")
 & (Join-Path $Root "scripts\poc-write-config.ps1")
 
 Write-Host "==> Docker Compose (nginx + FastAPI)..." -ForegroundColor Yellow
@@ -74,5 +75,19 @@ Write-Host "  API health:       http://localhost:8082/api/v1/health  (FastAPI)"
 Write-Host "  Play / IA:        /api/v1/play/*  /api/v1/debug/ai/*  (FastAPI)"
 Write-Host "  Media:            http://localhost:8082/media/"
 Write-Host "  Supabase:         http://localhost:54321"
+$lanHostRaw = $null
+if (Test-Path $envFile) {
+    foreach ($line in Get-Content $envFile) {
+        if ($line -match '^\s*KIDEPIK_LAN_HOST\s*=\s*(.+)\s*$') {
+            $lanHostRaw = $Matches[1].Trim().Trim('"').Trim("'")
+            break
+        }
+    }
+}
+if ($lanHostRaw) {
+    $lanOAuth = if ($lanHostRaw -match '^\d{1,3}(\.\d{1,3}){3}$') { "$lanHostRaw.nip.io" } else { $lanHostRaw }
+    Write-Host ""
+    Write-Host "  LAN (tablet/movil): http://${lanOAuth}:8082" -ForegroundColor Green
+}
 Write-Host ""
 Write-Host "Preview movil: ./scripts/poc-web-preview.ps1" -ForegroundColor Green

@@ -17,6 +17,20 @@ Proyecto recomendado: `kidepik` (o el que uses en GCP).
 
 Opcional (por si cambia el bind): añade también `http://localhost:54321/auth/v1/callback`.
 
+### Tablet / móvil en la misma WiFi (LAN)
+
+Google **no acepta** IPs privadas (`192.168.x.x`) en redirect URIs → error `device_id and device_name are required for private IP`.
+
+Usa un **dominio nip.io** que resuelve a tu IP LAN (DNS público, sin tocar `/etc/hosts` en el móvil):
+
+| Campo | Valor (ejemplo IP PC `192.168.1.75`) |
+| --- | --- |
+| URL app en el móvil | `http://192.168.1.75.nip.io:8082` |
+| Authorized JavaScript origins | `http://192.168.1.75.nip.io:8082` |
+| Authorized redirect URIs | `http://192.168.1.75.nip.io:54321/auth/v1/callback` |
+
+En `.env.poc`: `KIDEPIK_LAN_HOST=192.168.1.75` (el script convierte a `.nip.io`) y ejecuta `./scripts/sync-lan-auth.ps1` + reinicia Supabase.
+
 4. Descarga el JSON del cliente o copia **Client ID** y **Client secret**.
 
 ## 2. Secretos en el repo (local)
@@ -71,6 +85,7 @@ En el dashboard del proyecto Supabase (`Authentication → Providers → Google`
 | Síntoma | Causa habitual |
 | --- | --- |
 | `redirect_uri_mismatch` | Redirect en GCP debe ser **exactamente** `http://127.0.0.1:54321/auth/v1/callback` (no `localhost`, no puerto `8082`) |
+| `device_id and device_name are required for private IP` | Estás usando IP cruda (`192.168.x.x`) en redirect; usa **nip.io** (ver § Tablet / móvil LAN) |
 | Provider disabled | Falta `supabase/.env` o no reiniciaste Supabase tras sync |
 | Login OK pero sin fila padre | Revisa `POST /api/v1/parents/bootstrap` y logs PHP |
 | App en 127.0.0.1 | Añade también `http://127.0.0.1:8082` en origins y redirect URLs de Supabase (`config.toml`) |

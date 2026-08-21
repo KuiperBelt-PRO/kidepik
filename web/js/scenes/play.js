@@ -40,7 +40,8 @@ import {
   shouldShowBaggageOfferStrip,
   offerToBaggageItem,
   escapeHtml,
-} from "../lib/play-baggage-offer.js?v=5";
+} from "../lib/play-baggage-offer.js?v=6";
+import { shouldRenderChoiceChips } from "../lib/play-compose-layout.js?v=1";
 import { formatLevelLabel } from "../lib/subject-catalog.js?v=253";
 import { renderShellUiIconSvgInner } from "../components/shell-ui-icons.js";
 import { getShellUiTheme } from "../lib/shell-theme.js";
@@ -358,6 +359,7 @@ async function mountPlayPanel(root, ctx) {
       if (titleEl instanceof HTMLElement) {
         titleEl.setAttribute("aria-live", "polite");
         titleEl.classList.add("section-frame__title--chapter");
+        titleEl.setAttribute("title", title);
       }
     }
   }
@@ -505,9 +507,7 @@ async function mountPlayPanel(root, ctx) {
   const footer = document.createElement("div");
   footer.className = "section-frame__footer play-panel__footer";
   footer.innerHTML = `
-    <p class="play-panel__footer-progress" data-exam-progress hidden aria-live="polite"></p>
     <div class="play-baggage-offer" data-baggage-offer hidden aria-label="Equipaje disponible"></div>
-    <div class="play-panel__options" data-options role="group" aria-label="Opciones"></div>
     <form class="play-compose" data-form hidden>
       <textarea
         id="play-reply"
@@ -702,7 +702,6 @@ async function mountPlayPanel(root, ctx) {
     footer.hidden = mode === "baggage";
     if (mode === "baggage") {
       formEl?.setAttribute("hidden", "");
-      optionsEl?.setAttribute("hidden", "");
       baggageToggleBtn?.classList.remove("is-badge");
       const sc = scrollContainer();
       if (sc instanceof HTMLElement) sc.scrollTop = 0;
@@ -731,12 +730,42 @@ async function mountPlayPanel(root, ctx) {
     logEl.appendChild(historyLoadWrap);
     updateHistoryButtonLabel("idle");
   }
-  const optionsEl = footer.querySelector("[data-options]");
   const baggageOfferEl = footer.querySelector("[data-baggage-offer]");
   let usingBaggageOffer = false;
-  let baggageHotbarCollapsed = false;
+  let baggageHotbarCollapsed = true;
   /** @type {string | null} */
   let baggageOfferDetailId = null;
+  /** @type {HTMLElement | null} */
+  let choicesHost = null;
+  /** @type {HTMLElement | null} */
+  let optionsEl = null;
+  /** @type {HTMLElement | null} */
+  let progressEl = null;
+
+  function clearChoices() {
+    choicesHost?.remove();
+    choicesHost = null;
+    optionsEl = null;
+    progressEl = null;
+  }
+
+  function ensureChoicesHost() {
+    if (!(logEl instanceof HTMLElement)) return null;
+    if (choicesHost instanceof HTMLElement && logEl.contains(choicesHost)) {
+      return choicesHost;
+    }
+    choicesHost = document.createElement("div");
+    choicesHost.className = "play-panel__choices";
+    choicesHost.setAttribute("data-play-choices", "");
+    choicesHost.innerHTML = `
+      <p class="play-panel__choices-progress" data-exam-progress hidden aria-live="polite"></p>
+      <div class="play-panel__options" data-options role="group" aria-label="Opciones"></div>
+    `;
+    progressEl = choicesHost.querySelector("[data-exam-progress]");
+    optionsEl = choicesHost.querySelector("[data-options]");
+    logEl.appendChild(choicesHost);
+    return choicesHost;
+  }
 
   if (baggageOfferEl instanceof HTMLElement) {
     baggageOfferEl.addEventListener("click", (ev) => {
@@ -778,7 +807,6 @@ async function mountPlayPanel(root, ctx) {
   }
   const formEl = footer.querySelector("[data-form]");
   const statusEl = root.querySelector("[data-status]");
-  const progressEl = footer.querySelector("[data-exam-progress]");
   const inputEl = footer.querySelector("#play-reply");
   const sendBtn = footer.querySelector("[data-send]");
 
@@ -813,15 +841,11 @@ async function mountPlayPanel(root, ctx) {
     syncFooterChrome();
   }
 
-  /** Oculta borde/fondo del footer cuando no hay opciones ni campo de texto. */
+  /** Oculta borde/fondo del footer cuando no hay campo de texto ni hotbar. */
   function syncFooterChrome() {
-    const optionsEmpty = !(optionsEl instanceof HTMLElement) || optionsEl.childElementCount === 0;
     const composeHidden = !(formEl instanceof HTMLElement) || formEl.hidden;
-    const progressVisible = progressEl instanceof HTMLElement && !progressEl.hidden;
-    footer.classList.toggle(
-      "play-panel__footer--idle",
-      optionsEmpty && composeHidden && !progressVisible,
-    );
+    const baggageHidden = !(baggageOfferEl instanceof HTMLElement) || baggageOfferEl.hidden;
+    footer.classList.toggle("play-panel__footer--idle", composeHidden && baggageHidden);
   }
 
   /** @type {HTMLElement | null} */
@@ -949,9 +973,11 @@ async function mountPlayPanel(root, ctx) {
     logEl.appendChild(group);
     scrollLogToEnd({ force: true });
 
+    const choicesSk = document.createElement("div");
+    choicesSk.className = "play-panel__choices play-panel__choices--sync-skeleton";
+    choicesSk.setAttribute("aria-hidden", "true");
     const footerSk = document.createElement("div");
     footerSk.className = "play-sync-skeleton-footer";
-    footerSk.setAttribute("aria-hidden", "true");
     for (let i = 0; i < 3; i += 1) {
       const chip = document.createElement("div");
       chip.className = "play-sync-skeleton-chip";
@@ -959,17 +985,12 @@ async function mountPlayPanel(root, ctx) {
       chip.querySelector(".glass-skeleton")?.removeAttribute("role");
       footerSk.appendChild(chip);
     }
-    if (optionsEl instanceof HTMLElement) {
-      optionsEl.innerHTML = "";
-      optionsEl.appendChild(footerSk);
-      optionsEl.classList.add("play-panel__options--sync-skeleton");
-      syncFooterChrome();
-    }
+    choicesSk.appendChild(footerSk);
+    logEl.appendChild(choicesSk);
 
     clearSyncSkeleton = () => {
       group.remove();
-      footerSk.remove();
-      optionsEl?.classList.remove("play-panel__options--sync-skeleton");
+      choicesSk.remove();
       clearSyncSkeleton = null;
     };
   }
@@ -1177,7 +1198,7 @@ async function mountPlayPanel(root, ctx) {
     renderedTurnIds.delete(turnId);
     turnSequenceById.delete(turnId);
     clearWorldHints();
-    if (optionsEl instanceof HTMLElement) optionsEl.innerHTML = "";
+    clearChoices();
     if (formEl instanceof HTMLElement) formEl.hidden = true;
     syncFooterComposeMode(false);
     syncExamProgress(null);
@@ -1668,8 +1689,9 @@ async function mountPlayPanel(root, ctx) {
   /**
    * @param {{ id: string, label: string, description: string }[]} hints
    * @param {string} [ariaLabel]
+   * @param {(opt: { id: string, label: string }) => void} [onPick]
    */
-  function renderWorldHints(hints, ariaLabel = "Mundos disponibles") {
+  function renderWorldHints(hints, ariaLabel = "Mundos disponibles", onPick) {
     if (!(logEl instanceof HTMLElement) || hints.length === 0) return;
     clearWorldHints();
 
@@ -1679,18 +1701,25 @@ async function mountPlayPanel(root, ctx) {
     panel.setAttribute("aria-label", ariaLabel);
 
     for (const hint of hints) {
-      const item = document.createElement("div");
+      const item = document.createElement("button");
+      item.type = "button";
       item.className = "play-world-hint";
+      item.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
 
-      const label = document.createElement("p");
+      const label = document.createElement("span");
       label.className = "play-world-hint__label";
       label.textContent = hint.label;
 
-      const desc = document.createElement("p");
+      const desc = document.createElement("span");
       desc.className = "play-world-hint__desc";
       desc.textContent = hint.description;
 
       item.append(label, desc);
+      if (typeof onPick === "function") {
+        item.addEventListener("click", () => {
+          onPick({ id: hint.id, label: hint.label });
+        });
+      }
       panel.appendChild(item);
     }
 
@@ -1848,6 +1877,7 @@ async function mountPlayPanel(root, ctx) {
       baggageOfferEl.hidden = true;
       baggageOfferEl.innerHTML = "";
       baggageOfferDetailId = null;
+      syncFooterChrome();
       if (lastBaggageOffers.length === 0) {
         void refreshBaggageOffers(turn);
       }
@@ -1869,6 +1899,7 @@ async function mountPlayPanel(root, ctx) {
       ? lastBaggageOffers.find((o) => String(o.item_row_id) === baggageOfferDetailId)
       : null;
     paintBaggageOfferDetail(selected || null);
+    syncFooterChrome();
   }
 
   /**
@@ -1959,12 +1990,11 @@ async function mountPlayPanel(root, ctx) {
    * @param {object} turn
    */
   function renderPending(turn) {
-    if (!(optionsEl instanceof HTMLElement) || !(formEl instanceof HTMLElement)) return;
-    optionsEl.innerHTML = "";
+    if (!(formEl instanceof HTMLElement)) return;
     formEl.hidden = true;
     syncFooterComposeMode(false);
     clearWorldHints();
-    syncExamProgress(turn);
+    clearChoices();
 
     const mode = resolvePendingInputMode(turn);
     /** @type {{ id: string, label?: string, description?: string, why_for_you?: string }[]} */
@@ -1998,16 +2028,32 @@ async function mountPlayPanel(root, ctx) {
     const chooseWorld = isChooseWorldTurn(turn);
     const chooseZone = isChooseZoneTurn(turn);
     const choosePath = isChoosePathTurn(turn);
+    const useChoiceCards = chooseWorld || chooseZone || choosePath;
+    const pickCard = (opt) => {
+      void sendReply({
+        kind: "option",
+        option_id: opt.id,
+        displayLabel: opt.label,
+      });
+    };
     if (chooseWorld) {
-      renderWorldHints(enrichWorldOptions(opts), "Mundos disponibles");
+      renderWorldHints(enrichWorldOptions(opts), "Mundos disponibles", pickCard);
     } else if (chooseZone) {
-      renderWorldHints(enrichZoneOptions(opts), "Destinos del viaje");
+      renderWorldHints(enrichZoneOptions(opts), "Destinos del viaje", pickCard);
     } else if (choosePath) {
-      renderWorldHints(enrichPathOptions(opts), "Caminos disponibles");
+      renderWorldHints(enrichPathOptions(opts), "Caminos disponibles", pickCard);
     }
 
-    if (mode === "options_only" || mode === "options_or_text" || mode === "continue") {
+    const showChips = shouldRenderChoiceChips(mode, { useChoiceCards });
+    const progressLabel = examProgressLabel(turn);
+    if (showChips || progressLabel) {
+      ensureChoicesHost();
+      syncExamProgress(turn);
+    }
+
+    if (showChips && optionsEl instanceof HTMLElement) {
       optionsEl.classList.remove("play-panel__options--world");
+      optionsEl.innerHTML = "";
 
       for (const opt of opts) {
         const btn = document.createElement("button");
@@ -2015,16 +2061,6 @@ async function mountPlayPanel(root, ctx) {
         btn.className = "crew-panel__chip play-panel__option";
         const chipLabel = optionChipLabel(opt, phase);
         btn.textContent = chipLabel;
-        if (chooseWorld && WORLD_THEME_HINTS[opt.id]) {
-          const hint = enrichWorldOptions([opt])[0];
-          btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
-        } else if (chooseZone) {
-          const hint = enrichZoneOptions([opt])[0];
-          btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
-        } else if (choosePath) {
-          const hint = enrichPathOptions([opt])[0];
-          btn.setAttribute("aria-label", `${hint.label}. ${hint.description}`);
-        }
 
         btn.addEventListener("click", () => {
           void sendReply(
@@ -2423,7 +2459,7 @@ async function mountPlayPanel(root, ctx) {
       syncExamProgress(null);
     }
     clearWorldHints();
-    if (optionsEl instanceof HTMLElement) optionsEl.innerHTML = "";
+    clearChoices();
     if (formEl instanceof HTMLElement) formEl.hidden = true;
     syncFooterComposeMode(false);
 

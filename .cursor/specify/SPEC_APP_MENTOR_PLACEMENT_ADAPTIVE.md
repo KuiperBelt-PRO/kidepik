@@ -1,6 +1,6 @@
 # Spec: Placement adaptado por edad y prosa narrativa del mentor
 
-> Estado: **implementada** (31 jul 2026) — **delta A2** (1 ago 2026) compose paralelo; **delta 19 ago 2026:** suelo de banda + nivel de materia (`ChallengeDifficultyService`).  
+> Estado: **implementada** (31 jul 2026) — **delta A2** (1 ago 2026) compose paralelo; **delta 19 ago 2026:** suelo de banda + nivel de materia (`ChallengeDifficultyService`); **delta 20 ago 2026:** instrucciones anti-tautología, sin reintento pedagógico.  
 > Relacionado: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md)  
 > Diagrama: [11-child-adventure-pipeline.md](../diagrams/11-child-adventure-pipeline.md)  
 > **Delta** — catálogo y activación: [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md).
@@ -90,7 +90,20 @@ El examen de ingreso **viste** el currículo con prosa del mundo; no convierte e
 | Placement | Solo **conocimiento escolar previo** (edad/banda + materia). Prohibido examinar mitos, héroes o lugares inventados del mundo. En `mythology`: mitos reales (p. ej. Prometeo), no «¿quién trajo el fuego en Binar Star?». |
 | Caminos post-placement | Lore del mundo **solo** si acaba de enseñarse en `lesson_narrative` o en el `narrative_wrapper` de ese reto; si no, conocimiento escolar. |
 
-Contrato de skills: `backend/skills/placement-exam/SKILL.md`, `subject-pedagogy`, `challenge-design`. Prompt de compose: `PLACEMENT_PRIOR_KNOWLEDGE_RULE` / `PATH_LORE_ONLY_IF_TAUGHT_RULE`.
+Contrato de skills: `backend/skills/placement-exam/SKILL.md`, `subject-pedagogy`, `challenge-design`. Prompt de compose: `PLACEMENT_PRIOR_KNOWLEDGE_RULE` / `PATH_LORE_ONLY_IF_TAUGHT_RULE` / `MEANING_QUESTION_NO_ECHO_RULE`.
+
+### 1.6 Instrucciones primero, sin reintento pedagógico (20 ago 2026)
+
+La calidad MCQ (alineación pregunta↔opciones, anti-tautología de significado) se gobierna **solo** por skills y reglas inyectadas en el prompt. El compose **no** rechaza ni reintenta por avisos pedagógicos: eso duplicaba latencia del mentor.
+
+Siguen en pie, porque rompen el envelope o el scoring:
+
+- Schema Pydantic (`mcq_needs_options`, `correct_option_id` ausente).
+- Conteo de ítems/caminos del lote.
+- Inferencia de `correct_option_id` si el modelo pone el texto en vez del id.
+- Filtro de franquicias conocidas.
+
+Anti-tautología normativa: si la pregunta pide el significado/sinónimo de una palabra, ninguna opción puede ser esa palabra (p. ej. «inefable» → «que no se puede explicar», nunca el chip «Inefable»).
 
 ---
 

@@ -1,6 +1,7 @@
 """Play dialogue: first_run + placement + LLM Gemini + ledger ficheros."""
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from typing import Any
@@ -9,6 +10,8 @@ from uuid import UUID
 from sqlalchemy import text
 
 from app.ai.agents.curriculum_knowledge import (
+    ANSWER_LEAK_IN_STIMULUS_RULE,
+    MEANING_QUESTION_NO_ECHO_RULE,
     PATH_LORE_ONLY_IF_TAUGHT_RULE,
     PLACEMENT_PRIOR_KNOWLEDGE_RULE,
 )
@@ -43,7 +46,6 @@ from app.services.mentor_profiles import mentor_for_child, mentor_profile, resol
 from app.services.mentor_prose import (
     franchise_violations_in_text,
     simple_character_agent_text,
-    validate_mentor_prose,
     validate_species_options,
     validate_traveler_profile_prose,
 )
@@ -431,6 +433,15 @@ class DialogueService:
             raise ValueError("session not found")
         parent_id = child.get("parent_id")
         world = self._world(child) or "fantasy"
+        events = self._ledger_events_for_session(
+            self.ledger,
+            str(parent_id) if parent_id else None,
+            child_id,
+            session_id,
+            world,
+        )
+        completed_ids = DialogueService._completed_path_ids_from_events(events)
+        latest_completed = DialogueService._latest_completed_path_id(events)
         pack = self._read_path_pack(
             str(parent_id) if parent_id else None, child_id, session_id, world
         )
@@ -457,6 +468,30 @@ class DialogueService:
                     pass
         if not pack:
             raise ValueError("path pack unavailable")
+        if latest_completed and any(
+            str(path.get("path_id") or "") == latest_completed for path in pack
+        ):
+            pack, _ = await self._refresh_path_pack_after_complete(
+                child, session_id, latest_completed
+            )
+        elif completed_ids:
+            pack = [
+                path
+                for path in pack
+                if str(path.get("path_id") or "") not in completed_ids
+            ]
+        if not pack:
+            raise ValueError("path pack unavailable")
+        if completed_ids:
+            intro_text = (
+                "¡Camino superado! Siguen rutas que dejaste pendientes "
+                "y una nueva pensada para lo que más te conviene practicar ahora."
+            )
+        else:
+            intro_text = (
+                "¡Prueba superada! Elige el siguiente camino. "
+                "Hay tres rutas pensadas para lo que más te conviene practicar."
+            )
         sequence = int(
             (
                 await self.session.execute(
@@ -486,10 +521,7 @@ class DialogueService:
             child_id,
             str(session["flow_id"]),
             sequence,
-            (
-                "¡Prueba superada! Elige el siguiente camino. "
-                "Hay tres rutas pensadas para lo que más te conviene practicar."
-            ),
+            intro_text,
             "options_only",
             options,
             {
@@ -722,7 +754,11 @@ class DialogueService:
                 )
             elif phase == "adventure_ready":
                 effects, turns = await self._start_path_choice(
-                    child, session_id, session, sequence
+                    child,
+                    session_id,
+                    session,
+                    sequence,
+                    refresh_after_complete=True,
                 )
             elif phase == "compose_failed":
                 retry = str((last or {}).get("meta", {}).get("retry_action") or "placement")
@@ -1081,17 +1117,6 @@ class DialogueService:
                 personality_md=profile.personality_md,
                 avoid_phrases=avoid_phrases,
             )
-            if prose_issues and prose_attempt < 2:
-                return await self._phase_character(
-                    child_id,
-                    session_id,
-                    session,
-                    sequence,
-                    value,
-                    child,
-                    prose_retry_hint="; ".join(prose_issues[:6]),
-                    prose_attempt=prose_attempt + 1,
-                )
             if prose_issues:
                 species = raw[:64]
                 vibe = species
@@ -1471,41 +1496,7 @@ class DialogueService:
                 "model_used": model,
             }
             items.append(self._finalize_placement_queue_item(item_dict))
-        for item in items:
-            issue = self._placement_item_quality_issue(item)
-            if issue in DialogueService._PLACEMENT_HARD_QUALITY:
-                compose_log.warning(
-                    "placement_compose_quality_reject",
-                    batch_index=batch_index,
-                    subject_id=item.get("subject_id"),
-                    issue=issue,
-                    model=model,
-                )
-                raise self._placement_compose_error(
-                    model=model,
-                    issue=issue,
-                    batch_index=batch_index,
-                    subject_id=str(item.get("subject_id") or ""),
-                    quality_fallback_items=items,
-                )
-            if issue:
-                compose_log.warning(
-                    "placement_compose_soft_quality",
-                    batch_index=batch_index,
-                    subject_id=item.get("subject_id"),
-                    issue=issue,
-                    model=model,
-                )
-        batch_issue = self._placement_batch_quality_issue(
-            items, palette_tokens=palette_tokens
-        )
-        if batch_issue:
-            compose_log.warning(
-                "placement_compose_soft_quality",
-                batch_index=batch_index,
-                issue=batch_issue,
-                model=model,
-            )
+        del palette_tokens
         compose_log.info(
             "placement_compose_batch_ok",
             batch_index=batch_index,
@@ -2475,6 +2466,8 @@ class DialogueService:
             "En este examen de ingreso usa SOLO item_type mcq (no short_text ni true_false)."
         )
         parts.append(PLACEMENT_PRIOR_KNOWLEDGE_RULE)
+        parts.append(MEANING_QUESTION_NO_ECHO_RULE)
+        parts.append(ANSWER_LEAK_IN_STIMULUS_RULE)
         parts.append(
             "Aplica los skills placement-exam y subject-pedagogy (checklist MCQ, "
             "alineación pregunta↔opciones por tipo). "
@@ -2884,6 +2877,8 @@ class DialogueService:
         session_id: str,
         session: Any,
         sequence: int,
+        *,
+        refresh_after_complete: bool = False,
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
         child_id = str(child["id"])
         world = self._world(child) or "fantasy"
@@ -2893,7 +2888,26 @@ class DialogueService:
             age_band=child.get("age_band") or child.get("effective_age_band"),
             phase="path_compose",
         )
-        pack = await self._compose_path_pack(child, session_id)
+        pack_meta: dict[str, Any] = {"compose_mode": "full_parallel"}
+        if refresh_after_complete:
+            parent_id = child.get("parent_id")
+            progress = self._read_path_progress(
+                str(parent_id) if parent_id else None, child_id, session_id, world
+            )
+            completed_path_id = str((progress.get("path") or {}).get("path_id") or "")
+            pack, pack_meta = await self._refresh_path_pack_after_complete(
+                child, session_id, completed_path_id
+            )
+            intro_text = (
+                "¡Camino superado! Siguen dos rutas que dejaste pendientes "
+                "y una nueva pensada para lo que más te conviene practicar ahora."
+            )
+        else:
+            pack = await self._compose_path_pack(child, session_id)
+            intro_text = (
+                "¡Prueba superada! Elige el siguiente camino. "
+                "Hay tres rutas pensadas para lo que más te conviene practicar."
+            )
         parent_id = child.get("parent_id")
         if parent_id:
             try:
@@ -2903,7 +2917,22 @@ class DialogueService:
                     session_id,
                     kind="path_pack",
                     purpose="path_composer",
-                    payload={"pack": pack, "waiting_hints": waiting_hints},
+                    payload={
+                        "pack": pack,
+                        "waiting_hints": waiting_hints,
+                        **{
+                            key: pack_meta[key]
+                            for key in (
+                                "compose_mode",
+                                "reused_path_ids",
+                                "composed_slots",
+                                "fallback_slots",
+                                "completed_path_id",
+                                "new_subject_id",
+                            )
+                            if key in pack_meta
+                        },
+                    },
                     world_theme=world,
                 )
             except Exception:
@@ -2916,16 +2945,12 @@ class DialogueService:
             }
             for p in pack
         ]
-        text = (
-            "¡Prueba superada! Elige el siguiente camino. "
-            "Hay tres rutas pensadas para lo que más te conviene practicar."
-        )
         turn = await self._mentor_turn(
             session_id,
             child_id,
             session["flow_id"],
             sequence + 1,
-            text,
+            intro_text,
             "options_only",
             options,
             {
@@ -2934,10 +2959,15 @@ class DialogueService:
                 "path_ids": [p["path_id"] for p in pack],
             },
         )
-        return [
-            {"type": "advance_onboarding", "to": "complete"},
-            {"type": "placement_completed", "value": True},
-        ], [turn]
+        effects: list[dict[str, Any]] = []
+        if not refresh_after_complete:
+            effects = [
+                {"type": "advance_onboarding", "to": "complete"},
+                {"type": "placement_completed", "value": True},
+            ]
+        else:
+            effects = [{"type": "path_pack_refreshed", "value": True}]
+        return effects, [turn]
 
     async def _path_composer_subject_rows(
         self, child: dict[str, Any]
@@ -2990,36 +3020,148 @@ class DialogueService:
                 )
             except Exception:
                 pass
-        try:
-            return await self._compose_path_pack_with_retry(
+        return await self._compose_path_pack_parallel(
+            child,
+            session_id,
+            weak,
+            composer_context,
+            subjects,
+            theme,
+            palette_tokens,
+            retries,
+        )
+
+    @staticmethod
+    def _path_slots_for_compose(
+        composer_context: dict[str, Any], weak: list[str]
+    ) -> list[dict[str, Any]]:
+        slots = composer_context.get("path_slots")
+        if isinstance(slots, list) and len(slots) >= 3:
+            return [dict(slot) for slot in slots[:3]]
+        return [
+            {
+                "slot_index": idx,
+                "subject_id": weak[idx % len(weak)] if weak else "math",
+            }
+            for idx in range(3)
+        ]
+
+    @staticmethod
+    def _pick_refresh_subject(
+        reused_paths: list[dict[str, Any]], composer_context: dict[str, Any]
+    ) -> str:
+        reused_subjects = {
+            str(path.get("subject_id") or "").strip()
+            for path in reused_paths
+            if str(path.get("subject_id") or "").strip()
+        }
+        ranked = composer_context.get("weak_subjects_ranked")
+        candidates: list[dict[str, Any]] = []
+        if isinstance(ranked, list):
+            candidates = [
+                row
+                for row in ranked
+                if str(row.get("subject_id") or "").strip()
+                and str(row.get("subject_id")) not in reused_subjects
+            ]
+        if not candidates:
+            compose_log.warning(
+                "path_reuse_subject_collision",
+                reused_subjects=sorted(reused_subjects),
+            )
+            candidates = list(ranked) if isinstance(ranked, list) else []
+        if candidates:
+            return str(candidates[0]["subject_id"])
+        weak = PathComposerContextService.weak_subject_ids(composer_context)
+        return weak[0] if weak else "math"
+
+    async def _refresh_path_pack_after_complete(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        completed_path_id: str,
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        subjects = PlacementService.active_subjects_for_child(child)[:5]
+        composer_context = await self._path_composer_context(child)
+        theme = self._world(child) or "fantasy"
+        palette_tokens = self._traveler_palette_tokens(child)
+        retries = self.settings.ai_compose_batch_retries
+        parent_id = child.get("parent_id")
+        pack = self._read_path_pack(
+            str(parent_id) if parent_id else None,
+            str(child["id"]),
+            session_id,
+            theme,
+        )
+        reused = [
+            dict(path)
+            for path in pack
+            if str(path.get("path_id") or "") != completed_path_id
+        ]
+        if len(reused) != 2 or not completed_path_id:
+            compose_log.warning(
+                "path_pack_refresh_fallback_full",
+                completed_path_id=completed_path_id or None,
+                reused_count=len(reused),
+            )
+            full_pack = await self._compose_path_pack_parallel(
                 child,
                 session_id,
-                weak,
+                PathComposerContextService.weak_subject_ids(composer_context),
                 composer_context,
                 subjects,
                 theme,
                 palette_tokens,
                 retries,
             )
-        except AiProductError as exc:
-            compose_log.warning(
-                "path_compose_batch_exhausted",
-                error_code=exc.error_code,
-                issue=(exc.compose_debug or {}).get("quality_issue"),
-            )
-        except Exception as exc:
-            compose_log.warning(
-                "path_compose_batch_exception",
-                error=f"{type(exc).__name__}: {exc}"[:300],
-            )
+            return full_pack, {
+                "compose_mode": "full_parallel",
+                "reused_path_ids": [],
+                "composed_slots": [],
+                "fallback_slots": [],
+            }
 
-        out: list[dict[str, Any]] = []
-        for i in range(3):
-            subject = weak[i % len(weak)]
-            out.append(self._path_pack_fallback_entry(subject, i))
-        return out
+        new_subject = DialogueService._pick_refresh_subject(reused, composer_context)
+        new_slot_index = len(reused)
+        new_path = await self._compose_path_slot_with_retry(
+            child,
+            session_id,
+            new_slot_index,
+            new_subject,
+            composer_context,
+            subjects,
+            theme,
+            palette_tokens,
+            retries,
+        )
+        refreshed = reused + [new_path]
+        fallback_slots: list[int] = []
+        if not new_path.get("model_used"):
+            fallback_slots.append(new_slot_index)
+        meta = {
+            "compose_mode": "refresh_after_complete",
+            "reused_path_ids": [str(path.get("path_id") or "") for path in reused],
+            "composed_slots": [
+                {
+                    "slot_index": new_slot_index,
+                    "subject_id": new_subject,
+                    "model": new_path.get("model_used"),
+                }
+            ],
+            "fallback_slots": fallback_slots,
+            "completed_path_id": completed_path_id,
+            "new_subject_id": new_subject,
+        }
+        compose_log.info(
+            "path_pack_refresh",
+            compose_mode=meta["compose_mode"],
+            reused_path_ids=meta["reused_path_ids"],
+            new_subject_id=new_subject,
+            fallback_slots=fallback_slots,
+        )
+        return refreshed, meta
 
-    async def _compose_path_pack_with_retry(
+    async def _compose_path_pack_parallel(
         self,
         child: dict[str, Any],
         session_id: str,
@@ -3030,125 +3172,160 @@ class DialogueService:
         palette_tokens: list[str],
         retries: int,
     ) -> list[dict[str, Any]]:
-        last_error: AiProductError | None = None
-        last_quality_pack: list[dict[str, Any]] | None = None
-        for attempt in range(retries + 1):
-            try:
-                return await self._compose_path_pack_batch(
+        slots = DialogueService._path_slots_for_compose(composer_context, weak)
+        concurrency = min(3, max(1, int(self.settings.ai_compose_batch_max_slots)))
+        semaphore = asyncio.Semaphore(concurrency)
+
+        async def compose_slot(slot: dict[str, Any]) -> dict[str, Any]:
+            slot_index = int(slot.get("slot_index") or 0)
+            subject_id = str(slot.get("subject_id") or weak[slot_index % len(weak)])
+            async with semaphore:
+                return await self._compose_path_slot_with_retry(
                     child,
                     session_id,
-                    weak,
+                    slot_index,
+                    subject_id,
+                    composer_context,
+                    subjects,
+                    theme,
+                    palette_tokens,
+                    retries,
+                )
+
+        pack = list(await asyncio.gather(*(compose_slot(slot) for slot in slots)))
+        del theme, palette_tokens
+        compose_log.info("path_compose_parallel_ok", paths=len(pack))
+        return pack
+
+    async def _compose_path_slot_with_retry(
+        self,
+        child: dict[str, Any],
+        session_id: str,
+        slot_index: int,
+        subject_id: str,
+        composer_context: dict[str, Any],
+        subjects: list[str],
+        theme: str,
+        palette_tokens: list[str],
+        retries: int,
+    ) -> dict[str, Any]:
+        last_issue: str | None = None
+        for attempt in range(retries + 1):
+            try:
+                entry = await self._compose_path_slot(
+                    child,
+                    session_id,
+                    slot_index,
+                    subject_id,
                     composer_context,
                     subjects,
                     theme,
                     palette_tokens,
                 )
-            except AiProductError as exc:
-                last_error = exc
-                fallback = getattr(exc, "quality_fallback_pack", None)
-                if isinstance(fallback, list) and fallback:
-                    last_quality_pack = fallback
-                compose_log.warning(
-                    "path_compose_batch_retry",
+                compose_log.info(
+                    "path_compose_slot_ok",
+                    slot_index=slot_index,
+                    subject_id=subject_id,
+                    model=entry.get("model_used"),
                     attempt=attempt + 1,
-                    error_code=exc.error_code,
-                    quality_fallback=bool(last_quality_pack),
                 )
-                if attempt >= retries:
-                    if last_quality_pack is not None:
-                        issue = (exc.compose_debug or {}).get("quality_issue")
-                        compose_log.warning(
-                            "path_compose_quality_fallback",
-                            issue=issue,
-                            paths=len(last_quality_pack),
-                        )
-                        return last_quality_pack
-                    raise
-        if last_error:
-            raise last_error
-        raise self._path_compose_error()
+                return entry
+            except AiProductError as exc:
+                debug = exc.compose_debug or {}
+                last_issue = str(debug.get("quality_issue") or exc.error_code)
+                compose_log.warning(
+                    "path_compose_slot_retry",
+                    slot_index=slot_index,
+                    subject_id=subject_id,
+                    attempt=attempt + 1,
+                    issue=last_issue,
+                    model=debug.get("model") or exc.model,
+                )
+            except Exception as exc:
+                last_issue = f"{type(exc).__name__}"
+                compose_log.warning(
+                    "path_compose_slot_exception",
+                    slot_index=slot_index,
+                    subject_id=subject_id,
+                    attempt=attempt + 1,
+                    error=f"{type(exc).__name__}: {exc}"[:300],
+                )
+        compose_log.warning(
+            "path_compose_slot_fallback",
+            slot_index=slot_index,
+            subject_id=subject_id,
+            issue=last_issue,
+        )
+        return self._path_pack_fallback_entry(subject_id, slot_index)
 
-    async def _compose_path_pack_batch(
+    async def _compose_path_slot(
         self,
         child: dict[str, Any],
         session_id: str,
-        weak: list[str],
+        slot_index: int,
+        subject_id: str,
         composer_context: dict[str, Any],
         subjects: list[str],
         theme: str,
         palette_tokens: list[str],
-    ) -> list[dict[str, Any]]:
+    ) -> dict[str, Any]:
+        del theme, palette_tokens
         deps = self._deps(child, session_id, "path_composer")
-        batch_prompt = self._path_compose_prompt(
+        prompt = self._path_compose_prompt(
             child,
-            weak,
+            [subject_id],
             composer_context,
-            path_count=3,
+            path_count=1,
+            slot_subject=subject_id,
         )
         bundle, model = await run_purpose(
             "path_composer",
-            batch_prompt,
+            prompt,
             deps,
             settings=self.settings,
             gateway=self.gateway,
             expect_type=PathPackEnvelope,
         )
-        if not isinstance(bundle, PathPackEnvelope) or len(bundle.paths) < 3:
+        if not isinstance(bundle, PathPackEnvelope) or len(bundle.paths) < 1:
             compose_log.warning(
                 "path_compose_pack_count_mismatch",
-                expected=3,
+                expected=1,
                 got=len(bundle.paths) if isinstance(bundle, PathPackEnvelope) else None,
                 model=model,
+                slot_index=slot_index,
+                subject_id=subject_id,
             )
             raise self._path_compose_error(
                 model=model,
                 issue="pack_count_mismatch",
+                path_index=slot_index,
+                subject_id=subject_id,
             )
 
-        out: list[dict[str, Any]] = []
-        for i, detail in enumerate(bundle.paths[:3]):
-            subject = weak[i % len(weak)]
-            parsed = self._path_detail_to_pack_entry(
-                detail,
-                subject,
-                subjects,
-                i,
-                model,
-            )
-            if not parsed:
-                raise self._path_compose_error(
-                    model=model,
-                    issue="path_parse_failed",
-                    path_index=i,
-                    subject_id=subject,
-                )
-            out.append(parsed)
-
-        pack_issue = self._path_pack_quality_issue(
-            out, theme, palette_tokens=palette_tokens
+        detail = bundle.paths[0]
+        parsed, parse_issue = self._path_detail_to_pack_entry(
+            detail,
+            subject_id,
+            subjects,
+            slot_index,
+            model,
         )
-        if pack_issue:
+        if not parsed:
             compose_log.warning(
-                "path_compose_quality_reject",
-                issue=pack_issue,
+                "path_compose_path_parse_failed",
+                path_index=slot_index,
+                subject_id=subject_id,
+                issue=parse_issue or "path_parse_failed",
                 model=model,
+                challenges_received=len(detail.challenges),
             )
             raise self._path_compose_error(
                 model=model,
-                issue=pack_issue,
-                quality_fallback_pack=out,
+                issue=parse_issue or "path_parse_failed",
+                path_index=slot_index,
+                subject_id=subject_id,
             )
-        compose_log.info("path_compose_batch_ok", paths=len(out), model=model)
-        soft = DialogueService._path_pack_soft_quality_warnings_pack(
-            out, theme, palette_tokens=palette_tokens
-        )
-        if soft:
-            compose_log.warning(
-                "path_compose_soft_quality",
-                warnings=sorted(set(soft)),
-                model=model,
-            )
-        return out
+        return parsed
 
     def _path_compose_prompt(
         self,
@@ -3157,13 +3334,26 @@ class DialogueService:
         composer_context: dict[str, Any],
         *,
         path_count: int,
+        slot_subject: str | None = None,
     ) -> str:
         theme = str(child.get("world_theme") or child.get("active_world_theme") or "fantasy")
         subjects_line = ", ".join(subject_slots)
         catalog_avoid = ", ".join(
             ZoneCatalog.label(theme, zone_id) for zone_id in ZoneCatalog.ZONE_IDS
         )
-        tutor_sections = PathComposerContextService.prompt_sections(composer_context)
+        prompt_context = composer_context
+        if slot_subject:
+            slots = composer_context.get("path_slots")
+            filtered = [
+                dict(slot)
+                for slot in (slots if isinstance(slots, list) else [])
+                if str(slot.get("subject_id") or "") == slot_subject
+            ]
+            if not filtered:
+                filtered = [{"slot_index": 0, "subject_id": slot_subject}]
+            prompt_context = dict(composer_context)
+            prompt_context["path_slots"] = filtered
+        tutor_sections = PathComposerContextService.prompt_sections(prompt_context)
         parts = [
             f"Genera PathPackEnvelope con exactamente {path_count} camino(s) "
             f"(paths.length = {path_count}).",
@@ -3184,7 +3374,9 @@ class DialogueService:
                 "(4) para cada reto, prompt_text + 3 opciones (ids a/b/c) y LUEGO "
                 "correct_option_id obligatorio (id a/b/c de la opción verdadera, "
                 "nunca null ni el texto visible); responde solo con el wrapper "
-                "(o la regla escolar si es gramática); "
+                "(o la regla escolar si es gramática); ANTES de emitir, relee "
+                "wrapper+pregunta: si pides ortografía/locución/significado, la "
+                "correcta NO puede estar ya escrita en el wrapper; "
                 "(5) explanation enseña la regla en 1-2 frases (por qué es esa opción), "
                 "no solo «la correcta es X»; en series, escribe las diferencias "
                 "y el siguiente término (que debe estar en las opciones)."
@@ -3196,6 +3388,8 @@ class DialogueService:
                 "No copies ejemplos de lesson_narrative en los retos."
             ),
             PATH_LORE_ONLY_IF_TAUGHT_RULE,
+            MEANING_QUESTION_NO_ECHO_RULE,
+            ANSWER_LEAK_IN_STIMULUS_RULE,
             (
                 "Regla de oro del MCQ: si enseñas que «correr» es un verbo, la opción "
                 "«Verbo» DEBE ser correct_option_id. Si preguntas «¿cuál es un adjetivo?», "
@@ -3257,7 +3451,14 @@ class DialogueService:
         subjects: list[str],
         index: int,
         model: str,
-    ) -> dict[str, Any] | None:
+    ) -> tuple[dict[str, Any] | None, str | None]:
+        """Parse one LLM path into a pack entry.
+
+        Returns
+        -------
+        tuple
+            ``(entry, None)`` on success; ``(None, issue_code)`` on structural reject.
+        """
         p = detail.path
         challenges: list[dict[str, Any]] = []
         for ch in detail.challenges[: DialogueService._PATH_MIN_CHALLENGES]:
@@ -3280,12 +3481,15 @@ class DialogueService:
                     compose_log.warning(
                         "path_compose_challenge_unscorable",
                         issue=truth_issue,
+                        path_index=index,
+                        subject_id=subject,
+                        model=model,
                         prompt=str(finalized.get("prompt_text") or "")[:120],
                     )
-                    return None
+                    return None, truth_issue
             challenges.append(finalized)
         if len(challenges) < DialogueService._PATH_MIN_CHALLENGES:
-            return None
+            return None, "path_challenge_count_short"
         npc_blob = ""
         if p.npc is not None:
             npc_blob = f"{p.npc.name} {p.npc.one_line_voice}"
@@ -3302,22 +3506,25 @@ class DialogueService:
             ]
         )
         if franchise_violations_in_text(path_blob):
-            return None
+            return None, "franchise_violation"
         npc: dict[str, Any] | None = None
         if p.npc is not None:
             npc = p.npc.model_dump()
-        return {
-            "path_id": p.path_id or f"path_{index + 1}",
-            "subject_id": p.subject_id if p.subject_id in subjects else subject,
-            "title": p.title or f"Camino {index + 1}",
-            "intro": p.intro,
-            "learning_blurb": p.learning_blurb,
-            "path_narrative": p.path_narrative,
-            "lesson_narrative": getattr(p, "lesson_narrative", None) or "",
-            "npc": npc,
-            "challenges": challenges,
-            "model_used": model,
-        }
+        return (
+            {
+                "path_id": p.path_id or f"path_{index + 1}",
+                "subject_id": p.subject_id if p.subject_id in subjects else subject,
+                "title": p.title or f"Camino {index + 1}",
+                "intro": p.intro,
+                "learning_blurb": p.learning_blurb,
+                "path_narrative": p.path_narrative,
+                "lesson_narrative": getattr(p, "lesson_narrative", None) or "",
+                "npc": npc,
+                "challenges": challenges,
+                "model_used": model,
+            },
+            None,
+        )
 
     def _path_pack_fallback_entry(self, subject: str, index: int) -> dict[str, Any]:
         guide_name = "Rumi" if index % 2 == 0 else "Sela"
@@ -3363,6 +3570,68 @@ class DialogueService:
                 }
             ],
         }
+
+    @staticmethod
+    def _ledger_events_for_session(
+        ledger: JourneyLedger,
+        parent_id: str | None,
+        child_id: str,
+        session_id: str,
+        world: str | None,
+    ) -> list[dict[str, Any]]:
+        if not parent_id:
+            return []
+        try:
+            return list(
+                ledger.read_events(
+                    str(parent_id), child_id, session_id, world_theme=world
+                )
+            )
+        except TypeError:
+            return list(ledger.read_events(str(parent_id), child_id, session_id))
+
+    @staticmethod
+    def _completed_path_ids_from_events(events: list[dict[str, Any]]) -> set[str]:
+        """path_id con los 3 retos superados (challenge_index >= n retos)."""
+        completed: set[str] = set()
+        for row in events or []:
+            if row.get("kind") != "path_progress":
+                continue
+            payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            path_id = str(payload.get("path_id") or "").strip()
+            if not path_id:
+                continue
+            path = payload.get("path") if isinstance(payload.get("path"), dict) else {}
+            challenges = path.get("challenges") or []
+            if not isinstance(challenges, list) or not challenges:
+                continue
+            if payload.get("last_ok") is not True:
+                continue
+            idx = int(payload.get("challenge_index") or 0)
+            if idx >= len(challenges):
+                completed.add(path_id)
+        return completed
+
+    @staticmethod
+    def _latest_completed_path_id(events: list[dict[str, Any]]) -> str | None:
+        last_id: str | None = None
+        for row in events or []:
+            if row.get("kind") != "path_progress":
+                continue
+            payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            path_id = str(payload.get("path_id") or "").strip()
+            if not path_id:
+                continue
+            path = payload.get("path") if isinstance(payload.get("path"), dict) else {}
+            challenges = path.get("challenges") or []
+            if not isinstance(challenges, list) or not challenges:
+                continue
+            if payload.get("last_ok") is not True:
+                continue
+            idx = int(payload.get("challenge_index") or 0)
+            if idx >= len(challenges):
+                last_id = path_id
+        return last_id
 
     def _read_path_pack(
         self,
@@ -3919,16 +4188,9 @@ class DialogueService:
         assert isinstance(envelope, DialogueEnvelope)
         phase_key = str(phase or "")
         world = self._world(child) or "fantasy"
-        avoid_phrases = self._ledger_avoid_phrases(child)
         options = force_options or [o.model_dump() for o in envelope.options] or None
-        prose_issues = validate_mentor_prose(
-            envelope.agent_text,
-            age_band=child.get("age_band") or child.get("effective_age_band"),
-            age_years=child.get("age_years"),
-            avoid_phrases=avoid_phrases,
-        )
-        option_issues: list[str] = []
         if phase_key == "choose_character_species" and not force_options:
+            avoid_phrases = self._ledger_avoid_phrases(child)
             option_issues = validate_species_options(
                 options,
                 world,
@@ -3936,22 +4198,8 @@ class DialogueService:
                 age_years=child.get("age_years"),
                 avoid_phrases=avoid_phrases,
             )
-        all_issues = prose_issues + option_issues
-        if all_issues and prose_retry_hint is None:
-            return await self._agent_mentor_turn(
-                child,
-                session_id,
-                flow,
-                sequence,
-                value,
-                phase,
-                purpose=purpose,
-                force_options=force_options,
-                force_input_mode=force_input_mode,
-                prose_retry_hint="; ".join(all_issues[:6]),
-            )
-        if option_issues and phase_key == "choose_character_species" and not force_options:
-            options = species_options_for_world(world)
+            if option_issues:
+                options = species_options_for_world(world)
         input_mode = force_input_mode or envelope.input_mode
         return await self._mentor_turn(
             session_id,
@@ -4636,7 +4884,11 @@ class DialogueService:
                 else progress.get("challenge_index") or 0
             )
             if 0 <= index < len(challenges):
-                return DialogueService._finalize_path_challenge(challenges[index])
+                item = DialogueService._finalize_path_challenge(challenges[index])
+                subject_id = str(path.get("subject_id") or item.get("subject_id") or "")
+                if subject_id:
+                    item["subject_id"] = subject_id
+                return item
         return None
 
     @staticmethod
@@ -4680,6 +4932,9 @@ class DialogueService:
                 meta["choice_correct"] = True
             elif score < 0.5:
                 meta["choice_correct"] = False
+            subject_id = str(scoring_item.get("subject_id") or finalized.get("subject_id") or "")
+            if subject_id:
+                meta["subject_id"] = subject_id
         return meta
 
     @staticmethod

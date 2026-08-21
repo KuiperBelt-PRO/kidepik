@@ -47,7 +47,7 @@ test("renderBaggageOfferStripHtml includes catalog slots and ver equipaje comple
   assert.match(html, /data-baggage-offer-more/);
   assert.match(html, /data-baggage-offer-preview/);
   assert.match(html, /Ver equipaje completo/);
-  assert.match(html, /Usar ahora/);
+  assert.doesNotMatch(html, /data-baggage-offer-use/);
   assert.match(html, /Equipaje \(2\)/);
   assert.match(html, /data-baggage-hotbar-toggle/);
 });
@@ -70,4 +70,7 @@ test("renderBaggageOfferStripHtml supports collapsed state", () => {
   );
   assert.match(html, /play-baggage-hotbar--collapsed/);
   assert.match(html, /data-baggage-hotbar-body hidden/);
+  assert.doesNotMatch(html, /Ver equipaje completo/);
+  assert.doesNotMatch(html, /play-baggage-hotbar__hint/);
+  assert.doesNotMatch(html, /data-baggage-offer-use/);
 });

@@ -17,6 +17,7 @@ from app.logging_ import AppLogger
 from app.catalogs.explorer_gender import assert_explorer_gender
 from app.services.dialogue import DialogueService
 from app.services.mentor_profiles import resolve_mentor_key
+from app.services.subject_progress import SubjectProgressService
 
 api_log = AppLogger("api")
 
@@ -389,6 +390,21 @@ class JourneyRewindService:
                 clear_traveler=pending_phase in PRE_CHARACTER_PHASES,
                 clear_session_summary=pending_phase in PRE_ADVENTURE_PHASES,
             )
+        if pending_phase in POST_PLACEMENT_PHASES and world in {"fantasy", "sci-fi"}:
+            events: list[dict[str, Any]] = []
+            if parent_id:
+                events = self.ledger.read_events(
+                    parent_id,
+                    child_id,
+                    session_id,
+                    world_theme=world,
+                )
+            await SubjectProgressService(self.session).rebuild_after_rewind(
+                child_id,
+                world,
+                events=events,
+                remaining_turns=remaining_turns,
+            )
 
         await self.session.execute(
             text("update dialogue_sessions set updated_at=now() where id=:id"),
@@ -538,14 +554,8 @@ class JourneyRewindService:
                     {"cid": child_id},
                 )
         elif pending_phase in POST_PLACEMENT_PHASES:
-            # Retos de camino actualizan user_subject_levels sin created_at;
-            # hay que truncar por updated_at igual que en fases posteriores (SPEC §4.1).
-            await self.session.execute(
-                text(
-                    "delete from user_subject_levels where child_id=:cid and updated_at > :at"
-                ),
-                {"cid": child_id, "at": anchor_dt},
-            )
+            # El rolling se reconstruye tras trim del ledger (V2 Linear B),
+            # no se borra por updated_at: el upsert pisa la fila de placement.
             for table in (
                 "story_beats",
                 "story_summaries",

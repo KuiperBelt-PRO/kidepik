@@ -103,7 +103,7 @@ complete
 | `sci-fi` | Ciencia ficción |
 | `fantasy` | Fantasía |
 
-Cada opción incluye `description` breve (1–2 líneas) evocando el mundo — nave/galaxia vs reinos/magia — alineado a [docs/kidepik.md](../../docs/kidepik.md) §5. La UI muestra las descripciones **bajo la burbuja de bienvenida** (`.play-world-hints`); en el pie solo aparecen chips con el nombre del mundo.
+Cada opción incluye `description` breve (1–2 líneas) evocando el mundo — nave/galaxia vs reinos/magia — alineado a [docs/kidepik.md](../../docs/kidepik.md) §5. La UI muestra las descripciones **bajo la burbuja de bienvenida** (`.play-world-hints`); esas **cartas son el selector** (sin chips duplicados en el pie). Resto de pasos `options_*` (género, edad, traits…): chips en el log — [SPEC_APP_PLAY_COMPOSE_COMPACT.md](SPEC_APP_PLAY_COMPOSE_COMPACT.md).
 
 Copy canónico (servidor):
 

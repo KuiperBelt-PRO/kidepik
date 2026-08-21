@@ -18,7 +18,7 @@ flowchart TB
 | Loader / gate / auth Google | SPEC_LOADER_APP_GATE, SPEC_APP_AUTH* | 08, 09 |
 | Shell / drawer / FABs | SPEC_APP_SHELL_CHROME | 07, 10 |
 | Cuenta / ajustes / crew | SPEC_APP_*_SECTION | 10, 05 |
-| Play / examen / diálogo / IA / mentor / memoria / materias / **riqueza narrativa** / **LLM aventura** / **historial paginado** | SPEC_APP_JOURNEY_MECHANICS + SUBJECT_CATALOG / PLAY_* / MENTOR / JOURNEY_MEMORY / ADVENTURE_* / AGE_BANDS / SPEC_AI_* (OpenRouter legado) | 11 |
+| Play / examen / diálogo / IA / mentor / memoria / materias / **riqueza narrativa** / **LLM aventura** / **historial paginado** / **compose compacto (chips en log)** | SPEC_APP_JOURNEY_MECHANICS + SUBJECT_CATALOG / PLAY_* / MENTOR / JOURNEY_MEMORY / ADVENTURE_* / AGE_BANDS / **SPEC_APP_PLAY_COMPOSE_COMPACT** / SPEC_AI_* (OpenRouter legado) | 11 |
 | **IA agentic FastAPI** (Gemini, orquestador, skills, ledger, DuckDB/glosario, mundos paralelos) | **SPEC_DATA_STORAGE_LAYERS** / **SPEC_AI_CENTRAL_ORCHESTRATOR** / **SPEC_AI_GEMINI_GATEWAY** / **SPEC_AI_PYDANTIC_AGENTS** / **SPEC_AI_AGENT_SKILLS** / **SPEC_AI_JOURNEY_FILE_LEDGER** / **SPEC_APP_PARALLEL_WORLDS** / **SPEC_APP_WORLD_GLOSSARY** / **SPEC_APP_WAITING_PHRASES** / **SPEC_APP_CANONICAL_VOCABULARY** | **15**, 11, 05 |
 | Mecánicas de viaje (flujos de decisión jugables) | **SPEC_APP_JOURNEY_MECHANICS** | **16**, 11 |
 | Dónde guardar datos (PG vs archivos vs DuckDB) | **SPEC_DATA_STORAGE_LAYERS** | **17**, 05 |

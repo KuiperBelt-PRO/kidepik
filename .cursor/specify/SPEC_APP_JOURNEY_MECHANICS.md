@@ -24,8 +24,8 @@ La mecánica actual es lenta: mentor demasiado extenso, esperas poco claras, rep
 | M1 | Mentor | Tono del mundo elegido; **breve y dinámico**; no prosa larga |
 | M2 | Esperas | Frases desde **JSONL** `data/waiting/`; rotación cada **8 s**; sin spoilear lugares/personajes de la escena actual |
 | M3 | Prueba de acceso | LLM prepara N preguntas + respuestas + explicaciones; **sin banco estático** |
-| M4 | Caminos | 3 propuestas sobre materias flojas; pitch + NPC + `lesson_narrative` (teoría antes de retos) + 3 MCQ limpios en **un batch** `path_composer`; sin reenseñar en cada pregunta |
-| M5 | Fallo de camino | Se puede regenerar **solo el camino fallido**; los otros dos se reutilizan |
+| M4 | Caminos | 3 propuestas sobre materias flojas; pitch + NPC + `lesson_narrative` + 3 MCQ; compose **por slot** (3 llamadas paralelas) + refresh tras completar camino — ver [SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE](SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE.md) |
+| M5 | Fallo de camino | Se puede regenerar **solo el camino fallido**; los otros dos se reutilizan. Tras **completar** un camino: reutilizar los 2 no elegidos + 1 compose nuevo ([SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE](SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE.md) §4) |
 | M6 | Persistencia de examen/retos | Ledger archivos ([SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md) D5) |
 | M7 | Subida de nivel/rango | Tras cerrar examen o camino; informe `.md` tutor + mensaje breve al viajero |
 | M8 | First-run personaje | Nombre + descripción (especie/aspecto/atuendo/personalidad); 1 paso si cabe, varios si hace falta |
@@ -164,7 +164,9 @@ Estado del pack de caminos (textos, retos, progreso) → **ledger**; no `narrati
 
 ### 5.3 Batch enriquecido + NPCs (ago 2026)
 
-El `path_composer` genera en **una sola llamada** el pack completo:
+> **Delta 20 ago 2026 (implementado):** compose en **3 slots paralelos** + reutilización de pack tras completar camino; ver [SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE](SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE.md).
+
+El `path_composer` genera **un camino por llamada**; el orquestador lanza **3 slots en paralelo** para la encrucijada inicial y, tras completar un camino, reutiliza 2 rutas pendientes y compone solo 1 nueva:
 
 | Campo | Cuándo se muestra | Contenido |
 | --- | --- | --- |

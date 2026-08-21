@@ -103,6 +103,13 @@ En POC Docker, la app escribe **JSONL** bajo `web/logs/` (accesible desde Cursor
 | Compose / mentor amable sin JSON | `compose` + `ai` (todos `llm_attempt` fallan vs fallo post-LLM) |
 | Cambio en gateway, colas, cooldown | `ai` + panel debug AI / logs `web/logs/ai-*.log` |
 
+Mensajes `compose` útiles para `path_composer`:
+
+| message | Cuándo | Campos |
+| --- | --- | --- |
+| `path_compose_path_parse_failed` | Camino rechazado en batch | `issue`, `path_index`, `subject_id`, `challenges_received`, `model` |
+| `path_compose_batch_exhausted` | Agotados reintentos → plantilla | `issue`, `path_index`, `subject_id`, `model` |
+
 ### Cómo leer (agente)
 
 1. Reproducir el fallo en navegador (o pedir al usuario que lo haya hecho).

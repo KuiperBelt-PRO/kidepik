@@ -10,6 +10,7 @@ from app.catalogs import SubjectCatalog
 from app.services.crew_progress import CrewProgressService
 from app.services.subject_progress_config import (
     DELTA_PER_CORRECT,
+    REQUIRED_CORRECT_CHALLENGES,
     ROLLING_MODEL,
     SEED_ROLLING,
     THRESHOLD_UP,
@@ -103,6 +104,145 @@ class SubjectProgressService:
                     )
                     effects.append({"type": "grant_rank", "rank_id": rank_id})
         return effects
+
+    @staticmethod
+    def linear_state_after_corrects(
+        n_correct: int, start_level: str = "L1"
+    ) -> tuple[str, float, str]:
+        """Reconstruye nivel, rolling y source tras N aciertos conservados."""
+        remaining = max(0, int(n_correct))
+        level_idx = SubjectProgressService._level_index(start_level)
+        if level_idx < 1:
+            level_idx = 1
+        if level_idx > 5:
+            level_idx = 5
+        leveled = False
+        while remaining >= REQUIRED_CORRECT_CHALLENGES and level_idx < 5:
+            remaining -= REQUIRED_CORRECT_CHALLENGES
+            level_idx += 1
+            leveled = True
+        if remaining == 0:
+            source = "path_level_up" if leveled else "placement"
+            return f"L{level_idx}", SEED_ROLLING, source
+        rolling = round(
+            min(THRESHOLD_UP, SEED_ROLLING + remaining * DELTA_PER_CORRECT), 4
+        )
+        return f"L{level_idx}", rolling, "path_challenge"
+
+    @staticmethod
+    def count_conserved_corrects(
+        events: list[dict[str, Any]] | None = None,
+        remaining_turns: list[dict[str, Any]] | None = None,
+    ) -> dict[str, int]:
+        """Cuenta aciertos de camino que siguen vivos tras un rewind.
+
+        Prefiere eventos ``path_progress`` con ``last_ok: true``. Si no hay
+        ninguno, usa turnos ``path_challenge_echo`` con ``choice_correct``.
+        """
+        counts: dict[str, int] = {}
+        for row in events or []:
+            if row.get("kind") != "path_progress":
+                continue
+            payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            if payload.get("last_ok") is not True:
+                continue
+            path = payload.get("path") if isinstance(payload.get("path"), dict) else {}
+            subject = str(
+                path.get("subject_id") or payload.get("subject_id") or ""
+            ).strip() or "math"
+            counts[subject] = counts.get(subject, 0) + 1
+        if counts:
+            return counts
+        for turn in remaining_turns or []:
+            meta = turn.get("meta") if isinstance(turn.get("meta"), dict) else {}
+            if str(meta.get("phase") or "") != "path_challenge_echo":
+                continue
+            if meta.get("choice_correct") is not True:
+                continue
+            subject = str(meta.get("subject_id") or "").strip() or "math"
+            counts[subject] = counts.get(subject, 0) + 1
+        return counts
+
+    @staticmethod
+    def _placement_subjects(events: list[dict[str, Any]] | None) -> list[str]:
+        subjects: list[str] = []
+        for row in events or []:
+            if row.get("kind") != "placement_result":
+                continue
+            payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            if payload.get("status") != "completed":
+                continue
+            raw = payload.get("subjects") or []
+            if isinstance(raw, list):
+                subjects = [str(item) for item in raw if str(item).strip()]
+        return subjects
+
+    async def rebuild_after_rewind(
+        self,
+        child_id: str,
+        world_theme: str,
+        *,
+        events: list[dict[str, Any]] | None = None,
+        remaining_turns: list[dict[str, Any]] | None = None,
+    ) -> None:
+        """Reescribe rolling post-placement desde aciertos conservados (rewind V2)."""
+        world = str(world_theme or "fantasy")
+        counts = self.count_conserved_corrects(
+            events, remaining_turns=remaining_turns
+        )
+        existing = await self._fetch_all_rows(child_id, world)
+        subjects = (
+            set(existing)
+            | set(counts)
+            | set(self._placement_subjects(events))
+        )
+        if not subjects:
+            return
+        for subject in subjects:
+            row = existing.get(subject)
+            start_level = "L1"
+            if row and str(row.get("source") or "") == "placement":
+                start_level = str(row.get("level_id") or "L1")
+            n_correct = int(counts.get(subject, 0))
+            level_id, rolling, source = self.linear_state_after_corrects(
+                n_correct, start_level
+            )
+            await self._upsert_row(
+                child_id, world, subject, level_id, rolling, source=source
+            )
+        await self._recalculate_general_level(
+            child_id, world, await self._active_subjects(child_id)
+        )
+        general = await self._general_level(child_id)
+        if general:
+            rank_id = self._rank_id_for_general(world, general)
+            if rank_id:
+                await self.session.execute(
+                    text(
+                        "update children set rank_id=:rid, rank_track=:track, "
+                        "updated_at=now() where id=:cid"
+                    ),
+                    {
+                        "rid": rank_id,
+                        "track": "sci-fi" if world == "sci-fi" else "fantasy",
+                        "cid": child_id,
+                    },
+                )
+
+    async def _fetch_all_rows(
+        self, child_id: str, world: str
+    ) -> dict[str, dict[str, Any]]:
+        rows = (
+            await self.session.execute(
+                text(
+                    "select subject_id, level_id, source, accuracy_rolling "
+                    "from user_subject_levels "
+                    "where child_id=:cid and world_theme=:theme"
+                ),
+                {"cid": child_id, "theme": world},
+            )
+        ).mappings().all()
+        return {str(row["subject_id"]): dict(row) for row in rows}
 
     async def finalize_path_completion(
         self,

@@ -1,6 +1,7 @@
 # Spec: Economía de recompensas (moneda + grants)
 
 > Estado: **aprobada — implementada parcialmente** (ago 2026)  
+> **Delta 20 ago 2026:** `toast_child` nombra el `instance_name` **primero**; no dice «un hallazgo» genérico si hay nombre.
 > Relacionado: [SPEC_APP_INVENTORY_BAGGAGE.md](SPEC_APP_INVENTORY_BAGGAGE.md), [SPEC_APP_ITEM_CATALOG.md](SPEC_APP_ITEM_CATALOG.md), [SPEC_APP_REWARD_SPENDING.md](SPEC_APP_REWARD_SPENDING.md), [SPEC_APP_REWARD_EFFECTS.md](SPEC_APP_REWARD_EFFECTS.md), [SPEC_APP_PARALLEL_WORLDS.md](SPEC_APP_PARALLEL_WORLDS.md), [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md)  
 > **Diagrama:** [19-rewards-inventory.md](../diagrams/19-rewards-inventory.md)
 
@@ -174,9 +175,19 @@ interface RewardGrantedEffect {
   grant_key: string;
   wallet?: WalletDto;           // saldo tras grant
   items_added?: InventoryItemDto[];
-  toast_child?: string;         // 1 frase; UI toast info
+  toast_child?: string;         // 1 frase; UI toast info + recap de camino
 }
 ```
+
+Copy de `toast_child` (servidor; se pega al recap de camino y al toast glass):
+
+| Caso | Frase |
+| --- | --- |
+| Ítem + moneda | `¡Has encontrado {instance_name} y {n} créditos/monedas!` |
+| Solo ítem | `¡Has encontrado {instance_name}!` |
+| Solo moneda | `¡Has ganado {n} créditos/monedas!` |
+
+El **nombre concreto** va antes de la moneda. Prohibido «un hallazgo» genérico cuando hay `instance_name`. Fallback «un hallazgo» solo si el grant de ítem no trae nombre.
 
 El cliente play actualiza HUD de equipaje / wallet sin recargar página.
 

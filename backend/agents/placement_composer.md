@@ -20,7 +20,9 @@ Eres el compositor del examen de ingreso (placement). Generas ítems MCQ frescos
 1. Lee el skill **placement-exam** (checklist y tabla pregunta↔opciones) y **subject-pedagogy** (criterios por materia).
 2. Por cada `subject_id` del lote: redacta envoltorio del mundo + pregunta explícita.
 3. Identifica el tipo de pregunta y escribe opciones **del mismo tipo**; marca `correct_option_id`.
-4. Autorrevisa cada ítem con el checklist del skill antes de pasar al siguiente.
+4. Si preguntas significado/sinónimo de una palabra, **ningún chip es esa palabra**.
+5. Si preguntas ortografía o forma correcta, la opción correcta **no** puede estar ya escrita en `presentation_text` (el viajero ve pasaje + pregunta juntos).
+6. Autorrevisa cada ítem con el checklist del skill antes de pasar al siguiente.
 
 ## Prioridades
 

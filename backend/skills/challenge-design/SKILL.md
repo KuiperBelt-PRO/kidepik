@@ -19,12 +19,13 @@ Castellano de España. La **teoría** va en `lesson_narrative` del camino; cada 
 Orden obligatorio:
 
 1. `narrative_wrapper` con pasaje autónomo (3–5 frases) y ejemplo **distinto** al de la lección.
-2. Pregunta explícita en `prompt_text` (solo sobre el wrapper o regla escolar).
-3. Tres opciones del mismo tipo (`a`/`b`/`c`).
-4. Responde tú la pregunta mirando el wrapper.
-5. `correct_option_id` = esa respuesta.
-6. Si ninguna opción es verdadera → reescribe opciones (no marques una incorrecta).
-7. `explanation` enseña la **regla** (por qué es esa opción), no solo nombra el label. En series numéricas: escribe las diferencias y el siguiente término; si ese término no está entre las opciones, reescribe las opciones.
+2. **Autorrevisión anti-fuga:** si preguntarás ortografía, locución o significado, relee el wrapper: la opción correcta **no** puede estar ya escrita ahí.
+3. Pregunta explícita en `prompt_text` (solo sobre el wrapper o regla escolar).
+4. Tres opciones del mismo tipo (`a`/`b`/`c`).
+5. Responde tú la pregunta mirando el wrapper.
+6. `correct_option_id` = esa respuesta.
+7. Si ninguna opción es verdadera → reescribe opciones (no marques una incorrecta).
+8. `explanation` enseña la **regla** (por qué es esa opción), no solo nombra el label. En series numéricas: escribe las diferencias y el siguiente término; si ese término no está entre las opciones, reescribe las opciones.
 
 ### Ejemplos
 
@@ -48,15 +49,36 @@ Orden obligatorio:
 - Opciones: Casa / Grande / Perro
 - `correct_option_id`: el de **Grande** (nunca un set sin adjetivo)
 
+**Significado / sinónimo (anti-tautología)**
+
+- Prompt: «¿Cuál es el significado de “inefable” en el pasaje?»
+- Opciones: Que no se puede explicar / Frecuente / Medible
+- `correct_option_id`: el de **Que no se puede explicar**
+- ❌ Nunca un chip «Inefable» (es la palabra preguntada, no la respuesta)
+
+## Anti-fuga de respuesta en el pasaje (crítico)
+
+El viajero ve `narrative_wrapper` + `prompt_text` juntos. Si la pregunta pide **ortografía**, **forma correcta**, **locución**, **sinónimo** o **significado**, el wrapper **no puede contener** la opción correcta ni esa forma escrita.
+
+| Mal | Bien |
+| --- | --- |
+| Pasaje: «**Asimismo**, el sistema redujo…» → pregunta: escritura de «también» → chip «Asimismo» | Pasaje: «**Además**, el protocolo cambió…» o deja hueco; chips: Asi mismo / Asimismo / A sí mismo |
+| Pasaje: «navegar **a través de** la nube» → pregunta: locución de desplazamiento → chip «a través de» | Pasaje: «cruzaron la densa nube de escombros» sin la locución; chips con variantes |
+| Pasaje usa la palabra correcta y preguntas su significado con chip = esa palabra | Pasaje usa la palabra; chips son definiciones distintas |
+
+**Autorrevisión por reto:** escribe wrapper → pregunta → opciones → comprueba que la correcta **no** aparece en el wrapper (salvo `reading` con pregunta de **hecho**: «¿qué ocurre?»).
+
 ## Prohibido
 
 - Reenseñar la teoría en cada reto (`teaching_beat` no vacío).
 - Copiar ejemplos de `lesson_narrative` en los retos.
+- Poner en `narrative_wrapper` la forma correcta cuando la pregunta pide ortografía, locución o significado.
 - Preguntar hechos no mencionados en `narrative_wrapper` (salvo `conocimiento escolar previo`).
 - Preguntar `lore inventado` del mundo que **no** acaba de enseñarse en `lesson_narrative` ni en el `narrative_wrapper` de ese reto.
 - Inventar un mito del mundo y examinarlo como si el viajero lo conociera de casa.
 - Marcar `correct_option_id` antes de comprobar la respuesta.
 - Preguntar algo que ninguna opción responde.
+- Preguntar el significado/sinónimo de una palabra y ofrecer esa misma palabra como opción.
 
 ## Alineación con placement-exam
 

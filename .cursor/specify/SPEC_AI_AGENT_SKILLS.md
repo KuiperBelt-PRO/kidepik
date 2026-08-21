@@ -1,6 +1,6 @@
 # Spec: Skills de agentes de producto — Pydantic AI
 
-> Estado: **aprobada** (ago 2026) — **delta 18 ago 2026:** placement-exam / subject-pedagogy / challenge-design: conocimiento escolar previo vs lore inventado.  
+> Estado: **aprobada** (ago 2026) — **delta 18 ago 2026:** placement-exam / subject-pedagogy / challenge-design: conocimiento escolar previo vs lore inventado. **delta 20 ago 2026:** anti-tautología de significado; compose sin reintento pedagógico.  
 > Hilo: IA agentic FastAPI  
 > Relacionado: [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_APP_WORLD_JOURNEY_CANON.md](SPEC_APP_WORLD_JOURNEY_CANON.md), [SPEC_APP_ADVENTURE_ZONE_BIBLE.md](SPEC_APP_ADVENTURE_ZONE_BIBLE.md), [SPEC_APP_AGE_BANDS.md](SPEC_APP_AGE_BANDS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md)
 

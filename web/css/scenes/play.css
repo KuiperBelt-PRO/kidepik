@@ -3,7 +3,8 @@
 .section-frame:has(.play-panel) .section-frame__brand {
   flex-direction: column;
   gap: 0.15rem;
-  max-width: min(100%, 18rem);
+  max-width: min(100%, calc(100% - 5.75rem));
+  padding-inline: 0.15rem;
 }
 
 .section-frame:has(.play-panel) .section-frame__title--chapter,
@@ -16,6 +17,16 @@
   opacity: 0.9;
   text-transform: none;
   font-family: Nunito, system-ui, sans-serif;
+  white-space: normal;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-overflow: ellipsis;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.2;
 }
 
 .section-frame[data-play-theme="fantasy"] .section-frame__title--chapter,
@@ -96,6 +107,39 @@
   color: rgba(255, 255, 255, 0.94);
   border-bottom: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
+}
+
+.play-panel__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.2rem;
+  padding: 0.1rem 0.05rem 0.2rem;
+}
+
+.play-panel__choices-progress {
+  margin: 0;
+  text-align: center;
+  font-family: Nunito, system-ui, sans-serif;
+  font-size: calc(0.78rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.play-panel__choices-progress[hidden] {
+  display: none;
+}
+
+.play-panel__choices .play-panel__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.play-panel__choices .play-panel__option {
+  min-height: 44px;
 }
 
 .play-panel__footer-progress[hidden] {
@@ -362,13 +406,30 @@
 }
 
 .play-world-hint {
+  display: block;
+  width: 100%;
   padding: 0.65rem 0.75rem;
   border-radius: var(--glass-radius-field, 12px);
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.22));
   background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.play-world-hint:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+button.play-world-hint:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.75);
+  outline-offset: 2px;
 }
 
 .play-world-hint__label {
+  display: block;
   margin: 0 0 0.25rem;
   font-family: Nunito, system-ui, sans-serif;
   font-size: calc(0.88rem * var(--font-scale-ui, 1));
@@ -378,6 +439,7 @@
 }
 
 .play-world-hint__desc {
+  display: block;
   margin: 0;
   font-family: Nunito, system-ui, sans-serif;
   font-size: calc(0.8rem * var(--font-scale-ui, 1));
@@ -473,6 +535,10 @@
   min-height: 2.5rem;
 }
 
+.play-compose[hidden] {
+  display: none !important;
+}
+
 .play-compose__input {
   flex: 1 1 auto;
   min-width: 0;
@@ -558,6 +624,11 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.play-baggage-offer:has(.play-baggage-hotbar--collapsed) {
+  padding-top: 0.2rem;
+  padding-bottom: 0.12rem;
+}
+
 .play-baggage-hotbar {
   display: flex;
   flex-direction: column;
@@ -570,24 +641,29 @@
 
 .play-baggage-hotbar__head {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.35rem;
   width: 100%;
-  min-height: 36px;
+  min-height: 32px;
+}
+
+.play-baggage-hotbar--collapsed .play-baggage-hotbar__head {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .play-baggage-hotbar__toggle {
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: none;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
   color: inherit;
   cursor: pointer;
 }
@@ -601,6 +677,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .play-baggage-hotbar__chevron svg {
@@ -667,8 +749,8 @@
 }
 
 .play-baggage-hotbar__slot {
-  flex: 0 0 5.35rem;
-  min-width: 5.35rem;
+  flex: 0 0 4.2rem;
+  min-width: 4.2rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -763,6 +845,13 @@
   width: 100%;
   padding: 0.24rem 0.35rem;
   font-size: calc(0.68rem * var(--font-scale-ui, 1));
+}
+
+@media (min-width: 431px) {
+  .play-baggage-hotbar__slot {
+    flex-basis: 5.35rem;
+    min-width: 5.35rem;
+  }
 }
 
 .play-baggage-hotbar__detail-host {

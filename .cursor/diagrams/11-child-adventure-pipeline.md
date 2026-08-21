@@ -35,7 +35,7 @@ flowchart TB
 
 | Capa | Qué |
 | --- | --- |
-| Supabase | auth, children, progreso por mundo, wallets, inventory |
+| Supabase | auth, children, progreso por mundo, wallets, inventory; `user_subject_levels` se **reconstruye** al rebobinar caminos (no se borra por `updated_at`) |
 | Archivos | dialogue/events/summary/traveler por mundo; estado examen/caminos; `reward_granted` |
 | DuckDB | tools sobre JSONL (glosario + ledger) |
 

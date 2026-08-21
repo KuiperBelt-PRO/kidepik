@@ -74,8 +74,6 @@ export function renderBaggageOfferStripHtml(offers, opts = {}) {
   const slots = offers
     .map((chip) => {
       const label = String(chip.label_child || "Objeto");
-      const effect = effectActionLabel(chip.effect_id);
-      const disabled = chip.can_use ? "" : " disabled aria-disabled=\"true\"";
       const blocked = chip.can_use ? "" : " play-baggage-hotbar__slot--blocked";
       const selected =
         selectedId && selectedId === String(chip.item_row_id)
@@ -93,27 +91,32 @@ export function renderBaggageOfferStripHtml(offers, opts = {}) {
             </div>
             <p class="play-baggage-hotbar__name">${escapeHtml(label)}</p>
           </button>
-          <button type="button" class="play-baggage-hotbar__action crew-panel__btn crew-panel__btn--ghost" data-baggage-offer-use data-effect-id="${escapeHtml(String(chip.effect_id || "challenge_hint"))}"${disabled}>${escapeHtml(effect)}</button>
         </article>`;
     })
     .join("");
 
   const collapsedClass = collapsed ? " play-baggage-hotbar--collapsed" : "";
   const usableCount = offers.filter((chip) => chip.can_use).length;
-  const hint =
+  const hintText =
     usableCount > 0
       ? `${usableCount} listo${usableCount === 1 ? "" : "s"} en este reto`
       : "Desliza para ver todo tu equipaje";
+  const hint = collapsed
+    ? ""
+    : `<span class="play-baggage-hotbar__hint">${escapeHtml(hintText)}</span>`;
+  const moreBtn = collapsed
+    ? ""
+    : `<button type="button" class="crew-panel__btn crew-panel__btn--ghost play-baggage-hotbar__more" data-baggage-offer-more>Ver equipaje completo</button>`;
   return `<div class="play-baggage-hotbar${collapsedClass}" role="group" aria-label="Equipaje útil">
       <div class="play-baggage-hotbar__head">
         <button type="button" class="play-baggage-hotbar__toggle" data-baggage-hotbar-toggle aria-expanded="${collapsed ? "false" : "true"}" aria-label="${collapsed ? "Desplegar equipaje" : "Plegar equipaje"}">
           <span class="play-baggage-hotbar__chevron" data-icon="chevron" aria-hidden="true"></span>
+          <span class="play-baggage-hotbar__title-wrap">
+            <span class="play-baggage-hotbar__title">Equipaje (${offers.length})</span>
+            ${hint}
+          </span>
         </button>
-        <span class="play-baggage-hotbar__title-wrap">
-          <span class="play-baggage-hotbar__title">Equipaje (${offers.length})</span>
-          <span class="play-baggage-hotbar__hint">${escapeHtml(hint)}</span>
-        </span>
-        <button type="button" class="crew-panel__btn crew-panel__btn--ghost play-baggage-hotbar__more" data-baggage-offer-more>Ver equipaje completo</button>
+        ${moreBtn}
       </div>
       <div class="play-baggage-hotbar__body" data-baggage-hotbar-body${collapsed ? " hidden" : ""}>
         <div class="play-baggage-hotbar__strip">${slots}</div>

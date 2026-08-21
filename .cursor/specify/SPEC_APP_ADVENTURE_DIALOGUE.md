@@ -40,24 +40,20 @@ Definir el **contrato de UI, estado, API y seguridad** del diálogo de aventura,
 │  ┌─ burbuja agente ───────────┐ │
 │  │ Texto narrativo / pregunta │ │
 │  └────────────────────────────┘ │
+│  [ A ] [ B ] [ C ]              │  ← chips del turno vigente (log)
+│  (historial scrollable)         │
 │                                 │
-│  (historial scrollable corto)   │
-│                                 │
-│  ┌ opciones ──────────────────┐ │
-│  │ [ A ]  [ B ]               │ │
-│  │ [ C ]  …                   │ │
-│  └────────────────────────────┘ │
-│  [ Escribe tu respuesta…   ➤ ]  │  ← multilínea; botón enviar integrado a la derecha
+│  [ Escribe tu respuesta…   ➤ ]  │  ← pie: solo compose (+ hotbar plegada)
 └─────────────────────────────────┘
 ```
 
-El bloque de respuesta (opciones + campo de texto) se ancla al **pie del marco glass** (`section-frame__footer`), no al scroll del historial. El historial hace scroll en la zona superior; el compose permanece visible.
+El compose de texto se ancla al **pie del marco glass** (`section-frame__footer`). Las **opciones (chips / continue)** viven en el log junto al turno mentor vigente — [SPEC_APP_PLAY_COMPOSE_COMPACT.md](SPEC_APP_PLAY_COMPOSE_COMPACT.md) (propuesta 21 ago 2026). El historial hace scroll en la zona superior; el campo de escribir permanece visible cuando el modo lo pide.
 
 ### 1.0 Control de respuesta (chat)
 
 | Aspecto | Decisión |
 | --- | --- |
-| Posición | Pie fijo del marco glass |
+| Posición | Pie fijo del marco glass (**solo** textarea + enviar; chips fuera del pie, ver COMPOSE_COMPACT) |
 | Campo | `textarea` multilínea (auto-grow hasta ~5 líneas) |
 | Enviar | Botón circular integrado dentro del campo, a la derecha |
 | Enter | Envía; Shift+Enter inserta salto de línea |
@@ -256,7 +252,7 @@ Orquestación detallada (roles, PlayerState, envelopes JSON): [SPEC_AI_PLAY_ORCH
 
 ## 6. Criterios de aceptación (cuando se implemente)
 
-1. Un turno `options_or_text` muestra chips e input.
+1. Un turno `options_or_text` muestra chips **en el log** e input en el pie ([SPEC_APP_PLAY_COMPOSE_COMPACT](SPEC_APP_PLAY_COMPOSE_COMPACT.md)).
 2. Elegir opción o texto produce siguiente burbuja agente.
 3. Effect `set_world_theme` cambia tipografía/iconos al vuelo (`data-play-theme` en `.section-frame`).
 4. Reanudar sesión recupera historial sin regenerar desde cero.

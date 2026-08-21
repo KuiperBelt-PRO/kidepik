@@ -16,7 +16,7 @@ tools:
   - ledger_query
 ---
 
-Compositor de caminos post-placement. Genera **exactamente 3** caminos en una sola respuesta (`paths.length = 3`).
+Compositor de caminos post-placement. Genera **un camino por llamada** (`PathPackEnvelope` con `paths.length = 1`). El orquestador lanza **3 slots en paralelo** para la encrucijada inicial; tras completar un camino, reutiliza 2 rutas pendientes y compone solo 1 nueva.
 
 ## Orden de escritura (por camino, obligatorio)
 
@@ -26,6 +26,7 @@ Compositor de caminos post-placement. Genera **exactamente 3** caminos en una so
 4. Escribe **3 retos** con ejemplos **nuevos** (no reutilices personajes, situaciones ni frases de la lección).
 5. Por cada reto, en este orden:
    - Escribe `narrative_wrapper` (3–5 frases): mini-pasaje autónomo con **toda** la información necesaria para responder.
+   - **Comprueba anti-fuga:** si la pregunta pedirá ortografía, locución o significado, el wrapper **no** puede contener la forma correcta (usa sinónimo, paráfrasis o deja hueco).
    - Escribe `prompt_text` (pregunta clara; solo sobre el wrapper o conocimiento escolar previo).
    - Escribe 3 `options` (ids `a`/`b`/`c`).
    - **Responde tú** la pregunta mirando solo `narrative_wrapper` + opciones (o la regla escolar si es gramática).
@@ -45,6 +46,11 @@ La opción marcada como correcta debe ser la respuesta **verdadera** en el mundo
 | Mismo ejemplo en lección y reto (p. ej. el hada y el árbol) | Cada reto usa situación distinta en `narrative_wrapper` |
 | Pregunta sobre algo no dicho en el wrapper | Toda pista necesaria debe estar en `narrative_wrapper` |
 | Trivia de lore del mundo no enseñada | Lore del mundo solo si acaba de enseñarse en la lección o el wrapper; si no, conocimiento escolar previo |
+| «¿Qué significa inefable?» con chip «Inefable» | Definición distinta: «que no se puede explicar» |
+| Pasaje con «Asimismo…» y pregunta ortografía de «también» | Pasaje con «Además…» o sin la forma; chips con variantes |
+| Pasaje con «a través de» y pregunta la locución | Pasaje describe el desplazamiento sin escribir la locución |
+
+**Anti-fuga:** el viajero lee `narrative_wrapper` + `prompt_text` a la vez. Si preguntas ortografía, locución, sinónimo o significado, la opción correcta **no** puede aparecer en el wrapper (salvo `reading` con hecho del pasaje).
 
 ## Campos
 

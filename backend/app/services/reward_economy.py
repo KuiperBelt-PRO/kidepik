@@ -10,6 +10,46 @@ from app.db import session_scope
 from app.services.inventory import InventoryService
 
 
+def format_child_reward_toast(
+    currency_delta: int,
+    items_meta: list[dict[str, Any]],
+    currency_label: str,
+) -> str | None:
+    """Build the child-facing grant phrase.
+
+    The concrete finding name comes first. Generic «un hallazgo» is only a
+    fallback when an item was granted without ``instance_name``.
+
+    Parameters
+    ----------
+    currency_delta
+        Amount granted in this call (0 if none).
+    items_meta
+        Items added, each optionally with ``instance_name``.
+    currency_label
+        World label («Créditos» / «Monedas»).
+
+    Returns
+    -------
+    str or None
+        One sentence, or ``None`` when nothing was granted.
+    """
+    names = [
+        str(item.get("instance_name") or "").strip()
+        for item in items_meta
+        if str(item.get("instance_name") or "").strip()
+    ]
+    shown = " y ".join(names) if names else ("un hallazgo" if items_meta else None)
+    label = str(currency_label or "").strip().lower() or "créditos"
+    if shown and currency_delta:
+        return f"¡Has encontrado {shown} y {currency_delta} {label}!"
+    if shown:
+        return f"¡Has encontrado {shown}!"
+    if currency_delta:
+        return f"¡Has ganado {currency_delta} {label}!"
+    return None
+
+
 class RewardEconomyService:
     def __init__(self, inventory: InventoryService | None = None) -> None:
         self.inventory = inventory or InventoryService()
@@ -148,14 +188,9 @@ class RewardEconomyService:
             "label_tutor": labels["label_tutor"],
             "icon_id": labels.get("icon_id", "currency"),
         }
-        toast = None
-        if currency_delta and items_meta:
-            toast = f"¡Has ganado {currency_delta} {labels['label_child'].lower()} y un hallazgo!"
-        elif currency_delta:
-            toast = f"¡Has ganado {currency_delta} {labels['label_child'].lower()}!"
-        elif items_meta:
-            shown = items_meta[0].get("instance_name") or "un hallazgo"
-            toast = f"¡Nuevo hallazgo: {shown}!"
+        toast = format_child_reward_toast(
+            currency_delta, items_meta, labels["label_child"]
+        )
 
         return {
             "skipped": False,

@@ -1,7 +1,7 @@
 # Spec: Rebobinado de viaje en modo debug (play)
 
 > Estado: **implementada** (fases A+B, ago 2026)  
-> Relacionado: [SPEC_APP_DEBUG_MODE.md](SPEC_APP_DEBUG_MODE.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md](SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_APP_JOURNEY_CHAPTERS.md](SPEC_APP_JOURNEY_CHAPTERS.md)
+> Relacionado: [SPEC_APP_DEBUG_MODE.md](SPEC_APP_DEBUG_MODE.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md](SPEC_APP_ADVENTURE_DIALOGUE_HISTORY.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_APP_JOURNEY_CHAPTERS.md](SPEC_APP_JOURNEY_CHAPTERS.md), [SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md](SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md)
 
 ## Contexto
 
@@ -168,7 +168,7 @@ Operación **atómica** (una transacción Postgres + escritura ledger acotada).
 | `dialogue_sessions` | `updated_at = now()`; mantener `status = open` |
 | `children` | Reconstruir campos de viaje según §4.3 |
 | `placement_exams` | Borrar filas del child si el ancla queda **antes** de completar placement |
-| `user_subject_levels`, `child_world_progress`, `story_beats`, `story_summaries`, `journey_decisions` | Truncar o borrar entradas con `created_at` posterior al ancla **o** regenerar según fase |
+| `user_subject_levels`, `child_world_progress`, `story_beats`, `story_summaries`, `journey_decisions` | Truncar por fecha **salvo** `user_subject_levels` en fases post-placement: **reconstruir** rolling (semilla + aciertos conservados; [SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md](SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md) §7) |
 | `child_traits` | Deprecado; no fuente de verdad — ignorar salvo legado |
 
 ### 4.2 Ledger (`data/journey/`)
@@ -255,7 +255,8 @@ No persistir preferencia; iconos solo con debug activo en la sesión.
 
 | Capa | Casos |
 | --- | --- |
-| Unit `journey_rewind` | mentor ancla; explorer ancla; dry-run; fase→child mapping |
+| Unit `journey_rewind` | mentor ancla; explorer ancla; dry-run; fase→child mapping; post-placement **no** borra `user_subject_levels` |
+| Unit `subject_progress` | rebuild rolling: 2 aciertos → semilla+2Δ; 12 → L2+semilla |
 | Contract | 404 sin debug; 403 child ajeno; 200 trunca turnos |
 | Integration | rewind tras choose_name → display_name coherente; tras placement parcial → queue limpia |
 | Playwright 390×844 | Con `?debugAi=1`, icono visible en burbuja; rewind elimina burbujas posteriores — `tmp/playwright-output/debug-rewind-v1.png` |

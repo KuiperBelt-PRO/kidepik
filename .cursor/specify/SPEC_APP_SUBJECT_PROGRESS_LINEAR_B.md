@@ -1,6 +1,6 @@
 # Spec: Progreso por materia — modelo lineal «Opción B»
 
-> Estado: **aprobada — pendiente de implementación completa** (16 ago 2026)  
+> Estado: **implementada** (20 ago 2026; rewind V2 de rolling incluido)  
 > Relacionado: [SPEC_APP_CREW_PROGRESS.md](SPEC_APP_CREW_PROGRESS.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_PLAY_PROGRESS_HUD.md](SPEC_APP_PLAY_PROGRESS_HUD.md), [SPEC_APP_DEBUG_JOURNEY_REWIND.md](SPEC_APP_DEBUG_JOURNEY_REWIND.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md)
 
 ## Contexto
@@ -39,7 +39,7 @@ El niño **no** ve `L*` en play por defecto; el tutor **sí** en tripulación ([
 | P7 | Tras subir nivel | `rolling` vuelve a `SEED_ROLLING`; no usar 0.55 ni EMA residual |
 | P8 | Placement | El examen fija `level_id` por materia; **no** modifica rolling de caminos (rolling post-placement = semilla hasta primer acierto) |
 | P9 | Retroceso | Sin bajar nivel por fallos en retos MVP; `threshold_down` solo para hints tutor (futuro) |
-| P10 | Rewind | Truncar filas `user_subject_levels` con `updated_at > anchor_at` en fases post-placement (ya implementado); V2 opcional: recalcular desde ledger |
+| P10 | Rewind | Post-placement: **reconstruir** rolling desde placement + aciertos conservados (V2). Pre-placement: borrar filas. |
 
 ---
 
@@ -245,16 +245,19 @@ Opcional MVP: al recibir `record_learning_result` con `rolling_delta > 0`, anima
 
 | Fase pending | `user_subject_levels` |
 | --- | --- |
-| Post-placement (`choose_path`, `path_challenge`, …) | `DELETE` filas con `updated_at > anchor_at` **o** recalcular (V2) |
+| Pre-placement / durante examen | Borrar filas del child |
+| Post-placement (`choose_path`, `path_challenge`, …) | **Reconstruir** rolling (V2); no `DELETE` por `updated_at` |
 
-**MVP (Opción B):** truncar por `updated_at` (implementado 16 ago 2026).
+**Por qué no truncar por `updated_at`:** el acierto hace upsert de la **misma** fila de placement (pisa `updated_at`). Un rewind a `choose_path` borraría también la semilla.
 
-**V2 (recomendado):** tras truncar ledger, **reconstruir** rolling desde:
+**V2 (implementada):** tras `ledger.trim_after`, reconstruir cada materia:
 
-1. Semilla placement para la materia.
-2. Sumar `DELTA_PER_CORRECT` por cada acierto conservado en `path_progress` / turnos `path_challenge_echo` con `choice_correct: true` posteriores al ancla.
+1. `level_id` inicial = placement (`source = placement` si la fila sigue así; si no, `L1` — el examen actual siembra L1).
+2. Contar aciertos **conservados** (anteriores o en el ancla, no posteriores): eventos `path_progress` con `last_ok: true` agrupados por `path.subject_id`. Si el ledger no tiene ninguno, turnos `path_challenge_echo` con `choice_correct: true`.
+3. Aplicar `linear_state_after_corrects(n)`: semilla + `n × DELTA_PER_CORRECT`, con subidas de L cada 12 aciertos (`THRESHOLD_UP`) y reset a semilla.
+4. Recalcular `general_level` y rango.
 
-Esto evita perder progreso legítimo anterior al ancla cuando solo se deshace un camino reciente.
+Función: `SubjectProgressService.rebuild_after_rewind`.
 
 ---
 
@@ -291,7 +294,7 @@ No backfill histórico de aciertos desde ledger en MVP.
 | `backend/app/services/crew_progress.py` | Semilla: si `accuracy_rolling == SEED_ROLLING`, hint coherente; quitar default 0.5 implícito |
 | `backend/app/services/placement*.py` o seed post-placement | Inicializar rolling = `SEED_ROLLING` |
 | `backend/tests/unit/test_subject_progress.py` | Tabla §10 |
-| `backend/tests/unit/test_journey_rewind.py` | Rewind trunca rolling post-ancla |
+| `backend/tests/unit/test_journey_rewind.py` | Rewind post-placement **no** borra filas; rebuild restaura rolling |
 
 ---
 
@@ -306,7 +309,7 @@ No backfill histórico de aciertos desde ledger en MVP.
 | T5 | `three_correct_per_path` | 3 aciertos: rolling = 0.26, percent = 33 |
 | T6 | `placement_seed` | Tras placement, rolling = SEED_ROLLING en todas las materias |
 | T7 | `crew_progress_percent` | `CrewProgressService` 10% con semilla |
-| T8 | `rewind_truncates_rolling` | Rewind post-placement elimina incrementos posteriores al ancla |
+| T8 | `rewind_rebuilds_rolling` | 2 aciertos conservados → rolling = semilla + 2Δ; 12 aciertos → L2 + semilla; rewind no borra la fila de placement |
 | T9 | `general_level_recalc` | Subida math L2 actualiza general si ponderación lo exige |
 | T10 | `effect_payload` | `rolling_model == linear_b`, `rolling_delta == 0.06` |
 
@@ -320,7 +323,7 @@ No backfill histórico de aciertos desde ledger en MVP.
 4. Un camino de **3 retos** acertados suma ~**23–33%** de barra según redondeo (≈ 25% objetivo).
 5. Fallar un reto **no** baja la barra.
 6. Completar camino **no** añade bonificación extra de rolling.
-7. Rebobinar en debug durante/tras caminos revierte incrementos posteriores al ancla (MVP: truncado PG).
+7. Rebobinar en debug durante/tras caminos **restaura** rolling a semilla + aciertos conservados (no pierde la fila de placement).
 8. HUD general en play refleja el ritmo más lento (media ponderada).
 9. Tests §10 en verde.
 
@@ -332,7 +335,7 @@ No backfill histórico de aciertos desde ledger en MVP.
 | --- | --- |
 | [SPEC_APP_CREW_PROGRESS.md](SPEC_APP_CREW_PROGRESS.md) §3.1 | **Amplía:** sustituye EMA y default 0.5; mantiene fórmula `percent_to_next` |
 | [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md) §5.1 | **Ajusta:** «rolling↑ por reto» con Δ fijo; subida L con 12 aciertos / 4 caminos |
-| [SPEC_APP_DEBUG_JOURNEY_REWIND.md](SPEC_APP_DEBUG_JOURNEY_REWIND.md) | **Compatible;** V2 recálculo opcional |
+| [SPEC_APP_DEBUG_JOURNEY_REWIND.md](SPEC_APP_DEBUG_JOURNEY_REWIND.md) | **Compatible;** V2 recálculo de rolling implementada |
 | Implementación EMA actual | **Deprecada** tras aprobación de esta spec |
 
 ---
@@ -342,7 +345,7 @@ No backfill histórico de aciertos desde ledger en MVP.
 - Bajar nivel por racha de fallos (`threshold_down`).
 - Δ distinto por dificultad o `effective_age_band`.
 - Barra por materia en HUD play (solo general).
-- Recálculo rewind desde ledger (V2).
+- Recálculo rewind de snapshots `meta.state_snapshot` (otra V2, ver spec rewind).
 - Multiplicador tutor en `settings.learning`.
 
 ---

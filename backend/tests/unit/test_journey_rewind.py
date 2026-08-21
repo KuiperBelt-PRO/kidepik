@@ -181,3 +181,24 @@ def test_rewind_report_includes_regenerated_flag() -> None:
     assert payload["regenerated"] is True
     assert payload["regenerate_mode"] == "placement_reemit"
     assert payload["deleted_turns"] == 1
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_trim_related_tables_post_placement_keeps_subject_levels() -> None:
+    from app.services.journey_rewind import JourneyRewindService
+
+    executed: list[str] = []
+
+    class FakeSession:
+        async def execute(self, stmt, params=None):  # noqa: ANN001
+            executed.append(str(stmt))
+            return None
+
+    svc = JourneyRewindService.__new__(JourneyRewindService)
+    svc.session = FakeSession()  # type: ignore[assignment]
+    await svc._trim_related_tables(
+        CHILD_ID, "2026-08-19T12:00:00Z", "path_challenge"
+    )
+    assert not any("user_subject_levels" in sql for sql in executed)
+    assert any("story_beats" in sql for sql in executed)

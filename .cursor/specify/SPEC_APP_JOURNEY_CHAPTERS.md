@@ -112,22 +112,25 @@ El mentor integra el nombre en `agent_text` si encaja; el rótulo UI **no** se i
 ```
 ┌─────────────────────────────────┐
 │ [←]     [logo KidepiK]          │  ← section-frame__header (fijo)
-│        El umbral                │  ← chapter_title (FIJO, no scrollea)
+│        El umbral                │  ← chapter_title (FIJO, hasta 2 líneas)
 ├─────────────────────────────────┤
 │ ▲ scroll                        │
 │ │  burbujas mentor / explorador │
-│ │  historial…                   │
+│ │  chips del turno vigente      │
 │ ▼                               │
 ├─────────────────────────────────┤
-│ opciones / compose              │  ← footer fijo
+│ equipaje plegado / compose      │  ← footer fijo (COMPOSE_COMPACT)
 └─────────────────────────────────┘
 ```
+
+**Delta 21 ago 2026 (propuesta):** títulos largos de aventura **no** se recortan a 18 rem ni a una sola línea con ellipsis. Wrap ≤ 2 líneas; detalle en [SPEC_APP_PLAY_COMPOSE_COMPACT.md](SPEC_APP_PLAY_COMPOSE_COMPACT.md) §4.
 
 ### 4.1 Reglas de layout
 
 | Regla | Decisión |
 | --- | --- |
 | Ubicación | `chapter_title` en **cabecera del marco** (`section-frame__header` / brand), **debajo del logo**, **fuera** de `.section-frame__scroll` |
+| Overflow (play) | Hasta **2 líneas**; brand sin cap `18rem`; ver [SPEC_APP_PLAY_COMPOSE_COMPACT](SPEC_APP_PLAY_COMPOSE_COMPACT.md) §4 |
 | No scrollea | Solo `.play-panel__log` (y contenido de diálogo) vive dentro del área con scroll; el rótulo de capítulo **no** puede quedar dentro de `[data-log]` |
 | Migración | `data-mentor-name` → `data-chapter-title`; clase `play-panel__mentor` → `play-panel__chapter` |
 | Skeleton | Una línea glass en cabecera mientras no hay `chapter.title` |

@@ -78,10 +78,10 @@ flowchart TD
 flowchart TD
   A([Elegir caminos]) --> B[Ranking híbrido PG + notas tutor]
   B --> B2[Calibrar dificultad: suelo banda + L* + rolling]
-  B2 --> C[path_composer: 3 caminos con nota y target por slot]
-  C --> W[Espera 8s]
-  W --> D{¿Pack válido?}
-  D -- NO --> C
+  B2 --> C[path_composer ×3 en paralelo<br/>1 camino por slot]
+  C --> D{¿Pack válido?}
+  D -- NO slot --> C2[Reintento / fallback solo ese slot]
+  C2 --> D
   D -- SI --> E[Guardar path_pack en JSONL]
   E --> F[Viajero elige 1 de 3]
   F --> G[Intro camino]
@@ -97,7 +97,8 @@ flowchart TD
   K -- SI --> H
   K -- NO --> L{¿Camino superado?}
   L -- SI --> M[Felicitación + §4 niveles]
-  M --> A
+  M --> R[Reutilizar 2 caminos + compose 1 nuevo]
+  R --> E
   L -- NO --> N[Regenerar SOLO ese camino]
   N --> E2[Sustituir slot en pack]
   E2 --> F
