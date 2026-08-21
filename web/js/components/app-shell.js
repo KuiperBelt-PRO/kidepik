@@ -234,6 +234,7 @@ export function mountAppShell(options) {
               { id: "privacy", label: "Privacidad", href: "/legal/privacidad" },
             ],
           },
+          { id: "settings", label: "Ajustes", icon: "settings", kind: "link", href: "/settings" },
           { id: "account", label: "Cuenta", icon: "account", kind: "link", href: "/account" },
           { id: "signout", label: "Cerrar sesión", icon: "signout", kind: "action", action: "signout" },
         ]

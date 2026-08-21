@@ -500,6 +500,8 @@ class CrewService:
                 }
         learning = (detail.get("settings") or {}).get("learning") if isinstance(detail.get("settings"), dict) else {}
         active = learning.get("active_subjects") if isinstance(learning, dict) else detail.get("active_subjects")
+        perms = detail.get("permissions") if isinstance(detail.get("permissions"), dict) else {}
+        settings = detail.get("settings") if isinstance(detail.get("settings"), dict) else {}
         return {
             "id": detail["id"],
             "display_name": detail.get("display_name"),
@@ -517,10 +519,34 @@ class CrewService:
             "journey": detail.get("journey"),
             "rank": (progress or {}).get("rank") if isinstance(progress, dict) else detail.get("rank"),
             "active_subjects": active,
+            "subject_catalog": detail.get("subject_catalog"),
+            "font_scale_play": str(perms.get("font_scale_play") or "md"),
+            "ui_preferences": self._member_ui_preferences(settings, detail.get("world_theme")),
             "viewer": "self",
         }
 
-    MEMBER_SELF_FIELDS = frozenset({"display_name", "explorer_gender", "character_summary", "traveler_profile", "diagnostics"})
+    MEMBER_SELF_FIELDS = frozenset(
+        {
+            "display_name",
+            "explorer_gender",
+            "character_summary",
+            "traveler_profile",
+            "diagnostics",
+            "font_scale_play",
+            "ui_preferences",
+        }
+    )
+
+    @staticmethod
+    def _member_ui_preferences(settings: dict[str, Any], world_theme: str | None) -> dict[str, str]:
+        raw = settings.get("ui_preferences") if isinstance(settings.get("ui_preferences"), dict) else {}
+        theme = raw.get("ui_theme")
+        if theme not in ("fantasy", "sci-fi"):
+            theme = world_theme if world_theme in ("fantasy", "sci-fi") else "fantasy"
+        motion = raw.get("reduce_motion")
+        if motion not in ("system", "always", "never"):
+            motion = "system"
+        return {"ui_theme": str(theme), "reduce_motion": str(motion)}
 
     async def patch_crew_diagnostics(
         self, auth_user_id: str, child_id: str, email: str, diagnostics: dict[str, Any]
@@ -552,6 +578,67 @@ class CrewService:
             )
         return await self.get_for_linked_crew(auth_user_id, child_id)
 
+    async def patch_member_font_scale_play(
+        self, auth_user_id: str, child_id: str, value: object
+    ) -> None:
+        if value not in ("md", "lg", "xl"):
+            raise ValueError("font_scale_play invalid")
+        async with session_scope() as session:
+            result = await session.execute(
+                text(
+                    """
+                    update public.child_permissions p
+                    set font_scale_play = :font_scale_play
+                    from public.children c
+                    where p.child_id = c.id
+                      and c.id = :id
+                      and c.linked_auth_user_id = :auth
+                      and c.status <> 'deleted'
+                    """
+                ),
+                {"id": child_id, "auth": auth_user_id, "font_scale_play": value},
+            )
+            if result.rowcount == 0:
+                raise RuntimeError("Crew member not found")
+
+    async def patch_member_ui_preferences(
+        self, auth_user_id: str, child_id: str, prefs: object
+    ) -> None:
+        if not isinstance(prefs, dict):
+            raise ValueError("ui_preferences invalid")
+        unknown = set(prefs) - {"ui_theme", "reduce_motion"}
+        if unknown:
+            raise ValueError("field_forbidden")
+        if "ui_theme" in prefs and prefs["ui_theme"] not in ("fantasy", "sci-fi"):
+            raise ValueError("ui_theme invalid")
+        if "reduce_motion" in prefs and prefs["reduce_motion"] not in ("system", "always", "never"):
+            raise ValueError("reduce_motion invalid")
+        detail = await self.get_for_linked_crew(auth_user_id, child_id)
+        settings = dict(detail.get("settings") or {})
+        merged = dict(settings.get("ui_preferences") or {})
+        if "ui_theme" in prefs:
+            merged["ui_theme"] = prefs["ui_theme"]
+        if "reduce_motion" in prefs:
+            merged["reduce_motion"] = prefs["reduce_motion"]
+        settings["ui_preferences"] = merged
+        async with session_scope() as session:
+            result = await session.execute(
+                text(
+                    """
+                    update public.children
+                    set settings = cast(:settings as jsonb), updated_at = now()
+                    where id = :id and linked_auth_user_id = :auth and status <> 'deleted'
+                    """
+                ),
+                {
+                    "id": child_id,
+                    "auth": auth_user_id,
+                    "settings": json.dumps(settings),
+                },
+            )
+            if result.rowcount == 0:
+                raise RuntimeError("Crew member not found")
+
     async def update_self_profile(
         self,
         auth_user_id: str,
@@ -568,6 +655,12 @@ class CrewService:
                 payload["diagnostics"],
             )
             payload = {k: v for k, v in payload.items() if k != "diagnostics"}
+        if "ui_preferences" in payload:
+            await self.patch_member_ui_preferences(auth_user_id, child_id, payload["ui_preferences"])
+            payload = {k: v for k, v in payload.items() if k != "ui_preferences"}
+        if "font_scale_play" in payload:
+            await self.patch_member_font_scale_play(auth_user_id, child_id, payload["font_scale_play"])
+            payload = {k: v for k, v in payload.items() if k != "font_scale_play"}
         unknown = set(payload) - self.MEMBER_SELF_FIELDS
         if unknown:
             raise ValueError("field_forbidden")

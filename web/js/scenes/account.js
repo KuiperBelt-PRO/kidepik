@@ -5,7 +5,7 @@
 
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
 import { mountSectionFrame } from "../components/section-frame.js?v=261";
-import { mountAccountPanel } from "../components/account-panel.js?v=283";
+import { mountAccountPanel } from "../components/account-panel.js?v=285";
 import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=280";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";

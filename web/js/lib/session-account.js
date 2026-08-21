@@ -102,8 +102,7 @@ export function wrongRoleRedirect(path = "") {
   if (isCrewSession()) {
     if (
       normalized === "crew" ||
-      normalized.startsWith("crew/") ||
-      normalized === "settings"
+      normalized.startsWith("crew/")
     ) {
       return "/member";
     }

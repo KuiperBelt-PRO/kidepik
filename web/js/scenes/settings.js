@@ -6,7 +6,9 @@
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=236";
 import { mountSectionFrame } from "../components/section-frame.js?v=261";
 import { mountSettingsPanel } from "../components/settings-panel.js?v=271";
-import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=280";
+import { mountCrewSettingsPanel } from "../components/crew-settings-panel.js?v=1";
+import { ensureAppShell, destroyAppShell } from "../components/app-shell.js?v=281";
+import { isCrewSession } from "../lib/session-account.js";
 import { navigate } from "../lib/router.js";
 import { getValidSession, signOut } from "../lib/supabase.js";
 import { wrongRoleRedirect } from "../lib/session-account.js";
@@ -58,7 +60,9 @@ export function renderSettings() {
     if (!(host instanceof HTMLElement) || !(sceneEl instanceof HTMLElement)) return;
 
     frameHandle = mountSectionFrame(host, { title: "Ajustes", ariaLabel: "Ajustes" });
-    panelHandle = mountSettingsPanel(frameHandle.contentEl, { session });
+    panelHandle = isCrewSession()
+      ? mountCrewSettingsPanel(frameHandle.contentEl, { session })
+      : mountSettingsPanel(frameHandle.contentEl, { session });
     await applySectionEnter({
       scene: sceneEl,
       logoMount: frameHandle.logoMountEl,

@@ -363,15 +363,18 @@ export function mountGlassSelect(host, opts) {
  *   max?: number;
  *   name?: string;
  *   onChange?: (value: number | null) => void;
+ *   readOnly?: boolean;
  * }} opts
  */
 export function mountAgeStepper(host, opts) {
   const min = opts.min ?? 5;
   const max = opts.max ?? 14;
+  const readOnly = opts.readOnly === true;
   let value = opts.value;
 
   const wrap = document.createElement("div");
   wrap.className = "glass-stepper";
+  if (readOnly) wrap.classList.add("glass-stepper--readonly");
 
   const dec = document.createElement("button");
   dec.type = "button";
@@ -396,6 +399,13 @@ export function mountAgeStepper(host, opts) {
   inc.setAttribute("aria-label", "Subir edad");
   inc.appendChild(createGlassIconSvg("chevron", { size: 18 }));
 
+  if (readOnly) {
+    input.readOnly = true;
+    input.setAttribute("aria-readonly", "true");
+    dec.disabled = true;
+    inc.disabled = true;
+  }
+
   function emit() {
     opts.onChange?.(value);
   }
@@ -411,9 +421,16 @@ export function mountAgeStepper(host, opts) {
     emit();
   }
 
-  dec.addEventListener("click", () => set((value ?? min) - 1));
-  inc.addEventListener("click", () => set((value ?? min) + 1));
+  dec.addEventListener("click", () => {
+    if (readOnly) return;
+    set((value ?? min) - 1);
+  });
+  inc.addEventListener("click", () => {
+    if (readOnly) return;
+    set((value ?? min) + 1);
+  });
   input.addEventListener("change", () => {
+    if (readOnly) return;
     if (input.value === "") set(null);
     else set(Number(input.value));
   });

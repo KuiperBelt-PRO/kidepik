@@ -179,6 +179,15 @@
   text-align: center;
 }
 
+.glass-stepper--readonly .glass-field {
+  opacity: 0.92;
+}
+
+.glass-stepper--readonly .glass-stepper__btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* —— Checkbox —— */
 .glass-check,
 .settings-panel__check,

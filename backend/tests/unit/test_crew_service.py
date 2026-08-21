@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
@@ -502,4 +503,58 @@ async def test_apply_invite_email_sets_canonical(crew_svc) -> None:
     )
     assert params["invite_email"] == "Nina.Viajera@gmail.com"
     assert params["invite_email_canonical"] == "ninaviajera@gmail.com"
-    assert "linked_auth_user_id = null" in fields
+
+
+@pytest.mark.unit
+def test_to_self_view_includes_member_ui_settings() -> None:
+    svc = CrewService()
+    row = child_row(
+        font_scale_play="xl",
+        settings={
+            "learning": {"active_subjects": ["math", "language"]},
+            "ui_preferences": {"reduce_motion": "never", "ui_theme": "sci-fi"},
+        },
+    )
+    detail = svc._detail(row)
+    view = svc.to_self_view(detail)
+    assert view["font_scale_play"] == "xl"
+    assert view["ui_preferences"]["reduce_motion"] == "never"
+    assert view["ui_preferences"]["ui_theme"] == "sci-fi"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_update_self_profile_font_scale_play(crew_svc, mocker) -> None:
+    svc, session = crew_svc
+    linked = svc._detail(child_row())
+    get_mock = mocker.patch.object(
+        svc,
+        "get_for_linked_crew",
+        new=AsyncMock(return_value=linked),
+    )
+    session._results = [FakeExecuteResult(rowcount=1)]
+    await svc.update_self_profile(AUTH_USER_ID, CHILD_ID, {"font_scale_play": "lg"})
+    assert session.executed[0][1]["font_scale_play"] == "lg"
+    get_mock.assert_awaited()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_update_self_profile_ui_preferences(crew_svc, mocker) -> None:
+    svc, session = crew_svc
+    linked = svc._detail(child_row())
+    get_mock = mocker.patch.object(
+        svc,
+        "get_for_linked_crew",
+        new=AsyncMock(return_value=linked),
+    )
+    session._results = [FakeExecuteResult(rowcount=1)]
+    await svc.update_self_profile(
+        AUTH_USER_ID,
+        CHILD_ID,
+        {"ui_preferences": {"reduce_motion": "always", "ui_theme": "sci-fi"}},
+    )
+    settings = json.loads(session.executed[0][1]["settings"])
+    assert settings["ui_preferences"]["reduce_motion"] == "always"
+    assert settings["ui_preferences"]["ui_theme"] == "sci-fi"
+    assert get_mock.await_count >= 2

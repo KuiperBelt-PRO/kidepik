@@ -91,7 +91,7 @@ Esta spec **sustituye** la línea de [SPEC_APP_AUTH.md](SPEC_APP_AUTH.md) «Face
 | D14 | Perfil tutor (`is_tutor_profile`) | Sin campo Gmail; no se puede invitar |
 | D15 | Soft-delete de plaza | Limpia `invite_email` + `linked_auth_user_id`. Un login posterior con ese Gmail crea **tutor** nuevo (no hay plaza) |
 | D16 | Debug IA / rewind | 403 para `role=crew` |
-| D17 | Ajustes del hogar | Ocultos y 403 para crew |
+| D17 | Ajustes del hogar | Tutor: `#/settings` completo. Crew: `#/settings` **reducido** (tema menú, texto play, animaciones) vía `PATCH /member`; sin tripulación ni defaults del hogar |
 
 ---
 
@@ -434,7 +434,7 @@ Gate con sesión ya válida: mismo split.
 | `crew` | Tripulación → `#/crew` | **oculto** |
 | `member` | **oculto** | Tripulante → `#/member` |
 | `legal` | accordion | accordion (igual) |
-| `settings` | Ajustes | **oculto** |
+| `settings` | Ajustes | Ajustes (reducido) |
 | `account` | Cuenta | Cuenta |
 | `signout` | Cerrar sesión | Cerrar sesión |
 
@@ -445,7 +445,7 @@ Guards de router (además del API):
 | Hash | Crew |
 | --- | --- |
 | `#/crew`, `#/crew/new`, `#/crew/:id` | Redirect `#/member` |
-| `#/settings` | Redirect `#/member` |
+| `#/settings` | Ajustes reducidos crew (tema menú, texto play, animaciones) |
 | `#/play/:id` | Si `id !== child_id` → `#/member` |
 | `#/member` | Tutor → redirect `#/crew` |
 
@@ -459,11 +459,11 @@ Marco compacto; título fijo **«Tripulante»**. Hero carta TCG (misma pieza que
 
 | Tab | Modo |
 | --- | --- |
-| **Detalles** | Nombre de tripulación editable; sexo editable; mundo **solo lectura**; edad solo lectura; `character_summary` / rasgos de personaje editables; **sin** `tutor_label` |
+| **Detalles** | Igual layout que ficha tutor: nombre editable; personaje y descripción editables; **mundo** (chips deshabilitados) y **edad** (stepper solo lectura) como en Tripulación; sexo editable; **sin** `tutor_label`, estado, permisos ni notas de materias |
 | **Viaje** | Mapa + diario solo lectura; CTA **«Entrar al viaje»** (si `active` y first-run/play permitido) |
-| **Progreso** | Materias activas + barras + rango niño; **sin** switches de activar materia |
+| **Progreso** | Materias activas + barras + rango niño + **leyenda de rangos**; debajo **grid de todas las materias** (activas e inactivas, solo lectura) |
 | **Equipaje** | Lectura (mismo grid); el uso de objetos sigue en play |
-| **Ajustes** | **No existe** |
+| **Ajustes** | `#/settings` reducido: tema del menú, texto de aventuras, animaciones (`PATCH /member`) |
 
 Entrar al viaje también desde el drawer: el ítem **Tripulante** abre la ficha; el CTA de Viaje y el de Home lanzan play. El usuario pidió «entrar al viaje directamente desde el menú»: el ítem `member` del drawer, **si** `onboarding` ya puede jugar, puede ser un accordion:
 
@@ -489,7 +489,7 @@ First-run incompleto: CTA play sigue existiendo (el diálogo completa mundo/nomb
 | Permisos / PIN / pausa / borrar | Sí | Oculto / 403 |
 | `invite_email` | Sí | Oculto (Cuenta muestra el email de sesión) |
 
-PATCH `/member` allowlist: `display_name`, `explorer_gender`, `character_summary`, `traveler_profile` (mismas validaciones que crew tutor). Cualquier otro key → 422 `field_forbidden`.
+PATCH `/member` allowlist: `display_name`, `explorer_gender`, `character_summary`, `traveler_profile`, `diagnostics`, `font_scale_play`, `ui_preferences` (mismas validaciones que crew tutor en permisos/UI). Cualquier otro key → 422 `field_forbidden`.
 
 ### 5.7 Cuenta — variante crew
 
@@ -498,6 +498,7 @@ Misma ruta `#/account`, mismo marco. Contenido:
 ```
 Cuenta de tripulante
 Avatar / inicial
+Nombre para mostrar (editable, alias del explorador; PATCH /member)
 Nombre en Google (RO)
 Correo (RO) — el Gmail de la sesión
 Inicio de sesión: Google (RO)
@@ -516,6 +517,29 @@ Modal desvincular:
 > Esta acción no elimina tu viaje.
 
 Primario: «Desvincular». Foco inicial en Cancelar.
+
+### 5.7b Ajustes — variante crew (reducido)
+
+Misma ruta `#/settings`, marco idéntico. Contenido:
+
+```
+Preferencias de tu sesión de viaje
+
+Apariencia
+- Tema del menú (fantasía / sci-fi) — no cambia el mundo del viaje
+- Texto de aventuras (Normal / Grande / Muy grande)
+- Animaciones (sistema / reducir / completas)
+```
+
+Persistencia:
+
+| Campo | Almacén | API |
+| --- | --- | --- |
+| `font_scale_play` | `child_permissions` | `PATCH /member` |
+| `ui_preferences.ui_theme` | `children.settings.ui_preferences` | `PATCH /member` |
+| `ui_preferences.reduce_motion` | `children.settings.ui_preferences` | `PATCH /member` |
+
+**No** incluye: resumen tripulación, defaults al crear miembro, permisos/PIN, materias, eliminar plaza, texto de gestión del tutor (`font_scale_ui`).
 
 ### 5.8 Copy (extracto)
 
@@ -598,7 +622,7 @@ Playwright local: usuario `playwright-crew@gmail.com` no es viable en GoTrue sin
 3. Login Google con Gmail invitado **no** crea `parent_accounts`; `session.me.role === "crew"`.
 4. Login Google desconocido sigue creando tutor.
 5. Login Google que ya es tutor no se convierte en crew aunque alguien escriba ese correo (el PATCH tutor ya lo impidió).
-6. Drawer crew: **Tripulante** (accordion ficha + viaje), Legal, Cuenta, Salir. Sin Tripulación ni Ajustes.
+6. Drawer crew: **Tripulante** (accordion ficha + viaje), Legal, **Ajustes** (reducido), Cuenta, Salir. Sin Tripulación.
 7. `#/crew` con sesión crew redirige a `#/member`; API `/crew` 403.
 8. `#/member` muestra progreso, materias RO, diario, equipaje; CTA viaje → `#/play/:ownId`.
 9. Tripulante edita nombre y personaje; no edita mundo ni edad; PATCH mundo → 422.
@@ -663,7 +687,7 @@ No mezclar A–E en un único PR si se puede evitar; el orden A→E es obligator
 - [x] D1–D17 (tabla de decisiones; D4 = conservar invite al desvincular)
 - [ ] Campo Gmail en Ajustes de ficha tutor + unicidad global
 - [ ] Bootstrap: match invite → crew, si no → tutor
-- [ ] Menú Tripulante (accordion ficha + viaje); sin Tripulación ni Ajustes
+- [ ] Menú Tripulante (accordion ficha + viaje); Ajustes reducido; sin Tripulación
 - [ ] `#/member` RO progreso/materias/diario/equipaje; edit nombre + personaje; no mundo
 - [x] Cuenta crew: desvincular (conserva correo) y no eliminar plaza
 - [ ] 403 de servidor en todas las superficies tutor-only

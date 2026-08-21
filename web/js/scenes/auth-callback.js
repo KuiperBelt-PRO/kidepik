@@ -6,6 +6,7 @@
 import { mountLoaderChrome } from "../components/loader-chrome.js?v=183";
 import { navigate } from "../lib/router.js";
 import { bootstrapParentIfNeeded } from "../lib/parent-account.js";
+import { fetchMemberSettings } from "../lib/member-settings.js?v=1";
 import { exchangeCodeFromUrl, getValidSession } from "../lib/supabase.js";
 
 const CALLBACK_TIMEOUT_MS = 15_000;
@@ -36,7 +37,12 @@ export function renderAuthCallback() {
     if (session) {
       const boot = await bootstrapParentIfNeeded(session);
       if (cancelled) return;
-      navigate(boot.role === "crew" ? "/member" : "/home");
+      if (boot.role === "crew") {
+        void fetchMemberSettings(session);
+        navigate("/member");
+      } else {
+        navigate("/home");
+      }
     } else {
       navigate("/loader");
     }

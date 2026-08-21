@@ -193,7 +193,11 @@ export async function signInWithGoogle() {
     const redirectTo = `${resolveAppOrigin()}/#/auth/callback`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo },
+      options: {
+        redirectTo,
+        // Tras cerrar sesión, Google vuelve a mostrar el selector de cuenta.
+        queryParams: { prompt: "select_account" },
+      },
     });
     return { error: error ? new Error(error.message) : null };
   } catch (err) {

@@ -7,7 +7,7 @@ import { renderLoader } from "./scenes/loader.js?v=236";
 import { renderAuthCallback } from "./scenes/auth-callback.js?v=280";
 import { renderHome } from "./scenes/home.js?v=280";
 import { renderAccount } from "./scenes/account.js?v=280";
-import { renderSettings } from "./scenes/settings.js?v=280";
+import { renderSettings } from "./scenes/settings.js?v=281";
 import { watchNoSpellcheck } from "./components/glass-controls.js?v=227";
 import { renderCrew, renderCrewNew, renderCrewDetail } from "./scenes/crew.js?v=280";
 import { renderMember } from "./scenes/member.js?v=1";
@@ -16,6 +16,7 @@ import { renderLegal } from "./scenes/legal.js?v=256";
 import {
   readCachedParentSettings,
 } from "./lib/parent-settings.js?v=245";
+import { readCachedMemberSettings } from "./lib/member-settings.js?v=1";
 import { ensureDebugAiShellBadge } from "./lib/debug-ai-shell.js?v=1";
 
 watchNoSpellcheck(document.documentElement);
@@ -41,6 +42,7 @@ function boot() {
   initShellUiTheme();
   void initAppLogger();
   readCachedParentSettings();
+  readCachedMemberSettings();
   // Asegurar hash para el router si falta.
   if (!window.location.hash || window.location.hash === "#") {
     window.location.replace(`${window.location.pathname}${window.location.search}#/loader`);

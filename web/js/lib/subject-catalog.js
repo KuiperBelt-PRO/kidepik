@@ -289,3 +289,63 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
   }
   return html;
 }
+
+/**
+ * Grid de materias solo lectura (tripulante): todas las del catálogo, activas e inactivas.
+ * @param {SubjectMeta[]} catalog
+ * @param {string[]} active
+ * @param {{ progressSubjects?: Array<{ id?: string, subject_id?: string, label?: string, rank_label?: string, rank_next_label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }> }} [opts]
+ * @returns {string}
+ */
+export function renderSubjectsGridReadOnly(catalog, active, opts = {}) {
+  const activeSet = new Set(active);
+  /** @type {Map<string, { current?: string, next?: string, percent?: number, rank?: string, rankNext?: string }>} */
+  const progressById = new Map();
+  for (const row of opts.progressSubjects || []) {
+    const id = String(row.id || row.subject_id || "");
+    if (!id) continue;
+    const lp = row.level_progress || {};
+    progressById.set(id, {
+      current: lp.current,
+      next: lp.next,
+      percent: Number(lp.percent_to_next) || 0,
+      rank: row.rank_label,
+      rankNext: row.rank_next_label,
+    });
+  }
+  const groups = groupSubjectsByFamily(catalog);
+  const order = Object.keys(SUBJECT_FAMILY_LABELS);
+  let html = "";
+  for (const fam of order) {
+    const items = groups[fam];
+    if (!items?.length) continue;
+    html += `<fieldset class="crew-panel__subjects-family"><legend class="crew-panel__subjects-legend">${SUBJECT_FAMILY_LABELS[fam]}</legend>`;
+    html += `<div class="crew-panel__subjects-grid">`;
+    for (const s of items) {
+      const on = activeSet.has(s.id);
+      const prog = progressById.get(s.id);
+      const percent = on ? Math.max(0, Math.min(100, prog?.percent ?? 0)) : 0;
+      const curRank = prog?.rank || "";
+      const nextRank = prog?.rankNext || "";
+      let levelLine = on ? "Sin nivel aún" : "No activada";
+      if (on && curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
+      else if (on && curRank) levelLine = curRank;
+      const stateClass = on ? "is-on" : "is-off";
+      const badge = on
+        ? `<span class="crew-subject-card__state crew-subject-card__state--on">Activa</span>`
+        : `<span class="crew-subject-card__state crew-subject-card__state--off">No activa</span>`;
+      html += `<div class="crew-subject-card crew-subject-card--readonly ${stateClass}" data-subject-card="${escapeHtml(s.id)}">
+        <div class="crew-subject-card__head">
+          <span class="crew-subject-card__label">${escapeHtml(s.label)}</span>
+          ${badge}
+        </div>
+        <p class="crew-subject-card__level">${escapeHtml(levelLine)}</p>
+        <div class="crew-progress__bar" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso en ${escapeHtml(s.label)}">
+          <div class="crew-progress__bar-fill" style="width:${percent}%"></div>
+        </div>
+      </div>`;
+    }
+    html += `</div></fieldset>`;
+  }
+  return html;
+}

@@ -39,6 +39,7 @@ import {
   generalNoteFromLearning,
   normalizeActiveSubjects,
   renderSubjectsChecklistHtml,
+  renderSubjectsGridReadOnly,
   subjectNotesById,
   subjectPrioritiesFromLearning,
   SUBJECT_CATALOG,
@@ -160,11 +161,19 @@ function inviteAccessBlock(member) {
 }
 
 function renderSubjectsReadOnly(member) {
-  const active = Array.isArray(member.active_subjects) ? member.active_subjects : [];
-  const labels = active.map((id) => escapeHtml(String(id))).join(", ");
+  const catalog =
+    Array.isArray(member.subject_catalog) && member.subject_catalog.length
+      ? member.subject_catalog
+      : SUBJECT_CATALOG;
+  const active = normalizeActiveSubjects(
+    member.active_subjects ?? member.settings?.learning?.active_subjects,
+  );
   return `<section class="crew-panel__block">
-    <h2 class="crew-panel__block-title">Materias</h2>
-    <p class="crew-panel__helper">${labels || "Tu tutor elige las materias activas."}</p>
+    <h2 class="crew-panel__block-title">Materias del viaje</h2>
+    <p class="crew-panel__helper">Las materias activas aparecen en tu aventura. Las demás están disponibles para que tu tutor las active más adelante.</p>
+    ${renderSubjectsGridReadOnly(catalog, active, {
+      progressSubjects: Array.isArray(member.progress?.subjects) ? member.progress.subjects : [],
+    })}
   </section>`;
 }
 
@@ -281,7 +290,7 @@ function renderProgressSection(member, opts = {}) {
     <h2 class="crew-panel__block-title">Tu explorador en el viaje</h2>
     ${gp ? renderLevelBar(gp.percent_to_next, gpLeft, gpRight, { showRing: true }) : ""}
     ${selfView ? "" : pendingHint}
-    ${selfView ? "" : renderRankLegend(member)}
+    ${renderRankLegend(member)}
     ${subjectBars}
   </section>`;
 }
@@ -634,7 +643,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         }
         ${
           !isTutor
-            ? `<label class="crew-panel__label">Descripción del personaje (resumen tutor)
+            ? `<label class="crew-panel__label">Descripción del personaje
           <textarea
             class="crew-panel__input crew-panel__input--character-summary"
             data-profile="character_summary"
@@ -654,11 +663,20 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           isTutor
             ? ""
             : isSelf
-            ? `<p class="crew-panel__helper">Mundo de juego: ${escapeHtml(member.world_theme === "sci-fi" ? "Ciencia ficción" : member.world_theme === "fantasy" ? "Fantasía" : "Sin mundo aún")}</p>
-        <p class="crew-panel__helper">Edad: ${member.age_years != null ? `${member.age_years} años` : "Pendiente"}</p>
-        <label class="crew-panel__label">Sexo
+            ? `<label class="crew-panel__label">Mundo de juego
+          <div class="crew-panel__segment" data-world-segment>
+            <button type="button" class="crew-panel__chip" data-world="fantasy" aria-pressed="false">Fantasía</button>
+            <button type="button" class="crew-panel__chip" data-world="sci-fi" aria-pressed="false">Ciencia ficción</button>
+          </div>
+          <p class="crew-panel__helper" data-world-hint></p>
+        </label>
+        <label class="crew-panel__label">Edad
+          <div data-age-host></div>
+        </label>
+        <div class="account-panel__field">
+          <span class="account-panel__label">Sexo</span>
           <div data-gender-host></div>
-        </label>`
+        </div>`
             : `<label class="crew-panel__label">Mundo de juego
           <div class="crew-panel__segment" data-world-segment>
             <button type="button" class="crew-panel__chip" data-world="fantasy" aria-pressed="false">Fantasía</button>
@@ -816,9 +834,11 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       let baggageCache = null;
       /** @type {'inventory' | 'used'} */
       let baggageViewMode =
-        sessionStorage.getItem(crewBaggageViewStorageKey(member.id)) === "used"
-          ? "used"
-          : "inventory";
+        isSelf
+          ? "inventory"
+          : sessionStorage.getItem(crewBaggageViewStorageKey(member.id)) === "used"
+            ? "used"
+            : "inventory";
       /**
        * @param {string} name
        */
@@ -842,9 +862,11 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       const paintBaggage = (bag) => {
         const host = root.querySelector("[data-crew-baggage-host]");
         if (!(host instanceof HTMLElement)) return;
+        const baggageAudience = isSelf ? "child" : "tutor";
         host.innerHTML = renderBaggageHtml(bag, {
-          audience: "tutor",
+          audience: baggageAudience,
           viewMode: baggageViewMode,
+          showUsageToggle: !isSelf,
         });
         host.querySelectorAll("[data-icon]").forEach((el) => {
           if (!(el instanceof HTMLElement)) return;
@@ -857,12 +879,13 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           el.replaceChildren(createGlassIconSvg(/** @type {any} */ (id), { size }));
         });
         wireBaggageViewToggle(host, (mode) => {
+          if (isSelf) return;
           baggageViewMode = mode;
           sessionStorage.setItem(crewBaggageViewStorageKey(member.id), mode);
           paintBaggage(bag);
         });
         if (baggageViewMode === "inventory") {
-          wireBaggageGrid(host, bag.items || [], { audience: "tutor" });
+          wireBaggageGrid(host, bag.items || [], { audience: baggageAudience });
         }
       };
       async function loadBaggageTab() {
@@ -873,22 +896,32 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           return;
         }
         fillGlassSkeleton(host, { preset: "panel", ariaLabel: "Cargando equipaje" });
-        const res = isSelf
-          ? await fetchMemberBaggage(session)
-          : await fetchCrewBaggage(session, member.id, member.world_theme, {
-          includeUsage: true,
-        });
-        if (!res.ok || !res.baggage) {
+        try {
+          const res = isSelf
+            ? await fetchMemberBaggage(session)
+            : await fetchCrewBaggage(session, member.id, member.world_theme, {
+                includeUsage: true,
+              });
+          if (!res.ok || !res.baggage) {
+            host.innerHTML = `<p class="crew-panel__helper">No se pudo cargar el equipaje.</p>
+            <button type="button" class="crew-panel__btn" data-baggage-retry>Reintentar</button>`;
+            host.querySelector("[data-baggage-retry]")?.addEventListener("click", () => {
+              baggageCache = null;
+              void loadBaggageTab();
+            });
+            return;
+          }
+          baggageCache = res.baggage;
+          paintBaggage(baggageCache);
+        } catch (err) {
+          console.warn("baggage tab error", err);
           host.innerHTML = `<p class="crew-panel__helper">No se pudo cargar el equipaje.</p>
             <button type="button" class="crew-panel__btn" data-baggage-retry>Reintentar</button>`;
           host.querySelector("[data-baggage-retry]")?.addEventListener("click", () => {
             baggageCache = null;
             void loadBaggageTab();
           });
-          return;
         }
-        baggageCache = res.baggage;
-        paintBaggage(baggageCache);
       }
       root.querySelectorAll("[data-crew-tab]").forEach((btn) => {
         btn.addEventListener("click", () => {
@@ -985,7 +1018,11 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     const worldSegment = root.querySelector("[data-world-segment]");
 
     if (worldHintEl instanceof HTMLElement) {
-      if (!member.world_theme) {
+      if (isSelf) {
+        worldHintEl.textContent = member.world_theme
+          ? "Solo tu tutor puede cambiar el mundo desde Tripulación."
+          : "Tu tutor o la primera aventura definirán el mundo.";
+      } else if (!member.world_theme) {
         worldHintEl.textContent = "Elige el mundo activo o déjalo para la primera aventura.";
       } else if (worldLocked) {
         worldHintEl.textContent =
@@ -1001,11 +1038,12 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         const id = btn.getAttribute("data-world");
         const pressed = id === selectedWorld;
         btn.setAttribute("aria-pressed", String(pressed));
-        if (worldLocked) {
+        if (isSelf || worldLocked) {
           btn.setAttribute("disabled", "true");
         } else {
           btn.removeAttribute("disabled");
         }
+        if (isSelf) return;
         btn.addEventListener("click", () => {
           if (worldLocked) return;
           selectedWorld = id;
@@ -1027,6 +1065,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
             value: member.age_years ?? null,
             min: 5,
             max: 14,
+            readOnly: isSelf,
           })
         : null;
     if (ageStepper) cleanups.push(() => ageStepper.destroy());

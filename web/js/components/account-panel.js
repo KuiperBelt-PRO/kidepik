@@ -209,7 +209,7 @@ export function mountAccountPanel(container, { session, onDeleted }) {
     nameInput.id = "account-display-name";
     nameInput.className = "account-panel__input";
     nameInput.type = "text";
-    nameInput.maxLength = 40;
+    nameInput.maxLength = isCrewSession() ? 24 : 40;
     nameInput.autocomplete = "nickname";
     nameInput.value = parent.display_name ?? "";
     const saveBtn = document.createElement("button");
@@ -262,28 +262,68 @@ export function mountAccountPanel(container, { session, onDeleted }) {
     dangerTitle.className = "account-panel__danger-title";
     dangerTitle.textContent = "Zona peligrosa";
 
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.className = "account-panel__btn";
-    setLabeledButton(deleteBtn, "danger", "Eliminar cuenta", { dangerIcon: true });
+    const dangerBtn = document.createElement("button");
+    dangerBtn.type = "button";
+    dangerBtn.className = "account-panel__btn";
+    const crew = isCrewSession();
+    if (crew) {
+      setLabeledButton(dangerBtn, "danger", "Desvincular Gmail", { dangerIcon: true });
+    } else {
+      setLabeledButton(dangerBtn, "danger", "Eliminar cuenta", { dangerIcon: true });
+    }
 
-    if (isCrewSession()) {
-      const unlinkBtn = document.createElement("button");
-      unlinkBtn.type = "button";
-      unlinkBtn.className = "account-panel__btn";
-      setLabeledButton(unlinkBtn, "danger", "Desvincular Gmail", { dangerIcon: true });
+    root.append(
+      subtitle,
+      avatar,
+      nameField,
+      googleField,
+      emailField,
+      providerField,
+      ...buildDebugSectionNodes(debugCaps),
+      divider,
+      dangerTitle,
+      dangerBtn,
+    );
 
-      const crewNodes = [
-        subtitle,
-        avatar,
-        googleField,
-        emailField,
-        providerField,
-        ...buildDebugSectionNodes(debugCaps),
-      ];
-      crewNodes.push(divider, dangerTitle, unlinkBtn);
-      root.append(...crewNodes);
-      unlinkBtn.addEventListener("click", () => {
+    saveBtn.addEventListener("click", () => {
+      void (async () => {
+        nameError.hidden = true;
+        nameStatus.hidden = true;
+        const check = normalizeDisplayNameInput(nameInput.value);
+        if (!check.ok) {
+          nameError.textContent = check.error;
+          nameError.hidden = false;
+          return;
+        }
+        await runGlassButtonAction(
+          saveBtn,
+          async () => {
+            const result = crew
+              ? await patchMember(session, { display_name: check.value })
+              : await updateParentDisplayName(session, check.value);
+            if (!result.ok) {
+              const err =
+                typeof result.error === "string" && result.error !== "save"
+                  ? result.error
+                  : "No hemos podido guardar. Inténtalo de nuevo.";
+              nameError.textContent = err;
+              nameError.hidden = false;
+              return { ok: false, error: err };
+            }
+            if (crew) {
+              nameInput.value = result.member?.display_name ?? "";
+            } else {
+              nameInput.value = result.parent.display_name ?? "";
+            }
+            return { ok: true };
+          },
+          { successMessage: "Nombre guardado" },
+        );
+      })();
+    });
+
+    if (crew) {
+      dangerBtn.addEventListener("click", () => {
         void showGlassConfirm({
           title: "¿Desvincular este Gmail?",
           body: "<p>Saldrás de esta sesión. Seguirás en la tripulación y podrás volver a entrar con el mismo correo. Esta acción no elimina tu viaje.</p>",
@@ -303,51 +343,7 @@ export function mountAccountPanel(container, { session, onDeleted }) {
       return;
     }
 
-    root.append(
-      subtitle,
-      avatar,
-      nameField,
-      googleField,
-      emailField,
-      providerField,
-      ...buildDebugSectionNodes(debugCaps),
-      divider,
-      dangerTitle,
-      deleteBtn,
-    );
-
-    saveBtn.addEventListener("click", () => {
-      void (async () => {
-        nameError.hidden = true;
-        nameStatus.hidden = true;
-        const check = normalizeDisplayNameInput(nameInput.value);
-        if (!check.ok) {
-          nameError.textContent = check.error;
-          nameError.hidden = false;
-          return;
-        }
-        await runGlassButtonAction(
-          saveBtn,
-          async () => {
-            const result = await updateParentDisplayName(session, check.value);
-            if (!result.ok) {
-              nameError.textContent = result.error
-                ?? "No hemos podido guardar. Inténtalo de nuevo.";
-              nameError.hidden = false;
-              return {
-                ok: false,
-                error: result.error ?? "No hemos podido guardar. Inténtalo de nuevo.",
-              };
-            }
-            nameInput.value = result.parent.display_name ?? "";
-            return { ok: true };
-          },
-          { successMessage: "Nombre guardado" },
-        );
-      })();
-    });
-
-    deleteBtn.addEventListener("click", () => {
+    dangerBtn.addEventListener("click", () => {
       void showGlassConfirm({
         title: "¿Eliminar tu cuenta?",
         body: DELETE_COPY_HTML,
@@ -405,19 +401,31 @@ export function mountAccountPanel(container, { session, onDeleted }) {
     }
 
     const crew = isCrewSession();
-    const result = crew
-      ? {
-          ok: true,
-          parent: {
-            parent_id: "",
-            auth_user_id: session.user?.id || "",
-            email: session.user?.email || "",
-            display_name: session.user?.user_metadata?.full_name || session.user?.email || "",
-            avatar_url: session.user?.user_metadata?.avatar_url || null,
-            provider: "google",
-          },
-        }
-      : await fetchParentMe(session);
+    if (crew) {
+      const memberRes = await fetchMember(session);
+      if (cancelled) return;
+      if (!memberRes.ok) {
+        renderError();
+        return;
+      }
+      if (!debugCaps?.operator_eligible && memberRes.member?.debug_capabilities) {
+        debugCaps = memberRes.member.debug_capabilities;
+      }
+      renderForm(
+        {
+          parent_id: "",
+          auth_user_id: session.user?.id || "",
+          email: session.user?.email || "",
+          display_name: memberRes.member?.display_name ?? "",
+          avatar_url: session.user?.user_metadata?.avatar_url || null,
+          provider: "google",
+        },
+        debugCaps,
+      );
+      return;
+    }
+
+    const result = await fetchParentMe(session);
     if (cancelled) return;
     if (!result.ok) {
       renderError();

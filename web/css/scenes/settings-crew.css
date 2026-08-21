@@ -184,6 +184,36 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   background: rgba(255, 255, 255, 0.14);
 }
 
+.crew-subject-card.is-off {
+  opacity: 0.72;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.crew-subject-card--readonly .crew-subject-card__head {
+  align-items: flex-start;
+}
+
+.crew-subject-card__state {
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+
+.crew-subject-card__state--on {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.crew-subject-card__state--off {
+  border-color: rgba(255, 255, 255, 0.18);
+  color: rgba(255, 255, 255, 0.72);
+}
+
 .crew-subject-card__head {
   display: flex;
   align-items: center;

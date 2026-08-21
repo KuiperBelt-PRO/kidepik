@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from httpx import AsyncClient
 
-from tests.helpers.factories import CHILD_ID
+from tests.helpers.factories import CHILD_ID, sample_crew_member
 from tests.helpers.http import assert_auth_error, assert_status
 
 DEBUG_CAPS_OFF = {
@@ -162,6 +162,49 @@ async def test_member_patch_forbidden_field(
         422,
     )
     assert body["detail"] == "field_forbidden"
+
+
+@pytest.mark.contract
+@pytest.mark.asyncio
+async def test_member_patch_ui_settings(
+    client: AsyncClient,
+    mock_auth,
+    auth_headers,
+    mock_parent_service,
+    mock_crew_service,
+    mocker,
+) -> None:
+    mocker.patch(
+        "app.routers.member.SessionAccountService"
+    ).return_value.require_crew = AsyncMock(
+        return_value={
+            "role": "crew",
+            "auth_user_id": "00000000-0000-4000-8000-000000000099",
+            "child_id": CHILD_ID,
+            "email": "nina@gmail.com",
+        }
+    )
+    updated = {
+        **sample_crew_member(),
+        "font_scale_play": "lg",
+        "ui_preferences": {"ui_theme": "sci-fi", "reduce_motion": "always"},
+        "viewer": "self",
+    }
+    mock_crew_service.update_self_profile = AsyncMock(return_value=sample_crew_member())
+    mock_crew_service.to_self_view = MagicMock(return_value=updated)
+    body = assert_status(
+        await client.patch(
+            "/api/v1/member",
+            json={
+                "font_scale_play": "lg",
+                "ui_preferences": {"reduce_motion": "always"},
+            },
+            headers=auth_headers,
+        ),
+        200,
+    )
+    assert body["font_scale_play"] == "lg"
+    assert body["ui_preferences"]["reduce_motion"] == "always"
 
 
 @pytest.mark.contract
