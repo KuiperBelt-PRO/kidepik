@@ -580,21 +580,24 @@ export function renderTimelineSkeletonItemsHtml(count = 3) {
 }
 
 /**
- * Añade filas skeleton al final de una lista (p. ej. «Ver más» en diario).
+ * Añade filas skeleton a una lista (p. ej. «Ver más» en diario).
  * @param {HTMLElement} host — normalmente `<ol>` o contenedor de lista
- * @param {{ count?: number }} [opts]
+ * @param {{ count?: number, prepend?: boolean }} [opts]
  * @returns {() => void}
  */
 export function mountTimelineSkeletonItems(host, opts = {}) {
   const count = opts.count ?? 3;
+  const prepend = Boolean(opts.prepend);
   const wrap = document.createElement("div");
   wrap.innerHTML = renderTimelineSkeletonItemsHtml(count);
   /** @type {HTMLElement[]} */
   const items = [];
+  const anchor = prepend ? host.firstChild : null;
   while (wrap.firstElementChild) {
     const el = wrap.firstElementChild;
     if (el instanceof HTMLElement) {
-      host.appendChild(el);
+      if (prepend) host.insertBefore(el, anchor);
+      else host.appendChild(el);
       items.push(el);
     }
   }

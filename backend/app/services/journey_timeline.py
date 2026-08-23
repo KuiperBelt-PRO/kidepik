@@ -11,6 +11,34 @@ from app.config import get_settings
 from app.services.journey_memory import JourneyMemoryService
 from app.services.mentor_profiles import mentor_for_child
 
+_TUTOR_SUMMARY_MAX_CHARS = 2000
+
+
+def tutor_facing_summary(
+    *,
+    kind: str,
+    text: str = "",
+    summary: str = "",
+    payload: dict[str, Any] | None = None,
+) -> str:
+    """Prosa del diario tutor: etiqueta humana, no option_id crudo."""
+    raw = str(text or summary or "")
+    if kind == "explorer_reply":
+        reply = payload.get("reply") if isinstance(payload, dict) else None
+        if isinstance(reply, dict):
+            display = str(reply.get("displayLabel") or "").strip()
+            body = str(reply.get("text") or "").strip()
+            if display:
+                raw = display
+            elif body:
+                raw = body
+            elif str(reply.get("kind") or "") == "continue":
+                raw = "Continuar"
+    collapsed = " ".join(str(raw).split())
+    if len(collapsed) > _TUTOR_SUMMARY_MAX_CHARS:
+        return collapsed[:_TUTOR_SUMMARY_MAX_CHARS].rstrip()
+    return collapsed
+
 
 class JourneyTimelineService:
     KIND_RANK = {
@@ -56,7 +84,14 @@ class JourneyTimelineService:
                         kind,
                         "dialogue.jsonl",
                         row.get("id"),
-                        str(row.get("text") or row.get("summary") or ""),
+                        tutor_facing_summary(
+                            kind=kind,
+                            text=str(row.get("text") or ""),
+                            summary=str(row.get("summary") or ""),
+                            payload=row.get("payload")
+                            if isinstance(row.get("payload"), dict)
+                            else None,
+                        ),
                         int(row.get("seq") or 0),
                     )
                 )
@@ -84,12 +119,15 @@ class JourneyTimelineService:
                         kind,
                         "dialogue_turns",
                         r["id"],
-                        str(r["text"]),
+                        tutor_facing_summary(
+                            kind=kind,
+                            text=str(r["text"] or ""),
+                        ),
                         int(r["sequence"] or 0),
                     )
                 )
-        events.sort(
-            key=lambda x: (x["at"], x["seq"], x["kind_rank"], x["id"]), reverse=True
+        newest_first = sorted(
+            events, key=lambda x: (x["at"], x["seq"], x["kind_rank"], x["id"]), reverse=True
         )
         offset = 0
         if cursor:
@@ -97,7 +135,8 @@ class JourneyTimelineService:
                 offset = int(base64.b64decode(cursor).decode())
             except Exception:
                 offset = 0
-        page = events[offset : offset + limit]
+        window = newest_first[offset : offset + limit]
+        page = list(reversed(window))
         nxt = offset + len(page)
         return {
             "events": page,
@@ -134,6 +173,6 @@ class JourneyTimelineService:
             "kind": kind,
             "ref_table": table,
             "ref_id": str(ref),
-            "summary": " ".join(summary.split())[:160],
+            "summary": str(summary or ""),
             "source": "primary",
         }

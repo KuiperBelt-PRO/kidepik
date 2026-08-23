@@ -278,7 +278,7 @@ class DialogueService:
                 "meta": explorer_meta,
             }
         )
-        self._ledger_explorer(child, session_id, value, reply)
+        self._ledger_explorer(child, session_id, bubble_text, reply)
         return await self._advance_from_last_explorer(
             auth_user_id,
             child_id,
@@ -4353,13 +4353,19 @@ class DialogueService:
         parent_id = child.get("parent_id")
         if not parent_id:
             return
+        display = str(reply.get("displayLabel") or "").strip()
+        body = str(reply.get("text") or "").strip()
+        if str(reply.get("kind") or "") == "continue":
+            ledger_text = display or "Continuar"
+        else:
+            ledger_text = display or body or value
         try:
             self.ledger.append_dialogue(
                 str(parent_id),
                 str(child["id"]),
                 session_id,
                 kind="explorer_reply",
-                text=value,
+                text=ledger_text,
                 payload={"reply": reply},
             )
         except Exception:

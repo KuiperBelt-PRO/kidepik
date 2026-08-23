@@ -162,7 +162,7 @@ Barras redondeadas con shimmer (Privacidad/Términos). Ver helpers `renderGlassS
 
 También: skeleton del **wordmark** en el slot del marco (`.section-frame__logo-skeleton`) mientras el logo está `is-logo-pending` — ver `SPEC_APP_SECTION_FRAME` §2.4d y `logo-reveal.js`.
 
-**Carga incremental (listas):** al paginar («Ver más» en diario del viaje, historial en play, etc.) añadir filas skeleton al final con `mountTimelineSkeletonItems(host, { count: 3 })` y retirarlas al resolver el fetch. **Prohibido** texto «Cargando más…» bajo el botón.
+**Carga incremental (listas):** al paginar hacia **mensajes anteriores** («Ver más» en diario del viaje, historial en play) añadir filas skeleton **al inicio** de la lista (tras el control de carga) con `mountTimelineSkeletonItems(host, { count: 3, prepend: true })` y retirarlas al resolver el fetch. **Prohibido** texto «Cargando más…» bajo el botón.
 
 ### 12. Navegación del marco (`section-frame` + `shell-nav-stack`)
 

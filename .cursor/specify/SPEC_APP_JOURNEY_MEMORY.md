@@ -1,6 +1,6 @@
 # Spec: Memoria del viaje (ledger + resúmenes para agentes)
 
-> Estado: **parcialmente implementada** (jul–ago 2026); **§1.4 ordenación diario implementada** (ago 2026)  
+> Estado: **parcialmente implementada** (jul–ago 2026); **§1.4 ordenación diario implementada** (ago 2026); **§1.4.4 texto tripulante + wrap completo** (ago 2026)  
 > Relacionado: [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_DIALOGUE.md](SPEC_APP_ADVENTURE_DIALOGUE.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_MENTOR.md](SPEC_APP_MENTOR.md), [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §9
 
 ## Contexto
@@ -96,7 +96,7 @@ Puede ser vista SQL o tabla `journey_events` alimentada por triggers/servicio.
 | `level` / `rank` | 70 | Efectos de progresión |
 | otros | 80 | |
 
-Dirección de listado tutor: **más reciente primero** (como hoy), pero **dentro del mismo segundo** el orden relativo debe respetar la causalidad (decisión → narración de llegada → intro de reto → respuesta → resultado).
+Dirección de listado tutor: **igual que play** (más antiguo → más reciente). La primera página es la **ventana más reciente** (últimos N hitos, ya en orden de aventura). «Ver más» pide la página **anterior** (hitos más antiguos) y la UI los **antepone** al inicio de la lista, como el historial de play.
 
 Cada evento en la respuesta API incluye:
 
@@ -126,9 +126,11 @@ Cuando un `story_beat` y un `dialogue_turns` (mentor) representan el **mismo bea
 | Aspecto | Contrato |
 | --- | --- |
 | Timestamp visible | Mostrar **fecha + hora con segundos** (`YYYY-MM-DD HH:MM:SS` local o relativo «hace 2 min»). **No** truncar a minuto si eso colapsa varios eventos. |
-| Orden visual | Exactamente el orden del array `events` del servidor (no re-ordenar en cliente por string truncado). |
+| Orden visual | Exactamente el orden del array `events` del servidor (no re-ordenar en cliente por string truncado). Orden de aventura: mentor → respuesta del tripulante. |
 | Labels | `kind` → etiqueta humana (Decisión, Reto, Mentor, …); el `summary` **no** debe empezar por `[challenge_intro]` técnico — el servidor limpia o mapea `beat_kind` a prosa. |
-| «Ver más» | Paginación por `sort_key` / cursor opaco (preferible a offset frágil). |
+| Texto del tripulante | En `explorer_reply`, el `summary` usa `payload.reply.displayLabel` (o el texto de la opción), **no** el `option_id` crudo (`a`/`b`/`c`). Continuar vacío → «Continuar». |
+| Longitud | El diario muestra el enunciado **completo** con wrap en la tarjeta; **prohibido** recortar a ~160 caracteres a mitad de palabra. |
+| «Ver más» | Encima de la lista. Carga hitos **anteriores** (cursor de páginas más antiguas) y los inserta al inicio. Skeleton en cabecera de lista, no al final. Primera carga: scroll al final (lo más reciente visible). |
 
 #### 1.4.5 Criterios de aceptación (diario)
 
@@ -136,6 +138,8 @@ Cuando un `story_beat` y un `dialogue_turns` (mentor) representan el **mismo bea
 2. Dos eventos con el mismo minuto de reloj **no** intercambian orden entre recargas.
 3. PHPUnit: fixture con `created_at` idéntico y `sequence` distintos → orden esperado.
 4. UI no muestra el mismo texto dos veces seguidas por eco beat/turno.
+5. Primera carga: últimos N hitos en orden de aventura (antiguo → reciente); el scroll del diario arranca al final.
+6. «Ver más» antepone hitos anteriores; no aparecen debajo de lo más nuevo.
 
 ---
 

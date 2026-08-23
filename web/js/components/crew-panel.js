@@ -30,7 +30,7 @@ import {
   normalizeSessionMinutes,
   runGlassButtonAction,
   setGlassButton,
-} from "./glass-controls.js?v=227";
+} from "./glass-controls.js?v=228";
 import { showGlassConfirm } from "./glass-modal.js?v=2";
 import { showPinPadModal } from "./pin-pad-modal.js?v=3";
 import { markExitPinVerified } from "../lib/exit-pin-gate.js";
@@ -752,8 +752,8 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       <section class="crew-panel__block" data-journey-block>
         <h2 class="crew-panel__block-title">Diario del viaje</h2>
         <div class="crew-panel__helper" data-journey-summary></div>
+        <button type="button" class="crew-panel__btn crew-panel__btn--timeline-more" data-journey-more hidden>Ver más</button>
         <ol class="crew-panel__timeline glass-scroll-fade" data-journey-timeline aria-label="Cronología del viaje"></ol>
-        <button type="button" class="crew-panel__btn" data-journey-more hidden>Ver más</button>
       </section>`;
     const dangerBlock = `
       <section class="crew-panel__block crew-panel__block--danger">
@@ -1444,7 +1444,7 @@ async function loadJourneyTimeline(root, session, childId) {
     /** @type {(() => void) | null} */
     let clearAppendSkeleton = null;
     if (append) {
-      clearAppendSkeleton = mountTimelineSkeletonItems(listEl, { count: 3 });
+      clearAppendSkeleton = mountTimelineSkeletonItems(listEl, { count: 3, prepend: true });
     }
     const res = await fetchJourneyTimeline(session, childId, { cursor: cursor ?? undefined, limit: 12 });
     clearAppendSkeleton?.();
@@ -1482,6 +1482,10 @@ async function loadJourneyTimeline(root, session, childId) {
       listEl.innerHTML = "";
     }
     const events = Array.isArray(data.events) ? data.events : [];
+    const prevScrollHeight = listEl.scrollHeight;
+    const prevScrollTop = listEl.scrollTop;
+    /** @type {HTMLElement | null} */
+    const prependAnchor = append ? listEl.firstElementChild : null;
     for (const ev of events) {
       const li = document.createElement("li");
       li.className = "crew-panel__timeline-item";
@@ -1491,10 +1495,16 @@ async function loadJourneyTimeline(root, session, childId) {
       li.innerHTML = `<span class="crew-panel__timeline-kind">${escapeHtml(eventKindLabel(kind))}</span>
         <span class="crew-panel__timeline-text">${summary}</span>
         <time class="crew-panel__timeline-at" datetime="${escapeAttr(String(ev.at || ""))}">${at}</time>`;
-      listEl.appendChild(li);
+      if (append && prependAnchor) listEl.insertBefore(li, prependAnchor);
+      else listEl.appendChild(li);
     }
     if (!append && events.length === 0 && summaryEl instanceof HTMLElement && !data.summary) {
       summaryEl.textContent = "Este tripulante aún no tiene hitos de viaje.";
+    }
+    if (!append && events.length) {
+      listEl.scrollTop = listEl.scrollHeight;
+    } else if (append && events.length) {
+      listEl.scrollTop = prevScrollTop + (listEl.scrollHeight - prevScrollHeight);
     }
     cursor = data.next_cursor ?? null;
     if (moreBtn instanceof HTMLButtonElement) {
