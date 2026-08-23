@@ -190,6 +190,14 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.crew-subject-card.is-off.has-preserved-progress {
+  opacity: 0.88;
+}
+
+.crew-subject-card.is-off.has-preserved-progress .crew-progress__bar-fill {
+  opacity: 0.55;
+}
+
 .crew-subject-card--readonly .crew-subject-card__head {
   align-items: flex-start;
 }

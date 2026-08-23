@@ -200,9 +200,203 @@ function renderRankLegend(member) {
 }
 
 /**
- * @param {ParentNode} host
+ * @param {ParentNode} root
+ * @returns {string[]}
+ */
+function collectActiveSubjectsFromRoot(root) {
+  const host = root.querySelector("[data-subjects-host]");
+  if (!(host instanceof HTMLElement)) return [];
+  /** @type {string[]} */
+  const selected = [];
+  host.querySelectorAll("[data-subject]").forEach((input) => {
+    if (!(input instanceof HTMLInputElement)) return;
+    const id = input.getAttribute("data-subject");
+    if (id && input.checked) selected.push(id);
+  });
+  return selected;
+}
+
+/**
+ * @param {ParentNode} root
+ * @returns {string[]}
+ */
+function collectSubjectPrioritiesFromRoot(root) {
+  const host = root.querySelector("[data-subjects-host]");
+  if (!(host instanceof HTMLElement)) return [];
+  /** @type {string[]} */
+  const subject_priorities = [];
+  host.querySelectorAll("[data-subject-priority]").forEach((el) => {
+    if (!(el instanceof HTMLInputElement)) return;
+    const sid = el.getAttribute("data-subject-priority");
+    if (sid && el.checked) subject_priorities.push(sid);
+  });
+  return subject_priorities;
+}
+
+/**
+ * @param {any} member
+ * @param {Record<string, unknown>} apiMember
+ */
+function applyMemberLearningPatch(member, apiMember) {
+  Object.assign(member, apiMember);
+  if (apiMember.settings) member.settings = apiMember.settings;
+  if (Array.isArray(apiMember.active_subjects)) {
+    member.active_subjects = apiMember.active_subjects;
+  }
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {any} member
+ * @param {() => void} [onSync]
+ */
+function syncSubjectSwitchStatesFromMember(root, member, onSync) {
+  const host = root.querySelector("[data-subjects-host]");
+  if (!(host instanceof HTMLElement)) return;
+  const active = new Set(
+    normalizeActiveSubjects(
+      member.active_subjects ?? member.settings?.learning?.active_subjects,
+    ),
+  );
+  host.querySelectorAll("[data-subject]").forEach((input) => {
+    if (!(input instanceof HTMLInputElement)) return;
+    const id = input.getAttribute("data-subject");
+    if (id) input.checked = active.has(id);
+  });
+  onSync?.();
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {any} member
+ */
+function syncSubjectProgressFromMember(root, member) {
+  const host = root.querySelector("[data-subjects-host]");
+  if (!(host instanceof HTMLElement)) return;
+  /** @type {Map<string, Record<string, unknown>>} */
+  const byId = new Map();
+  for (const row of member.progress?.subjects || []) {
+    const id = String(row.subject_id || row.id || "");
+    if (id) byId.set(id, row);
+  }
+  host.querySelectorAll("[data-subject-card]").forEach((card) => {
+    const sid = card.getAttribute("data-subject-card");
+    if (!sid) return;
+    const input = card.querySelector("[data-subject]");
+    const on = input instanceof HTMLInputElement && input.checked;
+    const row = byId.get(sid);
+    const prog = row?.level_progress;
+    const percent = Math.max(0, Math.min(100, Number(prog?.percent_to_next) || 0));
+    const curRank = String(row?.rank_label || "");
+    const nextRank = String(row?.rank_next_label || "");
+    let levelLine = "Sin nivel aún";
+    if (!on && curRank) {
+      levelLine = `Pausada · ${curRank}${nextRank ? ` → ${nextRank}` : ""}`;
+    } else if (on && curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
+    else if (curRank) levelLine = curRank;
+    const levelEl = card.querySelector(".crew-subject-card__level");
+    if (levelEl instanceof HTMLElement) levelEl.textContent = levelLine;
+    const bar = card.querySelector(".crew-progress__bar");
+    if (bar instanceof HTMLElement) bar.setAttribute("aria-valuenow", String(percent));
+    const fill = card.querySelector(".crew-progress__bar-fill");
+    if (fill instanceof HTMLElement) fill.style.width = `${percent}%`;
+    card.classList.toggle("has-preserved-progress", Boolean(!on && curRank));
+  });
+}
+
+/**
+ * Activación/desactivación de materias: guardado inmediato al cambiar el switch.
+ * @param {ParentNode} root
+ * @param {{ session: import('@supabase/supabase-js').Session; childId: string; member: Record<string, unknown>; onSync?: () => void; onProgressSync?: () => void }} opts
  * @returns {() => void}
  */
+function mountSubjectActivationSwitches(root, opts) {
+  const host = root.querySelector("[data-subjects-host]");
+  if (!(host instanceof HTMLElement)) return () => {};
+
+  let saveTimer = 0;
+  let saveInFlight = false;
+  let saveQueued = false;
+
+  const persistActiveSubjects = async () => {
+    if (saveInFlight) {
+      saveQueued = true;
+      return;
+    }
+    const selected = collectActiveSubjectsFromRoot(root);
+    if (selected.length < 1) return;
+
+    saveInFlight = true;
+    try {
+      const res = await patchCrewMember(opts.session, opts.childId, {
+        learning: {
+          active_subjects: selected,
+          subject_priorities: collectSubjectPrioritiesFromRoot(root),
+        },
+      });
+      if (res.ok) {
+        applyMemberLearningPatch(opts.member, res.member);
+        opts.onProgressSync?.();
+      } else {
+        syncSubjectSwitchStatesFromMember(root, opts.member, opts.onSync);
+        const { showGlassToast } = await import("./glass-toast.js");
+        showGlassToast("No hemos podido guardar la materia.", { variant: "error" });
+      }
+    } finally {
+      saveInFlight = false;
+      if (saveQueued) {
+        saveQueued = false;
+        void persistActiveSubjects();
+      }
+    }
+  };
+
+  const schedulePersist = () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(() => {
+      saveTimer = 0;
+      void persistActiveSubjects();
+    }, 280);
+  };
+
+  /** @type {(() => void)[]} */
+  const cleanups = [];
+  host.querySelectorAll("[data-subject]").forEach((el) => {
+    const handler = (ev) => {
+      const input = ev.target;
+      if (!(input instanceof HTMLInputElement)) return;
+
+      if (!input.checked) {
+        const sid = input.getAttribute("data-subject");
+        if (sid) {
+          const prio = host.querySelector(`[data-subject-priority="${sid}"]`);
+          if (prio instanceof HTMLInputElement) prio.checked = false;
+        }
+      }
+
+      const selected = collectActiveSubjectsFromRoot(root);
+      if (selected.length < 1) {
+        input.checked = true;
+        void import("./glass-toast.js").then(({ showGlassToast }) => {
+          showGlassToast("Activa al menos una materia.", { variant: "warning", durationMs: 3200 });
+        });
+        opts.onSync?.();
+        return;
+      }
+
+      opts.onSync?.();
+      schedulePersist();
+    };
+    el.addEventListener("change", handler);
+    cleanups.push(() => el.removeEventListener("change", handler));
+  });
+
+  return () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    cleanups.forEach((fn) => fn());
+  };
+}
+
 function mountSubjectNoteDisclosures(host) {
   const toggles = host.querySelectorAll("[data-subject-notes-toggle]");
   /** @type {(() => void)[]} */
@@ -727,7 +921,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     const subjectsBlock = `
       <section class="crew-panel__block" data-subjects-block>
         <h2 class="crew-panel__block-title">Materias de aprendizaje</h2>
-        <p class="crew-panel__helper">Activa materias y añade notas si quieres. Esta información se tendrá en cuenta para generar la historia del viaje, los retos y aprendizajes.</p>
+        <p class="crew-panel__helper">Activa o desactiva materias con el interruptor; el cambio se guarda al instante. Si pausas una materia, su progreso se conserva. Las notas e información general se guardan con el botón de abajo.</p>
         <label class="crew-panel__label">Información adicional (general)
           <textarea
             class="crew-panel__input"
@@ -935,7 +1129,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
     paintBtn(root, "[data-save-perm]", "save", "Guardar permisos");
     paintBtn(root, "[data-save-invite]", "save", "Guardar correo");
     if (!isTutor) {
-      paintBtn(root, "[data-save-subjects]", "save", "Guardar materias");
+      paintBtn(root, "[data-save-subjects]", "save", "Guardar notas");
       const catalog =
         Array.isArray(member.subject_catalog) && member.subject_catalog.length
           ? member.subject_catalog
@@ -955,21 +1149,39 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         cleanups.push(mountSubjectNoteDisclosures(host));
       }
       const warn = root.querySelector("[data-subjects-warn]");
+      const subjectsHost = root.querySelector("[data-subjects-host]");
       const syncWarn = () => {
-        const n = root.querySelectorAll("[data-subject]:checked").length;
+        const n = collectActiveSubjectsFromRoot(root).length;
         if (warn instanceof HTMLElement) warn.hidden = n <= 10;
-        root.querySelectorAll(".crew-subject-card").forEach((card) => {
-          const input = card.querySelector("[data-subject]");
-          card.classList.toggle(
-            "is-on",
-            input instanceof HTMLInputElement && input.checked,
-          );
-        });
+        if (subjectsHost instanceof HTMLElement) {
+          subjectsHost.querySelectorAll(".crew-subject-card").forEach((card) => {
+            const input = card.querySelector("[data-subject]");
+            const prio = card.querySelector("[data-subject-priority]");
+            card.classList.toggle(
+              "is-on",
+              input instanceof HTMLInputElement && input.checked,
+            );
+            card.classList.toggle(
+              "is-off",
+              !(input instanceof HTMLInputElement && input.checked),
+            );
+            card.classList.toggle(
+              "is-priority",
+              prio instanceof HTMLInputElement && prio.checked,
+            );
+          });
+        }
       };
       syncWarn();
-      root.querySelectorAll("[data-subject]").forEach((el) => {
-        el.addEventListener("change", syncWarn);
-      });
+      cleanups.push(
+        mountSubjectActivationSwitches(root, {
+          session,
+          childId,
+          member,
+          onSync: syncWarn,
+          onProgressSync: () => syncSubjectProgressFromMember(root, member),
+        }),
+      );
     }
     if (!isTutor) {
       paintBtn(root, "[data-play]", "save", "Entrar en la aventura");
@@ -1304,13 +1516,7 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       if (isTutor) return;
       const btn = root.querySelector("[data-save-subjects]");
       if (!(btn instanceof HTMLButtonElement)) return;
-      /** @type {string[]} */
-      const selected = [];
-      root.querySelectorAll("[data-subject]").forEach((input) => {
-        if (!(input instanceof HTMLInputElement)) return;
-        const id = input.getAttribute("data-subject");
-        if (id && input.checked) selected.push(id);
-      });
+      const selected = collectActiveSubjectsFromRoot(root);
       if (selected.length < 1) {
         void import("./glass-toast.js").then(({ showGlassToast }) => {
           showGlassToast("Activa al menos una materia.", { variant: "warning", durationMs: 3200 });
@@ -1322,43 +1528,35 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
         async () => {
           /** @type {Array<{ subject_id: string, note: string }>} */
           const subject_notes = [];
-          root.querySelectorAll("[data-subject-note]").forEach((el) => {
-            if (!(el instanceof HTMLTextAreaElement)) return;
-            const sid = el.getAttribute("data-subject-note");
-            const note = el.value.trim();
-            if (sid && note) subject_notes.push({ subject_id: sid, note });
-          });
+          const notesHost = root.querySelector("[data-subjects-host]");
+          if (notesHost instanceof HTMLElement) {
+            notesHost.querySelectorAll("[data-subject-note]").forEach((el) => {
+              if (!(el instanceof HTMLTextAreaElement)) return;
+              const sid = el.getAttribute("data-subject-note");
+              const note = el.value.trim();
+              if (sid && note) subject_notes.push({ subject_id: sid, note });
+            });
+          }
           const generalEl = root.querySelector("[data-general-note]");
           const general_note =
             generalEl instanceof HTMLTextAreaElement ? generalEl.value.trim() : "";
-          /** @type {string[]} */
-          const subject_priorities = [];
-          root.querySelectorAll("[data-subject-priority]").forEach((el) => {
-            if (!(el instanceof HTMLInputElement)) return;
-            const sid = el.getAttribute("data-subject-priority");
-            if (sid && el.checked) subject_priorities.push(sid);
-          });
           const res = await patchCrewMember(session, childId, {
             learning: {
               active_subjects: selected,
               subject_notes,
               general_note: general_note || null,
-              subject_priorities,
+              subject_priorities: collectSubjectPrioritiesFromRoot(root),
             },
           });
           if (res.ok) {
-            Object.assign(member, res.member);
-            if (res.member.settings) member.settings = res.member.settings;
-            if (Array.isArray(res.member.active_subjects)) {
-              member.active_subjects = res.member.active_subjects;
-            }
+            applyMemberLearningPatch(member, res.member);
           }
           return {
             ok: res.ok,
-            error: res.ok ? undefined : "No hemos podido guardar las materias.",
+            error: res.ok ? undefined : "No hemos podido guardar las notas.",
           };
         },
-        { successMessage: "Materias guardadas" },
+        { successMessage: "Notas guardadas" },
       );
     });
 

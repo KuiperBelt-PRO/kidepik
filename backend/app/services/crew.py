@@ -19,6 +19,8 @@ from app.text_utils import CharacterSummaryBuilder
 
 class CrewService:
     MEMBER_LIMIT = 10
+    GENERAL_NOTE_MAX_LEN = 400
+    SUBJECT_NOTE_MAX_LEN = 600
     def __init__(self, parents: ParentAccountService | None = None, settings_repo: ParentSettingsRepository | None = None) -> None:
         self.parents, self.settings_repo = parents or ParentAccountService(), settings_repo or ParentSettingsRepository()
 
@@ -109,7 +111,14 @@ class CrewService:
             learning = dict(settings.get("learning") or {})
             if "active_subjects" in incoming:
                 if not isinstance(incoming["active_subjects"], list): raise ValueError("learning.active_subjects invalid")
-                learning["active_subjects"] = SubjectCatalog.normalize_active_subjects(incoming["active_subjects"]); learning["subjects_locked_by_tutor"] = True
+                # Solo cambia la lista activa; user_subject_levels conserva el progreso de materias pausadas.
+                learning["active_subjects"] = SubjectCatalog.normalize_active_subjects(incoming["active_subjects"])
+                learning["subjects_locked_by_tutor"] = True
+                if "subject_priorities" not in incoming and learning.get("subject_priorities"):
+                    learning["subject_priorities"] = self._normalize_subject_priorities(
+                        learning["subject_priorities"],
+                        learning["active_subjects"],
+                    )
             for key in ("adaptation_policy", "show_levels_to_child", "pause_adaptation"):
                 if key in incoming: learning[key] = incoming[key]
             if "subject_notes" in incoming:
@@ -352,7 +361,7 @@ class CrewService:
         value = raw.strip()
         if not value:
             return None
-        if len(value) > 400:
+        if len(value) > CrewService.GENERAL_NOTE_MAX_LEN:
             raise ValueError("learning.general_note too long")
         return value
 
@@ -368,9 +377,11 @@ class CrewService:
             if not isinstance(item, dict):
                 continue
             sid = str(item.get("subject_id") or "").strip()
-            note = str(item.get("note") or "").strip()[:200]
+            note = str(item.get("note") or "").strip()
             if not sid or not note:
                 continue
+            if len(note) > CrewService.SUBJECT_NOTE_MAX_LEN:
+                raise ValueError("learning.subject_notes too long")
             if sid not in SubjectCatalog.ALL:
                 raise ValueError("learning.subject_notes invalid")
             if sid in seen:

@@ -67,6 +67,7 @@ class CrewProgressService:
             else None
         )
         subjects, weighted, total_weight, unevaluated = [], 0.0, 0.0, 0
+        active_set = set(active)
         for subject in active:
             if subject not in SubjectCatalog.META:
                 continue
@@ -90,23 +91,47 @@ class CrewProgressService:
                 unevaluated += 1
             zone = meta["zone_id"]
             subjects.append(
-                {
-                    "subject_id": subject,
-                    "label": meta["label"],
-                    "family": meta["family"],
-                    "zone_id": zone,
-                    "zone_label": self._zone_label(theme, zone),
-                    "level_id": level,
-                    "level_progress": progress,
-                    "rank_label": self._rank_label_for_level(theme, level),
-                    "rank_next_label": self._rank_label_for_level(
-                        theme, progress.get("next") if progress else None
-                    ),
-                    "zone_status": self._zone_status(
-                        level, zone, completed, active_zone, quest
-                    ),
-                    "recent_attempts": 1 if row else 0,
-                }
+                self._subject_progress_item(
+                    subject,
+                    meta,
+                    row,
+                    progress,
+                    theme,
+                    zone,
+                    completed,
+                    active_zone,
+                    quest,
+                    is_active=True,
+                )
+            )
+        for subject in sorted(levels.keys()):
+            if subject in active_set or subject not in SubjectCatalog.META:
+                continue
+            row = levels[subject]
+            level = row.get("level_id") if row else None
+            if not level:
+                continue
+            meta = SubjectCatalog.META[subject]
+            progress = self._level_progress(
+                level,
+                row.get("accuracy_rolling") if row else None,
+                1,
+                meta["label"],
+            )
+            zone = meta["zone_id"]
+            subjects.append(
+                self._subject_progress_item(
+                    subject,
+                    meta,
+                    row,
+                    progress,
+                    theme,
+                    zone,
+                    completed,
+                    active_zone,
+                    quest,
+                    is_active=False,
+                )
             )
         general = (
             child.get("general_level")
@@ -170,6 +195,42 @@ class CrewProgressService:
         self, child: dict[str, Any], learning: dict[str, Any]
     ) -> list[str]:
         return SubjectCatalog.resolve_active_subjects(child, learning)
+
+    def _subject_progress_item(
+        self,
+        subject: str,
+        meta: dict[str, Any],
+        row: dict[str, Any] | None,
+        progress: dict[str, Any] | None,
+        theme: str,
+        zone: str | None,
+        completed: list[str],
+        active_zone: str | None,
+        quest: dict[str, Any] | None,
+        *,
+        is_active: bool,
+    ) -> dict[str, Any]:
+        level = row.get("level_id") if row else None
+        return {
+            "subject_id": subject,
+            "label": meta["label"],
+            "family": meta["family"],
+            "zone_id": zone,
+            "zone_label": self._zone_label(theme, zone),
+            "level_id": level,
+            "level_progress": progress,
+            "rank_label": self._rank_label_for_level(theme, level),
+            "rank_next_label": self._rank_label_for_level(
+                theme, progress.get("next") if progress else None
+            ),
+            "zone_status": (
+                self._zone_status(level, zone, completed, active_zone, quest)
+                if is_active
+                else "paused"
+            ),
+            "recent_attempts": 1 if row else 0,
+            "is_active": is_active,
+        }
 
     def _rank_legend(self, theme: str) -> list[dict[str, Any]]:
         track = "sci-fi" if theme == "sci-fi" else "fantasy"

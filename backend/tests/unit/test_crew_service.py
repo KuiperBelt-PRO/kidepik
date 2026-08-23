@@ -110,6 +110,10 @@ def test_normalize_subject_notes() -> None:
     assert notes == [{"subject_id": "math", "note": "Domina tablas de multiplicar"}]
     with pytest.raises(ValueError, match="learning.subject_notes invalid"):
         CrewService._normalize_subject_notes([{"subject_id": "invalid", "note": "x"}])
+    with pytest.raises(ValueError, match="learning.subject_notes too long"):
+        CrewService._normalize_subject_notes(
+            [{"subject_id": "math", "note": "x" * (CrewService.SUBJECT_NOTE_MAX_LEN + 1)}]
+        )
 
 
 @pytest.mark.unit
@@ -319,7 +323,35 @@ async def test_update_profile_locked_world(crew_svc, mocker) -> None:
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_update_profile_learning(crew_svc, mocker) -> None:
+async def test_update_profile_learning_active_subjects_filters_priorities(crew_svc, mocker) -> None:
+    svc, session = crew_svc
+    base = svc._detail(child_row())
+    base["settings"] = {
+        "learning": {
+            "active_subjects": ["math", "language", "logic"],
+            "subject_priorities": ["math", "logic"],
+        }
+    }
+    base["permissions"] = {"lock_world_theme": False}
+    mocker.patch.object(svc, "get_for_auth_user", new=AsyncMock(return_value=base))
+    session._results = [FakeExecuteResult(), FakeExecuteResult(rows=child_row())]
+    mocker.patch(
+        "app.services.crew_progress.CrewProgressService.build_for_child",
+        new=AsyncMock(return_value={"progress": {}, "journey": {}}),
+    )
+    await svc.update_profile_for_auth_user(
+        AUTH_USER_ID,
+        CHILD_ID,
+        {"learning": {"active_subjects": ["math", "language"]}},
+    )
+    settings = session.executed[0][1]["settings"]
+    assert settings["learning"]["active_subjects"] == ["math", "language"]
+    assert settings["learning"]["subject_priorities"] == ["math"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_update_profile_learning_weak_spots_legacy(crew_svc, mocker) -> None:
     svc, session = crew_svc
     base = svc._detail(child_row())
     base["settings"] = {}

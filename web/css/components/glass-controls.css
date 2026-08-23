@@ -778,14 +778,18 @@
 
 .glass-switch input {
   position: absolute;
+  inset: 0;
+  z-index: 1;
   opacity: 0;
-  width: 1px;
-  height: 1px;
+  width: 100%;
+  height: 100%;
   margin: 0;
-  pointer-events: none;
+  cursor: pointer;
 }
 
 .glass-switch__track {
+  position: relative;
+  z-index: 0;
   display: inline-flex;
   align-items: center;
   width: 48px;

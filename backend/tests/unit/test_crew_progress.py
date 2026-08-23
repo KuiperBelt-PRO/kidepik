@@ -34,6 +34,38 @@ def test_level_progress_and_ranks() -> None:
     assert svc._rank_label_for_level("fantasy", "L1") == "Chispa del reino"
 
 
+async def test_build_includes_paused_subjects_with_preserved_progress(progress_svc) -> None:
+    svc, session = progress_svc
+    session._results = [
+        FakeExecuteResult(
+            rows=[
+                {"subject_id": "math", "level_id": "L2", "accuracy_rolling": 0.55},
+                {"subject_id": "logic", "level_id": "L3", "accuracy_rolling": 0.72},
+            ]
+        ),
+        FakeExecuteResult(rows=None),
+        FakeExecuteResult(scalar="2026-01-01"),
+    ]
+    child = {
+        "id": CHILD_ID,
+        "world_theme": "fantasy",
+        "age_band": "band_child",
+        "placement_status": "completed",
+        "general_level": "L2",
+        "settings": {
+            "learning": {"active_subjects": ["math", "language"]},
+        },
+    }
+    built = await svc.build_for_child(child)
+    subjects = built["progress"]["subjects"]
+    logic = next(s for s in subjects if s["subject_id"] == "logic")
+    assert logic["is_active"] is False
+    assert logic["zone_status"] == "paused"
+    assert logic["level_id"] == "L3"
+    math = next(s for s in subjects if s["subject_id"] == "math")
+    assert math["is_active"] is True
+
+
 @pytest.mark.unit
 @pytest.mark.asyncio
 async def test_build_uses_band_subjects_when_learning_empty(progress_svc) -> None:

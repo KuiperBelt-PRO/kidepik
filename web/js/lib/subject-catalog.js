@@ -3,6 +3,9 @@
  * @module subject-catalog
  */
 
+/** Máximo de caracteres en notas por materia (`learning.subject_notes`). */
+export const SUBJECT_NOTE_MAX_LEN = 600;
+
 /** @typedef {{ id: string, label: string, family: string }} SubjectMeta */
 
 /** @type {SubjectMeta[]} */
@@ -237,14 +240,17 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
       const curRank = prog?.rank || "";
       const nextRank = prog?.rankNext || "";
       let levelLine = "Sin nivel aún";
-      if (curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
+      if (!on && curRank) {
+        levelLine = `Pausada · ${curRank}${nextRank ? ` → ${nextRank}` : ""}`;
+      } else if (on && curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
       else if (curRank) levelLine = curRank;
       const noteText = notesById.get(s.id) || "";
       const hasNote = Boolean(noteText);
       const prioritized = priorities.has(s.id);
+      const preserved = Boolean(!on && curRank);
       const panelId = `crew-subject-note-${escapeHtml(s.id)}`;
       const notePlaceholder = subjectNotePlaceholder(s.id);
-      html += `<div class="crew-subject-card${on ? " is-on" : ""}${hasNote ? " has-note" : ""}${prioritized ? " is-priority" : ""}" data-subject-card="${escapeHtml(s.id)}">
+      html += `<div class="crew-subject-card${on ? " is-on" : " is-off"}${hasNote ? " has-note" : ""}${prioritized ? " is-priority" : ""}${preserved ? " has-preserved-progress" : ""}" data-subject-card="${escapeHtml(s.id)}">
         <div class="crew-subject-card__head">
           <span class="crew-subject-card__label">${escapeHtml(s.label)}</span>
           <div class="crew-subject-card__actions">
@@ -272,8 +278,8 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
           <textarea
             class="crew-panel__input crew-subject-card__notes-input"
             data-subject-note="${escapeHtml(s.id)}"
-            rows="2"
-            maxlength="200"
+            rows="3"
+            maxlength="${SUBJECT_NOTE_MAX_LEN}"
             placeholder="${escapeHtml(notePlaceholder)}"
             aria-label="Información adicional de ${escapeHtml(s.label)}"
           >${escapeHtml(noteText)}</textarea>
