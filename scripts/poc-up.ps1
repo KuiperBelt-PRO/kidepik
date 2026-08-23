@@ -75,17 +75,20 @@ Write-Host "  API health:       http://localhost:8082/api/v1/health  (FastAPI)"
 Write-Host "  Play / IA:        /api/v1/play/*  /api/v1/debug/ai/*  (FastAPI)"
 Write-Host "  Media:            http://localhost:8082/media/"
 Write-Host "  Supabase:         http://localhost:54321"
-$lanHostRaw = $null
-if (Test-Path $envFile) {
-    foreach ($line in Get-Content $envFile) {
-        if ($line -match '^\s*KIDEPIK_LAN_HOST\s*=\s*(.+)\s*$') {
-            $lanHostRaw = $Matches[1].Trim().Trim('"').Trim("'")
+$lanOAuth = $null
+$supabaseEnvFile = Join-Path $Root "supabase\.env"
+if (Test-Path $supabaseEnvFile) {
+    foreach ($line in Get-Content $supabaseEnvFile) {
+        if ($line -match '^\s*SUPABASE_API_EXTERNAL_URL\s*=\s*https?://([^/:]+)') {
+            $hostPart = $Matches[1]
+            if ($hostPart -and $hostPart -ne "127.0.0.1" -and $hostPart -ne "localhost") {
+                $lanOAuth = $hostPart
+            }
             break
         }
     }
 }
-if ($lanHostRaw) {
-    $lanOAuth = if ($lanHostRaw -match '^\d{1,3}(\.\d{1,3}){3}$') { "$lanHostRaw.nip.io" } else { $lanHostRaw }
+if ($lanOAuth) {
     Write-Host ""
     Write-Host "  LAN (tablet/movil): http://${lanOAuth}:8082" -ForegroundColor Green
 }

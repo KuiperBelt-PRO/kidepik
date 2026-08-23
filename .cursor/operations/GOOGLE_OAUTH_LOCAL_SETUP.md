@@ -29,7 +29,14 @@ Usa un **dominio nip.io** que resuelve a tu IP LAN (DNS público, sin tocar `/et
 | Authorized JavaScript origins | `http://192.168.1.75.nip.io:8082` |
 | Authorized redirect URIs | `http://192.168.1.75.nip.io:54321/auth/v1/callback` |
 
-En `.env.poc`: `KIDEPIK_LAN_HOST=192.168.1.75` (el script convierte a `.nip.io`) y ejecuta `./scripts/sync-lan-auth.ps1` + reinicia Supabase.
+**Varias redes (casa, oficina, …) — solo tablet/móvil:**
+
+1. En `.env.poc` pon `KIDEPIK_LAN_HOST=auto` (o una IP concreta) → `./scripts/sync-lan-auth.ps1` y reinicia Supabase.
+2. En **Google Cloud Console**, añade origins/redirects de **cada** `{ip}.nip.io` que uses (Google no admite wildcards).
+3. Tras cambiar de WiFi con `auto`: vuelve a ejecutar `sync-lan-auth` + reiniciar Supabase.
+4. Abre la tablet en `http://{ip}.nip.io:8082` (la URL la imprime el script).
+
+**Mismo PC de desarrollo:** deja `KIDEPIK_LAN_HOST` vacío (o `off`). OAuth usa `http://127.0.0.1:54321/auth/v1/callback` y abres `http://localhost:8082`. No uses nip.io en el PC.
 
 4. Descarga el JSON del cliente o copia **Client ID** y **Client secret**.
 
@@ -65,6 +72,9 @@ El script genera `supabase/.env` con `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`
 ## 4. Verificación
 
 1. Abre `http://localhost:8082` (viewport móvil 390×844).
+   - En el **mismo PC** de desarrollo, usa siempre `localhost` (no la IP LAN).
+   - El cliente fuerza `http://localhost:54321` e ignora URLs LAN residuales.
+   - En tablet: abre la URL `http://{ip}.nip.io:8082` que imprime `sync-lan-auth` (IP auto-detectada).
 2. Loader → tap → **Continuar con Google**.
 3. Tras login → `#/home` con tu email.
 4. Comprueba fila en `parent_accounts` (opcional):
@@ -86,6 +96,8 @@ En el dashboard del proyecto Supabase (`Authentication → Providers → Google`
 | --- | --- |
 | `redirect_uri_mismatch` | Redirect en GCP debe ser **exactamente** `http://127.0.0.1:54321/auth/v1/callback` (no `localhost`, no puerto `8082`) |
 | `device_id and device_name are required for private IP` | Estás usando IP cruda (`192.168.x.x`) en redirect; usa **nip.io** (ver § Tablet / móvil LAN) |
+| Authorize va a `192.168.x.x.nip.io` desde `localhost:8082` | En localhost el cliente fuerza `:54321` local (`resolveSupabaseUrl`). Si sigue fallando: hard refresh / SW. Para tablet tras cambio de WiFi: `sync-lan-auth.ps1` + reiniciar Supabase + URI en Google Console |
+| Tablet en red nueva: `redirect_uri_mismatch` | Falta añadir en GCP `http://{ip-actual}.nip.io:54321/auth/v1/callback` y el JS origin `:8082` |
 | Provider disabled | Falta `supabase/.env` o no reiniciaste Supabase tras sync |
 | Login OK pero sin fila padre | Revisa `POST /api/v1/parents/bootstrap` y logs PHP |
 | App en 127.0.0.1 | Añade también `http://127.0.0.1:8082` en origins y redirect URLs de Supabase (`config.toml`) |

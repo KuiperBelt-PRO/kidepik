@@ -28,21 +28,22 @@ function Read-DotEnvValue {
 }
 
 $envPoc = Join-Path $Root ".env.poc"
-if (-not $LanHost) {
-    $LanHost = Read-DotEnvValue -Path $envPoc -Key "KIDEPIK_LAN_HOST"
-}
 
+# Siempre localhost en config.js: en el mismo PC resolveSupabaseUrl fuerza :54321 local;
+# en tablet/móvil el cliente deriva host (+ nip.io) desde window.location.
+# No embeber IP LAN aquí (cambia al cambiar de red / SW cache).
 $publicSupabaseUrl = Read-DotEnvValue -Path $envPoc -Key "PUBLIC_SUPABASE_URL"
 $supabaseUrl = "http://localhost:54321"
 
-if ($publicSupabaseUrl -and $publicSupabaseUrl -notmatch "localhost" -and $publicSupabaseUrl -notmatch "127\.0\.0\.1") {
+if (
+    $publicSupabaseUrl -and
+    $publicSupabaseUrl -notmatch "localhost" -and
+    $publicSupabaseUrl -notmatch "127\.0\.0\.1" -and
+    $publicSupabaseUrl -notmatch "nip\.io" -and
+    $publicSupabaseUrl -notmatch '^\s*http://(\d{1,3}\.){3}\d{1,3}'
+) {
+    # Solo URLs remotas (p. ej. *.supabase.co), no LAN residual.
     $supabaseUrl = $publicSupabaseUrl
-} elseif ($LanHost) {
-    $oauthHost = $LanHost
-    if ($oauthHost -match '^\d{1,3}(\.\d{1,3}){3}$') {
-        $oauthHost = $oauthHost + ".nip.io"
-    }
-    $supabaseUrl = "http://" + $oauthHost + ":54321"
 }
 
 $publishableKey = "sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH"

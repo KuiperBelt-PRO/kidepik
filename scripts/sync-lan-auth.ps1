@@ -1,5 +1,6 @@
-# Sincroniza URLs LAN para OAuth (Supabase + config.js).
-# Lee KIDEPIK_LAN_HOST de .env.poc; si vacio, usa 127.0.0.1 (solo PC).
+# Sincroniza URLs OAuth para Supabase.
+# Default (KIDEPIK_LAN_HOST vacío/off): PC local → 127.0.0.1 (mismo PC / localhost).
+# Tablet en LAN: KIDEPIK_LAN_HOST=auto (detecta IP) o KIDEPIK_LAN_HOST=192.168.x.x
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
@@ -58,9 +59,81 @@ function Resolve-LanOAuthHost {
     return $HostOrIp
 }
 
+function Test-PrivateIpv4 {
+    param([string]$Ip)
+    if ($Ip -notmatch '^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$') { return $false }
+    $a = [int]$Matches[1]
+    $b = [int]$Matches[2]
+    return (
+        $a -eq 10 -or
+        ($a -eq 192 -and $b -eq 168) -or
+        ($a -eq 172 -and $b -ge 16 -and $b -le 31)
+    )
+}
+
+function Get-PrimaryLanIPv4 {
+    try {
+        $configs = Get-NetIPConfiguration -ErrorAction Stop |
+            Where-Object {
+                $_.NetAdapter.Status -eq "Up" -and
+                $null -ne $_.IPv4DefaultGateway -and
+                $null -ne $_.IPv4Address
+            }
+        foreach ($cfg in $configs) {
+            foreach ($addr in @($cfg.IPv4Address)) {
+                $ip = $addr.IPAddress
+                if ($ip -and (Test-PrivateIpv4 $ip)) {
+                    return $ip
+                }
+            }
+        }
+    } catch {
+        # Fallback abajo
+    }
+
+    try {
+        $addrs = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+            Where-Object {
+                $_.IPAddress -and
+                (Test-PrivateIpv4 $_.IPAddress) -and
+                $_.PrefixOrigin -ne "WellKnown"
+            } |
+            Sort-Object InterfaceMetric
+        if ($addrs -and $addrs[0].IPAddress) {
+            return $addrs[0].IPAddress
+        }
+    } catch {
+        return $null
+    }
+    return $null
+}
+
 $envPoc = Join-Path $Root ".env.poc"
 $lanHostRaw = Read-DotEnvValue -Path $envPoc -Key "KIDEPIK_LAN_HOST"
-$lanHost = if ($lanHostRaw) { Resolve-LanOAuthHost $lanHostRaw } else { $null }
+$lanSource = "pc"
+
+# Mismo PC / localhost: siempre 127.0.0.1 para el redirect de Google.
+# LAN solo si se pide explícitamente (auto o IP). Si no, OAuth en localhost
+# redirige a nip.io de otra red y timeout (ERR_CONNECTION_TIMED_OUT).
+if (-not $lanHostRaw -or $lanHostRaw -match '^(off|local|none|false|0)$') {
+    $lanHost = $null
+    $lanSource = "pc"
+} elseif ($lanHostRaw -match '^(auto|detect)$') {
+    $detected = Get-PrimaryLanIPv4
+    if ($detected) {
+        $lanHostRaw = $detected
+        $lanHost = Resolve-LanOAuthHost $detected
+        $lanSource = "auto"
+    } else {
+        $lanHost = $null
+        $lanSource = "auto-none"
+        Write-Host "KIDEPIK_LAN_HOST=auto pero no hay IPv4 LAN; usando 127.0.0.1" -ForegroundColor Yellow
+    }
+} else {
+    $lanHost = Resolve-LanOAuthHost $lanHostRaw
+    $lanSource = "env"
+}
+
 $authHost = if ($lanHost) { $lanHost } else { "127.0.0.1" }
 
 $apiExternalUrl = "http://" + $authHost + ":54321"
@@ -79,12 +152,12 @@ Upsert-DotEnv -Path $supabaseEnv -Values @{
 
 Write-Host "supabase/.env OAuth base: $apiExternalUrl" -ForegroundColor Green
 if ($lanHost) {
-    Write-Host "Modo LAN activo ($lanHost)" -ForegroundColor Cyan
+    Write-Host "Modo LAN activo ($lanHost) [$lanSource]" -ForegroundColor Cyan
     if ($lanHostRaw -and ($lanHostRaw -ne $lanHost)) {
         Write-Host "  (IP $lanHostRaw -> dominio OAuth $lanHost; Google no acepta IP privada)" -ForegroundColor DarkYellow
     }
 } else {
-    Write-Host "Modo PC local (127.0.0.1)" -ForegroundColor Cyan
+    Write-Host "Modo PC local (127.0.0.1) [$lanSource]" -ForegroundColor Cyan
 }
 
 $configToml = Join-Path $Root "supabase\config.toml"
@@ -93,9 +166,15 @@ if (-not (Test-Path $configToml)) {
     exit 1
 }
 
-$lanUrls = @()
+# Wildcards: cualquier red via nip.io (Supabase GoTrue). Google Console sigue
+# requiriendo cada {ip}.nip.io concreto en origins/redirects.
+$lanUrls = @(
+    "http://*.nip.io:8082",
+    "http://*.nip.io:8082/**",
+    "http://*.nip.io:8082/#/auth/callback"
+)
 if ($lanHost) {
-    $lanUrls = @(
+    $lanUrls += @(
         ("http://" + $lanHost + ":8082"),
         ("http://" + $lanHost + ":8082/"),
         ("http://" + $lanHost + ":8082/#/auth/callback")
@@ -134,10 +213,10 @@ if ($lanHost) {
     Write-Host "Abre la app en el movil con:" -ForegroundColor Yellow
     Write-Host ('  http://' + $lanHost + ':8082')
     Write-Host ""
-    Write-Host "En Google Cloud Console, anade:" -ForegroundColor Yellow
+    Write-Host "En Google Cloud Console (una vez por red/IP), anade:" -ForegroundColor Yellow
     Write-Host ('  JS origin:     http://' + $lanHost + ':8082')
     Write-Host ('  Redirect URI:  ' + $googleRedirectUri)
-    Write-Host "Reinicia Supabase: supabase stop; supabase start" -ForegroundColor Yellow
+    Write-Host "Tras cambiar de WiFi: ./scripts/sync-lan-auth.ps1 y reinicia Supabase." -ForegroundColor Yellow
 }
 
 exit 0

@@ -48,15 +48,41 @@ function oauthFriendlyHost(host) {
 }
 
 /**
- * Misma máquina: localhost:54321. Dispositivo en LAN: host de la página + :54321.
- * Evita depender de config.js con IP fija (SW/cache) al probar en tablet/móvil.
+ * URL de Supabase local/LAN residual (no cloud remoto).
+ * @param {string | undefined} url
+ * @returns {boolean}
+ */
+function isLocalOrLanSupabaseUrl(url) {
+  if (!url) return true;
+  try {
+    const hostname = new URL(url).hostname;
+    return (
+      !hostname ||
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".nip.io") ||
+      isPrivateIpv4Host(hostname)
+    );
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Misma máquina (localhost/127.0.0.1): siempre :54321 local.
+ * Ignora config.js con IP/nip.io residual de tablet en otra red.
+ * Solo respeta `configured` si apunta a un host remoto (p. ej. *.supabase.co).
+ * Dispositivo en LAN: host de la página (+ nip.io si IP privada) + :54321.
  * @param {string | undefined} configured
  * @returns {string}
  */
 export function resolveSupabaseUrl(configured) {
   const host = window.location.hostname;
   if (!host || host === "localhost" || host === "127.0.0.1") {
-    return configured || `http://localhost:${LOCAL_SUPABASE_PORT}`;
+    if (configured && !isLocalOrLanSupabaseUrl(configured)) {
+      return configured;
+    }
+    return `http://localhost:${LOCAL_SUPABASE_PORT}`;
   }
   return `http://${oauthFriendlyHost(host)}:${LOCAL_SUPABASE_PORT}`;
 }

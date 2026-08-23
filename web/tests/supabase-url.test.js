@@ -8,27 +8,56 @@ if (!globalThis.document) {
 
 import { resolveSupabaseUrl } from "../js/lib/supabase.js";
 
-describe("resolveSupabaseUrl", () => {
-  let originalHostname;
+/**
+ * @param {string} hostname
+ */
+function setPageHostname(hostname) {
+  window.location.href = `http://${hostname}:8082/`;
+}
 
+describe("resolveSupabaseUrl", () => {
   beforeEach(() => {
-    originalHostname = window.location.hostname;
+    setPageHostname("localhost");
   });
 
   afterEach(() => {
-    window.location.hostname = originalHostname;
+    setPageHostname("localhost");
   });
 
-  it("usa config en localhost", () => {
-    window.location.hostname = "localhost";
+  it("en localhost usa siempre Supabase local", () => {
+    setPageHostname("localhost");
     assert.equal(
       resolveSupabaseUrl("http://localhost:54321"),
       "http://localhost:54321",
     );
   });
 
+  it("en localhost ignora nip.io residual de LAN en config", () => {
+    setPageHostname("localhost");
+    assert.equal(
+      resolveSupabaseUrl("http://192.168.1.75.nip.io:54321"),
+      "http://localhost:54321",
+    );
+  });
+
+  it("en 127.0.0.1 ignora IP privada residual en config", () => {
+    setPageHostname("127.0.0.1");
+    assert.equal(
+      resolveSupabaseUrl("http://192.168.8.106:54321"),
+      "http://localhost:54321",
+    );
+  });
+
+  it("en localhost respeta URL remota cloud", () => {
+    setPageHostname("localhost");
+    assert.equal(
+      resolveSupabaseUrl("https://abcdefgh.supabase.co"),
+      "https://abcdefgh.supabase.co",
+    );
+  });
+
   it("convierte IP privada a nip.io para Google OAuth", () => {
-    window.location.hostname = "192.168.1.75";
+    setPageHostname("192.168.1.75");
     assert.equal(
       resolveSupabaseUrl("http://localhost:54321"),
       "http://192.168.1.75.nip.io:54321",
@@ -36,7 +65,7 @@ describe("resolveSupabaseUrl", () => {
   });
 
   it("hostname nip.io se mantiene", () => {
-    window.location.hostname = "192.168.1.75.nip.io";
+    setPageHostname("192.168.1.75.nip.io");
     assert.equal(
       resolveSupabaseUrl("http://localhost:54321"),
       "http://192.168.1.75.nip.io:54321",

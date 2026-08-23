@@ -33,15 +33,15 @@ additional_redirect_urls = [
   "http://127.0.0.1:8082",
   "http://127.0.0.1:8082/",
   "http://127.0.0.1:8082/#/auth/callback",
-  "http://192.168.1.75:8082",
-  "http://192.168.1.75:8082/",
-  "http://192.168.1.75:8082/#/auth/callback",
   "http://10.0.2.2:3000",
   "exp://127.0.0.1:8081",
+  "http://*.nip.io:8082",
+  "http://*.nip.io:8082/**",
+  "http://*.nip.io:8082/#/auth/callback",
 
-  "http://192.168.1.75.nip.io:8082",
-  "http://192.168.1.75.nip.io:8082/",
-  "http://192.168.1.75.nip.io:8082/#/auth/callback",
+  "http://192.168.8.106.nip.io:8082",
+  "http://192.168.8.106.nip.io:8082/",
+  "http://192.168.8.106.nip.io:8082/#/auth/callback",
 ]
 jwt_expiry = 3600
 enable_signup = true
