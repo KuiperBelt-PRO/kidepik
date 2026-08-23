@@ -40,10 +40,11 @@ import {
   normalizeActiveSubjects,
   renderSubjectsChecklistHtml,
   renderSubjectsGridReadOnly,
+  renderSubjectProgressBarsHtml,
   subjectNotesById,
   subjectPrioritiesFromLearning,
   SUBJECT_CATALOG,
-} from "../lib/subject-catalog.js?v=256";
+} from "../lib/subject-catalog.js?v=258";
 import {
   buildCrewListCardInner,
   buildCrewMemberCardInner,
@@ -116,30 +117,6 @@ function renderLevelBar(percent, leftLabel, rightLabel = "", opts = {}) {
         <div class="crew-progress__bar-fill" style="width:${p}%"></div>
       </div>
       ${right}
-    </div>
-  </div>`;
-}
-
-/**
- * @param {string} subjectLabel
- * @param {number} percent
- * @param {string} currentRank
- * @param {string} [nextRank]
- */
-function renderSubjectProgressRow(subjectLabel, percent, currentRank, nextRank = "") {
-  const p = Math.max(0, Math.min(100, Number(percent) || 0));
-  const cur = currentRank || "—";
-  const next = nextRank
-    ? `<span class="crew-progress__rank-next">${escapeHtml(nextRank)}</span>`
-    : `<span class="crew-progress__rank-next" aria-hidden="true"></span>`;
-  return `<div class="crew-progress__row crew-progress__row--subject">
-    <div class="crew-progress__subject-label">${escapeHtml(subjectLabel)}</div>
-    <div class="crew-progress__track">
-      <span class="crew-progress__rank-current">${escapeHtml(cur)}</span>
-      <div class="crew-progress__bar" role="progressbar" aria-valuenow="${p}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(subjectLabel)}: ${escapeHtml(cur)}${nextRank ? ` hacia ${escapeHtml(nextRank)}` : ""}">
-        <div class="crew-progress__bar-fill" style="width:${p}%"></div>
-      </div>
-      ${next}
     </div>
   </div>`;
 }
@@ -289,7 +266,8 @@ function syncSubjectProgressFromMember(root, member) {
     const percent = Math.max(0, Math.min(100, Number(prog?.percent_to_next) || 0));
     const curRank = String(row?.rank_label || "");
     const nextRank = String(row?.rank_next_label || "");
-    let levelLine = "Sin nivel aún";
+    const baseLabel = "Nivel 1";
+    let levelLine = on ? baseLabel : "No activada";
     if (!on && curRank) {
       levelLine = `Pausada · ${curRank}${nextRank ? ` → ${nextRank}` : ""}`;
     } else if (on && curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
@@ -446,6 +424,20 @@ function mountRankLegend(host) {
 }
 
 /**
+ * @param {Array<{ label?: string, level_id?: string }>} [rankLegend]
+ */
+function baseProgressFromRankLegend(rankLegend) {
+  const l1 = Array.isArray(rankLegend) ? rankLegend[0] : null;
+  const l2 = Array.isArray(rankLegend) ? rankLegend[1] : null;
+  if (!l1?.label) return undefined;
+  return {
+    rank: l1.label,
+    rankNext: l2?.label || "",
+    percent: 10,
+  };
+}
+
+/**
  * @param {any} member
  */
 function renderProgressSection(member, opts = {}) {
@@ -460,16 +452,22 @@ function renderProgressSection(member, opts = {}) {
   const gp = prog.general_progress;
   const rank = prog.rank;
   const rankNext = prog.rank_next;
-  const subjects = Array.isArray(prog.subjects) ? prog.subjects : [];
-  const subjectBars = subjects
-    .filter((s) => s.level_progress)
-    .map((s) => {
-      const lp = s.level_progress;
-      const curRank = s.rank_label || "";
-      const nextRank = s.rank_next_label || "";
-      return renderSubjectProgressRow(s.label || "", lp.percent_to_next, curRank, nextRank);
-    })
-    .join("");
+  const catalog =
+    Array.isArray(member.subject_catalog) && member.subject_catalog.length
+      ? member.subject_catalog
+      : SUBJECT_CATALOG;
+  const active = normalizeActiveSubjects(
+    member.active_subjects ?? member.settings?.learning?.active_subjects,
+  );
+  const subjectBars = renderSubjectProgressBarsHtml(
+    catalog,
+    active,
+    Array.isArray(prog.subjects) ? prog.subjects : [],
+    {
+      placementCompleted: member.placement_status === "completed",
+      baseProgress: baseProgressFromRankLegend(prog.rank_legend),
+    },
+  );
   const gpLeft = selfView
     ? rank?.label_child || rank?.label_tutor || "Explorador"
     : rank?.label_tutor || rank?.label_child || "Explorador";

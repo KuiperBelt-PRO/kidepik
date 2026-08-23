@@ -68,6 +68,51 @@ async def test_build_includes_paused_subjects_with_preserved_progress(progress_s
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_build_active_subject_without_row_defaults_to_l1(progress_svc) -> None:
+    svc, session = progress_svc
+    session._results = [
+        FakeExecuteResult(rows=[]),
+        FakeExecuteResult(rows=None),
+        FakeExecuteResult(scalar="2026-01-01"),
+    ]
+    child = {
+        "id": CHILD_ID,
+        "world_theme": "fantasy",
+        "age_band": "band_child",
+        "placement_status": "completed",
+        "general_level": "L1",
+        "settings": {
+            "learning": {"active_subjects": ["math", "language", "science"]},
+        },
+    }
+    built = await svc.build_for_child(child)
+    science = next(s for s in built["progress"]["subjects"] if s["subject_id"] == "science")
+    assert science["level_id"] == "L1"
+    assert science["rank_label"] == "Chispa del reino"
+    assert science["level_progress"] is not None
+    assert science["level_progress"]["percent_to_next"] == 10
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_ensure_base_levels_inserts_only_missing(progress_svc) -> None:
+    svc, session = progress_svc
+    await CrewProgressService.ensure_base_levels_with_session(
+        session,
+        CHILD_ID,
+        "fantasy",
+        ["math", "science"],
+        source="repair",
+    )
+    assert session.executed
+    stmt = session.executed[0][0]
+    sql = str(stmt)
+    assert "on conflict" in sql.lower()
+    assert "do nothing" in sql.lower()
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_build_uses_band_subjects_when_learning_empty(progress_svc) -> None:
     svc, session = progress_svc
     session._results = [

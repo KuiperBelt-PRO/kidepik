@@ -66,6 +66,21 @@ class CrewService:
             if not row: raise RuntimeError("Crew member not found")
             detail = self._detail(row)
             traits = (await session.execute(text("select species, palette, features, vibe, achievements, character_summary, updated_at from public.child_traits where child_id = :id limit 1"), {"id": child_id})).mappings().first()
+            if (
+                not detail["is_tutor_profile"]
+                and str(row.get("placement_status") or "") == "completed"
+            ):
+                from app.services.crew_progress import CrewProgressService
+
+                learning = detail["settings"].get("learning") if isinstance(detail["settings"], dict) else {}
+                active = SubjectCatalog.resolve_active_subjects(dict(row), learning or {})
+                await CrewProgressService.ensure_base_levels_with_session(
+                    session,
+                    child_id,
+                    str(row.get("world_theme") or "fantasy"),
+                    active,
+                    source="repair",
+                )
         if traits: detail["traits"] = self._traits(traits)
         if not detail["is_tutor_profile"]:
             traveler = TravelerProfileService().read_for_child(parent_id, child_id)
@@ -174,6 +189,25 @@ class CrewService:
                 statement = text(f"update public.children set {', '.join(fields)}, updated_at = now() where id = :id and status <> 'deleted'")
                 if "settings" in params: statement = statement.bindparams(bindparam("settings", type_=JSONB))
                 await session.execute(statement, params)
+                if (
+                    "learning" in payload
+                    and not detail["is_tutor_profile"]
+                    and str(detail.get("placement_status") or "") == "completed"
+                ):
+                    from app.services.crew_progress import CrewProgressService
+
+                    learning_patch = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
+                    active = SubjectCatalog.resolve_active_subjects(
+                        {"age_band": detail.get("age_band")},
+                        learning_patch,
+                    )
+                    await CrewProgressService.ensure_base_levels_with_session(
+                        session,
+                        child_id,
+                        str(detail.get("world_theme") or "fantasy"),
+                        active,
+                        source="activation",
+                    )
             elif traits_changed or traveler_changed:
                 await session.execute(
                     text(
@@ -480,6 +514,21 @@ class CrewService:
             detail = self._detail(row)
             parent_id = str(row["parent_id"])
             traits = (await session.execute(text("select species, palette, features, vibe, achievements, character_summary, updated_at from public.child_traits where child_id = :id limit 1"), {"id": child_id})).mappings().first()
+            if (
+                not detail["is_tutor_profile"]
+                and str(row.get("placement_status") or "") == "completed"
+            ):
+                from app.services.crew_progress import CrewProgressService
+
+                learning = detail["settings"].get("learning") if isinstance(detail["settings"], dict) else {}
+                active = SubjectCatalog.resolve_active_subjects(dict(row), learning or {})
+                await CrewProgressService.ensure_base_levels_with_session(
+                    session,
+                    child_id,
+                    str(row.get("world_theme") or "fantasy"),
+                    active,
+                    source="repair",
+                )
         if traits: detail["traits"] = self._traits(traits)
         if not detail["is_tutor_profile"]:
             traveler = TravelerProfileService().read_for_child(parent_id, child_id)

@@ -48,6 +48,39 @@ class CrewProgressService:
         5: "Cumbre del viaje",
     }
 
+    @staticmethod
+    async def ensure_base_levels_with_session(
+        session,
+        child_id: str,
+        world_theme: str,
+        subject_ids: list[str],
+        *,
+        source: str = "base_seed",
+    ) -> None:
+        """Inserta L1 con rolling semilla si la materia aún no tiene fila (no pisa progreso existente)."""
+        theme = str(world_theme or "fantasy")
+        for subject_id in subject_ids:
+            if subject_id not in SubjectCatalog.META:
+                continue
+            await session.execute(
+                text(
+                    """
+                    insert into user_subject_levels(
+                      child_id, world_theme, subject_id, level_id,
+                      accuracy_rolling, source, updated_at
+                    ) values (:cid, :theme, :sid, 'L1', :seed, :source, now())
+                    on conflict (child_id, world_theme, subject_id) do nothing
+                    """
+                ),
+                {
+                    "cid": child_id,
+                    "theme": theme,
+                    "sid": subject_id,
+                    "seed": SEED_ROLLING,
+                    "source": source,
+                },
+            )
+
     async def build_for_child(self, child: dict[str, Any]) -> dict[str, dict[str, Any]]:
         child_id = str(child.get("id", ""))
         theme = str(child.get("world_theme") or child.get("active_world_theme") or "fantasy")
@@ -68,27 +101,29 @@ class CrewProgressService:
         )
         subjects, weighted, total_weight, unevaluated = [], 0.0, 0.0, 0
         active_set = set(active)
+        placement_done = str(child.get("placement_status") or "") == "completed"
         for subject in active:
             if subject not in SubjectCatalog.META:
                 continue
-            meta, row = SubjectCatalog.META[subject], levels.get(subject)
-            level = row.get("level_id") if row else None
-            progress = (
-                self._level_progress(
+            meta = SubjectCatalog.META[subject]
+            row = levels.get(subject)
+            level, accuracy, attempts = self._resolve_subject_level_state(
+                child, row, placement_done=placement_done
+            )
+            if not level:
+                unevaluated += 1
+                progress = None
+            else:
+                progress = self._level_progress(
                     level,
-                    row.get("accuracy_rolling") if row else None,
-                    1 if row else 0,
+                    accuracy,
+                    attempts,
                     meta["label"],
                 )
-                if level
-                else None
-            )
-            if progress:
-                weight = SubjectCatalog.WEIGHTS.get(subject, 0.05)
-                weighted += progress["percent_to_next"] * weight
-                total_weight += weight
-            else:
-                unevaluated += 1
+                if progress:
+                    weight = SubjectCatalog.WEIGHTS.get(subject, 0.05)
+                    weighted += progress["percent_to_next"] * weight
+                    total_weight += weight
             zone = meta["zone_id"]
             subjects.append(
                 self._subject_progress_item(
@@ -102,20 +137,23 @@ class CrewProgressService:
                     active_zone,
                     quest,
                     is_active=True,
+                    level_id=level,
                 )
             )
         for subject in sorted(levels.keys()):
             if subject in active_set or subject not in SubjectCatalog.META:
                 continue
             row = levels[subject]
-            level = row.get("level_id") if row else None
+            level, accuracy, attempts = self._resolve_subject_level_state(
+                child, row, placement_done=placement_done
+            )
             if not level:
                 continue
             meta = SubjectCatalog.META[subject]
             progress = self._level_progress(
                 level,
-                row.get("accuracy_rolling") if row else None,
-                1,
+                accuracy,
+                attempts,
                 meta["label"],
             )
             zone = meta["zone_id"]
@@ -131,6 +169,7 @@ class CrewProgressService:
                     active_zone,
                     quest,
                     is_active=False,
+                    level_id=level,
                 )
             )
         general = (
@@ -196,6 +235,23 @@ class CrewProgressService:
     ) -> list[str]:
         return SubjectCatalog.resolve_active_subjects(child, learning)
 
+    def _resolve_subject_level_state(
+        self,
+        child: dict[str, Any],
+        row: dict[str, Any] | None,
+        *,
+        placement_done: bool,
+    ) -> tuple[str | None, float | None, int]:
+        """Nivel, rolling y intentos para barra de progreso (L1 base si examen completado)."""
+        if row:
+            level = str(row.get("level_id") or "L1")
+            acc = row.get("accuracy_rolling")
+            accuracy = float(acc) if acc is not None else None
+            return level, accuracy, 1
+        if placement_done:
+            return "L1", None, 0
+        return None, None, 0
+
     def _subject_progress_item(
         self,
         subject: str,
@@ -209,8 +265,11 @@ class CrewProgressService:
         quest: dict[str, Any] | None,
         *,
         is_active: bool,
+        level_id: str | None = None,
     ) -> dict[str, Any]:
-        level = row.get("level_id") if row else None
+        level = level_id or (row.get("level_id") if row else None)
+        if not level and progress:
+            level = progress.get("current")
         return {
             "subject_id": subject,
             "label": meta["label"],

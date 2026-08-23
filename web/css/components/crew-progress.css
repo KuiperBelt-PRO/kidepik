@@ -152,6 +152,27 @@
   margin-top: 0.85rem;
 }
 
+.crew-progress__subject-family {
+  margin-top: 0.65rem;
+}
+
+.crew-progress__subject-family-label {
+  margin: 0 0 0.35rem;
+  font-size: calc(0.72rem * var(--font-scale-ui, 1));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.crew-progress__row--subject.crew-progress__row--off {
+  opacity: 0.82;
+}
+
+.crew-progress__row--subject.crew-progress__row--off.has-preserved-progress .crew-progress__bar-fill {
+  opacity: 0.65;
+}
+
 .crew-progress__subject-label {
   margin-bottom: 0.3rem;
   font-size: calc(0.84rem * var(--font-scale-ui, 1));

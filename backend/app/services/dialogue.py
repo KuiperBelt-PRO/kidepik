@@ -2929,7 +2929,10 @@ class DialogueService:
     ) -> None:
         child_id = str(child["id"])
         world = self._world(child) or "fantasy"
-        subjects = {str(i.get("subject_id") or "math") for i in queue}
+        settings = child.get("settings") if isinstance(child.get("settings"), dict) else {}
+        learning = settings.get("learning") if isinstance(settings.get("learning"), dict) else {}
+        active = SubjectCatalog.resolve_active_subjects(child, learning)
+        subjects = set(active) | {str(i.get("subject_id") or "math") for i in queue}
         for subject in subjects:
             await self.session.execute(
                 text(

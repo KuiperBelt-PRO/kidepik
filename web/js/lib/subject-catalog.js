@@ -155,6 +155,107 @@ function escapeHtml(s) {
 }
 
 /**
+ * @param {Array<{ id?: string, subject_id?: string, label?: string, rank_label?: string, rank_next_label?: string, level_progress?: { current?: string, next?: string, percent_to_next?: number } }>} [progressSubjects]
+ */
+function progressSubjectsById(progressSubjects) {
+  /** @type {Map<string, { percent: number, rank?: string, rankNext?: string }>} */
+  const map = new Map();
+  for (const row of progressSubjects || []) {
+    const id = String(row.id || row.subject_id || "");
+    if (!id) continue;
+    const lp = row.level_progress || {};
+    map.set(id, {
+      percent: Number(lp.percent_to_next) || 0,
+      rank: row.rank_label,
+      rankNext: row.rank_next_label,
+    });
+  }
+  return map;
+}
+
+/**
+ * @param {boolean} on
+ * @param {{ percent?: number, rank?: string, rankNext?: string } | undefined} prog
+ */
+function computeSubjectProgressUi(on, prog) {
+  const percent = Math.max(0, Math.min(100, prog?.percent ?? 0));
+  const curRank = prog?.rank || "";
+  const nextRank = prog?.rankNext || "";
+  const baseLabel = formatLevelLabel("L1");
+  let levelLine = on ? baseLabel : "No activada";
+  if (!on && curRank) {
+    levelLine = `Pausada · ${curRank}${nextRank ? ` → ${nextRank}` : ""}`;
+  } else if (on && curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
+  else if (curRank) levelLine = curRank;
+  return {
+    percent,
+    curRank,
+    nextRank,
+    levelLine,
+    preserved: Boolean(!on && curRank),
+  };
+}
+
+/**
+ * Barras de progreso por materia (sección «Tu explorador en el viaje»): catálogo completo.
+ * @param {SubjectMeta[]} catalog
+ * @param {string[]} active
+ * @param {Array<{ id?: string, subject_id?: string, rank_label?: string, rank_next_label?: string, level_progress?: { percent_to_next?: number } }>} [progressSubjects]
+ * @param {{ baseProgress?: { rank?: string, rankNext?: string, percent?: number }, placementCompleted?: boolean }} [opts]
+ * @returns {string}
+ */
+export function renderSubjectProgressBarsHtml(catalog, active, progressSubjects, opts = {}) {
+  const activeSet = new Set(active);
+  const progressById = progressSubjectsById(progressSubjects);
+  const baseProgress = opts.baseProgress;
+  const placementCompleted = Boolean(opts.placementCompleted);
+  const groups = groupSubjectsByFamily(catalog);
+  const order = Object.keys(SUBJECT_FAMILY_LABELS);
+  let html = "";
+  for (const fam of order) {
+    const items = groups[fam];
+    if (!items?.length) continue;
+    html += `<div class="crew-progress__subject-family"><p class="crew-progress__subject-family-label">${escapeHtml(SUBJECT_FAMILY_LABELS[fam])}</p>`;
+    for (const s of items) {
+      const on = activeSet.has(s.id);
+      let prog = progressById.get(s.id);
+      if (!prog && placementCompleted && baseProgress) {
+        prog = baseProgress;
+      }
+      const { percent, curRank, nextRank, preserved } = computeSubjectProgressUi(on, prog);
+      const baseLabel = formatLevelLabel("L1");
+      let leftRank;
+      if (on) leftRank = curRank || baseLabel;
+      else if (curRank) leftRank = `Pausada · ${curRank}`;
+      else leftRank = "No activa";
+      const rowClass = [
+        "crew-progress__row",
+        "crew-progress__row--subject",
+        !on && "crew-progress__row--off",
+        preserved && "has-preserved-progress",
+      ]
+        .filter(Boolean)
+        .join(" ");
+      const right = nextRank
+        ? `<span class="crew-progress__rank-next">${escapeHtml(nextRank)}</span>`
+        : `<span class="crew-progress__rank-next" aria-hidden="true"></span>`;
+      html += `<div class="${rowClass}">
+        <div class="crew-progress__subject-label">${escapeHtml(s.label)}</div>
+        <div class="crew-progress__track">
+          <span class="crew-progress__rank-current">${escapeHtml(leftRank)}</span>
+          <div class="crew-progress__bar" role="progressbar" aria-valuenow="${percent}" aria-valuemin="0" aria-valuemax="100" aria-label="${escapeHtml(s.label)}: ${escapeHtml(leftRank)}${nextRank ? ` hacia ${escapeHtml(nextRank)}` : ""}">
+            <div class="crew-progress__bar-fill" style="width:${percent}%"></div>
+          </div>
+          ${right}
+        </div>
+      </div>`;
+    }
+    html += `</div>`;
+  }
+  return html;
+}
+
+/**
  * @param {unknown} learning
  * @returns {Map<string, string>}
  */
@@ -211,20 +312,7 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
   const activeSet = new Set(active);
   const notesById = opts.subjectNotes || new Map();
   const priorities = opts.subjectPriorities || new Set();
-  /** @type {Map<string, { current?: string, next?: string, percent?: number, rank?: string, rankNext?: string }>} */
-  const progressById = new Map();
-  for (const row of opts.progressSubjects || []) {
-    const id = String(row.id || row.subject_id || "");
-    if (!id) continue;
-    const lp = row.level_progress || {};
-    progressById.set(id, {
-      current: lp.current,
-      next: lp.next,
-      percent: Number(lp.percent_to_next) || 0,
-      rank: row.rank_label,
-      rankNext: row.rank_next_label,
-    });
-  }
+  const progressById = progressSubjectsById(opts.progressSubjects);
   const groups = groupSubjectsByFamily(catalog);
   const order = Object.keys(SUBJECT_FAMILY_LABELS);
   let html = "";
@@ -236,18 +324,10 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
     for (const s of items) {
       const on = activeSet.has(s.id);
       const prog = progressById.get(s.id);
-      const percent = Math.max(0, Math.min(100, prog?.percent ?? 0));
-      const curRank = prog?.rank || "";
-      const nextRank = prog?.rankNext || "";
-      let levelLine = "Sin nivel aún";
-      if (!on && curRank) {
-        levelLine = `Pausada · ${curRank}${nextRank ? ` → ${nextRank}` : ""}`;
-      } else if (on && curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
-      else if (curRank) levelLine = curRank;
+      const { percent, levelLine, preserved } = computeSubjectProgressUi(on, prog);
       const noteText = notesById.get(s.id) || "";
       const hasNote = Boolean(noteText);
       const prioritized = priorities.has(s.id);
-      const preserved = Boolean(!on && curRank);
       const panelId = `crew-subject-note-${escapeHtml(s.id)}`;
       const notePlaceholder = subjectNotePlaceholder(s.id);
       html += `<div class="crew-subject-card${on ? " is-on" : " is-off"}${hasNote ? " has-note" : ""}${prioritized ? " is-priority" : ""}${preserved ? " has-preserved-progress" : ""}" data-subject-card="${escapeHtml(s.id)}">
@@ -305,20 +385,7 @@ export function renderSubjectsChecklistHtml(catalog, active, opts = {}) {
  */
 export function renderSubjectsGridReadOnly(catalog, active, opts = {}) {
   const activeSet = new Set(active);
-  /** @type {Map<string, { current?: string, next?: string, percent?: number, rank?: string, rankNext?: string }>} */
-  const progressById = new Map();
-  for (const row of opts.progressSubjects || []) {
-    const id = String(row.id || row.subject_id || "");
-    if (!id) continue;
-    const lp = row.level_progress || {};
-    progressById.set(id, {
-      current: lp.current,
-      next: lp.next,
-      percent: Number(lp.percent_to_next) || 0,
-      rank: row.rank_label,
-      rankNext: row.rank_next_label,
-    });
-  }
+  const progressById = progressSubjectsById(opts.progressSubjects);
   const groups = groupSubjectsByFamily(catalog);
   const order = Object.keys(SUBJECT_FAMILY_LABELS);
   let html = "";
@@ -330,17 +397,12 @@ export function renderSubjectsGridReadOnly(catalog, active, opts = {}) {
     for (const s of items) {
       const on = activeSet.has(s.id);
       const prog = progressById.get(s.id);
-      const percent = on ? Math.max(0, Math.min(100, prog?.percent ?? 0)) : 0;
-      const curRank = prog?.rank || "";
-      const nextRank = prog?.rankNext || "";
-      let levelLine = on ? "Sin nivel aún" : "No activada";
-      if (on && curRank && nextRank) levelLine = `${curRank} → ${nextRank}`;
-      else if (on && curRank) levelLine = curRank;
+      const { percent, levelLine, preserved } = computeSubjectProgressUi(on, prog);
       const stateClass = on ? "is-on" : "is-off";
       const badge = on
         ? `<span class="crew-subject-card__state crew-subject-card__state--on">Activa</span>`
         : `<span class="crew-subject-card__state crew-subject-card__state--off">No activa</span>`;
-      html += `<div class="crew-subject-card crew-subject-card--readonly ${stateClass}" data-subject-card="${escapeHtml(s.id)}">
+      html += `<div class="crew-subject-card crew-subject-card--readonly ${stateClass}${preserved ? " has-preserved-progress" : ""}" data-subject-card="${escapeHtml(s.id)}">
         <div class="crew-subject-card__head">
           <span class="crew-subject-card__label">${escapeHtml(s.label)}</span>
           ${badge}
