@@ -100,6 +100,15 @@ class BaggageOfferService:
         return candidates[: self.MAX_OFFERS]
 
     @staticmethod
+    def has_usable_offer(offers: list[dict[str, Any]] | None) -> bool:
+        """True if at least one offer can be used on the current challenge."""
+        return any(
+            bool(offer.get("can_use"))
+            for offer in (offers or [])
+            if isinstance(offer, dict)
+        )
+
+    @staticmethod
     def _primary_play_effect(item: dict[str, Any]) -> str | None:
         effects = list(item.get("effects") or [])
         if "challenge_hint" in effects:

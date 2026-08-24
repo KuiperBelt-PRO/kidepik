@@ -23,7 +23,11 @@ export function shouldShowBaggageOfferStrip(offers, turnMeta = {}) {
   const phase = String(turnMeta.phase || "");
   const showPhase =
     phase === "path_challenge" || (phase === "path_intro" && Boolean(turnMeta.retry));
-  return showPhase && Array.isArray(offers) && offers.length > 0;
+  return (
+    showPhase &&
+    Array.isArray(offers) &&
+    offers.some((offer) => Boolean(offer?.can_use))
+  );
 }
 
 /**
@@ -112,7 +116,10 @@ export function renderBaggageOfferStripHtml(offers, opts = {}) {
         <button type="button" class="play-baggage-hotbar__toggle" data-baggage-hotbar-toggle aria-expanded="${collapsed ? "false" : "true"}" aria-label="${collapsed ? "Desplegar equipaje" : "Plegar equipaje"}">
           <span class="play-baggage-hotbar__chevron" data-icon="chevron" aria-hidden="true"></span>
           <span class="play-baggage-hotbar__title-wrap">
-            <span class="play-baggage-hotbar__title">Equipaje (${offers.length})</span>
+            <span class="play-baggage-hotbar__title">
+              <span class="play-baggage-hotbar__title-text">Equipaje</span>
+              <span class="play-baggage-hotbar__count" aria-label="${offers.length} objeto${offers.length === 1 ? "" : "s"}">${offers.length}</span>
+            </span>
             ${hint}
           </span>
         </button>

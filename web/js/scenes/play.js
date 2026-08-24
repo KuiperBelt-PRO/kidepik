@@ -32,6 +32,14 @@ import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
 import { appLog } from "../lib/app-logger.js";
 import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
+import {
+  resolvePlayThinkingKind,
+  resolveRewindThinkingKindForPhase,
+} from "../lib/play-thinking-kind.js?v=1";
+import {
+  composeDebugChipLabel,
+  shouldShowComposeDebugChip as shouldShowComposeDebugChipForTurn,
+} from "../lib/play-compose-debug.js?v=1";
 import { showGlassConfirm } from "../components/glass-modal.js";
 import { isDebugAiClientActive, syncDebugAiCapabilities } from "../lib/debug-ai.js";
 import { fetchDebugAiStatus } from "../lib/debug-ai-api.js?v=256";
@@ -1078,27 +1086,11 @@ async function mountPlayPanel(root, ctx) {
   function resolveThinkingKind(reply) {
     const phase =
       typeof lastPendingTurn?.meta?.phase === "string" ? lastPendingTurn.meta.phase : "";
-    if (
-      phase === "handoff_placement" ||
-      reply.option_id === "start_placement" ||
-      (reply.kind === "continue" && onboardingStep === "placement" && phase !== "placement_item")
-    ) {
-      return "preparing_exam";
-    }
-    if (phase === "placement_item" || phase === "placement_feedback") {
-      return "evaluating_answer";
-    }
-    if (
-      phase === "choose_zone" ||
-      phase === "admission_map" ||
-      phase === "zone_arrive" ||
-      phase === "zone_between" ||
-      phase === "adventure_challenge" ||
-      phase === "compose_failed"
-    ) {
-      return "adventure_compose";
-    }
-    return "general";
+    const meta =
+      lastPendingTurn?.meta && typeof lastPendingTurn.meta === "object"
+        ? lastPendingTurn.meta
+        : {};
+    return resolvePlayThinkingKind(phase, meta, reply, onboardingStep);
   }
 
   /**
@@ -1827,17 +1819,40 @@ async function mountPlayPanel(root, ctx) {
   let lastComposeDebug = null;
 
   /**
+   * @param {object | undefined | null} turn
+   * @returns {boolean}
+   */
+  function shouldShowComposeDebugChip(turn) {
+    return shouldShowComposeDebugChipForTurn(isDebugAiClientActive(), turn);
+  }
+
+  /**
+   * Muestra u oculta el chip según el turno pending actual (solo compose_failed + debug).
+   * @param {object | undefined | null} turn
+   * @param {object | null | undefined} [composeDebug]
+   */
+  function syncComposeDebugChip(turn, composeDebug) {
+    if (!shouldShowComposeDebugChip(turn)) {
+      lastComposeDebug = null;
+      logEl?.querySelector("[data-compose-debug-chip]")?.remove();
+      return;
+    }
+    lastComposeDebug = turn?.meta?.compose_debug ?? composeDebug ?? lastComposeDebug;
+    showComposeDebugChip(lastComposeDebug);
+  }
+
+  /**
    * @param {object | null | undefined} composeDebug
    */
   function showComposeDebugChip(composeDebug) {
-    if (!isDebugAiClientActive() || !(logEl instanceof HTMLElement)) return;
+    if (!(logEl instanceof HTMLElement)) return;
     logEl.querySelector("[data-compose-debug-chip]")?.remove();
     const p = document.createElement("p");
     p.className = "play-panel__debug-chip";
     p.setAttribute("data-compose-debug-chip", "");
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.textContent = "Ver diagnóstico de la prueba";
+    btn.textContent = composeDebugChipLabel(composeDebug);
     btn.addEventListener("click", () => {
       const debug = composeDebug ?? lastComposeDebug;
       void openDebugAiPanel({
@@ -2173,12 +2188,7 @@ async function mountPlayPanel(root, ctx) {
     baggageOffersRefreshedForTurn = null;
     renderBaggageOfferStrip(turn);
     captureWaitingHints(turn);
-    if (turn?.meta?.compose_failed) {
-      lastComposeDebug = turn.meta.compose_debug ?? lastComposeDebug;
-      showComposeDebugChip(lastComposeDebug);
-    } else {
-      logEl?.querySelector("[data-compose-debug-chip]")?.remove();
-    }
+    syncComposeDebugChip(turn);
     scrollLogToEnd();
   }
 
@@ -2187,23 +2197,7 @@ async function mountPlayPanel(root, ctx) {
    * @param {string} [phase]
    */
   function resolveRewindThinkingKind(phase) {
-    if (phase === "placement_item" || phase === "placement_feedback") {
-      return "evaluating_answer";
-    }
-    if (phase === "handoff_placement" || phase === "placement_compose") {
-      return "preparing_exam";
-    }
-    if (
-      phase === "choose_zone" ||
-      phase === "admission_map" ||
-      phase === "zone_arrive" ||
-      phase === "zone_between" ||
-      phase === "adventure_challenge" ||
-      phase === "compose_failed"
-    ) {
-      return "adventure_compose";
-    }
-    return "general";
+    return resolveRewindThinkingKindForPhase(phase);
   }
 
   /**
@@ -2350,10 +2344,6 @@ async function mountPlayPanel(root, ctx) {
       } else if (phase) {
         onboardingStep = phase;
       }
-      if (pending.meta?.compose_failed) {
-        lastComposeDebug = pending.meta.compose_debug ?? data.debug?.compose ?? lastComposeDebug;
-        showComposeDebugChip(lastComposeDebug);
-      }
       renderPending(pending);
       scrollLogToEnd({ force: true });
       return true;
@@ -2428,7 +2418,7 @@ async function mountPlayPanel(root, ctx) {
       if (ctx.isCancelled() || syncGen !== sessionSyncGeneration) return;
       if (synced.ok && synced.data) {
         mergeSessionSync(synced.data);
-        if (lastComposeDebug) showComposeDebugChip(lastComposeDebug);
+        syncComposeDebugChip(synced.data.pending_agent_turn ?? lastPendingTurn);
       }
     } finally {
       hideSyncSkeleton();
@@ -2603,7 +2593,7 @@ async function mountPlayPanel(root, ctx) {
     }
 
     const data = result.data;
-    if (data.debug?.compose) {
+    if (data.debug?.compose && data.pending_agent_turn?.meta?.compose_failed) {
       lastComposeDebug = data.debug.compose;
     }
 

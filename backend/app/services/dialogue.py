@@ -4209,6 +4209,132 @@ class DialogueService:
         )
         return [], [turn]
 
+    @staticmethod
+    def _wrong_path_challenge_copy(*, has_usable_baggage: bool) -> str:
+        if has_usable_baggage:
+            return (
+                "Esa respuesta no ha salido. Puedes usar algo del equipaje "
+                "para reintentar antes de ver la pista, o continuar."
+            )
+        return "Esa respuesta no ha salido. Puedes continuar para ver la pista."
+
+    async def _path_fail_skip_to_next_challenge(
+        self,
+        child_id: str,
+        session_id: str,
+        session: Any,
+        sequence: int,
+        child: dict[str, Any],
+        *,
+        path: dict[str, Any],
+        challenges: list[dict[str, Any]],
+        idx: int,
+        reply: dict[str, Any],
+        ch: dict[str, Any],
+        progress: dict[str, Any],
+        progress_effects: list[dict[str, Any]],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Sin equipaje usable: explicación inmediata y avance al siguiente reto."""
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        path_id = str(path.get("path_id") or "path")
+        next_idx = idx + 1
+        if parent_id:
+            try:
+                helps = (
+                    dict(progress.get("helps") or {})
+                    if isinstance(progress.get("helps"), dict)
+                    else {}
+                )
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="path_progress",
+                    payload={
+                        "path_id": path_id,
+                        "challenge_index": next_idx,
+                        "status": "active",
+                        "path": path,
+                        "challenges_per_path": challenges_per_path_from_pack(
+                            path,
+                            fallback=DialogueService._expected_challenges_per_path(child),
+                        ),
+                        "helps": helps,
+                    },
+                    world_theme=world,
+                )
+            except Exception:
+                pass
+        expl = DialogueService._incorrect_choice_feedback(ch, reply)
+        expl_turn = await self._mentor_turn(
+            session_id,
+            child_id,
+            session["flow_id"],
+            sequence + 1,
+            expl,
+            "continue",
+            None,
+            {
+                "phase": "path_intro",
+                "path_id": path_id,
+                "challenge_index": idx,
+                "total": len(challenges),
+                "retry": True,
+                "explanation_shown": True,
+            },
+        )
+        next_effects, next_turns = await self._path_next_challenge(
+            child_id, session_id, session, sequence + 1, child
+        )
+        return progress_effects + next_effects, [expl_turn] + next_turns
+
+    async def _has_usable_baggage_for_retry(
+        self,
+        child: dict[str, Any],
+        *,
+        path: dict[str, Any],
+        challenge_index: int,
+        progress: dict[str, Any],
+    ) -> bool:
+        try:
+            retry_progress = dict(progress)
+            retry_progress["last_ok"] = False
+            offers = await BaggageOfferService().offers_for_play(
+                child,
+                phase="path_intro",
+                meta={
+                    "phase": "path_intro",
+                    "retry": True,
+                    "challenge_index": challenge_index,
+                    "path_id": path.get("path_id"),
+                },
+                progress=retry_progress,
+                eligible_retry=True,
+            )
+        except Exception:
+            return False
+        return BaggageOfferService.has_usable_offer(offers)
+
+    async def _path_wrong_answer_mentor_text(
+        self,
+        child: dict[str, Any],
+        *,
+        path: dict[str, Any],
+        progress: dict[str, Any],
+        challenge_index: int,
+    ) -> str:
+        """Copy tras fallo: menciona equipaje solo si hay oferta `can_use`."""
+        has_usable = await self._has_usable_baggage_for_retry(
+            child,
+            path=path,
+            challenge_index=challenge_index,
+            progress=progress,
+        )
+        return DialogueService._wrong_path_challenge_copy(
+            has_usable_baggage=has_usable
+        )
+
     async def _path_intro_retry_continue(
         self,
         child_id: str,
@@ -4218,7 +4344,7 @@ class DialogueService:
         child: dict[str, Any],
         last: dict[str, Any],
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """Tras fallar un reto: equipaje → pista → reemitir el mismo reto."""
+        """Tras fallar con equipaje usable: equipaje → pista → siguiente reto."""
         parent_id = child.get("parent_id")
         world = self._world(child)
         progress = self._read_path_progress(
@@ -4262,6 +4388,34 @@ class DialogueService:
             )
             return [], [turn]
 
+        next_idx = idx + 1
+        if parent_id:
+            try:
+                helps = (
+                    dict(progress.get("helps") or {})
+                    if isinstance(progress.get("helps"), dict)
+                    else {}
+                )
+                self.ledger.append_event(
+                    str(parent_id),
+                    child_id,
+                    session_id,
+                    kind="path_progress",
+                    payload={
+                        "path_id": path_id,
+                        "challenge_index": next_idx,
+                        "status": "active",
+                        "path": path,
+                        "challenges_per_path": challenges_per_path_from_pack(
+                            path,
+                            fallback=DialogueService._expected_challenges_per_path(child),
+                        ),
+                        "helps": helps,
+                    },
+                    world_theme=world,
+                )
+            except Exception:
+                pass
         return await self._path_next_challenge(
             child_id, session_id, session, sequence, child
         )
@@ -4343,15 +4497,47 @@ class DialogueService:
             except Exception:
                 pass
         if not ok:
+            fail_progress = {
+                **progress,
+                "path_id": path.get("path_id"),
+                "challenge_index": idx,
+                "last_ok": False,
+                "last_wrong_reply": reply,
+                "path": path,
+            }
+            has_usable = await self._has_usable_baggage_for_retry(
+                child,
+                path=path,
+                challenge_index=idx,
+                progress=fail_progress,
+            )
+            if not has_usable:
+                return await self._path_fail_skip_to_next_challenge(
+                    child_id,
+                    session_id,
+                    session,
+                    sequence,
+                    child,
+                    path=path,
+                    challenges=challenges,
+                    idx=idx,
+                    reply=reply,
+                    ch=ch,
+                    progress=progress,
+                    progress_effects=progress_effects,
+                )
+            wrong_text = await self._path_wrong_answer_mentor_text(
+                child,
+                path=path,
+                progress=fail_progress,
+                challenge_index=idx,
+            )
             turn = await self._mentor_turn(
                 session_id,
                 child_id,
                 session["flow_id"],
                 sequence + 1,
-                (
-                    "Esa respuesta no ha salido. Puedes usar algo del equipaje "
-                    "para reintentar antes de ver la pista, o continuar."
-                ),
+                wrong_text,
                 "continue",
                 None,
                 {

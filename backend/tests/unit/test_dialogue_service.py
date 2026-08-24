@@ -2066,12 +2066,49 @@ async def test_path_next_challenge_presents_mcq(dialogue_svc, tmp_path, monkeypa
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "has_usable_baggage,expect_equipaje",
+    [(True, True), (False, False)],
+    ids=["with-usable", "without-usable"],
+)
+def test_wrong_path_challenge_copy(
+    has_usable_baggage: bool, expect_equipaje: bool
+) -> None:
+    text = DialogueService._wrong_path_challenge_copy(
+        has_usable_baggage=has_usable_baggage
+    ).lower()
+    assert "continuar" in text
+    assert ("equipaje" in text) is expect_equipaje
+
+
+@pytest.mark.unit
 @pytest.mark.asyncio
-async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monkeypatch) -> None:
+@pytest.mark.parametrize(
+    "offers,expect_equipaje,expect_skip",
+    [
+        ([], False, True),
+        ([{"can_use": False, "effect_id": "challenge_hint"}], False, True),
+        ([{"can_use": True, "effect_id": "challenge_retry"}], True, False),
+        ([{"can_use": True, "effect_id": "challenge_hint"}], True, False),
+    ],
+    ids=["empty", "blocked-only", "retry", "hint"],
+)
+async def test_path_challenge_answer_wrong_retries(
+    dialogue_svc,
+    tmp_path,
+    monkeypatch,
+    offers: list[dict],
+    expect_equipaje: bool,
+    expect_skip: bool,
+) -> None:
     monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
     from app.config import get_settings
 
     get_settings.cache_clear()
+    monkeypatch.setattr(
+        "app.services.dialogue.BaggageOfferService.offers_for_play",
+        AsyncMock(return_value=offers),
+    )
     dialogue_svc.ledger = JourneyLedger(tmp_path)
     dialogue_svc.ledger.append_event(
         PARENT_ID,
@@ -2090,7 +2127,13 @@ async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monke
                         "options": [{"id": "a", "label": "3"}, {"id": "b", "label": "4"}],
                         "correct_option_id": "b",
                         "explanation": "Casi, prueba otra vez.",
-                    }
+                    },
+                    {
+                        "prompt_text": "¿3+3?",
+                        "item_type": "mcq",
+                        "options": [{"id": "a", "label": "5"}, {"id": "b", "label": "6"}],
+                        "correct_option_id": "b",
+                    },
                 ],
             },
         },
@@ -2117,10 +2160,19 @@ async def test_path_challenge_answer_wrong_retries(dialogue_svc, tmp_path, monke
     )
     assert effects and effects[0]["type"] == "record_learning_result"
     assert effects[0]["score"] == 0.0
-    assert turns[0]["meta"]["retry"] is True
-    assert turns[0]["meta"]["explanation_shown"] is False
-    assert turns[0]["meta"]["challenge_index"] == 0
-    assert "equipaje" in str(turns[0].get("text") or "").lower()
+    if expect_skip:
+        assert len(turns) == 2
+        assert turns[0]["meta"]["explanation_shown"] is True
+        assert turns[1]["meta"]["phase"] == "path_challenge"
+        assert turns[1]["meta"]["challenge_index"] == 1
+    else:
+        assert len(turns) == 1
+        assert turns[0]["meta"]["retry"] is True
+        assert turns[0]["meta"]["explanation_shown"] is False
+        assert turns[0]["meta"]["challenge_index"] == 0
+        text = str(turns[0].get("text") or "").lower()
+        assert "continuar" in text
+        assert ("equipaje" in text) is expect_equipaje
     get_settings.cache_clear()
 
 
@@ -3629,7 +3681,13 @@ async def test_path_intro_retry_shows_explanation_then_challenge(
                         "options": [{"id": "a", "label": "3"}, {"id": "b", "label": "4"}],
                         "correct_option_id": "b",
                         "explanation": "Casi, prueba otra vez.",
-                    }
+                    },
+                    {
+                        "prompt_text": "¿3+3?",
+                        "item_type": "mcq",
+                        "options": [{"id": "a", "label": "5"}, {"id": "b", "label": "6"}],
+                        "correct_option_id": "b",
+                    },
                 ],
             },
         },
@@ -3665,7 +3723,7 @@ async def test_path_intro_retry_shows_explanation_then_challenge(
         CHILD_ID, SESSION_ID, sample_session_row(), 4, child, last2
     )
     assert turns2[0]["meta"]["phase"] == "path_challenge"
-    assert turns2[0]["meta"]["challenge_index"] == 0
+    assert turns2[0]["meta"]["challenge_index"] == 1
     get_settings.cache_clear()
 
 

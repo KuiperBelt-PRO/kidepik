@@ -8,6 +8,28 @@ from app.services.baggage_offers import BaggageOfferService
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    "offers,expected",
+    [
+        ([], False),
+        (None, False),
+        ([{"can_use": False, "effect_id": "challenge_hint"}], False),
+        ([{"can_use": True, "effect_id": "challenge_retry"}], True),
+        (
+            [
+                {"can_use": False, "effect_id": "challenge_hint"},
+                {"can_use": True, "effect_id": "challenge_hint"},
+            ],
+            True,
+        ),
+    ],
+    ids=["empty", "none", "blocked-only", "retry", "mixed"],
+)
+def test_has_usable_offer(offers: list[dict] | None, expected: bool) -> None:
+    assert BaggageOfferService.has_usable_offer(offers) is expected
+
+
+@pytest.mark.unit
 def test_challenge_context_path_challenge() -> None:
     ctx = BaggageOfferService._challenge_context(
         "path_challenge",

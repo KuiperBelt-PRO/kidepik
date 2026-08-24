@@ -18,6 +18,14 @@ test("shouldShowBaggageOfferStrip only on challenge phases", () => {
   assert.equal(shouldShowBaggageOfferStrip([], { phase: "path_challenge" }), false);
 });
 
+test("shouldShowBaggageOfferStrip hides strip without usable offers", () => {
+  const blocked = [
+    { item_row_id: "1", label_child: "Pergamino", can_use: false, effect_id: "challenge_hint" },
+  ];
+  assert.equal(shouldShowBaggageOfferStrip(blocked, { phase: "path_challenge" }), false);
+  assert.equal(shouldShowBaggageOfferStrip(blocked, { phase: "path_intro", retry: true }), false);
+});
+
 test("effectActionLabel uses Usar ahora for hints", () => {
   assert.equal(effectActionLabel("challenge_hint"), "Usar ahora");
   assert.equal(effectActionLabel("challenge_retry"), "Reintentar");
@@ -48,7 +56,9 @@ test("renderBaggageOfferStripHtml includes catalog slots and ver equipaje comple
   assert.match(html, /data-baggage-offer-preview/);
   assert.match(html, /Ver equipaje completo/);
   assert.doesNotMatch(html, /data-baggage-offer-use/);
-  assert.match(html, /Equipaje \(2\)/);
+  assert.match(html, /play-baggage-hotbar__count/);
+  assert.match(html, /aria-label="2 objetos"/);
+  assert.match(html, />2</);
   assert.match(html, /data-baggage-hotbar-toggle/);
 });
 

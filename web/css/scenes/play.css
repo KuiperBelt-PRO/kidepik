@@ -702,15 +702,39 @@ button.play-world-hint:focus-visible {
 }
 
 .play-baggage-hotbar__title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: calc(0.72rem * var(--font-scale-ui, 1));
   letter-spacing: 0.06em;
   text-transform: uppercase;
   opacity: 0.82;
   font-weight: 700;
+}
+
+.play-baggage-hotbar__title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.play-baggage-hotbar__count {
+  flex: 0 0 auto;
+  min-width: 1.35rem;
+  padding: 0.08rem 0.42rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  font-size: calc(0.62rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  opacity: 1;
 }
 
 .play-baggage-hotbar__hint {

@@ -126,6 +126,10 @@ export function mapPlayApiError(code) {
       return "La respuesta del servidor no se pudo leer. Reintenta o recarga la aventura.";
     case "transport":
       return "No se pudo continuar. Reintenta.";
+    case "timeout":
+      return "El mentor está tardando más de lo habitual. Espera un momento y vuelve a pulsar Continuar.";
+    case "Internal error":
+      return "Ha ocurrido un error en el servidor. Espera unos segundos y reintenta.";
     default:
       return code && code !== "turn" ? code : "No se pudo continuar. Reintenta.";
   }

@@ -24,6 +24,7 @@ El viajero puede tener ítems ligados a materias. El toggle equipaje existe pero
 | B3 | Máximo | 3 chips visibles |
 | B4 | Retry | Priorizar `challenge_retry` si `eligible_retry` |
 | B5 | Uso | Mismo `POST …/baggage/{id}/use` |
+| B6 | Copy mentor en fallo | Mencionar el equipaje **solo** si hay ≥1 oferta `can_use` (reintento o pista de la materia del reto). Si no, copy sin oferta de equipaje; sí continuar para ver la pista. |
 
 ## Implementación
 
@@ -35,5 +36,7 @@ El viajero puede tener ítems ligados a materias. El toggle equipaje existe pero
 
 1. Reto math con pergamino usable → chip visible.
 2. Tap → pista o reintento sin cambiar hash.
-3. Sin ítems aplicables → sin franja.
+3. Sin ítems aplicables (`can_use`) → sin franja.
 4. «Ver todo» abre toggle baggage.
+5. Tras fallo, si no hay ítem usable de reintento ni de la materia del reto, el mentor **no** menciona el equipaje; ofrece continuar para ver la pista.
+6. Tras fallo, si hay ítem `can_use` de `challenge_retry` o de la materia, el mentor menciona el atajo de equipaje.
