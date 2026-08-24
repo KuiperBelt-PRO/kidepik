@@ -302,6 +302,50 @@ export function subjectPrioritiesFromLearning(learning) {
   return out;
 }
 
+export const MIN_CHALLENGES_PER_PATH = 3;
+export const MAX_CHALLENGES_PER_PATH = 10;
+
+/** @type {Record<string, number>} */
+const DEFAULT_CHALLENGES_BY_BAND = {
+  band_early: 3,
+  band_child: 3,
+  band_tween: 5,
+  band_teen: 5,
+  band_adult: 5,
+  band_senior: 3,
+};
+
+/**
+ * @param {unknown} ageBand
+ * @param {unknown} [ageYears]
+ * @returns {number}
+ */
+export function defaultChallengesPerPath(ageBand, ageYears) {
+  const band = String(ageBand || "").trim();
+  if (band && DEFAULT_CHALLENGES_BY_BAND[band] != null) {
+    return DEFAULT_CHALLENGES_BY_BAND[band];
+  }
+  const age = Number(ageYears);
+  if (Number.isFinite(age)) {
+    if (age <= 10 || age >= 65) return 3;
+    if (age >= 11 && age <= 64) return 5;
+  }
+  return MIN_CHALLENGES_PER_PATH;
+}
+
+/**
+ * @param {unknown} raw
+ * @param {unknown} [ageBand]
+ * @param {unknown} [ageYears]
+ * @returns {number}
+ */
+export function effectiveChallengesPerPath(raw, ageBand, ageYears) {
+  if (typeof raw === "number" && Number.isInteger(raw) && raw >= MIN_CHALLENGES_PER_PATH && raw <= MAX_CHALLENGES_PER_PATH) {
+    return raw;
+  }
+  return defaultChallengesPerPath(ageBand, ageYears);
+}
+
 /**
  * @param {SubjectMeta[]} catalog
  * @param {string[]} active

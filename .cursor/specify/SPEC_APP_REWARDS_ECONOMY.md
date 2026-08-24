@@ -238,7 +238,7 @@ Fase: **P2** si el tab Equipaje pide «historial de hallazgos».
 | --- | --- | --- |
 | Reto de camino aprobado a la 1ª | 8–20 | 0–1 (rareza común) |
 | Reto aprobado tras pista / reintento | 4–12 | 0 |
-| Cierre de camino (3 retos) | 25–40 | 1 garantizado de materia del path |
+| Cierre de camino (3 retos) | 25–40 | 1 garantizado de materia del path. **Propuesta:** el grant sigue siendo por **cierre de camino**, no se reescala con N ([SPEC_APP_PATH_CHALLENGE_COUNT](SPEC_APP_PATH_CHALLENGE_COUNT.md) C10). |
 | Nodo «trabajo» elegido | `currency_amount` del offer (típicamente 1.5× el valor implícito del ítem) | 0 |
 | Placement | 0 | 0 |
 

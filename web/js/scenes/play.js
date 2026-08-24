@@ -24,7 +24,9 @@ import {
   fetchPlayBaggage,
   fetchPlayBaggageOffers,
   usePlayBaggageItem,
-} from "../lib/play-api.js?v=262";
+  PLAY_DIALOGUE_TIMEOUT_MS,
+  PLAY_DIALOGUE_COMPOSE_TIMEOUT_MS,
+} from "../lib/play-api.js?v=263";
 import { renderDialogueMarkdown } from "../lib/markdown.js?v=2";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
@@ -221,6 +223,7 @@ async function mountPlayPanel(root, ctx) {
   /** @type {object | null} */
   let lastPendingTurn = null;
   let sending = false;
+  let replyGeneration = 0;
   /** Ignora resyncs de openSession obsoletos si el usuario envió otro turno. */
   let sessionSyncGeneration = 0;
   let rewinding = false;
@@ -855,6 +858,8 @@ async function mountPlayPanel(root, ctx) {
   let thinkingBubbleEl = null;
   /** @type {ReturnType<typeof setInterval> | null} */
   let thinkingRotateTimer = null;
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let thinkingWatchdogTimer = null;
   /** @type {HTMLElement | null} */
   let thinkingTextEl = null;
   /** @type {HTMLElement | null} */
@@ -875,8 +880,13 @@ async function mountPlayPanel(root, ctx) {
     handoff_placement: "continue",
     placement_item: "options_only",
     placement_feedback: "continue",
-    choose_path: "options_only",
-    path_intro: "continue",
+    choose_path: "options_or_text",
+    path_intro: "options_or_text",
+  });
+
+  const PATH_INTRO_START_OPTION = Object.freeze({
+    id: "start_challenges",
+    label: "Empezar los retos",
   });
 
   const DEFAULT_GENDER_OPTIONS = Object.freeze([
@@ -944,8 +954,21 @@ async function mountPlayPanel(root, ctx) {
    */
   function resolvePendingInputMode(turn) {
     const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
+    const meta = turn?.meta && typeof turn.meta === "object" ? turn.meta : {};
+    // Reintento tras fallo de reto: solo Continuar (sin compose).
+    if (phase === "path_intro" && meta.retry) return "continue";
     if (phase && PHASE_INPUT_MODE[phase]) return PHASE_INPUT_MODE[phase];
     return turn?.input_mode || "continue";
+  }
+
+  /**
+   * @param {string} phase
+   * @returns {string}
+   */
+  function composePlaceholderForPhase(phase) {
+    if (phase === "choose_path") return "Pregunta al mentor…";
+    if (phase === "path_intro") return "¿Alguna duda sobre este tema?";
+    return "Escribe tu respuesta…";
   }
 
   /** @type {(() => void) | null} */
@@ -1080,6 +1103,20 @@ async function mountPlayPanel(root, ctx) {
 
   /**
    * @param {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'} kind
+   * @returns {number}
+   */
+  function resolveTurnTimeoutMs(kind) {
+    if (kind === "preparing_exam" || kind === "adventure_compose") {
+      return PLAY_DIALOGUE_COMPOSE_TIMEOUT_MS;
+    }
+    if (kind === "evaluating_answer") {
+      return PLAY_DIALOGUE_TIMEOUT_MS;
+    }
+    return PLAY_DIALOGUE_TIMEOUT_MS;
+  }
+
+  /**
+   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'} kind
    * @returns {string[]}
    */
   function thinkingLines(kind) {
@@ -1160,9 +1197,24 @@ async function mountPlayPanel(root, ctx) {
         scrollLogToEnd();
       }, 8000);
     }
+
+    if (thinkingWatchdogTimer != null) {
+      clearTimeout(thinkingWatchdogTimer);
+    }
+    const watchdogMs = resolveTurnTimeoutMs(kind) + 5_000;
+    thinkingWatchdogTimer = setTimeout(() => {
+      if (!thinkingBubbleEl || !sending) return;
+      void recoverDialogueTransport(
+        typeof lastPendingTurn?.meta?.phase === "string" ? lastPendingTurn.meta.phase : "",
+      );
+    }, watchdogMs);
   }
 
   function hideThinking() {
+    if (thinkingWatchdogTimer != null) {
+      clearTimeout(thinkingWatchdogTimer);
+      thinkingWatchdogTimer = null;
+    }
     if (thinkingRotateTimer != null) {
       clearInterval(thinkingRotateTimer);
       thinkingRotateTimer = null;
@@ -2017,6 +2069,8 @@ async function mountPlayPanel(root, ctx) {
     }
     if (mode === "text_only") {
       opts = [];
+    } else if (mode === "continue" || (phase === "path_intro" && mode === "options_or_text")) {
+      // path_intro: conservar CTA start_challenges / continue; no filtrar.
     } else {
       opts = opts.filter(
         (opt) =>
@@ -2026,6 +2080,14 @@ async function mountPlayPanel(root, ctx) {
     }
     if (mode === "continue" && opts.length === 0) {
       opts = [{ id: "continue", label: "Continuar" }];
+    }
+    if (
+      phase === "path_intro" &&
+      mode === "options_or_text" &&
+      !turn?.meta?.retry &&
+      !opts.some((o) => String(o.id || "") === PATH_INTRO_START_OPTION.id)
+    ) {
+      opts = [...opts, { ...PATH_INTRO_START_OPTION }];
     }
 
     const chooseWorld = isChooseWorldTurn(turn);
@@ -2066,9 +2128,19 @@ async function mountPlayPanel(root, ctx) {
         btn.textContent = chipLabel;
 
         btn.addEventListener("click", () => {
+          const isPathIntroStart =
+            phase === "path_intro" &&
+            (opt.id === PATH_INTRO_START_OPTION.id || opt.id === "continue");
           void sendReply(
-            opt.id === "continue" && mode === "continue"
-              ? { kind: "continue", displayLabel: opt.label || "Continuar" }
+            (opt.id === "continue" && mode === "continue") || isPathIntroStart
+              ? {
+                  kind: "continue",
+                  displayLabel:
+                    opt.label ||
+                    (isPathIntroStart
+                      ? PATH_INTRO_START_OPTION.label
+                      : "Continuar"),
+                }
               : {
                   kind: "option",
                   option_id: opt.id,
@@ -2084,6 +2156,8 @@ async function mountPlayPanel(root, ctx) {
       syncFooterComposeMode(true);
       if (inputEl instanceof HTMLTextAreaElement) {
         inputEl.value = "";
+        inputEl.placeholder = composePlaceholderForPhase(phase);
+        inputEl.setAttribute("aria-label", inputEl.placeholder);
         autoGrowTextarea(inputEl);
         inputEl.focus();
       }
@@ -2357,11 +2431,32 @@ async function mountPlayPanel(root, ctx) {
         if (lastComposeDebug) showComposeDebugChip(lastComposeDebug);
       }
     } finally {
-      if (syncGen === sessionSyncGeneration) {
-        hideSyncSkeleton();
-        hideThinking();
-      }
+      hideSyncSkeleton();
+      if (!sending) hideThinking();
     }
+  }
+
+  /**
+   * Resincroniza la sesión si el servidor avanzó pero el cliente no recibió la respuesta.
+   * @param {string} prevPhase
+   * @returns {Promise<boolean>}
+   */
+  async function recoverDialogueTransport(prevPhase) {
+    const synced = await openDialogueSession(ctx.session, ctx.childId, "first_run");
+    if (ctx.isCancelled() || !synced.ok || !synced.data) return false;
+    const pending = synced.data.pending_agent_turn;
+    const nextPhase =
+      typeof pending?.meta?.phase === "string" ? pending.meta.phase : "";
+    if (nextPhase && nextPhase !== prevPhase) {
+      replyGeneration += 1;
+      hideSyncSkeleton();
+      hideThinking();
+      sending = false;
+      if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
+      hydrateFromSession(synced.data);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -2439,6 +2534,8 @@ async function mountPlayPanel(root, ctx) {
     const sid = ctx.getSessionId();
     if (!sid || ctx.isCancelled() || sending) return;
     sending = true;
+    replyGeneration += 1;
+    const replyGen = replyGeneration;
     sessionSyncGeneration += 1;
     const syncGen = sessionSyncGeneration;
     if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = true;
@@ -2468,7 +2565,10 @@ async function mountPlayPanel(root, ctx) {
 
     const prevPhase =
       typeof lastPendingTurn?.meta?.phase === "string" ? lastPendingTurn.meta.phase : "";
-    const result = await submitDialogueTurn(ctx.session, ctx.childId, sid, reply);
+    const result = await submitDialogueTurn(ctx.session, ctx.childId, sid, reply, {
+      timeoutMs: resolveTurnTimeoutMs(thinkingKind),
+    });
+    if (replyGen !== replyGeneration) return;
     if (ctx.isCancelled()) {
       hideSyncSkeleton();
       hideThinking();
@@ -2478,21 +2578,13 @@ async function mountPlayPanel(root, ctx) {
     }
     if (!result.ok || !result.data) {
       // El servidor puede haber avanzado aunque el fetch falle (JSON corrupto / transporte).
-      if (result.transport || result.error === "invalid_json" || result.status === 0) {
-        const synced = await openDialogueSession(ctx.session, ctx.childId, "first_run");
-        if (!ctx.isCancelled() && synced.ok && synced.data) {
-          const pending = synced.data.pending_agent_turn;
-          const nextPhase =
-            typeof pending?.meta?.phase === "string" ? pending.meta.phase : "";
-          if (nextPhase && nextPhase !== prevPhase) {
-            hideSyncSkeleton();
-            hideThinking();
-            hydrateFromSession(synced.data);
-            sending = false;
-            if (sendBtn instanceof HTMLButtonElement) sendBtn.disabled = false;
-            return;
-          }
-        }
+      if (
+        result.transport ||
+        result.error === "invalid_json" ||
+        result.error === "timeout" ||
+        result.status === 0
+      ) {
+        if (await recoverDialogueTransport(prevPhase)) return;
       }
       showGlassToast(mapPlayApiError(result.error || "turn"), {
         variant: "error",

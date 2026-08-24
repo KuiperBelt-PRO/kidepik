@@ -351,6 +351,37 @@ async def test_update_profile_learning_active_subjects_filters_priorities(crew_s
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_update_profile_learning_challenges_per_path_persists_and_keeps_subjects(
+    crew_svc, mocker
+) -> None:
+    svc, session = crew_svc
+    base = svc._detail(child_row())
+    base["settings"] = {
+        "learning": {
+            "active_subjects": ["math", "language"],
+            "subject_priorities": ["math"],
+        }
+    }
+    base["permissions"] = {"lock_world_theme": False}
+    mocker.patch.object(svc, "get_for_auth_user", new=AsyncMock(return_value=base))
+    session._results = [FakeExecuteResult(), FakeExecuteResult(rows=child_row())]
+    mocker.patch(
+        "app.services.crew_progress.CrewProgressService.build_for_child",
+        new=AsyncMock(return_value={"progress": {}, "journey": {}}),
+    )
+    await svc.update_profile_for_auth_user(
+        AUTH_USER_ID,
+        CHILD_ID,
+        {"learning": {"challenges_per_path": 5}},
+    )
+    settings = session.executed[0][1]["settings"]
+    assert settings["learning"]["challenges_per_path"] == 5
+    assert settings["learning"]["active_subjects"] == ["math", "language"]
+    assert settings["learning"]["subject_priorities"] == ["math"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_update_profile_learning_weak_spots_legacy(crew_svc, mocker) -> None:
     svc, session = crew_svc
     base = svc._detail(child_row())

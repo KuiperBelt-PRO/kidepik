@@ -364,6 +364,8 @@ export function mountGlassSelect(host, opts) {
  *   name?: string;
  *   onChange?: (value: number | null) => void;
  *   readOnly?: boolean;
+ *   decLabel?: string;
+ *   incLabel?: string;
  * }} opts
  */
 export function mountAgeStepper(host, opts) {
@@ -380,7 +382,7 @@ export function mountAgeStepper(host, opts) {
   dec.type = "button";
   dec.className = "glass-stepper__btn";
   dec.dataset.dir = "dec";
-  dec.setAttribute("aria-label", "Bajar edad");
+  dec.setAttribute("aria-label", opts.decLabel || "Bajar edad");
   dec.appendChild(createGlassIconSvg("chevron", { size: 18 }));
 
   const input = document.createElement("input");
@@ -396,7 +398,7 @@ export function mountAgeStepper(host, opts) {
   inc.type = "button";
   inc.className = "glass-stepper__btn";
   inc.dataset.dir = "inc";
-  inc.setAttribute("aria-label", "Subir edad");
+  inc.setAttribute("aria-label", opts.incLabel || "Subir edad");
   inc.appendChild(createGlassIconSvg("chevron", { size: 18 }));
 
   if (readOnly) {
@@ -410,7 +412,13 @@ export function mountAgeStepper(host, opts) {
     opts.onChange?.(value);
   }
 
-  function set(n) {
+  function syncDisabled() {
+    if (readOnly) return;
+    dec.disabled = value != null && value <= min;
+    inc.disabled = value != null && value >= max;
+  }
+
+  function set(n, silent) {
     if (n == null || Number.isNaN(n)) {
       value = null;
       input.value = "";
@@ -418,7 +426,8 @@ export function mountAgeStepper(host, opts) {
       value = Math.min(max, Math.max(min, n));
       input.value = String(value);
     }
-    emit();
+    syncDisabled();
+    if (!silent) emit();
   }
 
   dec.addEventListener("click", () => {
@@ -437,10 +446,14 @@ export function mountAgeStepper(host, opts) {
 
   wrap.append(dec, input, inc);
   host.appendChild(wrap);
+  syncDisabled();
 
   return {
     getValue: () => value,
     getInput: () => input,
+    setValue(n, silent = true) {
+      set(n, silent);
+    },
     destroy() {
       wrap.remove();
     },

@@ -24,8 +24,8 @@ PHASE_INPUT_MODE: dict[str, InputMode] = {
     "handoff_placement": "continue",
     "placement_item": "options_only",
     "placement_feedback": "continue",
-    "choose_path": "options_only",
-    "path_intro": "continue",
+    "choose_path": "options_or_text",
+    "path_intro": "options_or_text",
 }
 
 

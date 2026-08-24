@@ -1,6 +1,6 @@
 # Spec: Sistema de diálogo de aventura (IA)
 
-> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos en [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md) / gateway en [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md); **deltas §1.1b / §1.4** (ago 2026)  
+> Estado: **aprobada como contrato de producto** (julio 2026) — detalle de prompts/modelos en [SPEC_AI_PLAY_ORCHESTRATION.md](SPEC_AI_PLAY_ORCHESTRATION.md) / gateway en [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md); **deltas §1.1b / §1.4** (ago 2026); **§1.1c** consulta mentor en caminos (24 ago 2026)  
 > Relacionado: [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_CHARACTER_TRAITS.md](SPEC_APP_CHARACTER_TRAITS.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_ADVENTURE_STORY_RICHNESS.md), [SPEC_APP_SECTION_FRAME.md](SPEC_APP_SECTION_FRAME.md), [SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md), [docs/kidepik.md](../../docs/kidepik.md) §7, §10.6
 
 ## Contexto
@@ -80,6 +80,16 @@ Contrato normativo ampliado en [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_A
 - `options_only` / `options_or_text` con &lt;2 options → inválido (servidor rechaza / fallback).
 - Labels de `continue` motivados («Seguir el sendero»), no CTAs opacos; «Hasta pronto» solo en cierre de sesión narrado.
 - Placeholder del compose según contexto: reto → «Escribe tu respuesta…»; narrativo libre → el mentor ya dijo qué escribir.
+
+#### 1.1c Consulta mentor en caminos (delta 24 ago 2026)
+
+| Fase (`meta.phase`) | `input_mode` | Notas |
+| --- | --- | --- |
+| `choose_path` | `options_or_text` | Cartas + compose; texto = consulta (misma fase) |
+| `path_intro` | `options_or_text` | CTA `start_challenges` + compose; texto = consulta del tema |
+| `path_intro` + `meta.retry` | `continue` | Excepción: sin teclado en reintento tras fallo |
+
+Detalle de producto y anti-spoiler: [SPEC_APP_JOURNEY_MECHANICS](SPEC_APP_JOURNEY_MECHANICS.md) §5.1b.
 
 ### 1.2 Tipografía e iconos según mundo
 

@@ -1,7 +1,7 @@
 # Spec: Contexto tutor en generación de caminos (path_composer)
 
 > Estado: **aprobada — implementada** (15 ago 2026) — **delta 19 ago 2026:** calibración de dificultad (suelo por banda + nivel de materia).  
-> Relacionado: [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) §5, [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md](SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md), [SPEC_APP_CREW_MEMBER_DETAIL.md](SPEC_APP_CREW_MEMBER_DETAIL.md), [SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) B11, [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md)  
+> Relacionado: [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) §5, [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md](SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE.md), [SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md](SPEC_APP_SUBJECT_PROGRESS_LINEAR_B.md), [SPEC_APP_CREW_MEMBER_DETAIL.md](SPEC_APP_CREW_MEMBER_DETAIL.md), [SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) B11, [SPEC_AI_PYDANTIC_AGENTS.md](SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: N retos inyectado al composer)*  
 > **Diagrama:** [16-journey-mechanics-flows.md](../diagrams/16-journey-mechanics-flows.md) §3
 
 ## Contexto
@@ -30,7 +30,7 @@ El tutor escribe nota general (`learning.general_note`) y notas por materia (`le
 | T9 | Suelo de dificultad | `difficulty_range(effective_age_band)` es **mínimo absoluto**; L1 no baja de ese suelo |
 | T10 | Objetivo por slot | `target = f(banda, level_id, accuracy_rolling, difficulty_modifier)` inyectado en el prompt de cada camino |
 | T11 | Instrucciones, no validador curricular | Calibrar con prompt + skills. **Prohibido** un validador post-compose que rechace el pack por contenido (p. ej. detectar `10+5`) y force reintento LLM: alarga la espera y empeora la partida |
-| T12 | Validadores laxos (19 ago 2026) | Duro solo lo estructural (3 caminos, 3 retos, MCQ puntuable). Cliché, paleta, wrapper, leak → log suave. El pack LLM se sirve; plantilla solo si el compose no produce pack jugable |
+| T12 | Validadores laxos (19 ago 2026) | Duro solo lo estructural (3 caminos, 3 retos, MCQ puntuable). Cliché, paleta, wrapper, leak → log suave. El pack LLM se sirve; plantilla solo si el compose no produce pack jugable. **Propuesta:** retos = N tutor ([SPEC_APP_PATH_CHALLENGE_COUNT](SPEC_APP_PATH_CHALLENGE_COUNT.md) §4). |
 
 ## Calibración pedagógica (19 ago 2026)
 

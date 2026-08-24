@@ -5,6 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DEFAULT_ACTIVE_SUBJECTS,
+  effectiveChallengesPerPath,
   groupSubjectsByFamily,
   normalizeActiveSubjects,
   renderSubjectsChecklistHtml,
@@ -35,6 +36,16 @@ test("groupSubjectsByFamily and checklist html", () => {
   assert.match(html, /checked/);
   assert.match(html, /Fundamentales/);
   assert.match(html, /Ética/);
+});
+
+test("effectiveChallengesPerPath uses band default and sticky integer", () => {
+  assert.equal(effectiveChallengesPerPath(undefined, "band_child"), 3);
+  assert.equal(effectiveChallengesPerPath(undefined, "band_teen"), 5);
+  assert.equal(effectiveChallengesPerPath(undefined, "band_senior"), 3);
+  assert.equal(effectiveChallengesPerPath(undefined, null, 12), 5);
+  assert.equal(effectiveChallengesPerPath(8, "band_child"), 8);
+  assert.equal(effectiveChallengesPerPath(2, "band_teen"), 5);
+  assert.equal(effectiveChallengesPerPath(true, "band_teen"), 5);
 });
 
 test("subject priorities checkbox in checklist", () => {

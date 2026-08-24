@@ -1,6 +1,6 @@
 # 16 — Flujos de mecánicas de viaje (decisiones de producto)
 
-**Specs:** [SPEC_APP_JOURNEY_MECHANICS.md](../specify/SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_WAITING_PHRASES.md](../specify/SPEC_APP_WAITING_PHRASES.md), [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_PARALLEL_WORLDS.md](../specify/SPEC_APP_PARALLEL_WORLDS.md), [SPEC_DATA_STORAGE_LAYERS.md](../specify/SPEC_DATA_STORAGE_LAYERS.md)
+**Specs:** [SPEC_APP_JOURNEY_MECHANICS.md](../specify/SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_WAITING_PHRASES.md](../specify/SPEC_APP_WAITING_PHRASES.md), [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_PARALLEL_WORLDS.md](../specify/SPEC_APP_PARALLEL_WORLDS.md), [SPEC_DATA_STORAGE_LAYERS.md](../specify/SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](../specify/SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: N retos/camino)*
 
 > Contratos detallados en la spec; aquí el **mapa de decisión** jugable.
 
@@ -78,14 +78,20 @@ flowchart TD
 flowchart TD
   A([Elegir caminos]) --> B[Ranking híbrido PG + notas tutor]
   B --> B2[Calibrar dificultad: suelo banda + L* + rolling]
-  B2 --> C[path_composer ×3 en paralelo<br/>1 camino por slot]
+  B2 --> C[path_composer ×3 en paralelo<br/>1 camino por slot · N retos/camino]
   C --> D{¿Pack válido?}
   D -- NO slot --> C2[Reintento / fallback solo ese slot]
   C2 --> D
   D -- SI --> E[Guardar path_pack en JSONL]
-  E --> F[Viajero elige 1 de 3]
-  F --> G[Intro camino]
-  G --> H[Mini-historia + reto k]
+  E --> F[Cartas + compose: consejo o elige 1 de 3]
+  F --> F2{¿Texto libre?}
+  F2 -- Sí --> F3[Consulta mentor acotada al pack]
+  F3 --> F
+  F2 -- No --> G[Intro camino + lección + compose]
+  G --> G2{¿Dudas o empezar retos?}
+  G2 -- Texto --> G3[Consulta mentor acotada al tema]
+  G3 --> G
+  G2 -- Empezar retos --> H[Mini-historia + reto k de N]
   H --> O{¿Ítems usable para materia?}
   O -- Sí --> P[Chips equipaje en pie diálogo]
   O -- No --> I

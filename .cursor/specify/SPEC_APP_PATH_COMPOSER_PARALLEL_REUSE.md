@@ -1,7 +1,7 @@
 # Spec: Path composer — slots paralelos y reutilización de pack
 
 > Estado: **aprobada — implementada** (fases 0–2, 20 ago 2026)  
-> Relacionado: [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) §5, [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md)  
+> Relacionado: [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md) §5, [SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md](SPEC_APP_PATH_COMPOSER_TUTOR_CONTEXT.md), [SPEC_AI_GEMINI_GATEWAY.md](SPEC_AI_GEMINI_GATEWAY.md), [SPEC_AI_JOURNEY_FILE_LEDGER.md](SPEC_AI_JOURNEY_FILE_LEDGER.md), [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: `path_challenge_count_short` = &lt; N)*  
 > **Diagrama:** [16-journey-mechanics-flows.md](../diagrams/16-journey-mechanics-flows.md) §5 (actualizar al implementar)
 
 ## Contexto
@@ -169,7 +169,7 @@ Códigos `issue` estructurales:
 
 | issue | Significado |
 | --- | --- |
-| `path_challenge_count_short` | Menos de 3 retos en la respuesta |
+| `path_challenge_count_short` | Menos de 3 retos en la respuesta. **Propuesta:** menos de N tutor ([SPEC_APP_PATH_CHALLENGE_COUNT](SPEC_APP_PATH_CHALLENGE_COUNT.md)). |
 | `path_mcq_needs_options` | MCQ con &lt;2 opciones |
 | `path_mcq_invalid_correct_option` | `correct_option_id` ausente o inválido |
 | `franchise_violation` | Texto con franquicia prohibida |

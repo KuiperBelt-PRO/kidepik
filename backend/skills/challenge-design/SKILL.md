@@ -2,8 +2,8 @@
 id: challenge-design
 name: Challenge Design
 description: >
-  Retos curriculares vestidos en el viaje: caminos post-placement (3 retos por
-  camino) y coherencia MCQ con placement-exam.
+  Retos curriculares vestidos en el viaje: caminos post-placement (N retos por
+  camino, N lo indica el prompt; mínimo 3) y coherencia MCQ con placement-exam.
 ---
 
 Castellano de España. La **teoría** va en `lesson_narrative` del camino; cada reto lleva su propio mini-pasaje.
@@ -12,7 +12,7 @@ Castellano de España. La **teoría** va en `lesson_narrative` del camino; cada 
 
 1. Viajero elige camino → pitch.
 2. Mentor: `path_narrative` + `lesson_narrative` (teoría con NPC).
-3. Continuar → 3 retos: `narrative_wrapper` (pasaje nuevo) + `prompt_text` + chips.
+3. Continuar → **N retos** (N del prompt, no fijos a 3): `narrative_wrapper` (pasaje nuevo) + `prompt_text` + chips.
 
 ## Cómo construir un MCQ correcto (prioridad)
 

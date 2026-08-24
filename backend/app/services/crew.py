@@ -13,6 +13,7 @@ from app.db import session_scope
 from app.security.exit_pin import hash_exit_pin, verify_exit_pin
 from app.services.parents import ParentAccountService
 from app.services.settings import ParentSettingsRepository
+from app.services.subject_progress_config import normalize_challenges_per_path_patch
 from app.services.traveler_profile import TravelerProfileService
 from app.text_utils import CharacterSummaryBuilder
 
@@ -163,6 +164,10 @@ class CrewService:
                 learning["subject_priorities"] = self._normalize_subject_priorities(
                     incoming["subject_priorities"],
                     active_list if isinstance(active_list, list) else None,
+                )
+            if "challenges_per_path" in incoming:
+                learning["challenges_per_path"] = normalize_challenges_per_path_patch(
+                    incoming["challenges_per_path"]
                 )
             settings["learning"] = learning
         if "tutor_label" in payload or "learning" in payload: fields.append("settings = CAST(:settings AS jsonb)"); params["settings"] = settings

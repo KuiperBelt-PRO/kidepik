@@ -60,7 +60,13 @@ from app.services.crew import CrewService
 from app.services.crew_progress import CrewProgressService
 from app.services.path_composer_context import PathComposerContextService
 from app.services.placement import PlacementService
-from app.services.subject_progress_config import SEED_ROLLING
+from app.services.subject_progress_config import (
+    MAX_CHALLENGES_PER_PATH,
+    MIN_CHALLENGES_PER_PATH,
+    SEED_ROLLING,
+    challenges_per_path_from_pack,
+    effective_challenges_per_path,
+)
 from app.services.traveler_profile import extract_palette_tokens, palette_is_meaningful
 from app.services.waiting_copy import WaitingCopyService
 from app.services.waiting_phrases import pick_waiting_batch
@@ -493,12 +499,14 @@ class DialogueService:
         if completed_ids:
             intro_text = (
                 "¡Camino superado! Siguen rutas que dejaste pendientes "
-                "y una nueva pensada para lo que más te conviene practicar ahora."
+                "y una nueva pensada para lo que más te conviene practicar ahora. "
+                "Si quieres, pregúntame antes de elegir."
             )
         else:
             intro_text = (
                 "¡Prueba superada! Elige el siguiente camino. "
-                "Hay tres rutas pensadas para lo que más te conviene practicar."
+                "Hay tres rutas pensadas para lo que más te conviene practicar. "
+                "Si quieres, pregúntame antes de elegir."
             )
         sequence = int(
             (
@@ -530,7 +538,7 @@ class DialogueService:
             str(session["flow_id"]),
             sequence,
             intro_text,
-            "options_only",
+            "options_or_text",
             options,
             {
                 "phase": "choose_path",
@@ -680,8 +688,8 @@ class DialogueService:
             str(session["flow_id"]),
             sequence,
             text,
-            "continue",
-            None,
+            "options_or_text",
+            [DialogueService._path_intro_start_option()],
             {"phase": "path_intro", "path_id": path.get("path_id")},
         )
 
@@ -743,12 +751,35 @@ class DialogueService:
                     child_id, session_id, session, sequence, last or {}
                 )
             elif phase == "choose_path":
-                effects, turns = await self._choose_path(
-                    child_id, session_id, session, sequence, reply, value, child
-                )
+                if kind == "text":
+                    effects, turns = await self._path_phase_mentor_consult(
+                        child_id,
+                        session_id,
+                        session,
+                        sequence,
+                        value,
+                        child,
+                        phase="choose_path",
+                        last=last or {},
+                    )
+                else:
+                    effects, turns = await self._choose_path(
+                        child_id, session_id, session, sequence, reply, value, child
+                    )
             elif phase == "path_intro":
                 last_meta = (last or {}).get("meta") if isinstance((last or {}).get("meta"), dict) else {}
-                if last_meta.get("retry"):
+                if kind == "text" and not last_meta.get("retry"):
+                    effects, turns = await self._path_phase_mentor_consult(
+                        child_id,
+                        session_id,
+                        session,
+                        sequence,
+                        value,
+                        child,
+                        phase="path_intro",
+                        last=last or {},
+                    )
+                elif last_meta.get("retry"):
                     effects, turns = await self._path_intro_retry_continue(
                         child_id, session_id, session, sequence, child, last or {}
                     )
@@ -1741,7 +1772,7 @@ class DialogueService:
             "short_text_missing_expected",
         }
     )
-    _PATH_MIN_CHALLENGES = 3
+    _PATH_MIN_CHALLENGES = MIN_CHALLENGES_PER_PATH
     # Avisos suaves (log); no rechazan el pack ni fuerzan reintentos.
     _PATH_NARRATIVE_MIN_CHARS = 40
     _PATH_LESSON_MIN_CHARS = 80
@@ -2205,6 +2236,122 @@ class DialogueService:
         return str(path.get("title") or "Adelante.")
 
     @staticmethod
+    def _path_intro_start_option() -> dict[str, str]:
+        return {"id": "start_challenges", "label": "Empezar los retos"}
+
+    @staticmethod
+    def _choose_path_card_options(pack: list[dict[str, Any]]) -> list[dict[str, str]]:
+        return [
+            {
+                "id": str(p.get("path_id") or ""),
+                "label": str(p.get("title") or p.get("path_id") or "Camino"),
+                "description": DialogueService._path_pitch_description(p),
+            }
+            for p in pack
+            if p.get("path_id")
+        ]
+
+    async def _path_phase_mentor_consult(
+        self,
+        child_id: str,
+        session_id: str,
+        session: Any,
+        sequence: int,
+        question: str,
+        child: dict[str, Any],
+        *,
+        phase: str,
+        last: dict[str, Any],
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        """Consulta libre al mentor en encrucijada o intro; no avanza de fase."""
+        parent_id = child.get("parent_id")
+        world = self._world(child)
+        meta = last.get("meta") if isinstance(last.get("meta"), dict) else {}
+        pack = self._read_path_pack(
+            str(parent_id) if parent_id else None, child_id, session_id, world
+        )
+        if phase == "choose_path":
+            force_options = DialogueService._choose_path_card_options(pack)
+            context_lines = []
+            for p in pack:
+                title = str(p.get("title") or p.get("path_id") or "Camino")
+                blurb = str(p.get("learning_blurb") or "").strip()
+                subject = str(p.get("subject_id") or "").strip()
+                line = f"- {title}"
+                if subject:
+                    line += f" (materia: {subject})"
+                if blurb:
+                    line += f": {blurb}"
+                context_lines.append(line)
+            context_block = "\n".join(context_lines) or "(sin pack de caminos)"
+            guidance = (
+                "El explorador pregunta consejo ANTES de elegir un camino. "
+                "Compara de forma breve las rutas del pack. "
+                "NO elijas por él. NO reveles enunciados, opciones ni respuestas "
+                "correctas de los retos. Tras aconsejar, invita a elegir una carta "
+                "o a seguir preguntando.\n\n"
+                f"Rutas disponibles:\n{context_block}"
+            )
+            force_meta_phase = "choose_path"
+            extra_meta: dict[str, Any] = {
+                "path_ids": [str(p.get("path_id")) for p in pack if p.get("path_id")],
+            }
+            if meta.get("waiting_hints") is not None:
+                extra_meta["waiting_hints"] = meta.get("waiting_hints")
+        else:
+            progress = self._read_path_progress(
+                str(parent_id) if parent_id else None, child_id, session_id, world
+            )
+            path = dict(progress.get("path") or {})
+            path_id = str(meta.get("path_id") or path.get("path_id") or "")
+            if not path and pack and path_id:
+                path = next(
+                    (dict(p) for p in pack if str(p.get("path_id")) == path_id),
+                    {},
+                )
+            force_options = [DialogueService._path_intro_start_option()]
+            title = str(path.get("title") or path_id or "este camino")
+            lesson = str(path.get("lesson_narrative") or "").strip()
+            scene = str(path.get("path_narrative") or "").strip()
+            blurb = str(path.get("learning_blurb") or "").strip()
+            context_block = "\n".join(
+                part
+                for part in (
+                    f"Título: {title}",
+                    f"Blurb: {blurb}" if blurb else "",
+                    f"Escena: {scene}" if scene else "",
+                    f"Lección: {lesson}" if lesson else "",
+                )
+                if part
+            )
+            guidance = (
+                "El explorador pregunta dudas o más información del TEMA de este "
+                "camino, ANTES de los retos MCQ. Aclara solo este tema con la "
+                "lección dada. NO reveles enunciados, opciones ni respuestas "
+                "correctas de los retos. Tras responder, invita a pulsar "
+                "«Empezar los retos» o a seguir preguntando.\n\n"
+                f"Contexto del camino:\n{context_block or title}"
+            )
+            force_meta_phase = "path_intro"
+            extra_meta = {"path_id": path_id}
+
+        prompt = question.strip() or "…"
+        turn = await self._agent_mentor_turn(
+            child,
+            session_id,
+            str(session["flow_id"]),
+            sequence + 1,
+            prompt,
+            force_meta_phase,
+            purpose="mentor_guide",
+            force_options=force_options,
+            force_input_mode="options_or_text",
+            extra_meta=extra_meta,
+            extra_prompt=guidance,
+        )
+        return [], [turn]
+
+    @staticmethod
     def _is_story_comprehension_question(text: str) -> bool:
         lowered = text.lower()
         return any(marker in lowered for marker in DialogueService._STORY_COMPREHENSION_MARKERS)
@@ -2290,7 +2437,9 @@ class DialogueService:
         if blurb:
             parts.append(f"Recordemos: {blurb}")
         if challenges:
-            recap_items = "; ".join(f"«{q}»" for q in challenges[:3])
+            recap_items = "; ".join(
+                f"«{q}»" for q in challenges[:MAX_CHALLENGES_PER_PATH]
+            )
             parts.append(f"Has practicado con estos retos: {recap_items}.")
         parts.append(
             f"{npc_name} da por buen trabajo lo aprendido. "
@@ -2432,7 +2581,7 @@ class DialogueService:
 
     @staticmethod
     def _path_pack_entry_quality_issue(entry: dict[str, Any], theme: str) -> str | None:
-        """Solo fallos estructurales: sin título, sin 3 retos o MCQ no puntuable."""
+        """Solo fallos estructurales: sin título, sin suficientes retos o MCQ no puntuable."""
         del theme  # La pedagogía (cliché, wrapper, leak) va a avisos suaves.
         title = str(entry.get("title") or "").strip()
         if not title:
@@ -2440,7 +2589,7 @@ class DialogueService:
         challenges = entry.get("challenges")
         if not isinstance(challenges, list) or len(challenges) < DialogueService._PATH_MIN_CHALLENGES:
             return "path_challenge_count"
-        for challenge in challenges[: DialogueService._PATH_MIN_CHALLENGES]:
+        for challenge in challenges:
             if not isinstance(challenge, dict):
                 return "path_challenge_invalid"
             finalized = DialogueService._finalize_path_challenge(challenge)
@@ -3023,13 +3172,15 @@ class DialogueService:
             )
             intro_text = (
                 "¡Camino superado! Siguen dos rutas que dejaste pendientes "
-                "y una nueva pensada para lo que más te conviene practicar ahora."
+                "y una nueva pensada para lo que más te conviene practicar ahora. "
+                "Si quieres, pregúntame antes de elegir."
             )
         else:
             pack = await self._compose_path_pack(child, session_id)
             intro_text = (
                 "¡Prueba superada! Elige el siguiente camino. "
-                "Hay tres rutas pensadas para lo que más te conviene practicar."
+                "Hay tres rutas pensadas para lo que más te conviene practicar. "
+                "Si quieres, pregúntame antes de elegir."
             )
         parent_id = child.get("parent_id")
         if parent_id:
@@ -3074,7 +3225,7 @@ class DialogueService:
             session["flow_id"],
             sequence + 1,
             intro_text,
-            "options_only",
+            "options_or_text",
             options,
             {
                 "phase": "choose_path",
@@ -3406,6 +3557,7 @@ class DialogueService:
             path_count=1,
             slot_subject=subject_id,
         )
+        expected_count = DialogueService._expected_challenges_per_path(child)
         bundle, model = await run_purpose(
             "path_composer",
             prompt,
@@ -3437,6 +3589,7 @@ class DialogueService:
             subjects,
             slot_index,
             model,
+            expected_count=expected_count,
         )
         if not parsed:
             compose_log.warning(
@@ -3445,6 +3598,7 @@ class DialogueService:
                 subject_id=subject_id,
                 issue=parse_issue or "path_parse_failed",
                 model=model,
+                expected_count=expected_count,
                 challenges_received=len(detail.challenges),
             )
             raise self._path_compose_error(
@@ -3454,6 +3608,22 @@ class DialogueService:
                 subject_id=subject_id,
             )
         return parsed
+
+    @staticmethod
+    def _expected_challenges_per_path(child: dict[str, Any]) -> int:
+        settings = child.get("settings") if isinstance(child.get("settings"), dict) else {}
+        learning = settings.get("learning") if isinstance(settings, dict) else {}
+        raw = learning.get("challenges_per_path") if isinstance(learning, dict) else None
+        years = child.get("age_years")
+        try:
+            age_years = int(years) if years is not None else None
+        except (TypeError, ValueError):
+            age_years = None
+        return effective_challenges_per_path(
+            raw,
+            str(child.get("age_band") or "") or None,
+            age_years,
+        )
 
     def _path_compose_prompt(
         self,
@@ -3482,6 +3652,7 @@ class DialogueService:
             prompt_context = dict(composer_context)
             prompt_context["path_slots"] = filtered
         tutor_sections = PathComposerContextService.prompt_sections(prompt_context)
+        challenge_n = DialogueService._expected_challenges_per_path(child)
         parts = [
             f"Genera PathPackEnvelope con exactamente {path_count} camino(s) "
             f"(paths.length = {path_count}).",
@@ -3498,7 +3669,9 @@ class DialogueService:
                 "Orden de escritura POR CAMINO (obligatorio): "
                 "(1) inventa título + pitch + NPC; "
                 "(2) escribe lesson_narrative con la teoría y 2–3 ejemplos concretos; "
-                "(3) escribe 3 retos con narrative_wrapper (3–5 frases cada uno) "
+                f"(3) escribe EXACTAMENTE {challenge_n} retos "
+                "(ni uno más ni uno menos) con narrative_wrapper "
+                "(3-5 frases cada uno) "
                 "usando ejemplos NUEVOS distintos a la lección; "
                 "(4) para cada reto, prompt_text + 3 opciones (ids a/b/c) y LUEGO "
                 "correct_option_id obligatorio (id a/b/c de la opción verdadera, "
@@ -3538,7 +3711,7 @@ class DialogueService:
                 "path_narrative (2-3 frases de escena), lesson_narrative (5-8 frases de teoría "
                 "con NPC ANTES de los retos), npc (npc_id, name, role guide|gatekeeper, "
                 "one_line_voice), "
-                f"{DialogueService._PATH_MIN_CHALLENGES} challenges con narrative_wrapper "
+                f"{challenge_n} challenges con narrative_wrapper "
                 "(3-5 frases, pasaje autónomo), prompt_text, "
                 "item_type mcq, 3 opciones a/b/c, correct_option_id (verdadera), explanation. "
                 "Castellano de España. Sin franquicias."
@@ -3582,6 +3755,7 @@ class DialogueService:
         subjects: list[str],
         index: int,
         model: str,
+        expected_count: int | None = None,
     ) -> tuple[dict[str, Any] | None, str | None]:
         """Parse one LLM path into a pack entry.
 
@@ -3591,8 +3765,24 @@ class DialogueService:
             ``(entry, None)`` on success; ``(None, issue_code)`` on structural reject.
         """
         p = detail.path
+        expected = (
+            DialogueService._PATH_MIN_CHALLENGES
+            if expected_count is None
+            else max(DialogueService._PATH_MIN_CHALLENGES, int(expected_count))
+        )
+        expected = min(expected, MAX_CHALLENGES_PER_PATH)
+        received = list(detail.challenges or [])
+        if len(received) > expected:
+            compose_log.info(
+                "path_compose_challenge_count_truncated",
+                expected_count=expected,
+                challenges_received=len(received),
+                path_index=index,
+                subject_id=subject,
+                model=model,
+            )
         challenges: list[dict[str, Any]] = []
-        for ch in detail.challenges[: DialogueService._PATH_MIN_CHALLENGES]:
+        for ch in received[:expected]:
             finalized = DialogueService._finalize_path_challenge(
                 {
                     "prompt_text": ch.prompt_text,
@@ -3632,7 +3822,7 @@ class DialogueService:
                 )
                 return None, coherence_issue
             challenges.append(finalized)
-        if len(challenges) < DialogueService._PATH_MIN_CHALLENGES:
+        if len(challenges) < expected:
             return None, "path_challenge_count_short"
         npc_blob = ""
         if p.npc is not None:
@@ -3665,6 +3855,7 @@ class DialogueService:
                 "lesson_narrative": getattr(p, "lesson_narrative", None) or "",
                 "npc": npc,
                 "challenges": challenges,
+                "challenges_per_path": len(challenges),
                 "model_used": model,
             },
             None,
@@ -3691,7 +3882,7 @@ class DialogueService:
 
     @staticmethod
     def _completed_path_ids_from_events(events: list[dict[str, Any]]) -> set[str]:
-        """path_id con los 3 retos superados (challenge_index >= n retos)."""
+        """path_id con los N retos superados (challenge_index >= n retos)."""
         completed: set[str] = set()
         for row in events or []:
             if row.get("kind") != "path_progress":
@@ -3801,9 +3992,13 @@ class DialogueService:
                     session["flow_id"],
                     sequence + 1,
                     "No encontré ese camino. Elige una de las rutas.",
-                    "options_only",
+                    "options_or_text",
                     [
-                        {"id": p["path_id"], "label": p["title"]}
+                        {
+                            "id": p["path_id"],
+                            "label": p["title"],
+                            "description": DialogueService._path_pitch_description(p),
+                        }
                         for p in pack
                     ],
                     {"phase": "choose_path"},
@@ -3833,8 +4028,8 @@ class DialogueService:
             session["flow_id"],
             sequence + 1,
             intro,
-            "continue",
-            None,
+            "options_or_text",
+            [DialogueService._path_intro_start_option()],
             {"phase": "path_intro", "path_id": path_id},
         )
         return [{"type": "path_chosen", "value": path_id}], [turn]
@@ -4107,6 +4302,10 @@ class DialogueService:
                     world or "fantasy",
                     subject_id,
                     score=1.0 if ok else 0.0,
+                    challenges_per_path=challenges_per_path_from_pack(
+                        path,
+                        fallback=DialogueService._expected_challenges_per_path(child),
+                    ),
                 )
             )
         except Exception:
@@ -4130,6 +4329,12 @@ class DialogueService:
                         "status": "active",
                         "last_ok": ok,
                         "path": path,
+                        "challenges_per_path": challenges_per_path_from_pack(
+                            path,
+                            fallback=DialogueService._expected_challenges_per_path(
+                                child
+                            ),
+                        ),
                         "helps": helps,
                         **({"last_wrong_reply": reply} if not ok else {}),
                     },
@@ -4260,12 +4465,15 @@ class DialogueService:
         force_options: list[dict[str, Any]] | None = None,
         force_input_mode: str | None = None,
         prose_retry_hint: str | None = None,
+        extra_meta: dict[str, Any] | None = None,
+        extra_prompt: str | None = None,
     ) -> dict[str, Any]:
         purpose_run = purpose if purpose != "character_coach" else "mentor_guide"
         deps = self._deps(child, session_id, purpose_run)
-        extra = value
+        merged_extra = extra_prompt
         if prose_retry_hint:
-            extra = f"{value}\n\nCorrección obligatoria: {prose_retry_hint}"
+            hint = f"Corrección obligatoria: {prose_retry_hint}"
+            merged_extra = f"{merged_extra}\n\n{hint}" if merged_extra else hint
         ctx = TurnContext(
             child=child,
             session_id=session_id,
@@ -4274,7 +4482,7 @@ class DialogueService:
             phase=str(phase or "dialogue"),
             purpose=purpose_run,
             explorer_reply=value,
-            extra_prompt=prose_retry_hint and f"Corrección obligatoria: {prose_retry_hint}" or None,
+            extra_prompt=merged_extra,
             force_options=force_options,
             force_input_mode=force_input_mode,
             deps=deps,
@@ -4300,6 +4508,14 @@ class DialogueService:
             if option_issues:
                 options = species_options_for_world(world)
         input_mode = force_input_mode or envelope.input_mode
+        meta = {
+            **(envelope.meta or {}),
+            **(extra_meta or {}),
+            "phase": phase or "dialogue",
+            "world_theme": child.get("world_theme"),
+            "mentor_id": deps.mentor and deps.mentor.get("id"),
+            "tool_notes": result.tool_notes,
+        }
         return await self._mentor_turn(
             session_id,
             str(child["id"]),
@@ -4308,13 +4524,7 @@ class DialogueService:
             envelope.agent_text,
             input_mode,
             options,
-            {
-                **(envelope.meta or {}),
-                "phase": phase or "dialogue",
-                "world_theme": child.get("world_theme"),
-                "mentor_id": deps.mentor and deps.mentor.get("id"),
-                "tool_notes": result.tool_notes,
-            },
+            meta,
             result.model_used,
         )
 
@@ -5147,7 +5357,9 @@ class DialogueService:
         meta = d.get("meta") if isinstance(d.get("meta"), dict) else {}
         phase = str(meta.get("phase") or "")
         d["options"] = DialogueService._normalize_options_list(d.get("options"))
-        if phase in PHASE_INPUT_MODE:
+        if phase == "path_intro" and meta.get("retry"):
+            d["input_mode"] = "continue"
+        elif phase in PHASE_INPUT_MODE:
             d["input_mode"] = PHASE_INPUT_MODE[phase]
         if phase == "choose_age" and not d.get("options"):
             d["options"] = [
@@ -5159,6 +5371,16 @@ class DialogueService:
         if phase in {"choose_character_species", "choose_character"} and not d.get("options"):
             world = str(meta.get("world_theme") or "")
             d["options"] = species_options_for_world(world if world in {"fantasy", "sci-fi"} else "fantasy")
+        if (
+            phase == "path_intro"
+            and not meta.get("retry")
+            and not any(
+                str(o.get("id") or "") == "start_challenges"
+                for o in (d.get("options") or [])
+                if isinstance(o, dict)
+            )
+        ):
+            d["options"] = [DialogueService._path_intro_start_option()]
         return d
 
     @staticmethod

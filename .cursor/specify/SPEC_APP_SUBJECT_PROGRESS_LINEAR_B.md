@@ -1,7 +1,7 @@
 # Spec: Progreso por materia — modelo lineal «Opción B»
 
 > Estado: **implementada** (20 ago 2026; rewind V2 de rolling incluido)  
-> Relacionado: [SPEC_APP_CREW_PROGRESS.md](SPEC_APP_CREW_PROGRESS.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_PLAY_PROGRESS_HUD.md](SPEC_APP_PLAY_PROGRESS_HUD.md), [SPEC_APP_DEBUG_JOURNEY_REWIND.md](SPEC_APP_DEBUG_JOURNEY_REWIND.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md)
+> Relacionado: [SPEC_APP_CREW_PROGRESS.md](SPEC_APP_CREW_PROGRESS.md), [SPEC_APP_ADVENTURE_SESSION.md](SPEC_APP_ADVENTURE_SESSION.md), [SPEC_APP_JOURNEY_MECHANICS.md](SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_PLAY_PROGRESS_HUD.md](SPEC_APP_PLAY_PROGRESS_HUD.md), [SPEC_APP_DEBUG_JOURNEY_REWIND.md](SPEC_APP_DEBUG_JOURNEY_REWIND.md), [SPEC_APP_PLACEMENT_EXAM.md](SPEC_APP_PLACEMENT_EXAM.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: N tutor y Δ(N))*
 
 ## Contexto
 
@@ -34,7 +34,7 @@ El niño **no** ve `L*` en play por defecto; el tutor **sí** en tripulación ([
 | P2 | Camino completo | No hay bonificación extra al cerrar el camino; el último reto ya aportó su Δ |
 | P3 | Umbral de subida | `rolling ≥ THRESHOLD_UP` → subida de **nivel de materia** (L*k* → L*{k+1}*) en el mismo turno que cruza el umbral |
 | P4 | Calibración | **4 caminos** × **3 retos** = **12 aciertos** desde semilla → umbral (barra 10% → 100%) |
-| P5 | Caminos con N retos ≠ 3 | Δ **no** depende del N real del pack; siempre el mismo incremento por acierto (normalización pedagógica) |
+| P5 | Caminos con N retos ≠ 3 | Δ **no** depende del N real del pack; siempre el mismo incremento por acierto (normalización pedagógica). **Superseded 23 ago 2026** por [SPEC_APP_PATH_CHALLENGE_COUNT](SPEC_APP_PATH_CHALLENGE_COUNT.md) C5 (Δ = `0.90 / (4N)`; min N=3). Aplicar en la implementación de esa spec. |
 | P6 | Semilla coherente | Tras placement, sin práctica en caminos: rolling interno = `SEED_ROLLING` (barra **10%**), no `null` con salto oculto |
 | P7 | Tras subir nivel | `rolling` vuelve a `SEED_ROLLING`; no usar 0.55 ni EMA residual |
 | P8 | Placement | El examen fija `level_id` por materia; **no** modifica rolling de caminos (rolling post-placement = semilla hasta primer acierto) |

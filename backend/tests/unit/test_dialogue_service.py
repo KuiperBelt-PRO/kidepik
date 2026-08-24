@@ -2001,7 +2001,10 @@ async def test_choose_path_valid_selection(dialogue_svc, tmp_path, monkeypatch) 
     assert effects[0] == {"type": "path_chosen", "value": "p1"}
     assert turns[0]["meta"]["phase"] == "path_intro"
     dialogue_svc._mentor_turn.assert_awaited_once()
-    mentor_text = dialogue_svc._mentor_turn.await_args[0][4]
+    mentor_args = dialogue_svc._mentor_turn.await_args[0]
+    mentor_text = mentor_args[4]
+    assert mentor_args[5] == "options_or_text"
+    assert mentor_args[6][0]["id"] == "start_challenges"
     assert "Rumi te guía al claro." in mentor_text
     assert "truco del bosque" in mentor_text
     get_settings.cache_clear()
@@ -2234,7 +2237,10 @@ async def test_finish_placement_persists_levels(dialogue_svc, tmp_path, monkeypa
         SESSION_ID,
         [{"subject_id": "math", "item_key": "q1"}],
     )
-    assert len(dialogue_svc.session.executed) == 3
+    from app.catalogs.subject_catalog import SubjectCatalog
+
+    expected_subjects = set(SubjectCatalog.resolve_active_subjects(child, {})) | {"math"}
+    assert len(dialogue_svc.session.executed) == len(expected_subjects) + 2
     events = dialogue_svc.ledger.read_events(
         PARENT_ID, CHILD_ID, SESSION_ID, world_theme="fantasy"
     )
@@ -2363,12 +2369,67 @@ async def test_start_path_choice_presents_options(dialogue_svc, mocker, tmp_path
     )
     assert effects[1]["type"] == "placement_completed"
     assert turns[0]["meta"]["phase"] == "choose_path"
+    mentor_args = dialogue_svc._mentor_turn.await_args[0]
+    assert mentor_args[5] == "options_or_text"
+    assert mentor_args[6][0]["id"] == "p1"
     get_settings.cache_clear()
 
 
 @pytest.mark.unit
 @pytest.mark.asyncio
-async def test_placement_answer_advances_queue(dialogue_svc, tmp_path, monkeypatch) -> None:
+async def test_path_phase_mentor_consult_choose_path(dialogue_svc, tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
+    from app.config import get_settings
+
+    get_settings.cache_clear()
+    dialogue_svc.ledger = JourneyLedger(tmp_path)
+    dialogue_svc.ledger.append_event(
+        PARENT_ID,
+        CHILD_ID,
+        SESSION_ID,
+        kind="path_pack",
+        payload={
+            "pack": [
+                {
+                    "path_id": "p1",
+                    "title": "Bosque",
+                    "learning_blurb": "Lógica",
+                    "subject_id": "logic",
+                    "challenges": [{"prompt_text": "SECRETO", "correct_option_id": "a"}],
+                }
+            ]
+        },
+        world_theme="fantasy",
+    )
+    dialogue_svc._agent_mentor_turn = AsyncMock(
+        return_value=DialogueService._turn(
+            sample_turn_row(
+                meta={"phase": "choose_path"},
+                input_mode="options_or_text",
+                options=[{"id": "p1", "label": "Bosque"}],
+            )
+        )
+    )
+    child = sample_child(parent_id=PARENT_ID)
+    effects, turns = await dialogue_svc._path_phase_mentor_consult(
+        CHILD_ID,
+        SESSION_ID,
+        sample_session_row(),
+        4,
+        "¿Cuál es más fácil?",
+        child,
+        phase="choose_path",
+        last={"meta": {"phase": "choose_path"}},
+    )
+    assert effects == []
+    assert turns[0]["meta"]["phase"] == "choose_path"
+    call_kwargs = dialogue_svc._agent_mentor_turn.await_args.kwargs
+    assert call_kwargs["force_input_mode"] == "options_or_text"
+    assert call_kwargs["force_options"][0]["id"] == "p1"
+    assert call_kwargs["extra_prompt"] and "NO reveles" in call_kwargs["extra_prompt"]
+    explorer_q = dialogue_svc._agent_mentor_turn.await_args[0][4]
+    assert explorer_q == "¿Cuál es más fácil?"
+    get_settings.cache_clear()
     monkeypatch.setenv("JOURNEY_DATA_DIR", str(tmp_path))
     from app.config import get_settings
 
@@ -2643,22 +2704,26 @@ async def test_maybe_write_session_summary_fallback(dialogue_svc, tmp_path, monk
 @pytest.mark.unit
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "phase,handler_name",
+    "phase,handler_name,reply",
     [
-        ("choose_age", "_phase_choose_age"),
-        ("choose_gender", "_phase_choose_gender"),
-        ("choose_character_species", "_phase_character"),
-        ("handoff_placement", "_start_placement"),
-        ("placement_item", "_placement_answer"),
-        ("placement_feedback", "_placement_feedback_continue"),
-        ("choose_path", "_choose_path"),
-        ("path_intro", "_path_next_challenge"),
-        ("path_challenge", "_path_challenge_answer"),
-        ("adventure_ready", "_start_path_choice"),
+        ("choose_age", "_phase_choose_age", {"kind": "text", "text": "valor"}),
+        ("choose_gender", "_phase_choose_gender", {"kind": "text", "text": "valor"}),
+        ("choose_character_species", "_phase_character", {"kind": "text", "text": "valor"}),
+        ("handoff_placement", "_start_placement", {"kind": "continue"}),
+        ("placement_item", "_placement_answer", {"kind": "text", "text": "valor"}),
+        ("placement_feedback", "_placement_feedback_continue", {"kind": "text", "text": "valor"}),
+        (
+            "choose_path",
+            "_choose_path",
+            {"kind": "option", "option_id": "path-a"},
+        ),
+        ("path_intro", "_path_next_challenge", {"kind": "continue"}),
+        ("path_challenge", "_path_challenge_answer", {"kind": "text", "text": "valor"}),
+        ("adventure_ready", "_start_path_choice", {"kind": "continue"}),
     ],
 )
 async def test_submit_turn_routes_onboarding_phases(
-    dialogue_svc, mocker, phase: str, handler_name: str
+    dialogue_svc, mocker, phase: str, handler_name: str, reply: dict
 ) -> None:
     child = sample_child(onboarding_step=phase, placement_status="in_progress")
     mentor_turn = sample_turn_row(meta={"phase": phase})
@@ -2679,14 +2744,88 @@ async def test_submit_turn_routes_onboarding_phases(
     mocker.patch(
         "app.services.dialogue.WaitingCopyService"
     ).return_value.waiting_copy_from_cache = AsyncMock(return_value=[])
-    reply = (
-        {"kind": "continue"}
-        if phase in {"handoff_placement", "path_intro", "adventure_ready"}
-        else {"kind": "text", "text": "valor"}
-    )
     result = await dialogue_svc.submit_turn(AUTH_USER_ID, CHILD_ID, SESSION_ID, reply)
     handler.assert_awaited_once()
     assert result["agent_turns"][0]["id"] == "phase-turn"
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "phase",
+    ["choose_path", "path_intro"],
+)
+async def test_submit_turn_text_routes_to_path_mentor_consult(
+    dialogue_svc, mocker, phase: str
+) -> None:
+    child = sample_child(onboarding_step="complete", placement_status="completed")
+    mentor_turn = sample_turn_row(meta={"phase": phase, "path_id": "p1"})
+    dialogue_svc.session = ScriptedSession(
+        [
+            FakeExecuteResult(rows=child),
+            FakeExecuteResult(rows=sample_session_row()),
+            FakeExecuteResult(scalar=1),
+            FakeExecuteResult(rows=sample_turn_row(role="explorer", sequence=2)),
+            FakeExecuteResult(rows=child),
+            FakeExecuteResult(rows=child),
+        ]
+    )
+    consult = AsyncMock(return_value=([], [{"id": "consult-turn", "role": "mentor"}]))
+    dialogue_svc._path_phase_mentor_consult = consult
+    dialogue_svc._choose_path = AsyncMock()
+    dialogue_svc._path_next_challenge = AsyncMock()
+    dialogue_svc._insert = AsyncMock(side_effect=lambda row: DialogueService._turn(sample_turn_row(**row)))
+    dialogue_svc._last_mentor = AsyncMock(return_value=DialogueService._turn(mentor_turn))
+    mocker.patch(
+        "app.services.dialogue.WaitingCopyService"
+    ).return_value.waiting_copy_from_cache = AsyncMock(return_value=[])
+    result = await dialogue_svc.submit_turn(
+        AUTH_USER_ID, CHILD_ID, SESSION_ID, {"kind": "text", "text": "¿Cuál me conviene?"}
+    )
+    consult.assert_awaited_once()
+    dialogue_svc._choose_path.assert_not_awaited()
+    dialogue_svc._path_next_challenge.assert_not_awaited()
+    assert result["agent_turns"][0]["id"] == "consult-turn"
+
+
+@pytest.mark.unit
+def test_turn_normalizes_choose_path_options_or_text() -> None:
+    turn = DialogueService._turn(
+        {
+            **sample_turn_row(),
+            "input_mode": "options_only",
+            "options": [{"id": "a", "label": "A"}],
+            "meta": {"phase": "choose_path"},
+        }
+    )
+    assert turn["input_mode"] == "options_or_text"
+
+
+@pytest.mark.unit
+def test_turn_normalizes_path_intro_start_option() -> None:
+    turn = DialogueService._turn(
+        {
+            **sample_turn_row(),
+            "input_mode": "continue",
+            "options": None,
+            "meta": {"phase": "path_intro", "path_id": "p1"},
+        }
+    )
+    assert turn["input_mode"] == "options_or_text"
+    assert turn["options"][0]["id"] == "start_challenges"
+
+
+@pytest.mark.unit
+def test_turn_path_intro_retry_stays_continue() -> None:
+    turn = DialogueService._turn(
+        {
+            **sample_turn_row(),
+            "input_mode": "options_or_text",
+            "options": None,
+            "meta": {"phase": "path_intro", "retry": True, "path_id": "p1"},
+        }
+    )
+    assert turn["input_mode"] == "continue"
 
 
 @pytest.mark.unit
@@ -3214,6 +3353,70 @@ def test_path_detail_to_pack_entry_reports_short_challenge_count(dialogue_svc) -
     )
     assert parsed is None
     assert issue == "path_challenge_count_short"
+
+
+@pytest.mark.unit
+def test_path_detail_to_pack_entry_rejects_short_when_expected_five(dialogue_svc) -> None:
+    detail = PathDetail(
+        path=PathOption(
+            path_id="math_path_01",
+            subject_id="math",
+            title="Camino",
+            intro="Intro",
+            learning_blurb="Blurb",
+            path_narrative=_LONG_SCENE,
+            lesson_narrative=_LONG_LESSON,
+        ),
+        challenges=[_path_challenge_seed("¿2+2?") for _ in range(4)],
+    )
+    parsed, issue = dialogue_svc._path_detail_to_pack_entry(
+        detail, "math", ["math"], 0, "test-model", expected_count=5
+    )
+    assert parsed is None
+    assert issue == "path_challenge_count_short"
+
+
+@pytest.mark.unit
+def test_path_detail_to_pack_entry_truncates_extra_challenges(dialogue_svc) -> None:
+    detail = PathDetail(
+        path=PathOption(
+            path_id="math_path_01",
+            subject_id="math",
+            title="Camino",
+            intro="Intro",
+            learning_blurb="Blurb",
+            path_narrative=_LONG_SCENE,
+            lesson_narrative=_LONG_LESSON,
+        ),
+        challenges=[_path_challenge_seed(f"¿{i}?") for i in range(7)],
+    )
+    parsed, issue = dialogue_svc._path_detail_to_pack_entry(
+        detail, "math", ["math"], 0, "test-model", expected_count=5
+    )
+    assert issue is None
+    assert parsed is not None
+    assert len(parsed["challenges"]) == 5
+    assert parsed["challenges_per_path"] == 5
+
+
+@pytest.mark.unit
+def test_path_compose_prompt_uses_band_and_tutor_challenge_count() -> None:
+    child = sample_child(age_years=15, age_band="band_teen")
+    context = PathComposerContextService.build_context(child)
+    svc = DialogueService.__new__(DialogueService)
+    prompt = svc._path_compose_prompt(
+        child, ["math"], context, path_count=1, slot_subject="math"
+    )
+    assert "EXACTAMENTE 5 retos" in prompt
+    sticky = sample_child(
+        age_years=9,
+        age_band="band_child",
+        settings={"learning": {"challenges_per_path": 8}},
+    )
+    sticky_prompt = svc._path_compose_prompt(
+        sticky, ["math"], PathComposerContextService.build_context(sticky), path_count=1
+    )
+    assert "EXACTAMENTE 8 retos" in sticky_prompt
 
 
 @pytest.mark.unit

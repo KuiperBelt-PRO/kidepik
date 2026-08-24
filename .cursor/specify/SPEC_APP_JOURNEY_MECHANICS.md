@@ -1,8 +1,8 @@
 # Spec: Mecánicas de viaje (flujos de juego)
 
-> Estado: **aprobada** (ago 2026)  
+> Estado: **aprobada** (ago 2026) — delta §5.1b consulta mentor en caminos (24 ago 2026)  
 > Fuente: notas de producto (ago 2026) + decisiones de almacenamiento  
-> Relacionado: [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_WAITING_PHRASES.md](SPEC_APP_WAITING_PHRASES.md), [SPEC_AI_CENTRAL_ORCHESTRATOR.md](SPEC_AI_CENTRAL_ORCHESTRATOR.md), [SPEC_APP_PARALLEL_WORLDS.md](SPEC_APP_PARALLEL_WORLDS.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md)  
+> Relacionado: [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_WAITING_PHRASES.md](SPEC_APP_WAITING_PHRASES.md), [SPEC_AI_CENTRAL_ORCHESTRATOR.md](SPEC_AI_CENTRAL_ORCHESTRATOR.md), [SPEC_APP_PARALLEL_WORLDS.md](SPEC_APP_PARALLEL_WORLDS.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: N retos/camino)*  
 > **Diagrama:** [16-journey-mechanics-flows.md](../diagrams/16-journey-mechanics-flows.md)
 
 ## Contexto
@@ -24,7 +24,7 @@ La mecánica actual es lenta: mentor demasiado extenso, esperas poco claras, rep
 | M1 | Mentor | Tono del mundo elegido; **breve y dinámico**; no prosa larga |
 | M2 | Esperas | Frases desde **JSONL** `data/waiting/`; rotación cada **8 s**; sin spoilear lugares/personajes de la escena actual |
 | M3 | Prueba de acceso | LLM prepara N preguntas + respuestas + explicaciones; **sin banco estático** |
-| M4 | Caminos | 3 propuestas sobre materias flojas; pitch + NPC + `lesson_narrative` + 3 MCQ; compose **por slot** (3 llamadas paralelas) + refresh tras completar camino — ver [SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE](SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE.md) |
+| M4 | Caminos | 3 propuestas sobre materias flojas; pitch + NPC + `lesson_narrative` + N MCQ (min 3, max 10, default por banda); compose **por slot** (3 llamadas paralelas) + refresh tras completar camino — ver [SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE](SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE.md) y [SPEC_APP_PATH_CHALLENGE_COUNT](SPEC_APP_PATH_CHALLENGE_COUNT.md). |
 | M5 | Fallo de camino | Se puede regenerar **solo el camino fallido**; los otros dos se reutilizan. Tras **completar** un camino: reutilizar los 2 no elegidos + 1 compose nuevo ([SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE](SPEC_APP_PATH_COMPOSER_PARALLEL_REUSE.md) §4) |
 | M6 | Persistencia de examen/retos | Ledger archivos ([SPEC_DATA_STORAGE_LAYERS](SPEC_DATA_STORAGE_LAYERS.md) D5) |
 | M7 | Subida de nivel/rango | Tras cerrar examen o camino; informe `.md` tutor + mensaje breve al viajero |
@@ -115,11 +115,15 @@ Reglas:
 
 ```mermaid
 flowchart TD
-  A([INICIO]) --> B[Mentor presenta N chips/caminos]
-  B --> C[Viajero elige]
-  C --> D[Intro del camino]
-  D --> E[Continuar]
-  E --> F([Reto 1..N])
+  A([INICIO]) --> B[Mentor presenta 3 caminos + compose]
+  B --> C{¿Texto o elige carta?}
+  C -- Texto --> C2[Consulta mentor acotada al pack]
+  C2 --> B
+  C -- Carta --> D[Intro del camino + lección]
+  D --> E{¿Dudas o empezar retos?}
+  E -- Texto --> E2[Consulta mentor acotada al tema del camino]
+  E2 --> D
+  E -- Empezar retos --> F([Reto 1..N])
   F --> G[Mini-historia / aprendizaje]
   G --> H[Reto o pregunta]
   H --> I[Respuesta]
@@ -139,6 +143,28 @@ flowchart TD
 ```
 
 > Delta ago 2026: al superar un camino (o nodos con offer), el servidor puede otorgar recompensas de **equipaje** y/o **moneda del mundo** — [SPEC_APP_REWARDS_ECONOMY](SPEC_APP_REWARDS_ECONOMY.md), [SPEC_APP_INVENTORY_BAGGAGE](SPEC_APP_INVENTORY_BAGGAGE.md). Placement (§4) **no** otorga economía en MVP.
+
+### 5.1b Consulta al mentor en caminos (delta 24 ago 2026)
+
+El tripulante puede **hablar con el mentor** antes de comprometerse a un camino y tras la lección, antes de los MCQ.
+
+| Fase | `input_mode` | Controles | Texto libre |
+| --- | --- | --- | --- |
+| `choose_path` | `options_or_text` | 3 cartas de camino + compose | Consejo sobre las 3 rutas del pack; **no** elige camino ni avanza fase |
+| `path_intro` (sin `retry`) | `options_or_text` | CTA «Empezar los retos» (`start_challenges`) + compose | Dudas / más info **solo del tema del camino activo**; **no** avanza a retos |
+| `path_intro` con `retry: true` | `continue` | Solo continuar (pista / reintento) | Sin compose (flujo de fallo de reto) |
+
+Reglas del mentor en consulta:
+
+1. Respuesta breve (2–4 frases), tono del mundo.
+2. **Anti-spoiler:** no revelar enunciados, opciones ni `correct_option_id` de los retos del pack / camino.
+3. En `choose_path`: puede comparar blurbs/materias; no elige por el viajero.
+4. En `path_intro`: se apoya en `lesson_narrative` / `path_narrative`; no adelanta MCQ.
+5. Tras la respuesta, re-emite la misma fase con los mismos controles (cartas o CTA + compose).
+
+Placeholder UI: encrucijada → «Pregunta al mentor…»; intro → «¿Alguna duda sobre este tema?».
+
+Contrato de modos: [SPEC_APP_ADVENTURE_DIALOGUE](SPEC_APP_ADVENTURE_DIALOGUE.md) §1.1c.
 
 ### 5.2 Generación (orquestador → subagentes)
 

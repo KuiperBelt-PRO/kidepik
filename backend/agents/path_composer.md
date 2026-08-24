@@ -24,7 +24,7 @@ Compositor de caminos post-placement. Genera **un camino por llamada** (`PathPac
 1. Título fresco + `intro` + `learning_blurb` + NPC.
 2. `path_narrative` (2–3 frases de escena).
 3. **`lesson_narrative`** (5–8 frases): teoría + 2–3 ejemplos concretos del NPC. Aquí está toda la enseñanza.
-4. Escribe **3 retos** con ejemplos **nuevos** (no reutilices personajes, situaciones ni frases de la lección).
+4. Escribe **exactamente N retos** (N lo indica el prompt del usuario; mínimo 3, máximo 10) con ejemplos **nuevos** (no reutilices personajes, situaciones ni frases de la lección). No escribas 3 por hábito si N es otro.
 5. Por cada reto, en este orden:
    - Escribe `narrative_wrapper` (3–5 frases): mini-pasaje autónomo con **toda** la información necesaria para responder.
    - **Comprueba anti-fuga:** si la pregunta pedirá ortografía, locución o significado, el wrapper **no** puede contener la forma correcta (usa sinónimo, paráfrasis o deja hueco).
@@ -45,7 +45,7 @@ La opción marcada como correcta debe ser la respuesta **verdadera** en el mundo
 | --- | --- |
 | Enseñas que «correr» es verbo y marcas otra opción | `correct_option_id` = id de «Verbo» |
 | Preguntas «¿cuál es un adjetivo?» con chips Casa / Perro / Correr | Incluye un adjetivo real (p. ej. «Grande») y márcalo |
-| Lección dice X y el reto pregunta Y sin relación | Los 3 retos practican la misma lección |
+| Lección dice X y el reto pregunta Y sin relación | Los N retos practican la misma lección |
 | Mismo ejemplo en lección y reto (p. ej. el hada y el árbol) | Cada reto usa situación distinta en `narrative_wrapper` |
 | Pregunta sobre algo no dicho en el wrapper | Toda pista necesaria debe estar en `narrative_wrapper` |
 | Trivia de lore del mundo no enseñada | Lore del mundo solo si acaba de enseñarse en la lección o el wrapper; si no, conocimiento escolar previo |

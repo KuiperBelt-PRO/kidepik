@@ -14,6 +14,29 @@ async function requirePlaySession() {
   return getValidSession();
 }
 
+const DEFAULT_DIALOGUE_TIMEOUT_MS = 90_000;
+const DIALOGUE_COMPOSE_TIMEOUT_MS = 180_000;
+
+/**
+ * @param {string} url
+ * @param {RequestInit} [init]
+ * @param {number} [timeoutMs]
+ */
+async function fetchWithTimeout(url, init = {}, timeoutMs = DEFAULT_DIALOGUE_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("timeout");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * @param {import('@supabase/supabase-js').Session} session
  * @param {string} childId
@@ -27,24 +50,38 @@ export async function openDialogueSession(_session, childId, flowId = "first_run
       return { ok: false, status: 401, error: "session_expired" };
     }
     const { config } = await import("../config.js");
-    const res = await fetch(`${config.apiUrl}/play/${encodeURIComponent(childId)}/dialogue/session`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-        ...debugAiRequestHeaders(),
+    const res = await fetchWithTimeout(
+      `${config.apiUrl}/play/${encodeURIComponent(childId)}/dialogue/session`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          ...debugAiRequestHeaders(),
+        },
+        body: JSON.stringify({ flow_id: flowId }),
       },
-      body: JSON.stringify({ flow_id: flowId }),
-    });
+      DEFAULT_DIALOGUE_TIMEOUT_MS,
+    );
     if (!res.ok) {
       appLogApi("play/dialogue/session", res.status, { child_id: childId });
       return { ok: false, status: res.status };
     }
     return { ok: true, data: await res.json() };
   } catch (err) {
+    const brief = err instanceof Error ? err.message.slice(0, 160) : "transport";
     console.warn("play session error", err);
-    appLogApi("play/dialogue/session", 0, { child_id: childId, transport: true });
-    return { ok: false };
+    appLogApi("play/dialogue/session", 0, {
+      child_id: childId,
+      transport: true,
+      brief,
+      timeout: brief === "timeout",
+    });
+    return {
+      ok: false,
+      error: brief === "timeout" ? "timeout" : undefined,
+      transport: true,
+    };
   }
 }
 
@@ -53,8 +90,13 @@ export async function openDialogueSession(_session, childId, flowId = "first_run
  * @param {string} childId
  * @param {string} sessionId
  * @param {{ kind: string, option_id?: string, text?: string }} reply
+ * @param {{ timeoutMs?: number }} [opts]
  */
-export async function submitDialogueTurn(_session, childId, sessionId, reply) {
+export async function submitDialogueTurn(_session, childId, sessionId, reply, opts = {}) {
+  const timeoutMs =
+    typeof opts.timeoutMs === "number" && opts.timeoutMs > 0
+      ? opts.timeoutMs
+      : DEFAULT_DIALOGUE_TIMEOUT_MS;
   try {
     const session = await requirePlaySession();
     if (!session) {
@@ -66,15 +108,19 @@ export async function submitDialogueTurn(_session, childId, sessionId, reply) {
       return { ok: false, status: 401, error: "session_expired" };
     }
     const { config } = await import("../config.js");
-    const res = await fetch(`${config.apiUrl}/play/${encodeURIComponent(childId)}/dialogue/turn`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-        "Content-Type": "application/json",
-        ...debugAiRequestHeaders(),
+    const res = await fetchWithTimeout(
+      `${config.apiUrl}/play/${encodeURIComponent(childId)}/dialogue/turn`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          ...debugAiRequestHeaders(),
+        },
+        body: JSON.stringify({ session_id: sessionId, reply }),
       },
-      body: JSON.stringify({ session_id: sessionId, reply }),
-    });
+      timeoutMs,
+    );
     if (!res.ok) {
       let detail = "turn";
       try {
@@ -103,10 +149,22 @@ export async function submitDialogueTurn(_session, childId, sessionId, reply) {
   } catch (err) {
     const brief = err instanceof Error ? err.message.slice(0, 160) : "transport";
     console.warn("play turn error", err);
-    appLogApi("play/dialogue/turn", 0, { child_id: childId, transport: true, brief });
-    return { ok: false, error: "transport", transport: true };
+    appLogApi("play/dialogue/turn", 0, {
+      child_id: childId,
+      transport: true,
+      brief,
+      timeout: brief === "timeout",
+    });
+    return {
+      ok: false,
+      error: brief === "timeout" ? "timeout" : "transport",
+      transport: true,
+    };
   }
 }
+
+export const PLAY_DIALOGUE_TIMEOUT_MS = DEFAULT_DIALOGUE_TIMEOUT_MS;
+export const PLAY_DIALOGUE_COMPOSE_TIMEOUT_MS = DIALOGUE_COMPOSE_TIMEOUT_MS;
 
 /**
  * @param {import('@supabase/supabase-js').Session} session

@@ -80,6 +80,7 @@ async def test_record_path_challenge_correct_increments() -> None:
     assert effects[0]["subject_id"] == "reading"
     assert effects[0]["rolling_model"] == "linear_b"
     assert effects[0]["rolling_delta"] == round(DELTA_PER_CORRECT, 4)
+    assert effects[0]["challenges_per_path"] == 3
     assert effects[0]["accuracy_rolling"] == round(
         min(THRESHOLD_UP, SEED_ROLLING + DELTA_PER_CORRECT), 3
     )
@@ -349,3 +350,60 @@ async def test_rebuild_after_rewind_restores_seed_plus_conserved() -> None:
     assert math_row["level"] == "L1"
     assert math_row["rolling"] == expected_rolling
     assert math_row["source"] == "path_challenge"
+
+
+@pytest.mark.unit
+def test_linear_state_after_five_challenge_paths() -> None:
+    from app.services.subject_progress_config import delta_per_correct
+
+    level, rolling, source = SubjectProgressService.linear_state_after_corrects(
+        20, challenges_per_path=5
+    )
+    assert level == "L2"
+    assert rolling == SEED_ROLLING
+    assert source == "path_level_up"
+    level, rolling, source = SubjectProgressService.linear_state_after_corrects(
+        1, challenges_per_path=10
+    )
+    assert level == "L1"
+    assert rolling == round(SEED_ROLLING + delta_per_correct(10), 4)
+    mixed = SubjectProgressService.linear_state_after_n_sequence([3, 3, 3, 10])
+    expected = round(
+        SEED_ROLLING + 3 * delta_per_correct(3) + delta_per_correct(10), 4
+    )
+    assert mixed[0] == "L1"
+    assert mixed[1] == expected
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
+async def test_record_path_challenge_uses_pack_n() -> None:
+    from app.services.subject_progress_config import delta_per_correct
+
+    executed: list[dict] = []
+
+    class FakeSession:
+        async def execute(self, stmt, params=None):  # noqa: ANN001
+            sql = str(stmt)
+            executed.append({"sql": sql, "params": params or {}})
+            if "select level_id" in sql and "settings" not in sql:
+                class Row:
+                    def mappings(self):
+                        class M:
+                            def first(self_inner):
+                                return {"level_id": "L1", "accuracy_rolling": SEED_ROLLING}
+
+                        return M()
+
+                return Row()
+            return None
+
+    svc = SubjectProgressService(FakeSession())  # type: ignore[arg-type]
+    effects = await svc.record_path_challenge(
+        "child", "fantasy", "math", score=1.0, challenges_per_path=10
+    )
+    assert effects[0]["challenges_per_path"] == 10
+    assert effects[0]["rolling_delta"] == round(delta_per_correct(10), 4)
+    assert effects[0]["accuracy_rolling"] == round(
+        min(THRESHOLD_UP, SEED_ROLLING + delta_per_correct(10)), 3
+    )

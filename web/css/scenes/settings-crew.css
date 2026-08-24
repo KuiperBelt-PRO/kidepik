@@ -78,6 +78,18 @@ html[data-shell-theme="fantasy"] .crew-panel__block-title {
   font-size: calc(0.9rem * var(--font-scale-ui, 1));
 }
 
+.crew-panel__challenges-per-path {
+  margin: 0.85rem 0 1.1rem;
+}
+
+.crew-panel__challenges-per-path .crew-panel__label {
+  margin-top: 0;
+}
+
+.crew-panel__challenges-per-path .glass-stepper {
+  margin: 0.15rem 0 0.35rem;
+}
+
 .settings-panel__helper,
 .crew-panel__helper,
 .crew-panel__muted,

@@ -43,8 +43,12 @@ import {
   renderSubjectProgressBarsHtml,
   subjectNotesById,
   subjectPrioritiesFromLearning,
+  defaultChallengesPerPath,
+  effectiveChallengesPerPath,
+  MAX_CHALLENGES_PER_PATH,
+  MIN_CHALLENGES_PER_PATH,
   SUBJECT_CATALOG,
-} from "../lib/subject-catalog.js?v=258";
+} from "../lib/subject-catalog.js?v=259";
 import {
   buildCrewListCardInner,
   buildCrewMemberCardInner,
@@ -372,6 +376,101 @@ function mountSubjectActivationSwitches(root, opts) {
   return () => {
     if (saveTimer) clearTimeout(saveTimer);
     cleanups.forEach((fn) => fn());
+  };
+}
+
+/**
+ * @param {any} member
+ * @param {number} n
+ * @returns {string}
+ */
+function challengesPerPathHelperText(member, n) {
+  const stored = member?.settings?.learning?.challenges_per_path;
+  const bandDefault = defaultChallengesPerPath(member?.age_band, member?.age_years);
+  const sticky = typeof stored === "number";
+  const lines = [
+    `Cada camino tendrá ${n} retos. Cuatro caminos completos suben de nivel en esa materia. Aplica a los próximos caminos que se generen, no al que esté en curso.`,
+  ];
+  if (!sticky) {
+    lines.push(`Por defecto para su edad: ${bandDefault}.`);
+  }
+  if (n >= MAX_CHALLENGES_PER_PATH) {
+    lines.push("Los caminos serán más largos y tardarán más en generarse.");
+  }
+  return lines.join(" ");
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {{
+ *   session: import('@supabase/supabase-js').Session;
+ *   childId: string;
+ *   member: any;
+ * }} opts
+ */
+function mountChallengesPerPathStepper(root, opts) {
+  const host = root.querySelector("[data-challenges-per-path-host]");
+  const helper = root.querySelector("[data-challenges-per-path-helper]");
+  if (!(host instanceof HTMLElement)) return () => {};
+
+  const learning = opts.member?.settings?.learning;
+  let current = effectiveChallengesPerPath(
+    learning?.challenges_per_path,
+    opts.member?.age_band,
+    opts.member?.age_years,
+  );
+
+  const paintHelper = (n) => {
+    if (helper instanceof HTMLElement) helper.textContent = challengesPerPathHelperText(opts.member, n);
+  };
+  paintHelper(current);
+
+  let saveTimer = 0;
+  const stepper = mountAgeStepper(host, {
+    value: current,
+    min: MIN_CHALLENGES_PER_PATH,
+    max: MAX_CHALLENGES_PER_PATH,
+    decLabel: "Menos retos por camino",
+    incLabel: "Más retos por camino",
+    onChange(value) {
+      if (value == null || value === current) return;
+      paintHelper(value);
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = window.setTimeout(() => {
+        saveTimer = 0;
+        void persist(value);
+      }, 280);
+    },
+  });
+
+  const persist = async (n) => {
+    const res = await patchCrewMember(opts.session, opts.childId, {
+      learning: { challenges_per_path: n },
+    });
+    if (res.ok) {
+      applyMemberLearningPatch(opts.member, res.member);
+      if (!opts.member.settings || typeof opts.member.settings !== "object") {
+        opts.member.settings = {};
+      }
+      if (!opts.member.settings.learning || typeof opts.member.settings.learning !== "object") {
+        opts.member.settings.learning = {};
+      }
+      opts.member.settings.learning.challenges_per_path = n;
+      current = n;
+      paintHelper(n);
+      const { showGlassToast } = await import("./glass-toast.js");
+      showGlassToast("Guardado", { variant: "success", durationMs: 1800 });
+      return;
+    }
+    stepper.setValue(current, true);
+    paintHelper(current);
+    const { showGlassToast } = await import("./glass-toast.js");
+    showGlassToast("No hemos podido guardar los retos por camino.", { variant: "error" });
+  };
+
+  return () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    stepper.destroy();
   };
 }
 
@@ -920,6 +1019,15 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       <section class="crew-panel__block" data-subjects-block>
         <h2 class="crew-panel__block-title">Materias de aprendizaje</h2>
         <p class="crew-panel__helper">Activa o desactiva materias con el interruptor; el cambio se guarda al instante. Si pausas una materia, su progreso se conserva. Las notas e información general se guardan con el botón de abajo.</p>
+        ${
+          isTutor
+            ? ""
+            : `<div class="crew-panel__challenges-per-path" data-challenges-per-path-block>
+          <p class="crew-panel__label">Retos por camino</p>
+          <div data-challenges-per-path-host></div>
+          <p class="crew-panel__helper" data-challenges-per-path-helper></p>
+        </div>`
+        }
         <label class="crew-panel__label">Información adicional (general)
           <textarea
             class="crew-panel__input"
@@ -1180,6 +1288,15 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           onProgressSync: () => syncSubjectProgressFromMember(root, member),
         }),
       );
+      if (!isSelf) {
+        cleanups.push(
+          mountChallengesPerPathStepper(root, {
+            session,
+            childId,
+            member,
+          }),
+        );
+      }
     }
     if (!isTutor) {
       paintBtn(root, "[data-play]", "save", "Entrar en la aventura");

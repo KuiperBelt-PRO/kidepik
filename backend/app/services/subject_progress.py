@@ -9,11 +9,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.catalogs import SubjectCatalog
 from app.services.crew_progress import CrewProgressService
 from app.services.subject_progress_config import (
+    CHALLENGES_PER_PATH_NORM,
     DELTA_PER_CORRECT,
-    REQUIRED_CORRECT_CHALLENGES,
     ROLLING_MODEL,
     SEED_ROLLING,
     THRESHOLD_UP,
+    challenges_per_path_from_pack,
+    clamp_challenges_per_path,
+    delta_per_correct,
+    effective_challenges_per_path,
 )
 
 
@@ -32,10 +36,17 @@ class SubjectProgressService:
         subject_id: str,
         *,
         score: float,
+        challenges_per_path: int | None = None,
     ) -> list[dict[str, Any]]:
         """Registra un intento de reto y devuelve efectos para el turno."""
         subject = str(subject_id or "math").strip() or "math"
         world = str(world_theme or "fantasy")
+        path_n = (
+            clamp_challenges_per_path(challenges_per_path)
+            if challenges_per_path is not None
+            else CHALLENGES_PER_PATH_NORM
+        )
+        delta = delta_per_correct(path_n)
         row = await self._fetch_row(child_id, world, subject)
         level = str(row.get("level_id") or "L1") if row else "L1"
         rolling_before = self._effective_rolling(row)
@@ -50,10 +61,11 @@ class SubjectProgressService:
                     "level_id": level,
                     "rolling_delta": 0.0,
                     "rolling_model": ROLLING_MODEL,
+                    "challenges_per_path": path_n,
                 }
             ]
 
-        rolling = min(THRESHOLD_UP, rolling_before + DELTA_PER_CORRECT)
+        rolling = min(THRESHOLD_UP, rolling_before + delta)
         rolling = round(rolling, 4)
         new_level = level
         source = "path_challenge"
@@ -72,8 +84,9 @@ class SubjectProgressService:
                 "score": score,
                 "accuracy_rolling": round(rolling, 3),
                 "level_id": new_level,
-                "rolling_delta": round(DELTA_PER_CORRECT, 4),
+                "rolling_delta": round(delta, 4),
                 "rolling_model": ROLLING_MODEL,
+                "challenges_per_path": path_n,
             }
         ]
         if new_level != level:
@@ -106,28 +119,47 @@ class SubjectProgressService:
         return effects
 
     @staticmethod
-    def linear_state_after_corrects(
-        n_correct: int, start_level: str = "L1"
+    def linear_state_after_n_sequence(
+        path_ns: list[int],
+        start_level: str = "L1",
     ) -> tuple[str, float, str]:
-        """Reconstruye nivel, rolling y source tras N aciertos conservados."""
-        remaining = max(0, int(n_correct))
+        """Reconstruye rolling aplicando Δ(N) de cada acierto en orden."""
         level_idx = SubjectProgressService._level_index(start_level)
         if level_idx < 1:
             level_idx = 1
         if level_idx > 5:
             level_idx = 5
+        if not path_ns:
+            return f"L{level_idx}", SEED_ROLLING, "placement"
+        rolling = SEED_ROLLING
         leveled = False
-        while remaining >= REQUIRED_CORRECT_CHALLENGES and level_idx < 5:
-            remaining -= REQUIRED_CORRECT_CHALLENGES
-            level_idx += 1
-            leveled = True
-        if remaining == 0:
-            source = "path_level_up" if leveled else "placement"
-            return f"L{level_idx}", SEED_ROLLING, source
-        rolling = round(
-            min(THRESHOLD_UP, SEED_ROLLING + remaining * DELTA_PER_CORRECT), 4
-        )
+        for raw_n in path_ns:
+            n = clamp_challenges_per_path(raw_n)
+            rolling = round(min(THRESHOLD_UP, rolling + delta_per_correct(n)), 4)
+            if rolling >= THRESHOLD_UP and level_idx < 5:
+                level_idx += 1
+                rolling = SEED_ROLLING
+                leveled = True
+        if rolling == SEED_ROLLING and leveled:
+            return f"L{level_idx}", SEED_ROLLING, "path_level_up"
         return f"L{level_idx}", rolling, "path_challenge"
+
+    @staticmethod
+    def linear_state_after_corrects(
+        n_correct: int,
+        start_level: str = "L1",
+        challenges_per_path: int | None = None,
+    ) -> tuple[str, float, str]:
+        """Reconstruye nivel, rolling y source tras N aciertos de un mismo recuento."""
+        path_n = (
+            CHALLENGES_PER_PATH_NORM
+            if challenges_per_path is None
+            else clamp_challenges_per_path(challenges_per_path)
+        )
+        sequence = [path_n] * max(0, int(n_correct))
+        return SubjectProgressService.linear_state_after_n_sequence(
+            sequence, start_level
+        )
 
     @staticmethod
     def count_conserved_corrects(
@@ -164,6 +196,44 @@ class SubjectProgressService:
         return counts
 
     @staticmethod
+    def conserved_correct_path_ns(
+        events: list[dict[str, Any]] | None = None,
+        remaining_turns: list[dict[str, Any]] | None = None,
+        *,
+        fallback_n: int = CHALLENGES_PER_PATH_NORM,
+    ) -> dict[str, list[int]]:
+        """N de camino de cada acierto conservado, en orden, agrupado por materia."""
+        by_subject: dict[str, list[int]] = {}
+        found_progress = False
+        for row in events or []:
+            if row.get("kind") != "path_progress":
+                continue
+            payload = row.get("payload") if isinstance(row.get("payload"), dict) else {}
+            if payload.get("last_ok") is not True:
+                continue
+            found_progress = True
+            path = payload.get("path") if isinstance(payload.get("path"), dict) else {}
+            subject = str(
+                path.get("subject_id") or payload.get("subject_id") or ""
+            ).strip() or "math"
+            path_n = challenges_per_path_from_pack(
+                path, payload, fallback=fallback_n
+            )
+            by_subject.setdefault(subject, []).append(path_n)
+        if found_progress:
+            return by_subject
+        for turn in remaining_turns or []:
+            meta = turn.get("meta") if isinstance(turn.get("meta"), dict) else {}
+            if str(meta.get("phase") or "") != "path_challenge_echo":
+                continue
+            if meta.get("choice_correct") is not True:
+                continue
+            subject = str(meta.get("subject_id") or "").strip() or "math"
+            path_n = challenges_per_path_from_pack(None, meta, fallback=fallback_n)
+            by_subject.setdefault(subject, []).append(path_n)
+        return by_subject
+
+    @staticmethod
     def _placement_subjects(events: list[dict[str, Any]] | None) -> list[str]:
         subjects: list[str] = []
         for row in events or []:
@@ -187,13 +257,14 @@ class SubjectProgressService:
     ) -> None:
         """Reescribe rolling post-placement desde aciertos conservados (rewind V2)."""
         world = str(world_theme or "fantasy")
-        counts = self.count_conserved_corrects(
-            events, remaining_turns=remaining_turns
+        fallback_n = await self._fallback_challenges_per_path(child_id)
+        by_subject = self.conserved_correct_path_ns(
+            events, remaining_turns=remaining_turns, fallback_n=fallback_n
         )
         existing = await self._fetch_all_rows(child_id, world)
         subjects = (
             set(existing)
-            | set(counts)
+            | set(by_subject)
             | set(self._placement_subjects(events))
         )
         if not subjects:
@@ -203,9 +274,9 @@ class SubjectProgressService:
             start_level = "L1"
             if row and str(row.get("source") or "") == "placement":
                 start_level = str(row.get("level_id") or "L1")
-            n_correct = int(counts.get(subject, 0))
-            level_id, rolling, source = self.linear_state_after_corrects(
-                n_correct, start_level
+            path_ns = list(by_subject.get(subject) or [])
+            level_id, rolling, source = self.linear_state_after_n_sequence(
+                path_ns, start_level
             )
             await self._upsert_row(
                 child_id, world, subject, level_id, rolling, source=source
@@ -324,6 +395,33 @@ class SubjectProgressService:
         learning = settings.get("learning") if isinstance(settings, dict) else {}
         active = learning.get("active_subjects") if isinstance(learning, dict) else []
         return [str(s) for s in active] if isinstance(active, list) else []
+
+    async def _fallback_challenges_per_path(self, child_id: str) -> int:
+        result = await self.session.execute(
+            text(
+                "select age_band, age_years, settings from children where id=:id"
+            ),
+            {"id": child_id},
+        )
+        if result is None:
+            return CHALLENGES_PER_PATH_NORM
+        row = result.mappings().first()
+        if not row:
+            return CHALLENGES_PER_PATH_NORM
+        data = dict(row)
+        settings = data.get("settings") if isinstance(data.get("settings"), dict) else {}
+        learning = settings.get("learning") if isinstance(settings, dict) else {}
+        raw = learning.get("challenges_per_path") if isinstance(learning, dict) else None
+        age_years = data.get("age_years")
+        try:
+            years = int(age_years) if age_years is not None else None
+        except (TypeError, ValueError):
+            years = None
+        return effective_challenges_per_path(
+            raw,
+            str(data.get("age_band") or "") or None,
+            years,
+        )
 
     async def _fetch_row(
         self, child_id: str, world: str, subject_id: str
