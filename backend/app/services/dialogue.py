@@ -2220,20 +2220,23 @@ class DialogueService:
 
     @staticmethod
     def _format_path_intro_text(path: dict[str, Any]) -> str:
+        title = str(path.get("title") or "").strip()
         scene = str(path.get("path_narrative") or "").strip()
         lesson = str(path.get("lesson_narrative") or "").strip()
         if scene and lesson:
-            return f"{scene}\n\n{lesson}"
-        if lesson:
-            return lesson
-        if scene:
-            return scene
-        intro = str(path.get("intro") or "").strip()
-        blurb = str(path.get("learning_blurb") or "").strip()
-        parts = [p for p in [intro, blurb] if p]
-        if parts:
-            return "\n\n".join(parts)
-        return str(path.get("title") or "Adelante.")
+            body = f"{scene}\n\n{lesson}"
+        elif lesson:
+            body = lesson
+        elif scene:
+            body = scene
+        else:
+            intro = str(path.get("intro") or "").strip()
+            blurb = str(path.get("learning_blurb") or "").strip()
+            parts = [p for p in [intro, blurb] if p]
+            body = "\n\n".join(parts) if parts else str(path.get("title") or "Adelante.")
+        if title and title.lower() not in body.lower()[: max(len(title) + 8, 40)]:
+            return f"{title}\n\n{body}"
+        return body
 
     @staticmethod
     def _path_intro_start_option() -> dict[str, str]:
@@ -3163,13 +3166,33 @@ class DialogueService:
         pack_meta: dict[str, Any] = {"compose_mode": "full_parallel"}
         if refresh_after_complete:
             parent_id = child.get("parent_id")
+            events = self._ledger_events_for_session(
+                self.ledger,
+                str(parent_id) if parent_id else None,
+                child_id,
+                session_id,
+                world,
+            )
             progress = self._read_path_progress(
                 str(parent_id) if parent_id else None, child_id, session_id, world
             )
-            completed_path_id = str((progress.get("path") or {}).get("path_id") or "")
+            completed_path_id = (
+                DialogueService._latest_completed_path_id(events)
+                or str((progress.get("path") or {}).get("path_id") or "")
+            )
             pack, pack_meta = await self._refresh_path_pack_after_complete(
                 child, session_id, completed_path_id
             )
+            completed_ids = DialogueService._completed_path_ids_from_events(events)
+            if completed_path_id:
+                completed_ids.add(completed_path_id)
+            pack = DialogueService._pack_entries_not_completed(pack, completed_ids)
+            if len(pack) < 3:
+                compose_log.warning(
+                    "path_pack_refresh_short_after_filter",
+                    pack_len=len(pack),
+                    completed_ids=sorted(completed_ids),
+                )
             intro_text = (
                 "¡Camino superado! Siguen dos rutas que dejaste pendientes "
                 "y una nueva pensada para lo que más te conviene practicar ahora. "
@@ -3349,6 +3372,20 @@ class DialogueService:
         weak = PathComposerContextService.weak_subject_ids(composer_context)
         return weak[0] if weak else "math"
 
+    @staticmethod
+    def _pack_entries_not_completed(
+        pack: list[dict[str, Any]], completed_ids: set[str]
+    ) -> list[dict[str, Any]]:
+        """Rutas del pack que el viajero aún no ha superado."""
+        if not completed_ids:
+            return [dict(path) for path in pack]
+        return [
+            dict(path)
+            for path in pack
+            if str(path.get("path_id") or "").strip()
+            and str(path.get("path_id") or "") not in completed_ids
+        ]
+
     async def _refresh_path_pack_after_complete(
         self,
         child: dict[str, Any],
@@ -3361,22 +3398,30 @@ class DialogueService:
         palette_tokens = self._traveler_palette_tokens(child)
         retries = self.settings.ai_compose_batch_retries
         parent_id = child.get("parent_id")
+        events = self._ledger_events_for_session(
+            self.ledger,
+            str(parent_id) if parent_id else None,
+            str(child["id"]),
+            session_id,
+            theme,
+        )
+        completed_ids = DialogueService._completed_path_ids_from_events(events)
+        if completed_path_id:
+            completed_ids.add(completed_path_id)
         pack = self._read_path_pack(
             str(parent_id) if parent_id else None,
             str(child["id"]),
             session_id,
             theme,
         )
-        reused = [
-            dict(path)
-            for path in pack
-            if str(path.get("path_id") or "") != completed_path_id
-        ]
-        if len(reused) != 2 or not completed_path_id:
+        reused = DialogueService._pack_entries_not_completed(pack, completed_ids)
+        need_compose = max(0, 3 - len(reused))
+        if need_compose >= 3 or not pack:
             compose_log.warning(
                 "path_pack_refresh_fallback_full",
                 completed_path_id=completed_path_id or None,
                 reused_count=len(reused),
+                completed_ids=sorted(completed_ids),
             )
             full_pack = await self._compose_path_pack_parallel(
                 child,
@@ -3395,45 +3440,51 @@ class DialogueService:
                 "fallback_slots": [],
             }
 
-        new_subject = DialogueService._pick_refresh_subject(reused, composer_context)
-        new_slot_index = len(reused)
-        new_path = await self._compose_path_slot_with_retry(
-            child,
-            session_id,
-            new_slot_index,
-            new_subject,
-            composer_context,
-            subjects,
-            theme,
-            palette_tokens,
-            retries,
-        )
-        refreshed = reused + [new_path]
+        composed_slots: list[dict[str, Any]] = []
         fallback_slots: list[int] = []
-        if not new_path.get("model_used"):
-            fallback_slots.append(new_slot_index)
-        meta = {
-            "compose_mode": "refresh_after_complete",
-            "reused_path_ids": [str(path.get("path_id") or "") for path in reused],
-            "composed_slots": [
+        refreshed = list(reused)
+        for offset in range(need_compose):
+            new_slot_index = len(refreshed)
+            new_subject = DialogueService._pick_refresh_subject(
+                refreshed, composer_context
+            )
+            new_path = await self._compose_path_slot_with_retry(
+                child,
+                session_id,
+                new_slot_index,
+                new_subject,
+                composer_context,
+                subjects,
+                theme,
+                palette_tokens,
+                retries,
+            )
+            refreshed.append(new_path)
+            composed_slots.append(
                 {
                     "slot_index": new_slot_index,
                     "subject_id": new_subject,
                     "model": new_path.get("model_used"),
                 }
-            ],
+            )
+            if not new_path.get("model_used"):
+                fallback_slots.append(new_slot_index)
+        meta = {
+            "compose_mode": "refresh_after_complete",
+            "reused_path_ids": [str(path.get("path_id") or "") for path in reused],
+            "composed_slots": composed_slots,
             "fallback_slots": fallback_slots,
             "completed_path_id": completed_path_id,
-            "new_subject_id": new_subject,
+            "new_subject_id": composed_slots[-1]["subject_id"] if composed_slots else None,
         }
         compose_log.info(
             "path_pack_refresh",
             compose_mode=meta["compose_mode"],
             reused_path_ids=meta["reused_path_ids"],
-            new_subject_id=new_subject,
+            composed_slots=composed_slots,
             fallback_slots=fallback_slots,
         )
-        return refreshed, meta
+        return refreshed[:3], meta
 
     async def _compose_path_pack_parallel(
         self,
@@ -3981,9 +4032,6 @@ class DialogueService:
         )
         path_id = str(reply.get("option_id") or value or "")
         chosen = next((p for p in pack if p.get("path_id") == path_id), None)
-        if not chosen and pack:
-            chosen = pack[0]
-            path_id = str(chosen.get("path_id"))
         if not chosen:
             return [], [
                 await self._mentor_turn(
@@ -4004,6 +4052,7 @@ class DialogueService:
                     {"phase": "choose_path"},
                 )
             ]
+        path_id = str(chosen.get("path_id"))
         if parent_id:
             try:
                 self.ledger.append_event(

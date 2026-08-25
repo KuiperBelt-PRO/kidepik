@@ -1636,6 +1636,91 @@ async def test_refresh_path_pack_after_complete_reuses_two_paths(dialogue_svc, m
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_refresh_path_pack_skips_earlier_completed_paths(
+    dialogue_svc, mocker, tmp_path
+) -> None:
+    child = sample_child()
+    pack = [
+        {"path_id": "path_a", "subject_id": "language", "title": "A"},
+        {"path_id": "path_b", "subject_id": "reading", "title": "B"},
+        {"path_id": "path_c", "subject_id": "geography", "title": "C"},
+    ]
+    challenges = [{"prompt_text": f"q{i}"} for i in range(3)]
+    events = [
+        {"kind": "path_pack", "payload": {"pack": pack}},
+        {
+            "kind": "path_progress",
+            "payload": {
+                "path_id": "path_a",
+                "challenge_index": 3,
+                "last_ok": True,
+                "path": {"path_id": "path_a", "challenges": challenges},
+            },
+        },
+    ]
+
+    mocker.patch.object(
+        dialogue_svc,
+        "_ledger_events_for_session",
+        return_value=events,
+    )
+    mocker.patch.object(dialogue_svc.ledger, "read_events", return_value=events)
+    compose_mock = mocker.patch.object(
+        dialogue_svc,
+        "_compose_path_slot_with_retry",
+        new=AsyncMock(
+            side_effect=[
+                {
+                    "path_id": "path_d",
+                    "subject_id": "math",
+                    "title": "D",
+                    "model_used": "gemini-test",
+                    "challenges": [{}] * 3,
+                },
+                {
+                    "path_id": "path_e",
+                    "subject_id": "logic",
+                    "title": "E",
+                    "model_used": "gemini-test",
+                    "challenges": [{}] * 3,
+                },
+            ]
+        ),
+    )
+
+    refreshed, meta = await dialogue_svc._refresh_path_pack_after_complete(
+        child, SESSION_ID, "path_c"
+    )
+    assert [p["path_id"] for p in refreshed] == ["path_b", "path_d", "path_e"]
+    assert meta["reused_path_ids"] == ["path_b"]
+    assert compose_mock.await_count == 2
+
+
+@pytest.mark.unit
+def test_pack_entries_not_completed() -> None:
+    pack = [
+        {"path_id": "path_a"},
+        {"path_id": "path_b"},
+        {"path_id": "path_c"},
+    ]
+    filtered = DialogueService._pack_entries_not_completed(pack, {"path_a", "path_c"})
+    assert [p["path_id"] for p in filtered] == ["path_b"]
+
+
+@pytest.mark.unit
+def test_format_path_intro_text_includes_title() -> None:
+    path = {
+        "title": "Análisis del Ecosistema Político Español",
+        "path_narrative": "Escena breve.",
+        "lesson_narrative": "Lección larga con teoría.",
+    }
+    text = DialogueService._format_path_intro_text(path)
+    assert text.startswith("Análisis del Ecosistema Político Español")
+    assert "Lección larga con teoría." in text
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_compose_path_pack_accepts_cliche_title_without_retry(
     dialogue_svc, mocker
 ) -> None:
