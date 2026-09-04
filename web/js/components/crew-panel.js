@@ -72,6 +72,19 @@ function crewTabStorageKey(childId) {
   return `crew-tab:${childId}`;
 }
 
+/**
+ * El marco (`.section-frame__scroll`) es el único scroll de la ficha.
+ * Las pestañas usan `[hidden]` → `display: none`, así que al salir de Viaje
+ * el contenedor se encoge y el navegador recorta `scrollTop`. Guardamos la
+ * posición por pestaña en memoria de la vista y la restauramos al volver.
+ * @param {HTMLElement} root
+ * @returns {HTMLElement | null}
+ */
+function crewDetailScrollEl(root) {
+  const el = root.closest(".section-frame__scroll");
+  return el instanceof HTMLElement ? el : null;
+}
+
 function crewBaggageViewStorageKey(childId) {
   return `crew-baggage-view:${childId}`;
 }
@@ -1139,10 +1152,29 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           : sessionStorage.getItem(crewBaggageViewStorageKey(member.id)) === "used"
             ? "used"
             : "inventory";
+      /** @type {Record<string, number>} */
+      const tabScrollTops = Object.create(null);
+      let tabScrollRestoreGen = 0;
+      /**
+       * @param {number} y
+       */
+      const restoreActiveTabScroll = (y) => {
+        const scrollEl = crewDetailScrollEl(root);
+        if (!scrollEl) return;
+        const gen = ++tabScrollRestoreGen;
+        const apply = () => {
+          if (gen !== tabScrollRestoreGen) return;
+          scrollEl.scrollTop = y;
+        };
+        apply();
+        requestAnimationFrame(apply);
+      };
       /**
        * @param {string} name
        */
       const setTab = (name) => {
+        const scrollEl = crewDetailScrollEl(root);
+        if (scrollEl) tabScrollTops[activeTab] = scrollEl.scrollTop;
         activeTab = name;
         sessionStorage.setItem(crewTabStorageKey(member.id), name);
         root.querySelectorAll("[data-crew-tab]").forEach((btn) => {
@@ -1154,7 +1186,13 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           if (!(panel instanceof HTMLElement)) return;
           panel.hidden = panel.getAttribute("data-crew-panel") !== name;
         });
-        if (name === "baggage") void loadBaggageTab();
+        const y = tabScrollTops[name] ?? 0;
+        restoreActiveTabScroll(y);
+        if (name === "baggage") {
+          void loadBaggageTab().then(() => {
+            if (activeTab === "baggage") restoreActiveTabScroll(tabScrollTops.baggage ?? y);
+          });
+        }
       };
       /**
        * @param {any} bag

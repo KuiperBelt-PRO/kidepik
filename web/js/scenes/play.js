@@ -705,10 +705,31 @@ async function mountPlayPanel(root, ctx) {
     paintPlayBaggage(baggageCache);
   }
 
+  /** @type {Record<'dialogue' | 'baggage', number>} */
+  const playViewScrollTops = { dialogue: 0, baggage: 0 };
+  let playViewScrollRestoreGen = 0;
+
+  /**
+   * @param {number} y
+   */
+  function restorePlayViewScroll(y) {
+    const sc = scrollContainer();
+    if (!(sc instanceof HTMLElement)) return;
+    const gen = ++playViewScrollRestoreGen;
+    const apply = () => {
+      if (gen !== playViewScrollRestoreGen) return;
+      sc.scrollTop = y;
+    };
+    apply();
+    requestAnimationFrame(apply);
+  }
+
   /**
    * @param {'dialogue' | 'baggage'} mode
    */
   async function setPlayViewMode(mode) {
+    const sc = scrollContainer();
+    if (sc instanceof HTMLElement) playViewScrollTops[playViewMode] = sc.scrollTop;
     playViewMode = mode;
     paintToggleIcon();
     if (dialogueView instanceof HTMLElement) dialogueView.hidden = mode !== "dialogue";
@@ -717,10 +738,9 @@ async function mountPlayPanel(root, ctx) {
     if (mode === "baggage") {
       formEl?.setAttribute("hidden", "");
       baggageToggleBtn?.classList.remove("is-badge");
-      const sc = scrollContainer();
-      if (sc instanceof HTMLElement) sc.scrollTop = 0;
       await loadPlayBaggage();
     }
+    restorePlayViewScroll(playViewScrollTops[mode] ?? 0);
   }
 
   mountBaggageToggle();
