@@ -32,6 +32,7 @@ flowchart TB
 | Docker / puerto | SPEC_POC_DOCKER_LOCAL_DEV + compose FastAPI | 03 |
 | Playwright auth local (agentes / E2E UI) | SPEC_DEV_LOCAL_AUTH_PLAYWRIGHT | 13 |
 | Diseño controles tutor | DESIGN.md | 06, 10 |
+| **Lentitud / rendimiento / CPU / scroll pesado** | **SPEC_APP_PERFORMANCE** + plan **PERFORMANCE_OPTIMIZATION_PLAN** | **13**, 06, 09 |
 | Codegraph desfasado | `codegraph index .` en kidepik | README |
 
 ## Precedencia documental

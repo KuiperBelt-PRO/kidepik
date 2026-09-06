@@ -382,22 +382,45 @@ class JourneyLedger:
             path = self.events_path(parent_id, child_id, session_id, world_theme=None)
         if not path.exists():
             return []
+        return self._read_events_file(path, limit=limit, after_seq=after_seq)
+
+    @staticmethod
+    def _parse_event_line(line: str, after_seq: int) -> dict[str, Any] | None:
+        line = line.strip()
+        if not line:
+            return None
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            return None
+        if int(row.get("seq", 0)) <= after_seq:
+            return None
+        return row
+
+    def _read_events_file(
+        self,
+        path: Path,
+        *,
+        limit: int | None,
+        after_seq: int,
+    ) -> list[dict[str, Any]]:
+        from collections import deque
+
+        if limit is not None:
+            buf: deque[dict[str, Any]] = deque(maxlen=limit)
+            with path.open(encoding="utf-8") as handle:
+                for line in handle:
+                    row = self._parse_event_line(line, after_seq)
+                    if row is not None:
+                        buf.append(row)
+            return list(buf)
+
         rows: list[dict[str, Any]] = []
         with path.open(encoding="utf-8") as handle:
             for line in handle:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    row = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if int(row.get("seq", 0)) <= after_seq:
-                    continue
-                rows.append(row)
-        rows.sort(key=lambda r: int(r.get("seq", 0)))
-        if limit is not None:
-            return rows[-limit:]
+                row = self._parse_event_line(line, after_seq)
+                if row is not None:
+                    rows.append(row)
         return rows
 
     def _sessions_dirs(

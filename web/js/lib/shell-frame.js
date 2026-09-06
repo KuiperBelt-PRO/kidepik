@@ -16,6 +16,9 @@ let onWindowResize = null;
 /** @type {HTMLElement | null} */
 let boundShellRoot = null;
 
+/** @type {number} */
+let syncRafId = 0;
+
 /**
  * @param {HTMLElement} shellRoot
  * @param {HTMLElement} app
@@ -47,11 +50,15 @@ export function syncShellFrameNow() {
   syncFrame();
 }
 
-/** Re-sincroniza tras cambios de layout del DOM (rAF doble para post-paint). */
+/** Re-sincroniza tras cambios de layout del DOM (coalescido a un rAF). */
 export function scheduleShellFrameSync() {
-  syncFrame();
-  requestAnimationFrame(syncFrame);
-  requestAnimationFrame(() => requestAnimationFrame(syncFrame));
+  if (!boundShellRoot?.isConnected) return;
+  if (syncRafId) return;
+  syncRafId = requestAnimationFrame(() => {
+    syncRafId = 0;
+    syncFrame();
+    requestAnimationFrame(syncFrame);
+  });
 }
 
 /**
@@ -64,7 +71,7 @@ export function bindShellFrame(shellRoot) {
   scheduleShellFrameSync();
 
   if (typeof ResizeObserver !== "undefined") {
-    resizeObserver = new ResizeObserver(syncFrame);
+    resizeObserver = new ResizeObserver(scheduleShellFrameSync);
     const app = document.getElementById("app");
     if (app) resizeObserver.observe(app);
   }
@@ -77,15 +84,19 @@ export function bindShellFrame(shellRoot) {
     }
   }
 
-  onWindowResize = syncFrame;
+  onWindowResize = scheduleShellFrameSync;
   window.addEventListener("resize", onWindowResize, { passive: true });
   window.addEventListener("orientationchange", onWindowResize, { passive: true });
   if (document.fonts?.ready) {
-    void document.fonts.ready.then(syncFrame);
+    void document.fonts.ready.then(scheduleShellFrameSync);
   }
 }
 
 export function unbindShellFrame() {
+  if (syncRafId) {
+    cancelAnimationFrame(syncRafId);
+    syncRafId = 0;
+  }
   resizeObserver?.disconnect();
   resizeObserver = null;
   mutationObserver?.disconnect();

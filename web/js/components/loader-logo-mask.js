@@ -5,6 +5,9 @@ export const LOADER_LOGO_MASKED_LAYER_SELECTOR =
 /** Margen extra sobre el radio interior para cubrir antialiasing del degradado. */
 export const LOGO_MASK_EDGE_PAD = 4;
 
+/** Debounce de sincronización de máscara (ms). */
+export const LOGO_MASK_SYNC_DEBOUNCE_MS = 100;
+
 /**
  * Fracción del ancho del focal: radio del círculo interior del anillo
  * (borde interior del trazo). Coherente con RING_RADIUS/RING_STROKE en loader-chrome.js.
@@ -36,6 +39,14 @@ export function measureLogoCenterInLayer(layer, focal) {
 }
 
 /**
+ * @param {DOMRect} rect
+ * @returns {string}
+ */
+export function focalRectKey(rect) {
+  return `${Math.round(rect.left)}|${Math.round(rect.top)}|${Math.round(rect.width)}|${Math.round(rect.height)}`;
+}
+
+/**
  * Alinea radio y centro de la máscara con el disco real del anillo/logo.
  * @param {HTMLElement} scene
  * @param {HTMLElement} focal
@@ -61,17 +72,36 @@ export function syncLoaderLogoMask(scene, focal) {
  * @returns {() => void}
  */
 export function mountLoaderLogoMaskSync(scene, focal) {
-  const run = () => syncLoaderLogoMask(scene, focal);
-  run();
+  let lastFocalKey = "";
+  let debounceTimer = 0;
 
-  const ro = new ResizeObserver(run);
+  const runNow = () => {
+    const focalRect = focal.getBoundingClientRect();
+    const key = focalRectKey(focalRect);
+    if (key === lastFocalKey) return;
+    lastFocalKey = key;
+    syncLoaderLogoMask(scene, focal);
+  };
+
+  const schedule = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      debounceTimer = 0;
+      runNow();
+    }, LOGO_MASK_SYNC_DEBOUNCE_MS);
+  };
+
+  runNow();
+
+  const ro = new ResizeObserver(schedule);
   ro.observe(scene);
   ro.observe(focal);
 
-  window.addEventListener("resize", run);
+  window.addEventListener("resize", schedule);
 
   return () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
     ro.disconnect();
-    window.removeEventListener("resize", run);
+    window.removeEventListener("resize", schedule);
   };
 }

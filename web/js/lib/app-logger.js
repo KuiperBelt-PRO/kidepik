@@ -4,7 +4,6 @@
  */
 
 import { getValidSession } from "./supabase.js";
-import { isDebugAiClientActive } from "./debug-ai.js";
 
 /** @type {boolean} */
 let enabled = false;
@@ -17,6 +16,14 @@ let queue = [];
 
 /** @type {ReturnType<typeof setInterval> | null} */
 let flushTimer = null;
+
+/** @type {Record<string, string> | null} */
+let cachedFlushHeaders = null;
+
+/** @type {number} */
+let cachedFlushHeadersUntil = 0;
+
+const FLUSH_AUTH_CACHE_MS = 60_000;
 
 const LEVEL_RANK = {
   debug: 10,
@@ -152,11 +159,7 @@ export async function flush(useBeacon = false) {
   try {
     const { config } = await import("../config.js");
     const url = `${config.apiUrl}/client/logs`;
-    const session = await getValidSession();
-    const headers = { "Content-Type": "application/json" };
-    if (session?.access_token) {
-      headers.Authorization = `Bearer ${session.access_token}`;
-    }
+    const headers = await flushAuthHeaders();
 
     if (useBeacon && typeof navigator.sendBeacon === "function") {
       const blob = new Blob([body], { type: "application/json" });
@@ -175,8 +178,25 @@ export async function flush(useBeacon = false) {
 }
 
 function shouldLog(level) {
-  const min = isDebugAiClientActive() ? "debug" : minLevel;
-  return (LEVEL_RANK[level] ?? 0) >= (LEVEL_RANK[min] ?? 20);
+  return (LEVEL_RANK[level] ?? 0) >= (LEVEL_RANK[minLevel] ?? 20);
+}
+
+/**
+ * @returns {Promise<Record<string, string>>}
+ */
+async function flushAuthHeaders() {
+  const now = Date.now();
+  if (cachedFlushHeaders && now < cachedFlushHeadersUntil) {
+    return cachedFlushHeaders;
+  }
+  const headers = { "Content-Type": "application/json" };
+  const session = await getValidSession();
+  if (session?.access_token) {
+    headers.Authorization = `Bearer ${session.access_token}`;
+  }
+  cachedFlushHeaders = headers;
+  cachedFlushHeadersUntil = now + FLUSH_AUTH_CACHE_MS;
+  return headers;
 }
 
 function normalizeLevel(level) {

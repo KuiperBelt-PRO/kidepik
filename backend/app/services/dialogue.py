@@ -83,6 +83,7 @@ class DialogueService:
         self.settings = get_settings()
         self.ledger = JourneyLedger(self.settings.journey_data_dir)
         self.orchestrator = Orchestrator(settings=self.settings, gateway=self.gateway)
+        self._ledger_events_cache: dict[tuple[str, str, str, str | None], list[dict[str, Any]]] = {}
 
     @staticmethod
     def _world(child: dict[str, Any]) -> str | None:
@@ -448,7 +449,6 @@ class DialogueService:
         parent_id = child.get("parent_id")
         world = self._world(child) or "fantasy"
         events = self._ledger_events_for_session(
-            self.ledger,
             str(parent_id) if parent_id else None,
             child_id,
             session_id,
@@ -469,7 +469,7 @@ class DialogueService:
                         age_band=child.get("age_band") or child.get("effective_age_band"),
                         phase="path_compose",
                     )
-                    self.ledger.append_event(
+                    self._append_ledger_event(
                         str(parent_id),
                         child_id,
                         session_id,
@@ -581,7 +581,7 @@ class DialogueService:
             raise ValueError("path challenge unavailable")
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -656,7 +656,7 @@ class DialogueService:
             raise ValueError("path progress unavailable")
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -1292,7 +1292,7 @@ class DialogueService:
         parent_id = child.get("parent_id")
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -2929,7 +2929,7 @@ class DialogueService:
         score = self._score_placement_item(item or {}, reply)
         if item and parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -2973,7 +2973,7 @@ class DialogueService:
 
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -3054,12 +3054,9 @@ class DialogueService:
     ) -> dict[str, Any] | None:
         if not parent_id:
             return None
-        try:
-            rows = self.ledger.read_events(
-                parent_id, child_id, session_id, world_theme=world
-            )
-        except TypeError:
-            rows = self.ledger.read_events(parent_id, child_id, session_id)
+        rows = self._read_ledger_events(
+            str(parent_id), child_id, session_id, world=world
+        )
         queue: list[dict[str, Any]] | None = None
         index = 0
         for row in rows:
@@ -3131,7 +3128,7 @@ class DialogueService:
         parent_id = child.get("parent_id")
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -3167,7 +3164,6 @@ class DialogueService:
         if refresh_after_complete:
             parent_id = child.get("parent_id")
             events = self._ledger_events_for_session(
-                self.ledger,
                 str(parent_id) if parent_id else None,
                 child_id,
                 session_id,
@@ -3208,7 +3204,7 @@ class DialogueService:
         parent_id = child.get("parent_id")
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -3307,7 +3303,7 @@ class DialogueService:
         parent_id = child.get("parent_id")
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     str(child["id"]),
                     session_id,
@@ -3399,7 +3395,6 @@ class DialogueService:
         retries = self.settings.ai_compose_batch_retries
         parent_id = child.get("parent_id")
         events = self._ledger_events_for_session(
-            self.ledger,
             str(parent_id) if parent_id else None,
             str(child["id"]),
             session_id,
@@ -3913,8 +3908,97 @@ class DialogueService:
         )
 
     @staticmethod
-    def _ledger_events_for_session(
+    def _ledger_events_cache_key(
         ledger: JourneyLedger,
+        parent_id: str | None,
+        child_id: str,
+        session_id: str,
+        world: str | None,
+    ) -> tuple[int, str, str, str, str | None]:
+        return (id(ledger), str(parent_id or ""), child_id, session_id, world)
+
+    def _invalidate_ledger_events_cache(
+        self,
+        parent_id: str | None,
+        child_id: str,
+        session_id: str,
+        world: str | None = None,
+    ) -> None:
+        self._ledger_events_cache.pop(
+            self._ledger_events_cache_key(
+                self.ledger, parent_id, child_id, session_id, world
+            ),
+            None,
+        )
+
+    def _read_ledger_events(
+        self,
+        parent_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        limit: int | None = None,
+        after_seq: int = 0,
+        world: str | None = None,
+    ) -> list[dict[str, Any]]:
+        if limit is None and after_seq == 0:
+            key = self._ledger_events_cache_key(
+                self.ledger, parent_id, child_id, session_id, world
+            )
+            cached = self._ledger_events_cache.get(key)
+            if cached is not None:
+                return cached
+        read_kwargs: dict[str, Any] = {}
+        if limit is not None:
+            read_kwargs["limit"] = limit
+        if after_seq:
+            read_kwargs["after_seq"] = after_seq
+        try:
+            rows = self.ledger.read_events(
+                parent_id,
+                child_id,
+                session_id,
+                world_theme=world,
+                **read_kwargs,
+            )
+        except TypeError:
+            rows = self.ledger.read_events(
+                parent_id,
+                child_id,
+                session_id,
+                **read_kwargs,
+            )
+        if limit is None and after_seq == 0:
+            self._ledger_events_cache[
+                self._ledger_events_cache_key(
+                    self.ledger, parent_id, child_id, session_id, world
+                )
+            ] = rows
+        return rows
+
+    def _append_ledger_event(
+        self,
+        parent_id: str,
+        child_id: str,
+        session_id: str,
+        *,
+        world_theme: str | None = None,
+        **kwargs: Any,
+    ) -> Any:
+        event = self.ledger.append_event(
+            parent_id,
+            child_id,
+            session_id,
+            world_theme=world_theme,
+            **kwargs,
+        )
+        self._invalidate_ledger_events_cache(
+            parent_id, child_id, session_id, world_theme
+        )
+        return event
+
+    def _ledger_events_for_session(
+        self,
         parent_id: str | None,
         child_id: str,
         session_id: str,
@@ -3922,14 +4006,9 @@ class DialogueService:
     ) -> list[dict[str, Any]]:
         if not parent_id:
             return []
-        try:
-            return list(
-                ledger.read_events(
-                    str(parent_id), child_id, session_id, world_theme=world
-                )
-            )
-        except TypeError:
-            return list(ledger.read_events(str(parent_id), child_id, session_id))
+        return list(
+            self._read_ledger_events(str(parent_id), child_id, session_id, world=world)
+        )
 
     @staticmethod
     def _completed_path_ids_from_events(events: list[dict[str, Any]]) -> set[str]:
@@ -3983,12 +4062,9 @@ class DialogueService:
     ) -> list[dict[str, Any]]:
         if not parent_id:
             return []
-        try:
-            rows = self.ledger.read_events(
-                parent_id, child_id, session_id, world_theme=world
-            )
-        except TypeError:
-            rows = self.ledger.read_events(parent_id, child_id, session_id)
+        rows = self._read_ledger_events(
+            str(parent_id), child_id, session_id, world=world
+        )
         for row in reversed(rows):
             if row.get("kind") == "path_pack":
                 return list((row.get("payload") or {}).get("pack") or [])
@@ -4003,12 +4079,9 @@ class DialogueService:
     ) -> dict[str, Any]:
         if not parent_id:
             return {}
-        try:
-            rows = self.ledger.read_events(
-                parent_id, child_id, session_id, world_theme=world
-            )
-        except TypeError:
-            rows = self.ledger.read_events(parent_id, child_id, session_id)
+        rows = self._read_ledger_events(
+            str(parent_id), child_id, session_id, world=world
+        )
         progress: dict[str, Any] = {}
         for row in rows:
             if row.get("kind") == "path_progress":
@@ -4055,7 +4128,7 @@ class DialogueService:
         path_id = str(chosen.get("path_id"))
         if parent_id:
             try:
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -4295,7 +4368,7 @@ class DialogueService:
                     if isinstance(progress.get("helps"), dict)
                     else {}
                 )
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -4445,7 +4518,7 @@ class DialogueService:
                     if isinstance(progress.get("helps"), dict)
                     else {}
                 )
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -4521,7 +4594,7 @@ class DialogueService:
                     if isinstance(progress.get("helps"), dict)
                     else {}
                 )
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -4828,7 +4901,9 @@ class DialogueService:
         if not child or not child.get("parent_id"):
             return
         parent_id = str(child["parent_id"])
-        events = self.ledger.read_events(parent_id, child_id, session_id, limit=40)
+        events = self._read_ledger_events(
+            parent_id, child_id, session_id, limit=40
+        )
         deps = self._deps(dict(child), session_id, "journey_summarizer")
         prompt = (
             "Escribe SessionSummaryEnvelope con resumen markdown de la sesión y structured ligero. "
@@ -4911,12 +4986,9 @@ class DialogueService:
     ) -> list[dict[str, Any]]:
         if not parent_id:
             return []
-        try:
-            return self.ledger.read_events(
-                parent_id, child_id, session_id, world_theme=world
-            )
-        except TypeError:
-            return self.ledger.read_events(parent_id, child_id, session_id)
+        return self._read_ledger_events(
+            str(parent_id), child_id, session_id, world=world
+        )
 
     def _resolve_chapter(
         self,
@@ -4968,7 +5040,7 @@ class DialogueService:
         ):
             return
         try:
-            self.ledger.append_event(
+            self._append_ledger_event(
                 str(parent_id),
                 str(child["id"]),
                 session_id,
@@ -5287,7 +5359,7 @@ class DialogueService:
                 if effect_id == "challenge_retry":
                     row_help["retry"] = True
                 new_helps[str(idx)] = row_help
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,
@@ -5295,7 +5367,7 @@ class DialogueService:
                     payload={**progress, "helps": new_helps},
                     world_theme=world,
                 )
-                self.ledger.append_event(
+                self._append_ledger_event(
                     str(parent_id),
                     child_id,
                     session_id,

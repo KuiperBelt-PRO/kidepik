@@ -93,6 +93,8 @@ class Settings(BaseSettings):
     log_dir: str = Field(default="/var/www/html/logs", alias="LOG_DIR")
     log_level: str = Field(default="info", alias="LOG_LEVEL")
     log_to_files: bool = Field(default=True, alias="LOG_TO_FILES")
+    log_buffer_lines: int = Field(default=32, alias="LOG_BUFFER_LINES")
+    log_flush_ms: int = Field(default=500, alias="LOG_FLUSH_MS")
     log_client_ingest: bool = Field(default=True, alias="LOG_CLIENT_INGEST")
     client_log_level: str = Field(default="info", alias="CLIENT_LOG_LEVEL")
 

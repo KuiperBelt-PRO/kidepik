@@ -8,6 +8,7 @@
 
 ## Producto
 
+- **Rendimiento global (auditoría ago 2026 — aprobación pendiente):** [specify/SPEC_APP_PERFORMANCE.md](specify/SPEC_APP_PERFORMANCE.md) — tiers de runtime del mundo, observers, logging, ledger tail, play DOM; plan [tasks/PERFORMANCE_OPTIMIZATION_PLAN.md](tasks/PERFORMANCE_OPTIMIZATION_PLAN.md).
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
 - **Backend FastAPI (ago 2026 — migración cerrada):** [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) — nginx `:8082`: **toda** `/api/v1/*` → FastAPI; `api/` y `shared/` PHP retirados del repo.
 - **Capas de datos (aprobada ago 2026):** [specify/SPEC_DATA_STORAGE_LAYERS.md](specify/SPEC_DATA_STORAGE_LAYERS.md) — Supabase = producto; archivos = viaje/examen; DuckDB = tools; sin PlacementBank; `traveler.md` sustituye `child_traits`.

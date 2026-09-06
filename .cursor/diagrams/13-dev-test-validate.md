@@ -30,6 +30,7 @@ flowchart TB
 | Electron | `./scripts/poc-web-preview.ps1` |
 | Codegraph | Desde raíz kidepik: `codegraph index .` / `codegraph status .` |
 | Spec tests | [SPEC_DEV_TEST_CI.md](../specify/SPEC_DEV_TEST_CI.md), [SPEC_DEV_FASTAPI_PYTEST.md](../specify/SPEC_DEV_FASTAPI_PYTEST.md) |
+| **Benchmark rendimiento (post SPEC_APP_PERFORMANCE)** | Baseline Fase 0 en [PERFORMANCE_OPTIMIZATION_PLAN.md](../tasks/PERFORMANCE_OPTIMIZATION_PLAN.md); Playwright 390×844 + pytest ledger/logger |
 
 ## Anti-errores
 

@@ -36,6 +36,24 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     app = FastAPI(title="kidepik-api", lifespan=lifespan)
 
+    _http_log_counter = 0
+
+    def _should_log_http_request(path: str, status: int) -> bool:
+        settings = get_settings()
+        if status >= 400:
+            return True
+        if settings.app_env != "local":
+            return True
+        if path in {"/api/v1/health", "/health"}:
+            return False
+        if path.startswith("/api/v1/client/logs"):
+            return False
+        if path.startswith("/api/v1/architecture/config"):
+            return False
+        nonlocal _http_log_counter
+        _http_log_counter += 1
+        return _http_log_counter % 20 == 0
+
     @app.middleware("http")
     async def log_requests(
         request: Request,
@@ -45,15 +63,17 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         duration = timed_ms(start)
         status = response.status_code
-        level = "error" if status >= 500 else ("warning" if status >= 400 else "info")
-        getattr(channel("api"), level)(
-            "http_request",
-            method=request.method,
-            path=request.url.path,
-            status=status,
-            duration_ms=duration,
-            debug_ai_header=request.headers.get("x-kidepik-debug-ai") == "1",
-        )
+        path = request.url.path
+        if _should_log_http_request(path, status):
+            level = "error" if status >= 500 else ("warning" if status >= 400 else "info")
+            getattr(channel("api"), level)(
+                "http_request",
+                method=request.method,
+                path=path,
+                status=status,
+                duration_ms=duration,
+                debug_ai_header=request.headers.get("x-kidepik-debug-ai") == "1",
+            )
         return response
 
     @app.exception_handler(MigrationError)
