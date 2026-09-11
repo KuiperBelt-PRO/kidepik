@@ -35,6 +35,7 @@ Kind = Literal[
     "path_progress",
     "chapter_opened",
     "item_used",
+    "dictation",
 ]
 
 

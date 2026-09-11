@@ -20,6 +20,7 @@ class DialogueEnvelope(BaseModel):
         "options_or_text",
         "continue",
         "blocked",
+        "photo",
     ] = "continue"
     options: list[DialogueOption] = Field(default_factory=list)
     effects: list[dict[str, Any]] = Field(default_factory=list)
@@ -174,3 +175,20 @@ class TravelerProfileEnvelope(BaseModel):
     personality_md: str = ""
     abilities_md: str = ""
     meta: dict[str, Any] = Field(default_factory=dict)
+
+
+class DictationComposeEnvelope(BaseModel):
+    theory_mentor: str
+    canonical_text: str
+    focus_applied: list[str] = Field(default_factory=list)
+    weak_points_used: list[str] = Field(default_factory=list)
+    tts_instruction: str = ""
+    word_count: int = 0
+
+
+class DictationGradeEnvelope(BaseModel):
+    transcription: str = ""
+    confidence: float = 0.0
+    unreadable: bool = False
+    mentor_text: str = ""
+    error_hints: list[dict[str, Any]] = Field(default_factory=list)

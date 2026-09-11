@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.config import get_settings
 
-ALLOWED_CATEGORIES = ("avatars", "audio", "pdf", "illustrations", "poc")
+ALLOWED_CATEGORIES = ("avatars", "audio", "pdf", "illustrations", "poc", "dictations")
 
 
 @dataclass

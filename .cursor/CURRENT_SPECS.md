@@ -8,6 +8,7 @@
 
 ## Producto
 
+- **Modo dictado (implementada 6 sep 2026; UI listen/espera 7 sep):** [specify/SPEC_APP_DICTATION.md](specify/SPEC_APP_DICTATION.md) — 4.ª carta en `choose_path` si el toggle está on; a las N encrucijadas sin elegirla, obligatorio. CTA y espera por mundo; reproductor glass en listen ([DESIGN.md](DESIGN.md) §6b). Toggle en Progreso; TTS cacheado; D7 sin cuota = sin dictado. Pedagogía: [specify/SPEC_APP_DICTATION_PEDAGOGY.md](specify/SPEC_APP_DICTATION_PEDAGOGY.md) (banda × ortografía independiente × ficha × mundo). Audio: [specify/SPEC_AI_GEMINI_TTS.md](specify/SPEC_AI_GEMINI_TTS.md) (voces M/F `es-ES`). Plan [tasks/DICTATION_IMPLEMENTATION_PLAN.md](tasks/DICTATION_IMPLEMENTATION_PLAN.md).
 - **Rendimiento global (auditoría ago 2026 — aprobación pendiente):** [specify/SPEC_APP_PERFORMANCE.md](specify/SPEC_APP_PERFORMANCE.md) — tiers de runtime del mundo, observers, logging, ledger tail, play DOM; plan [tasks/PERFORMANCE_OPTIMIZATION_PLAN.md](tasks/PERFORMANCE_OPTIMIZATION_PLAN.md).
 - Visión y stack: [docs/kidepik.md](../docs/kidepik.md) (documento maestro).
 - **Backend FastAPI (ago 2026 — migración cerrada):** [specify/SPEC_FASTAPI_BACKEND_MIGRATION.md](specify/SPEC_FASTAPI_BACKEND_MIGRATION.md) — nginx `:8082`: **toda** `/api/v1/*` → FastAPI; `api/` y `shared/` PHP retirados del repo.
@@ -20,7 +21,7 @@
 - **Orquestador central (aprobada ago 2026 — cableado en play):** [specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md](specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md) — subagentes desde `.md` + tools.
 - **Glosarios mundo (aprobada — seed + tool):** [specify/SPEC_APP_WORLD_GLOSSARY.md](specify/SPEC_APP_WORLD_GLOSSARY.md) — JSONL + DuckDB `glossary_search`.
 - **Glosario en capas y composición (aprobada ago 2026 — implementada):** [specify/SPEC_APP_GLOSSARY_LAYERED_COMPOSITION.md](specify/SPEC_APP_GLOSSARY_LAYERED_COMPOSITION.md) — ingredientes L1 + referencias L2; `glossary_compose`; flag `GLOSSARY_COMPOSE_ENABLED`.
-- **Frases de espera (JSONL — implementado):** [specify/SPEC_APP_WAITING_PHRASES.md](specify/SPEC_APP_WAITING_PHRASES.md) — `data/waiting/*.jsonl`; rotación 8 s; **no** PG.
+- **Frases de espera (JSONL — implementado):** [specify/SPEC_APP_WAITING_PHRASES.md](specify/SPEC_APP_WAITING_PHRASES.md) — `data/waiting/*.jsonl`; rotación 8 s; fases `dictation_compose` / `dictation_grade` distintas de `path_compose`; **no** PG.
 - **Backlog UI/mecánicas (aprobado — en curso):** [specify/SPEC_APP_PRODUCT_BACKLOG_AGO2026.md](specify/SPEC_APP_PRODUCT_BACKLOG_AGO2026.md) — ficha 3 tabs, PIN, informes, play polish; **sin** Parquet/ETL.
 - Plan: [tasks/PRODUCT_BACKLOG_AGO2026_PLAN.md](tasks/PRODUCT_BACKLOG_AGO2026_PLAN.md)
 - **Mundos en paralelo (aprobada — ledger worlds/ + child_world_progress):** [specify/SPEC_APP_PARALLEL_WORLDS.md](specify/SPEC_APP_PARALLEL_WORLDS.md) — fantasy + sci-fi por viajero.

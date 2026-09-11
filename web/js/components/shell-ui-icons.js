@@ -4,7 +4,7 @@
  */
 
 /** @typedef {'sci-fi' | 'fantasy'} UiIconTheme */
-/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'|'note'|'age'|'pause'|'pending'|'baggage'|'chat'|'currency'|'item-potion'|'item-charm'|'item-scroll'|'item-artifact'|'item-relic'|'item-weapon'|'item-ward'|'item-cloak'|'item-program'|'item-module'|'item-tech'|'item-datapad'|'item-blade'|'item-barrier'|'item-mesh'} UiIconId */
+/** @typedef {'menu'|'theme-to-fantasy'|'theme-to-scifi'|'account'|'home'|'crew'|'settings'|'legal'|'signout'|'chevron'|'save'|'danger'|'add'|'close'|'note'|'age'|'pause'|'play'|'rewind'|'camera'|'gallery'|'send'|'pending'|'baggage'|'chat'|'currency'|'item-potion'|'item-charm'|'item-scroll'|'item-artifact'|'item-relic'|'item-weapon'|'item-ward'|'item-cloak'|'item-program'|'item-module'|'item-tech'|'item-datapad'|'item-blade'|'item-barrier'|'item-mesh'} UiIconId */
 
 export const SHELL_UI_ICON_THEMES = Object.freeze(
   /** @type {UiIconTheme[]} */ (["sci-fi", "fantasy"]),
@@ -29,6 +29,11 @@ export const SHELL_UI_ICON_IDS = Object.freeze(
     "note",
     "age",
     "pause",
+    "play",
+    "rewind",
+    "camera",
+    "gallery",
+    "send",
     "pending",
     "baggage",
     "chat",
@@ -804,6 +809,168 @@ function buildGlyphGroups(theme, id) {
               { x: 68, y: 24 },
               { x: 70, y: 74 },
               { x: 58, y: 76 },
+            ],
+          ];
+
+    case "play":
+      return sci
+        ? [
+            [
+              { x: 34, y: 24 },
+              { x: 78, y: 50 },
+              { x: 34, y: 76 },
+            ],
+          ]
+        : [
+            [
+              { x: 32, y: 22 },
+              { x: 80, y: 48 },
+              { x: 78, y: 54 },
+              { x: 34, y: 78 },
+            ],
+          ];
+
+    case "rewind":
+      return sci
+        ? [
+            [
+              { x: 18, y: 26 },
+              { x: 26, y: 26 },
+              { x: 26, y: 74 },
+              { x: 18, y: 74 },
+            ],
+            [
+              { x: 30, y: 50 },
+              { x: 52, y: 26 },
+              { x: 52, y: 74 },
+            ],
+            [
+              { x: 54, y: 50 },
+              { x: 76, y: 26 },
+              { x: 76, y: 74 },
+            ],
+          ]
+        : [
+            [
+              { x: 16, y: 24 },
+              { x: 26, y: 26 },
+              { x: 24, y: 76 },
+              { x: 14, y: 74 },
+            ],
+            [
+              { x: 28, y: 50 },
+              { x: 52, y: 24 },
+              { x: 50, y: 76 },
+            ],
+            [
+              { x: 54, y: 50 },
+              { x: 78, y: 24 },
+              { x: 76, y: 76 },
+            ],
+          ];
+
+    case "camera":
+      return sci
+        ? [
+            [
+              { x: 22, y: 38 },
+              { x: 38, y: 38 },
+              { x: 42, y: 30 },
+              { x: 58, y: 30 },
+              { x: 62, y: 38 },
+              { x: 78, y: 38 },
+              { x: 78, y: 74 },
+              { x: 22, y: 74 },
+            ],
+            [
+              { x: 50, y: 46 },
+              { x: 62, y: 50 },
+              { x: 62, y: 62 },
+              { x: 50, y: 66 },
+              { x: 38, y: 62 },
+              { x: 38, y: 50 },
+            ],
+          ]
+        : [
+            [
+              { x: 20, y: 40 },
+              { x: 36, y: 38 },
+              { x: 42, y: 28 },
+              { x: 60, y: 28 },
+              { x: 66, y: 38 },
+              { x: 80, y: 40 },
+              { x: 78, y: 76 },
+              { x: 22, y: 74 },
+            ],
+            [
+              { x: 50, y: 46 },
+              { x: 64, y: 52 },
+              { x: 62, y: 64 },
+              { x: 48, y: 68 },
+              { x: 36, y: 62 },
+              { x: 38, y: 50 },
+            ],
+          ];
+
+    case "gallery":
+      return sci
+        ? [
+            [
+              { x: 28, y: 28 },
+              { x: 78, y: 28 },
+              { x: 78, y: 68 },
+              { x: 28, y: 68 },
+            ],
+            [
+              { x: 18, y: 38 },
+              { x: 28, y: 38 },
+              { x: 28, y: 78 },
+              { x: 18, y: 78 },
+            ],
+            [
+              { x: 18, y: 78 },
+              { x: 68, y: 78 },
+              { x: 68, y: 68 },
+              { x: 18, y: 68 },
+            ],
+          ]
+        : [
+            [
+              { x: 30, y: 26 },
+              { x: 80, y: 28 },
+              { x: 78, y: 70 },
+              { x: 28, y: 66 },
+            ],
+            [
+              { x: 16, y: 38 },
+              { x: 30, y: 36 },
+              { x: 28, y: 80 },
+              { x: 16, y: 78 },
+            ],
+            [
+              { x: 16, y: 78 },
+              { x: 66, y: 80 },
+              { x: 68, y: 68 },
+              { x: 18, y: 66 },
+            ],
+          ];
+
+    case "send":
+      return sci
+        ? [
+            [
+              { x: 22, y: 28 },
+              { x: 78, y: 50 },
+              { x: 22, y: 72 },
+              { x: 28, y: 50 },
+            ],
+          ]
+        : [
+            [
+              { x: 20, y: 26 },
+              { x: 80, y: 48 },
+              { x: 24, y: 74 },
+              { x: 30, y: 50 },
             ],
           ];
 

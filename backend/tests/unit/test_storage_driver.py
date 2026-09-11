@@ -46,6 +46,8 @@ def test_local_filesystem_prepare_upload(tmp_path, monkeypatch) -> None:
     driver = LocalFilesystemDriver()
     plan = driver.prepare_upload("user-1", "avatar.png", "avatars")
     assert plan.public_url.startswith("/media/avatars/")
+    dictation = driver.prepare_upload("user-1", "paper.jpg", "dictations")
+    assert dictation.public_url.startswith("/media/dictations/")
     assert plan.token
     get_settings.cache_clear()
 

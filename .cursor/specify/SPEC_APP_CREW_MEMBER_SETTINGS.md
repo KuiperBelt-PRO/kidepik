@@ -62,6 +62,7 @@ Contrato [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md) §3:
 | Descripción personaje / tutor | Detalles → Perfil |
 | Progreso L*, rango, barras | Progreso |
 | Materias activas | Progreso |
+| Dictados (toggle, foco) | Progreso — [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md) |
 | Diario del viaje | Viaje → Diario |
 | CTA «Entrar en la aventura» | Viaje → Mapa viaje |
 

@@ -14,6 +14,7 @@ from app.security.exit_pin import hash_exit_pin, verify_exit_pin
 from app.services.parents import ParentAccountService
 from app.services.settings import ParentSettingsRepository
 from app.services.subject_progress_config import normalize_challenges_per_path_patch
+from app.services.dictation_settings import normalize_dictation_patch
 from app.services.traveler_profile import TravelerProfileService
 from app.text_utils import CharacterSummaryBuilder
 
@@ -168,6 +169,35 @@ class CrewService:
             if "challenges_per_path" in incoming:
                 learning["challenges_per_path"] = normalize_challenges_per_path_patch(
                     incoming["challenges_per_path"]
+                )
+            if "dictation" in incoming:
+                if not isinstance(incoming["dictation"], dict):
+                    raise ValueError("learning.dictation invalid")
+                completed = 0
+                try:
+                    from app.ai.journey.ledger import JourneyLedger
+                    from app.config import get_settings
+                    from app.services.dictation_trigger import count_path_completions
+
+                    parent_id = await self._parent_id(auth_user_id)
+                    world = str(detail.get("world_theme") or "fantasy")
+                    completed = count_path_completions(
+                        JourneyLedger(get_settings().journey_data_dir),
+                        parent_id,
+                        child_id,
+                        world,
+                    )
+                except Exception:
+                    completed = 0
+                existing = (
+                    learning.get("dictation")
+                    if isinstance(learning.get("dictation"), dict)
+                    else None
+                )
+                learning["dictation"] = normalize_dictation_patch(
+                    incoming["dictation"],
+                    existing=existing,
+                    completed_path_count=completed,
                 )
             settings["learning"] = learning
         if "tutor_label" in payload or "learning" in payload: fields.append("settings = CAST(:settings AS jsonb)"); params["settings"] = settings

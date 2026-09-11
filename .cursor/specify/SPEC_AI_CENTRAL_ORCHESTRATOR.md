@@ -55,6 +55,8 @@ backend/agents/          # defs .md (o backend/app/ai/agents/defs/)
   character_coach.md
   placement_composer.md
   path_composer.md
+  dictation_composer.md   # propuesta SPEC_APP_DICTATION
+  dictation_grader.md
   challenge_writer.md
   journey_summarizer.md
   tutor_report.md

@@ -72,10 +72,11 @@ Definidos en `web/css/components/glass-controls.css`:
 
 ### 4. Slider de duración (`glass-slider`)
 
-- Rango **5–120 minutos**, step **5**.
+- Rango **5–120 minutos**, step **5** (sesión del viajero).
 - Track: línea blanca semitransparente; thumb: círculo blanco glass.
 - Label vivo al lado: `10 min` / `1 h 15 min` / `2 h`.
 - Mismo foco blanco.
+- El seek de locución en dictado **reutiliza** `.glass-slider__range` (no el rango 5–120 min). Ver §6b.
 
 ### 5. Select / dropdown (`glass-select`)
 
@@ -133,10 +134,23 @@ Tras cerrar: **400 ms** sin reabrir el trigger (evita “ghost click” del popo
 
 ### 6. Botón (`glass-btn`)
 
-- Siempre **icono + texto**.
+- Siempre **icono + texto**, salvo la excepción del reproductor de dictado (§6b).
 - Icono: `renderShellUiIconSvgInner` (`shell-ui-icons.js`); se **regenera** al cambiar `uiTheme` sci-fi ↔ fantasy.
 - Variantes: default / primary (fondo un poco más opaco) / ghost (link).
 - Peligro (eliminar): **misma** cromática glass que el resto; icono `danger` en **coral** (`#FF6B63`), igual que Cuenta. El color va en el **glyph**, no en el borde/fondo del botón.
+
+### 6b. Reproductor de dictado en play (`play-dictation`)
+
+Controles compactos en `#/play` fase `dictation_listen`, **dentro de la misma burbuja** del mentor (un cajetín: instrucción + transporte + captura). Misma cromática glass; **sin** acentos de color.
+
+| Pieza | Clase | Regla |
+| --- | --- | --- |
+| Play / pausa, volver al inicio, cámara, galería | `.play-dictation__icon-btn` | Círculo **48×48** (`--glass-touch`), **solo icono** + `aria-label`. Excepción a «siempre icono+texto». |
+| Rewind | `rewind` | Pausa + `currentTime = 0` (no −5 s). |
+| Timeline | `.play-dictation__seek` + `.glass-slider__range` | Track/thumb glass; clocks `0:12` / `−0:18` (tabular-nums). |
+| Enviar foto | `.play-dictation__send` + `setGlassButton(..., "send", …)` | **Icono + texto**. |
+
+Anti-patrones: pila de botones solo-texto (`Escuchar` / `Oír otra vez` / `Hacer foto`…); player nativo `<audio controls>`; controles sueltos fuera de la burbuja; verde/azul de sistema en el seek.
 
 ### 7. Toggle / switch (reserva)
 
@@ -218,7 +232,7 @@ Los botones «Volver» locales en paneles (`crew-panel__link`) se sustituyen por
 | Pantalla | Controles glass |
 | --- | --- |
 | **Tripulación** (detalle) | `mountGlassSelect` estado Activo/En pausa · `mountDurationSlider` 5–120 min · `mountAgeStepper` · chips texto aventuras · chips sesiones/día · botones icono+texto (`crew`, `save`, `close`, `danger`) · **pestañas** `.crew-panel__tabs` · **progreso** anillo glass + acordeón rangos · **equipaje** secciones monedas/hallazgos · **Diario del viaje** (timeline L1 + summary L2, tokens glass) |
-| **Aventura** `#/play/:childId` | Mismo **loader-chrome + section-frame** que Tripulación; log en burbujas glass; scroll del **marco** (`section-frame__scroll` + fade), sin scroll anidado en el log; pie fijo con compose. |
+| **Aventura** `#/play/:childId` | Mismo **loader-chrome + section-frame** que Tripulación; log en burbujas glass; scroll del **marco** (`section-frame__scroll` + fade), sin scroll anidado en el log; pie fijo con compose; **dictado** §6b (transporte + captura). |
 | **Ajustes** | `mountDurationSlider` · chips tema UI / texto · botones `save` / `close` |
 | **Cuenta** | Fields · checkboxes · botones (`signout`, etc.) · modales glass (`showGlassConfirm`) |
 | **Modales** | `showGlassAlert` · `showGlassConfirm` — glass, scroll+fade, alturas `sm`/`md`/`lg`/`auto` |
@@ -262,6 +276,10 @@ El HUD infantil full-bleed futuro, si existe, será una **spec aparte**; hasta e
 | Cerrar sesión | `signout` |
 | Ajustes | `settings` |
 | Cuenta | `account` |
+| Reproducir / pausar | `play` / `pause` |
+| Rebobinar locución | `rewind` |
+| Cámara / galería | `camera` / `gallery` |
+| Enviar | `send` |
 
 Nuevos ids se añaden en `shell-ui-icons.js` con variantes sci-fi y fantasy.
 

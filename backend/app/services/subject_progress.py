@@ -37,6 +37,8 @@ class SubjectProgressService:
         *,
         score: float,
         challenges_per_path: int | None = None,
+        delta_scale: float = 1.0,
+        source_override: str | None = None,
     ) -> list[dict[str, Any]]:
         """Registra un intento de reto y devuelve efectos para el turno."""
         subject = str(subject_id or "math").strip() or "math"
@@ -46,7 +48,7 @@ class SubjectProgressService:
             if challenges_per_path is not None
             else CHALLENGES_PER_PATH_NORM
         )
-        delta = delta_per_correct(path_n)
+        delta = delta_per_correct(path_n) * float(delta_scale)
         row = await self._fetch_row(child_id, world, subject)
         level = str(row.get("level_id") or "L1") if row else "L1"
         rolling_before = self._effective_rolling(row)
@@ -68,7 +70,7 @@ class SubjectProgressService:
         rolling = min(THRESHOLD_UP, rolling_before + delta)
         rolling = round(rolling, 4)
         new_level = level
-        source = "path_challenge"
+        source = source_override or "path_challenge"
         if rolling >= THRESHOLD_UP and self._level_index(level) < 5:
             new_level = f"L{self._level_index(level) + 1}"
             rolling = SEED_ROLLING
@@ -117,6 +119,25 @@ class SubjectProgressService:
                     )
                     effects.append({"type": "grant_rank", "rank_id": rank_id})
         return effects
+
+    async def record_dictation_pass(
+        self,
+        child_id: str,
+        world_theme: str,
+        subject_id: str = "language",
+        *,
+        challenges_per_path: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Δ rolling = ½ de un acierto de camino (D13). No cuenta como camino."""
+        return await self.record_path_challenge(
+            child_id,
+            world_theme,
+            subject_id,
+            score=1.0,
+            challenges_per_path=challenges_per_path,
+            delta_scale=0.5,
+            source_override="dictation",
+        )
 
     @staticmethod
     def linear_state_after_n_sequence(

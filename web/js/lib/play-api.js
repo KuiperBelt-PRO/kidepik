@@ -365,3 +365,43 @@ export async function fetchPlayProgress(_session, childId) {
     return { ok: false };
   }
 }
+
+/**
+ * Sube una foto de dictado (prepare-upload + upload).
+ * @param {import('@supabase/supabase-js').Session} _session
+ * @param {File} file
+ * @returns {Promise<{ ok: boolean, public_url?: string, error?: string }>}
+ */
+export async function uploadDictationPhoto(_session, file) {
+  try {
+    const session = await requirePlaySession();
+    if (!session) return { ok: false, error: "session_expired" };
+    const { config } = await import("../config.js");
+    const prepare = await fetch(`${config.apiUrl}/storage/prepare-upload`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ filename: file.name || "dictation.jpg", category: "dictations" }),
+    });
+    if (!prepare.ok) return { ok: false, error: "prepare" };
+    const plan = await prepare.json();
+    const token = plan.token || plan.upload?.fields?.token;
+    if (!token) return { ok: false, error: "token" };
+    const body = new FormData();
+    body.append("token", token);
+    body.append("file", file);
+    const up = await fetch(`${config.apiUrl}/storage/upload`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body,
+    });
+    if (!up.ok) return { ok: false, error: "upload" };
+    const data = await up.json();
+    return { ok: true, public_url: data.public_url };
+  } catch (err) {
+    console.warn("dictation photo upload error", err);
+    return { ok: false, error: "upload" };
+  }
+}

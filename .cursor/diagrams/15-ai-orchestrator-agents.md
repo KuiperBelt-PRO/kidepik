@@ -1,6 +1,6 @@
 # 15 — Orquestador y agentes de play
 
-**Specs:** [SPEC_AI_CENTRAL_ORCHESTRATOR.md](../specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md), [SPEC_AI_PYDANTIC_AGENTS.md](../specify/SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS.md](../specify/SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_GEMINI_GATEWAY.md](../specify/SPEC_AI_GEMINI_GATEWAY.md), [SPEC_APP_WORLD_GLOSSARY.md](../specify/SPEC_APP_WORLD_GLOSSARY.md)
+**Specs:** [SPEC_AI_CENTRAL_ORCHESTRATOR.md](../specify/SPEC_AI_CENTRAL_ORCHESTRATOR.md), [SPEC_AI_PYDANTIC_AGENTS.md](../specify/SPEC_AI_PYDANTIC_AGENTS.md), [SPEC_AI_AGENT_SKILLS.md](../specify/SPEC_AI_AGENT_SKILLS.md), [SPEC_AI_GEMINI_GATEWAY.md](../specify/SPEC_AI_GEMINI_GATEWAY.md), [SPEC_APP_WORLD_GLOSSARY.md](../specify/SPEC_APP_WORLD_GLOSSARY.md), [SPEC_APP_DICTATION.md](../specify/SPEC_APP_DICTATION.md) *(propuesta)*, [SPEC_AI_GEMINI_TTS.md](../specify/SPEC_AI_GEMINI_TTS.md)
 
 > Mapa del **runtime de IA de producto** (no confundir con [14](14-cursor-doc-routing.md), que orienta al agente de Cursor).
 
@@ -50,6 +50,11 @@ flowchart LR
     RETO[reto / escena] --> CW[challenge_writer]
     RETO --> NPC[npc_scenes opcional]
   end
+  subgraph Dictation
+    DT[teoría / listen / foto] --> DC[dictation_composer]
+    DT --> TTS[dictation_tts]
+    DT --> DG[dictation_grader visión]
+  end
   subgraph Memory
     FIN[cierre sesión/camino] --> JS[journey_summarizer lite]
     FIN --> TR[tutor_report]
@@ -57,6 +62,7 @@ flowchart LR
   Orch2[Orchestrator] --- FirstRun
   Orch2 --- Placement
   Orch2 --- Adventure
+  Orch2 --- Dictation
   Orch2 --- Memory
 ```
 
@@ -75,6 +81,8 @@ flowchart TD
   Score -- NO --> TScore[placement_text_scorer]
   Step -->|path compose| Paths[path_composer × materias flojas]
   Step -->|reto en curso| Chal[challenge_writer / mentor_guide breve]
+  Step -->|dictation compose| DicC[dictation_composer + TTS]
+  Step -->|dictation foto| DicG[dictation_grader]
   Step -->|cierre| Sum[journey_summarizer + tutor_report]
   Step -->|diálogo libre mentor| Mentor
   Host --> Out[Validar envelope]
@@ -85,6 +93,8 @@ flowchart TD
   TScore --> Out
   Paths --> Out
   Chal --> Out
+  DicC --> Out
+  DicG --> Out
   Sum --> Out
   Out --> Persist[Append ledger + PG si flags]
   Persist --> Err{¿Cuota/modelo OK?}
@@ -103,7 +113,9 @@ flowchart TD
 | path_composer | challenge-design, zone-pitches, world-canon, glossary tool | quality |
 | challenge_writer | challenge-design, npc-scenes, evaluation-rubric | quality |
 | journey_summarizer | journey-summary | lite |
-| tutor_report | journey-summary, evaluation-rubric | lite |
+| dictation_composer | dictation-orthography, audience-language, safety-tone, mentor-voice | lite |
+| dictation_grader | dictation-orthography, evaluation-rubric, audience-language | lite + imagen |
+| dictation_tts | — (gateway TTS) | Gemini Flash TTS |
 
 ## Anti-errores
 

@@ -48,6 +48,7 @@ import {
   MAX_CHALLENGES_PER_PATH,
   MIN_CHALLENGES_PER_PATH,
   SUBJECT_CATALOG,
+  formatLevelLabel,
 } from "../lib/subject-catalog.js?v=259";
 import {
   buildCrewListCardInner,
@@ -64,6 +65,20 @@ import {
 /** Altura mínima ~2 líneas; máxima ~4 líneas; scroll nativo sin fade. */
 const CHARACTER_SUMMARY_MIN_HEIGHT_PX = 72;
 const CHARACTER_SUMMARY_MAX_HEIGHT_PX = 104;
+
+const DICTATION_FOCUS_TAGS = [
+  ["accentuation", "Acentuación / tildes"],
+  ["b_v", "b / v"],
+  ["g_j", "g / j"],
+  ["h_muda", "h muda"],
+  ["c_z_s", "c / z / s"],
+  ["ll_y", "ll / y"],
+  ["r_rr", "r / rr"],
+  ["mayusculas", "Mayúsculas"],
+  ["puntuacion", "Puntuación"],
+  ["palabras_dificiles", "Palabras difíciles"],
+];
+
 
 /**
  * @param {string} childId
@@ -456,7 +471,7 @@ function mountChallengesPerPathStepper(root, opts) {
     },
   });
 
-  const persist = async (n) => {
+    const persist = async (n) => {
     const res = await patchCrewMember(opts.session, opts.childId, {
       learning: { challenges_per_path: n },
     });
@@ -485,6 +500,138 @@ function mountChallengesPerPathStepper(root, opts) {
     if (saveTimer) clearTimeout(saveTimer);
     stepper.destroy();
   };
+}
+
+function dictationFromMember(member) {
+  const raw = member?.settings?.learning?.dictation;
+  return raw && typeof raw === "object" ? raw : {};
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {{
+ *   session: import('@supabase/supabase-js').Session;
+ *   childId: string;
+ *   member: any;
+ * }} opts
+ */
+function mountDictationSettings(root, opts) {
+  const block = root.querySelector("[data-dictation-block]");
+  if (!(block instanceof HTMLElement)) return () => {};
+
+  const enabledEl = block.querySelector("[data-dictation-enabled]");
+  const everyHost = block.querySelector("[data-dictation-every-n-host]");
+  const chipsHost = block.querySelector("[data-dictation-chips]");
+  const noteEl = block.querySelector("[data-dictation-note]");
+  const orthoEl = block.querySelector("[data-dictation-ortho]");
+
+  let current = dictationFromMember(opts.member);
+  let enabled = current.enabled === true;
+  let everyN = typeof current.every_n === "number" ? current.every_n : 3;
+  everyN = Math.max(3, Math.min(10, everyN));
+  /** @type {Set<string>} */
+  let tags = new Set(Array.isArray(current.focus_tags) ? current.focus_tags.map(String) : []);
+  let note = String(current.focus_note || "");
+  let saveTimer = 0;
+  let noteTimer = 0;
+
+  const persistDictation = async (patch) => {
+    const res = await patchCrewMember(opts.session, opts.childId, {
+      learning: { dictation: patch },
+    });
+    if (res.ok) {
+      applyMemberLearningPatch(opts.member, res.member);
+      current = dictationFromMember(opts.member);
+      const { showGlassToast } = await import("./glass-toast.js");
+      showGlassToast("Guardado", { variant: "success", durationMs: 1800 });
+      return true;
+    }
+    const { showGlassToast } = await import("./glass-toast.js");
+    showGlassToast("No hemos podido guardar los dictados.", { variant: "error" });
+    return false;
+  };
+
+  if (enabledEl instanceof HTMLInputElement) {
+    enabledEl.checked = enabled;
+    enabledEl.addEventListener("change", () => {
+      enabled = enabledEl.checked;
+      void persistDictation({ enabled });
+    });
+  }
+
+  if (orthoEl instanceof HTMLElement) {
+    const level = String(current.orthography_level_id || "L1");
+    orthoEl.textContent = `Nivel de ortografía (independiente de Lengua): ${formatLevelLabel(level)}.`;
+  }
+
+  const dictationStepper =
+    everyHost instanceof HTMLElement
+      ? mountAgeStepper(everyHost, {
+          value: everyN,
+          min: 3,
+          max: 10,
+          decLabel: "Menos encrucijadas antes de que el dictado sea obligatorio",
+          incLabel: "Más encrucijadas antes de que el dictado sea obligatorio",
+          onChange(value) {
+            if (value == null || value === everyN) return;
+            everyN = value;
+            if (saveTimer) clearTimeout(saveTimer);
+            saveTimer = window.setTimeout(() => {
+              saveTimer = 0;
+              void persistDictation({ every_n: everyN });
+            }, 280);
+          },
+        })
+      : null;
+
+  if (chipsHost instanceof HTMLElement) {
+    chipsHost.querySelectorAll("[data-dictation-tag]").forEach((btn) => {
+      if (!(btn instanceof HTMLButtonElement)) return;
+      btn.addEventListener("click", () => {
+        const tag = btn.getAttribute("data-dictation-tag");
+        if (!tag) return;
+        if (tags.has(tag)) tags.delete(tag);
+        else if (tags.size < 6) tags.add(tag);
+        else {
+          void import("./glass-toast.js").then(({ showGlassToast }) => {
+            showGlassToast("Como mucho 6 focos.", { variant: "error", durationMs: 1800 });
+          });
+          return;
+        }
+        btn.setAttribute("aria-pressed", String(tags.has(tag)));
+        void persistDictation({ focus_tags: [...tags] });
+      });
+    });
+  }
+
+  if (noteEl instanceof HTMLTextAreaElement) {
+    noteEl.value = note;
+    noteEl.addEventListener("input", () => {
+      note = noteEl.value;
+      if (noteTimer) clearTimeout(noteTimer);
+      noteTimer = window.setTimeout(() => {
+        noteTimer = 0;
+        void persistDictation({ focus_note: note.slice(0, 400) });
+      }, 400);
+    });
+  }
+
+  return () => {
+    if (saveTimer) clearTimeout(saveTimer);
+    if (noteTimer) clearTimeout(noteTimer);
+    dictationStepper?.destroy();
+  };
+}
+
+function dictationChipsHtml(member) {
+  const current = dictationFromMember(member);
+  const selected = new Set(
+    Array.isArray(current.focus_tags) ? current.focus_tags.map(String) : [],
+  );
+  return DICTATION_FOCUS_TAGS.map(
+    ([id, label]) =>
+      `<button type="button" class="crew-panel__chip" data-dictation-tag="${escapeHtml(id)}" aria-pressed="${selected.has(id)}">${escapeHtml(label)}</button>`,
+  ).join("");
 }
 
 function mountSubjectNoteDisclosures(host) {
@@ -1041,6 +1188,41 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
           <p class="crew-panel__helper" data-challenges-per-path-helper></p>
         </div>`
         }
+        ${
+          !isTutor && !isSelf
+            ? `<div class="crew-panel__dictation" data-dictation-block>
+          <p class="crew-panel__label">Dictados</p>
+          <div class="crew-panel__dictation-toggle">
+            <span class="crew-panel__dictation-toggle-label">Pedir dictados en papel</span>
+            <label class="glass-switch">
+              <input type="checkbox" role="switch" data-dictation-enabled aria-label="Activar dictados" />
+              <span class="glass-switch__track" aria-hidden="true"><span class="glass-switch__knob"></span></span>
+            </label>
+          </div>
+          <p class="crew-panel__helper">Si está activo, en cada encrucijada hay una 4.ª carta de dictado. Si el explorador no la elige N veces, el dictado pasa a ser obligatorio y solo se muestra esa carta.</p>
+          <p class="crew-panel__helper" data-dictation-ortho></p>
+          <div class="crew-panel__dictation-every-n" data-dictation-every-n>
+            <p class="crew-panel__label">Obligatorio si no lo elige en N encrucijadas</p>
+            <div data-dictation-every-n-host></div>
+          </div>
+          <p class="crew-panel__label">Foco de práctica</p>
+          <div class="crew-panel__segment" data-dictation-chips>
+            ${dictationChipsHtml(member)}
+          </div>
+          <label class="crew-panel__label">Nota de foco
+            <textarea
+              class="crew-panel__input"
+              data-dictation-note
+              rows="2"
+              maxlength="400"
+              placeholder="Reglas o palabras que quieres practicar"
+              spellcheck="false"
+              aria-label="Nota de foco del dictado"
+            ></textarea>
+          </label>
+        </div>`
+            : ""
+        }
         <label class="crew-panel__label">Información adicional (general)
           <textarea
             class="crew-panel__input"
@@ -1329,6 +1511,13 @@ export function mountCrewDetailPanel(container, { session, childId, onTitleChang
       if (!isSelf) {
         cleanups.push(
           mountChallengesPerPathStepper(root, {
+            session,
+            childId,
+            member,
+          }),
+        );
+        cleanups.push(
+          mountDictationSettings(root, {
             session,
             childId,
             member,

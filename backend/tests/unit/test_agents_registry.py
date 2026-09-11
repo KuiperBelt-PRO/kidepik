@@ -11,6 +11,8 @@ def test_known_purposes_include_mentor() -> None:
     purposes = known_purposes()
     assert "mentor_guide" in purposes
     assert "onboarding_host" in purposes
+    assert "dictation_composer" in purposes
+    assert "dictation_grader" in purposes
 
 
 @pytest.mark.unit

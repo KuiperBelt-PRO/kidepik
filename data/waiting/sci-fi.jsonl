@@ -5,3 +5,13 @@
 {"id":"wait_scifi_challenge_01","world_theme":"sci-fi","age_band":null,"phase":"challenge_compose","locale":"es","body":"Calibrando el desafío orbital…","weight":1,"active":true}
 {"id":"wait_scifi_generic_01","world_theme":"sci-fi","age_band":null,"phase":"generic","locale":"es","body":"Procesando el siguiente salto de la misión.","weight":1,"active":true}
 {"id":"wait_scifi_generic_02","world_theme":"sci-fi","age_band":null,"phase":"generic","locale":"es","body":"La consola parpadea en espera…","weight":1,"active":true}
+{"id":"wait_scifi_dictation_01","world_theme":"sci-fi","age_band":null,"phase":"dictation_compose","locale":"es","body":"Ajustando la baliza de transcripción…","weight":2,"active":true}
+{"id":"wait_scifi_dictation_02","world_theme":"sci-fi","age_band":null,"phase":"dictation_compose","locale":"es","body":"El parte de radio se cifra para el dictado…","weight":1,"active":true}
+{"id":"wait_scifi_dictation_03","world_theme":"sci-fi","age_band":null,"phase":"dictation_compose","locale":"es","body":"Calibrando el canal de voz de la consola…","weight":2,"active":true}
+{"id":"wait_scifi_dictation_04","world_theme":"sci-fi","age_band":null,"phase":"dictation_compose","locale":"es","body":"Sincronizando el recado interestelar…","weight":1,"active":true}
+{"id":"wait_scifi_dictation_05","world_theme":"sci-fi","age_band":null,"phase":"dictation_compose","locale":"es","body":"La bitácora espera sintonía…","weight":1,"active":true}
+{"id":"wait_scifi_dictation_06","world_theme":"sci-fi","age_band":null,"phase":"dictation_compose","locale":"es","body":"El puente prepara el mensaje a copiar…","weight":1,"active":true}
+{"id":"wait_scifi_dictation_grade_01","world_theme":"sci-fi","age_band":null,"phase":"dictation_grade","locale":"es","body":"Analizando la captura del recado…","weight":2,"active":true}
+{"id":"wait_scifi_dictation_grade_02","world_theme":"sci-fi","age_band":null,"phase":"dictation_grade","locale":"es","body":"El visor compara tu letra con el parte…","weight":1,"active":true}
+{"id":"wait_scifi_dictation_grade_03","world_theme":"sci-fi","age_band":null,"phase":"dictation_grade","locale":"es","body":"Procesando la foto de la bitácora…","weight":1,"active":true}
+{"id":"wait_scifi_dictation_grade_04","world_theme":"sci-fi","age_band":null,"phase":"dictation_grade","locale":"es","body":"La consola revisa la transcripción manuscrita…","weight":1,"active":true}

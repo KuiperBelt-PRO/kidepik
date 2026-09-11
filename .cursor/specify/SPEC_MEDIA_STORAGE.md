@@ -23,7 +23,8 @@ Los ficheros de media viven en el **filesystem del servidor web** (DreamHost: es
 web/
   media/                      # NO versionar ficheros subidos; sí .gitkeep por subcarpeta
     avatars/
-    audio/
+    audio/                    # TTS generado (servidor) + uploads
+    dictations/               # fotos manuscritas (TTL 7 días) — SPEC_APP_DICTATION
     pdf/
     illustrations/
     poc/                      # Uploads de prueba POC
@@ -62,7 +63,7 @@ PHP **no** reenvía bytes en lectura.
 **Auth:** Bearer Supabase.
 
 **Body:** `{ "filename": "foto.jpg", "category": "avatars" }`  
-`category`: `avatars` | `audio` | `pdf` | `illustrations` | `poc`.
+`category`: `avatars` | `audio` | `pdf` | `illustrations` | `poc` | `dictations` *(propuesta: fotos de dictado — [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md))*.
 
 **Respuesta 200:**
 

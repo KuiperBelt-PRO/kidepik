@@ -3,6 +3,8 @@
  * @module play-thinking-kind
  */
 
+/** @typedef {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'dictation_compose' | 'dictation_grade' | 'general'} PlayThinkingKind */
+
 /**
  * @param {string} phase
  * @param {Record<string, unknown> | undefined | null} [meta]
@@ -28,7 +30,7 @@ export function triggersPathPackCompose(phase, meta = {}) {
 /**
  * @param {string} phase
  * @param {Record<string, unknown> | undefined | null} [meta]
- * @returns {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'}
+ * @returns {PlayThinkingKind}
  */
 export function resolveRewindThinkingKindForPhase(phase, meta = {}) {
   if (phase === "placement_item" || phase === "placement_feedback") {
@@ -37,6 +39,9 @@ export function resolveRewindThinkingKindForPhase(phase, meta = {}) {
   }
   if (phase === "handoff_placement" || phase === "placement_compose") {
     return "preparing_exam";
+  }
+  if (phase === "dictation_theory" || phase === "dictation_listen" || phase === "dictation_result") {
+    return "dictation_compose";
   }
   if (
     triggersPathPackCompose(phase, meta) ||
@@ -56,7 +61,7 @@ export function resolveRewindThinkingKindForPhase(phase, meta = {}) {
  * @param {Record<string, unknown> | undefined | null} [meta]
  * @param {{ kind?: string, option_id?: string }} [reply]
  * @param {string} [onboardingStep]
- * @returns {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'}
+ * @returns {PlayThinkingKind}
  */
 export function resolvePlayThinkingKind(phase, meta = {}, reply = {}, onboardingStep = "") {
   const replyKind = typeof reply.kind === "string" ? reply.kind : "";
@@ -75,6 +80,18 @@ export function resolvePlayThinkingKind(phase, meta = {}, reply = {}, onboarding
 
   if (triggersPathPackCompose(phase, meta)) {
     return "adventure_compose";
+  }
+
+  if (replyKind === "photo") {
+    return "dictation_grade";
+  }
+
+  if (
+    optionId === "debug_start_dictation" ||
+    optionId === "start_path_dictation" ||
+    optionId === "start_dictation"
+  ) {
+    return "dictation_compose";
   }
 
   if (phase === "placement_item" || phase === "placement_feedback") {

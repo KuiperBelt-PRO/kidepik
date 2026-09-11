@@ -44,3 +44,43 @@ def test_pick_waiting_fallback(tmp_path: Path) -> None:
     )
     assert out
     assert isinstance(out[0], str)
+
+
+@pytest.mark.unit
+def test_pick_waiting_dictation_compose_excludes_path(tmp_path: Path) -> None:
+    clear_waiting_cache()
+    (tmp_path / "sci-fi.jsonl").write_text(
+        '{"id":"p","world_theme":"sci-fi","age_band":null,"phase":"path_compose",'
+        '"locale":"es","body":"Tres rutas aparecen en el mapa holográfico…","weight":2,"active":true}\n'
+        '{"id":"d","world_theme":"sci-fi","age_band":null,"phase":"dictation_compose",'
+        '"locale":"es","body":"Ajustando la baliza de transcripción…","weight":2,"active":true}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "neutral.jsonl").write_text("\n", encoding="utf-8")
+    out = pick_waiting_batch_sync(
+        world_theme="sci-fi",
+        age_band=None,
+        phase="dictation_compose",
+        waiting_dir=tmp_path,
+    )
+    assert out == ["Ajustando la baliza de transcripción…"]
+
+
+@pytest.mark.unit
+def test_pick_waiting_dictation_grade_fantasy(tmp_path: Path) -> None:
+    clear_waiting_cache()
+    (tmp_path / "fantasy.jsonl").write_text(
+        '{"id":"p","world_theme":"fantasy","age_band":null,"phase":"path_compose",'
+        '"locale":"es","body":"Se abren tres senderos en la niebla…","weight":2,"active":true}\n'
+        '{"id":"g","world_theme":"fantasy","age_band":null,"phase":"dictation_grade",'
+        '"locale":"es","body":"El cronista lee tu letra con calma…","weight":1,"active":true}\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "neutral.jsonl").write_text("\n", encoding="utf-8")
+    out = pick_waiting_batch_sync(
+        world_theme="fantasy",
+        age_band=None,
+        phase="dictation_grade",
+        waiting_dir=tmp_path,
+    )
+    assert out == ["El cronista lee tu letra con calma…"]

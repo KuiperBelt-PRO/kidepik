@@ -448,6 +448,135 @@ button.play-world-hint:focus-visible {
   color: #fff;
 }
 
+.play-world-hint__badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+  font-size: calc(0.62rem * var(--font-scale-ui, 1));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+
+.play-world-hint--debug {
+  border-style: dashed;
+}
+
+.play-dictation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.play-dictation--in-bubble {
+  margin-top: 0.45rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+}
+
+.play-dictation--card {
+  margin-top: 0.5rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--glass-radius-field, 12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  background: var(--glass-bg, rgba(255, 255, 255, 0.1));
+}
+
+.play-dictation__transport,
+.play-dictation__capture {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.play-dictation__icon-btn {
+  flex: 0 0 auto;
+  width: var(--glass-touch, 48px);
+  height: var(--glass-touch, 48px);
+  padding: 0;
+  border-radius: var(--glass-radius-pill, 999px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  background: var(--glass-bg, rgba(255, 255, 255, 0.1));
+  color: var(--glass-text, #fff);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+
+.play-dictation__icon-btn:hover:not(:disabled) {
+  background: var(--glass-bg-hover, rgba(255, 255, 255, 0.2));
+  border-color: var(--glass-border-strong, rgba(255, 255, 255, 0.55));
+}
+
+.play-dictation__icon-btn:focus-visible {
+  outline: 2px solid var(--glass-focus, rgba(255, 255, 255, 0.85));
+  outline-offset: 2px;
+}
+
+.play-dictation__icon-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.play-dictation__icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.play-dictation__seek-wrap {
+  flex: 1 1 8.5rem;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.play-dictation__clock {
+  font-variant-numeric: tabular-nums;
+  font-size: calc(0.7rem * var(--font-scale-ui, 1));
+  letter-spacing: 0.02em;
+  opacity: 0.92;
+  min-width: 2.35rem;
+  white-space: nowrap;
+}
+
+.play-dictation__clock--remain {
+  text-align: right;
+}
+
+.play-dictation__seek {
+  margin: 0;
+  height: 6px;
+}
+
+.play-dictation__send {
+  width: auto;
+  flex: 1 1 7.5rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.play-dictation__preview {
+  display: block;
+  width: 100%;
+  max-height: 10rem;
+  object-fit: contain;
+  border-radius: var(--glass-radius-field, 12px);
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.28));
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.play-dictation__preview[hidden] {
+  display: none;
+}
+
 .play-choice-echo {
   display: flex;
   flex-wrap: wrap;

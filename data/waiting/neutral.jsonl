@@ -3,3 +3,5 @@
 {"id":"wait_neutral_placement_01","world_theme":"neutral","age_band":null,"phase":"placement_compose","locale":"es","body":"Preparando la prueba con calma…","weight":1,"active":true}
 {"id":"wait_neutral_path_01","world_theme":"neutral","age_band":null,"phase":"path_compose","locale":"es","body":"Elaborando las rutas posibles…","weight":1,"active":true}
 {"id":"wait_neutral_challenge_01","world_theme":"neutral","age_band":null,"phase":"challenge_compose","locale":"es","body":"Montando el siguiente reto…","weight":1,"active":true}
+{"id":"wait_neutral_dictation_01","world_theme":"neutral","age_band":null,"phase":"dictation_compose","locale":"es","body":"Preparando el dictado…","weight":1,"active":true}
+{"id":"wait_neutral_dictation_grade_01","world_theme":"neutral","age_band":null,"phase":"dictation_grade","locale":"es","body":"Revisando lo que has escrito…","weight":1,"active":true}

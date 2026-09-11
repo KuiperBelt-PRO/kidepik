@@ -59,6 +59,7 @@ El gateway **sí hace fallback** en código (`AiGateway::complete` recorre la co
 - La sección **«Modo debug»** en Ajustes solo se muestra si `operator_eligible` es true.
 - El toggle **«Activar modo debug»** persiste `settings.diagnostics.debug_ai_enabled` (opt-in del tutor; el permiso en BD no activa el modo solo).
 - En `#/play/:childId` el panel es overlay tutor (no burbuja del mentor); el rebobinado (↺) requiere modo debug activo.
+- **Dictado:** con producto on, `choose_path` muestra una 4.ª carta de transcripción; con debug y producto off, carta debug — [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md) §3.
 
 ### 1.3 Señal al API
 
@@ -291,6 +292,7 @@ Ver contrato completo en [SPEC_APP_FILE_LOGGING.md](SPEC_APP_FILE_LOGGING.md).
 | SPEC_APP_MENTOR_PLACEMENT_ADAPTIVE | Meta `compose_debug` en fallo |
 | SPEC_APP_ADVENTURE_DIALOGUE | Campo opcional `debug` en response de turn |
 | SPEC_APP_DEBUG_JOURNEY_REWIND | Rebobinar viaje a un turno en play (solo debug local) |
+| SPEC_APP_DICTATION D19 / D21 | 4.ª carta en `choose_path`: producto si toggle on; debug solo si producto off |
 | DESIGN.md | Nota panel diagnóstico glass |
 | Diagrama 11 | Nodo DebugAi opcional |
 

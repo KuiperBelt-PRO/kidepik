@@ -1,6 +1,6 @@
 # 12 — Media storage
 
-**Specs:** [SPEC_MEDIA_STORAGE.md](../specify/SPEC_MEDIA_STORAGE.md)
+**Specs:** [SPEC_MEDIA_STORAGE.md](../specify/SPEC_MEDIA_STORAGE.md), [SPEC_APP_DICTATION.md](../specify/SPEC_APP_DICTATION.md) *(fotos `dictations/` + WAV TTS)*
 
 ```mermaid
 flowchart LR

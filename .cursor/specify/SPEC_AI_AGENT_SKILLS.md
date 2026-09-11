@@ -77,6 +77,8 @@ backend/skills/
       subjects-overview.md
   placement-exam/
     SKILL.md
+  dictation-orthography/
+    SKILL.md
   evaluation-rubric/
     SKILL.md
   journey-summary/
@@ -126,7 +128,8 @@ Cuerpo: reglas operativas; `references/` cortos. No pegar specs enteras.
 | `challenge-design` | Retos | Vestir / resultado | Currículo narrado; lore del mundo solo si acaba de enseñarse |
 | `subject-pedagogy` | Currículo | Retos + placement | Catálogo materias; dificultad por banda; `mythology` = mitos reales |
 | `placement-exam` | Examen | Ítems placement | Formato; ES-ES; conocimiento escolar previo; sin lore inventado |
-| `evaluation-rubric` | Evaluación | Scorer texto | 0 / 0.5 / 1 + rationale |
+| `dictation-orthography` | Currículo | Dictado | Reglas ES-ES, tildes, grafías; anti-spoiler del canónico |
+| `evaluation-rubric` | Evaluación | Scorer texto + dictado | 0 / 0.5 / 1 + rationale; diff manuscrito |
 | `journey-summary` | Memoria | Summarizer | MD + front matter; no contradecir JSONL |
 | `waiting-copy` | UX espera | Bubbles | Variantes mundo × audiencia |
 | `onboarding-flow` | First run | Host / pasos | Orden first_run |

@@ -3,7 +3,7 @@
 > Estado: **aprobada** (ago 2026) — delta §5.1b consulta mentor en caminos (24 ago 2026)  
 > Fuente: notas de producto (ago 2026) + decisiones de almacenamiento  
 > Relacionado: [SPEC_DATA_STORAGE_LAYERS.md](SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PLAY_FIRST_RUN.md](SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_WAITING_PHRASES.md](SPEC_APP_WAITING_PHRASES.md), [SPEC_AI_CENTRAL_ORCHESTRATOR.md](SPEC_AI_CENTRAL_ORCHESTRATOR.md), [SPEC_APP_PARALLEL_WORLDS.md](SPEC_APP_PARALLEL_WORLDS.md), [SPEC_APP_PROGRESSION_RANKS.md](SPEC_APP_PROGRESSION_RANKS.md), [SPEC_APP_SUBJECT_CATALOG.md](SPEC_APP_SUBJECT_CATALOG.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: N retos/camino)*  
-> **Diagrama:** [16-journey-mechanics-flows.md](../diagrams/16-journey-mechanics-flows.md)
+> **Diagrama:** [16-journey-mechanics-flows.md](../diagrams/16-journey-mechanics-flows.md) · [SPEC_APP_DICTATION.md](SPEC_APP_DICTATION.md) *(propuesta: gate post-camino)*
 
 ## Contexto
 
@@ -138,7 +138,10 @@ flowchart TD
   O --> P[Regenerar solo el camino fallido]
   N -- SI --> Q[Felicitación + continuar viaje]
   Q --> R[RewardOffer: ítem y/o moneda<br/>ver SPEC_APP_REWARDS_ECONOMY]
-  R --> P2([Nueva elección de caminos / orquestador])
+  R --> D0{¿Dictado activado?}
+  D0 -- SI --> D1[Teoría + TTS + foto · SPEC_APP_DICTATION]
+  D1 --> P2
+  D0 -- NO --> P2([Nueva elección de caminos / orquestador])
   P --> B
 ```
 
@@ -165,6 +168,12 @@ Reglas del mentor en consulta:
 Placeholder UI: encrucijada → «Pregunta al mentor…»; intro → «¿Alguna duda sobre este tema?».
 
 Contrato de modos: [SPEC_APP_ADVENTURE_DIALOGUE](SPEC_APP_ADVENTURE_DIALOGUE.md) §1.1c.
+
+### 5.1c Gate de dictado (propuesta 6 sep 2026)
+
+Si el tutor tiene `learning.dictation.enabled` y la política dispara, **después** de superar el camino y **antes** de la nueva encrucijada el viajero entra en dictado (teoría → audio → papel → foto). Contrato: [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md). Placement y caminos fallidos no disparan.
+
+**Delta dictado:** en `choose_path` con dictados activos, 4.ª carta de transcripción (no es un camino); a las N skips, solo esa carta. Pedagogía banda × ortografía × ficha × mundo: [SPEC_APP_DICTATION_PEDAGOGY](SPEC_APP_DICTATION_PEDAGOGY.md).
 
 ### 5.2 Generación (orquestador → subagentes)
 

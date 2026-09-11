@@ -49,9 +49,27 @@ test("resolvePlayThinkingKind composes paths after final placement feedback", ()
   );
 });
 
+test("resolvePlayThinkingKind uses dictation_compose on path dictation card", () => {
+  assert.equal(
+    resolvePlayThinkingKind("choose_path", {}, { kind: "option", option_id: "start_path_dictation" }, ""),
+    "dictation_compose",
+  );
+});
+
+test("resolvePlayThinkingKind uses dictation_grade on photo", () => {
+  assert.equal(
+    resolvePlayThinkingKind("dictation_listen", {}, { kind: "photo" }, ""),
+    "dictation_grade",
+  );
+});
+
 test("resolveRewindThinkingKindForPhase mirrors adventure_ready compose", () => {
   assert.equal(
     resolveRewindThinkingKindForPhase("adventure_ready", { path_completed: true }),
     "adventure_compose",
   );
+});
+
+test("resolveRewindThinkingKindForPhase uses dictation_compose on dictation phases", () => {
+  assert.equal(resolveRewindThinkingKindForPhase("dictation_listen"), "dictation_compose");
 });

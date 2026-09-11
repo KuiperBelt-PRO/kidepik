@@ -11,6 +11,7 @@ InputMode = Literal[
     "options_or_text",
     "continue",
     "blocked",
+    "photo",
 ]
 
 # Contrato servidor: la fase manda sobre el default del LLM.
@@ -26,6 +27,9 @@ PHASE_INPUT_MODE: dict[str, InputMode] = {
     "placement_feedback": "continue",
     "choose_path": "options_or_text",
     "path_intro": "options_or_text",
+    "dictation_theory": "options_or_text",
+    "dictation_listen": "photo",
+    "dictation_result": "continue",
 }
 
 
@@ -40,6 +44,7 @@ def resolve_input_mode(
         "options_or_text",
         "continue",
         "blocked",
+        "photo",
     }:
         return force  # type: ignore[return-value]
     if phase and phase in PHASE_INPUT_MODE:
@@ -50,6 +55,7 @@ def resolve_input_mode(
         "options_or_text",
         "continue",
         "blocked",
+        "photo",
     }:
         return envelope_mode  # type: ignore[return-value]
     return "continue"
@@ -84,6 +90,8 @@ def normalize_dialogue_envelope(
         ]
 
     if mode == "text_only":
+        options = []
+    elif mode == "photo":
         options = []
     elif mode == "continue" and not options:
         options = []

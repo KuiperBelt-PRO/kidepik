@@ -64,7 +64,7 @@ La ficha `#/crew/:childId` ([SPEC_APP_CREW_SECTION.md](SPEC_APP_CREW_SECTION.md)
 | --- | --- | --- |
 | **Detalles** | `details` | Perfil/identidad — **default** si placement incompleto |
 | **Viaje** | `journey` | Mapa, diario, aventura — **default** si placement completado |
-| **Progreso** | `progress` | Rango + materias. **Implementada:** stepper «Retos por camino» (3–10, default por banda) — [SPEC_APP_PATH_CHALLENGE_COUNT](SPEC_APP_PATH_CHALLENGE_COUNT.md). |
+| **Progreso** | `progress` | Rango + materias. **Implementada:** stepper «Retos por camino» (3–10, default por banda) — [SPEC_APP_PATH_CHALLENGE_COUNT](SPEC_APP_PATH_CHALLENGE_COUNT.md). **Propuesta:** bloque Dictados — [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md). |
 | **Equipaje** | `baggage` | Moneda + hallazgos del mundo |
 | **Ajustes** | `settings` | Permisos, zona peligrosa |
 

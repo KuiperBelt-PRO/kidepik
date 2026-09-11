@@ -66,7 +66,7 @@ Ante un dato nuevo, preguntar en orden:
 | Auth + `parent_accounts` + settings | Identidad tutor |
 | `children` | nombre, edad, `age_band`, flags, PIN/permisos, `onboarding_step` mínimo |
 | Progreso canónico | `general_level`, `rank_*`, niveles por materia **oficiales** (fuente UI) |
-| Materias activas + puntos flojos tutor | Config editable |
+| Materias activas + puntos flojos tutor + dictado (`learning.dictation`) | Config editable — [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md) |
 | Economía / equipaje | `child_wallets`, `child_inventory_items` (por `world_theme`) |
 | Frases de espera | **JSONL** `data/waiting/{fantasy,sci-fi,neutral}.jsonl` |
 | Legal | `legal_documents` |
@@ -85,6 +85,7 @@ Progreso **por mundo** cuando aplique mundos paralelos: clave lógica `(child_id
 | `glossary/{world}.jsonl` | Glosarios tipológicos |
 | `agents/*.md`, `skills/` | Definiciones versionadas en repo |
 | Informes tutor `.md` | Generados |
+| Dictado (propuesta) | Eventos `dictation_*` en `events.jsonl` + `dictation_weak_points.json`; WAV/fotos en media — [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md) |
 
 Layout canónico (con mundos): ver ledger + parallel worlds.
 

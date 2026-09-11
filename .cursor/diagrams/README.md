@@ -42,7 +42,7 @@ Mapa visual canónico de **KidepiK** para agentes de IA. No sustituye las specs:
 | 13 | [13-dev-test-validate.md](13-dev-test-validate.md) | Tests y validación UI |
 | 14 | [14-cursor-doc-routing.md](14-cursor-doc-routing.md) | Qué skill/spec abrir (agente Cursor) |
 | 15 | [15-ai-orchestrator-agents.md](15-ai-orchestrator-agents.md) | Orquestador + agentes play + decisión de rol |
-| 16 | [16-journey-mechanics-flows.md](16-journey-mechanics-flows.md) | Flujos/decisiones mecánicas de viaje |
+| 16 | [16-journey-mechanics-flows.md](16-journey-mechanics-flows.md) | Flujos/decisiones mecánicas de viaje + **dictado §3b** |
 | 17 | [17-storage-decision-tree.md](17-storage-decision-tree.md) | Dónde guardar (PG / archivos / DuckDB) |
 | 18 | [18-parallel-worlds.md](18-parallel-worlds.md) | Mundos fantasy/sci-fi en paralelo |
 | 19 | [19-rewards-inventory.md](19-rewards-inventory.md) | Recompensas, moneda, equipaje, HUD nivel play |

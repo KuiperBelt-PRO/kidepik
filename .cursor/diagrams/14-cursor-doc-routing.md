@@ -21,6 +21,7 @@ flowchart TB
 | **Cuenta de tripulante / Gmail plaza / rol crew** | **SPEC_APP_CREW_MEMBER_ACCOUNT** (+ AUTH, SHELL, CREW, ACCOUNT) | **05, 07, 09, 10** |
 | Play / examen / diálogo / IA / mentor / memoria / materias / **riqueza narrativa** / **LLM aventura** / **historial paginado** / **compose compacto (chips en log)** | SPEC_APP_JOURNEY_MECHANICS + SUBJECT_CATALOG / PLAY_* / MENTOR / JOURNEY_MEMORY / ADVENTURE_* / AGE_BANDS / **SPEC_APP_PLAY_COMPOSE_COMPACT** / SPEC_AI_* (OpenRouter legado) | 11 |
 | **IA agentic FastAPI** (Gemini, orquestador, skills, ledger, DuckDB/glosario, mundos paralelos) | **SPEC_DATA_STORAGE_LAYERS** / **SPEC_AI_CENTRAL_ORCHESTRATOR** / **SPEC_AI_GEMINI_GATEWAY** / **SPEC_AI_PYDANTIC_AGENTS** / **SPEC_AI_AGENT_SKILLS** / **SPEC_AI_JOURNEY_FILE_LEDGER** / **SPEC_APP_PARALLEL_WORLDS** / **SPEC_APP_WORLD_GLOSSARY** / **SPEC_APP_WAITING_PHRASES** / **SPEC_APP_CANONICAL_VOCABULARY** | **15**, 11, 05 |
+| **Dictado encrucijada / TTS / foto / pedagogía / 4.ª carta** | **SPEC_APP_DICTATION** + **SPEC_APP_DICTATION_PEDAGOGY** + **SPEC_AI_GEMINI_TTS** (+ DEBUG_MODE, JOURNEY_MECHANICS, MEDIA_STORAGE, CREW Progreso) | **16**, 15, 12, 11 |
 | Mecánicas de viaje (flujos de decisión jugables) | **SPEC_APP_JOURNEY_MECHANICS** | **16**, 11 |
 | **Retos por camino / N configurable por tutor** | **SPEC_APP_PATH_CHALLENGE_COUNT** (+ LINEAR_B, PATH_COMPOSER_*, CREW_MEMBER_DETAIL) | **16**, 10, 11 |
 | Dónde guardar datos (PG vs archivos vs DuckDB) | **SPEC_DATA_STORAGE_LAYERS** | **17**, 05 |

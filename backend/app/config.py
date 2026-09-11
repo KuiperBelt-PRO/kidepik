@@ -58,6 +58,8 @@ GEMINI_PURPOSE_MODEL_DEFAULTS: dict[str, list[str]] = {
     "safety_rewriter": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
     "challenge_writer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
     "challenge_result_writer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+    "dictation_composer": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
+    "dictation_grader": _chain(GEMINI_LITE_CHAIN, GEMINI_QUALITY_CHAIN),
 }
 
 
@@ -147,6 +149,12 @@ class Settings(BaseSettings):
     ai_rate_limit_per_child_day: int = Field(default=80, alias="AI_RATE_LIMIT_PER_CHILD_DAY")
     ai_compose_batch_max_slots: int = Field(default=4, alias="AI_COMPOSE_BATCH_MAX_SLOTS")
     ai_compose_batch_retries: int = Field(default=3, alias="AI_COMPOSE_BATCH_RETRIES")
+    ai_gemini_tts_model_list: str = Field(
+        default="gemini-3.1-flash-tts-preview,gemini-2.5-flash-preview-tts",
+        alias="AI_GEMINI_TTS_MODEL_LIST",
+    )
+    ai_tts_voice: str = Field(default="Kore", alias="AI_TTS_VOICE")
+    ai_tts_language: str = Field(default="es-ES", alias="AI_TTS_LANGUAGE")
 
     @property
     def media_base(self) -> str:
@@ -186,7 +194,16 @@ class Settings(BaseSettings):
     def gemini_model_tier_for_purpose(self, purpose: str) -> str:
         return "lite" if purpose in GEMINI_LITE_PURPOSES else "quality"
 
+    def gemini_tts_model_list(self) -> list[str]:
+        models = self.parse_csv(self.ai_gemini_tts_model_list)
+        return models or [
+            "gemini-3.1-flash-tts-preview",
+            "gemini-2.5-flash-preview-tts",
+        ]
+
     def gemini_model_list_for_purpose(self, purpose: str) -> list[str]:
+        if purpose == "dictation_tts":
+            return self.gemini_tts_model_list()
         if purpose in GEMINI_PURPOSE_MODEL_DEFAULTS:
             return list(GEMINI_PURPOSE_MODEL_DEFAULTS[purpose])
         if purpose in GEMINI_LITE_PURPOSES:
@@ -195,6 +212,8 @@ class Settings(BaseSettings):
 
     def gemini_model_list_resilient(self, purpose: str) -> list[str]:
         """Lista ordenada de fallback para el purpose (incluye reserva lite/quality si aplica)."""
+        if purpose == "dictation_tts":
+            return self.gemini_tts_model_list()
         if purpose in GEMINI_PURPOSE_MODEL_DEFAULTS:
             return list(GEMINI_PURPOSE_MODEL_DEFAULTS[purpose])
         primary = self.gemini_model_list_for_purpose(purpose)

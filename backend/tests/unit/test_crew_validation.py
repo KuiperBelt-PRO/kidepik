@@ -22,6 +22,8 @@ from app.services.crew import CrewService
         ({"learning": {"challenges_per_path": 11}}, "learning.challenges_per_path invalid"),
         ({"learning": {"challenges_per_path": 3.5}}, "learning.challenges_per_path invalid"),
         ({"learning": {"challenges_per_path": True}}, "learning.challenges_per_path invalid"),
+        ({"learning": {"dictation": "bad"}}, "learning.dictation invalid"),
+        ({"learning": {"dictation": {"every_n": 2}}}, "learning.dictation.every_n invalid"),
         ({"character_summary": 1}, "character_summary invalid"),
         ({"explorer_gender": "other"}, "explorer_gender invalid"),
     ],

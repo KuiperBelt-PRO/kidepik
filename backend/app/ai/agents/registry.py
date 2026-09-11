@@ -9,6 +9,8 @@ from app.ai.agents.envelopes import (
     ChallengeEnvelope,
     ChallengeResultEnvelope,
     DialogueEnvelope,
+    DictationComposeEnvelope,
+    DictationGradeEnvelope,
     PathPackEnvelope,
     PlacementQueueEnvelope,
     ScoreEnvelope,
@@ -43,6 +45,8 @@ _OUTPUT_BY_PURPOSE: dict[str, type] = {
     "waiting_copy_writer": WaitingCopyBundle,
     "journey_summarizer": SessionSummaryEnvelope,
     "safety_rewriter": DialogueEnvelope,
+    "dictation_composer": DictationComposeEnvelope,
+    "dictation_grader": DictationGradeEnvelope,
 }
 
 

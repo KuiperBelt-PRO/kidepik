@@ -1,6 +1,6 @@
 # 16 — Flujos de mecánicas de viaje (decisiones de producto)
 
-**Specs:** [SPEC_APP_JOURNEY_MECHANICS.md](../specify/SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_WAITING_PHRASES.md](../specify/SPEC_APP_WAITING_PHRASES.md), [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_PARALLEL_WORLDS.md](../specify/SPEC_APP_PARALLEL_WORLDS.md), [SPEC_DATA_STORAGE_LAYERS.md](../specify/SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](../specify/SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: N retos/camino)*
+**Specs:** [SPEC_APP_JOURNEY_MECHANICS.md](../specify/SPEC_APP_JOURNEY_MECHANICS.md), [SPEC_APP_WAITING_PHRASES.md](../specify/SPEC_APP_WAITING_PHRASES.md), [SPEC_APP_PLAY_FIRST_RUN.md](../specify/SPEC_APP_PLAY_FIRST_RUN.md), [SPEC_APP_PARALLEL_WORLDS.md](../specify/SPEC_APP_PARALLEL_WORLDS.md), [SPEC_DATA_STORAGE_LAYERS.md](../specify/SPEC_DATA_STORAGE_LAYERS.md), [SPEC_APP_PATH_CHALLENGE_COUNT.md](../specify/SPEC_APP_PATH_CHALLENGE_COUNT.md) *(implementada: N retos/camino)*, [SPEC_APP_DICTATION.md](../specify/SPEC_APP_DICTATION.md) *(propuesta: gate dictado)*
 
 > Contratos detallados en la spec; aquí el **mapa de decisión** jugable.
 
@@ -83,11 +83,13 @@ flowchart TD
   D -- NO slot --> C2[Reintento / fallback solo ese slot]
   C2 --> D
   D -- SI --> E[Guardar path_pack en JSONL]
-  E --> F[Cartas + compose: consejo o elige 1 de 3]
-  F --> F2{¿Texto libre?}
-  F2 -- Sí --> F3[Consulta mentor acotada al pack]
+  E --> F[Cartas + compose: 3 caminos<br/>dictados on: + 4.ª transcripción]
+  F --> F2{¿Qué elige?}
+  F2 -- Texto --> F3[Consulta mentor acotada al pack]
   F3 --> F
-  F2 -- No --> G[Intro camino + lección + compose]
+  F2 -- 4.ª dictado --> Dbg[Dictado §3b · path_offer / debug]
+  Dbg --> F
+  F2 -- Camino --> G[Intro camino + lección + compose]
   G --> G2{¿Dudas o empezar retos?}
   G2 -- Texto --> G3[Consulta mentor acotada al tema]
   G3 --> G
@@ -108,6 +110,27 @@ flowchart TD
   L -- NO --> N[Regenerar SOLO ese camino]
   N --> E2[Sustituir slot en pack]
   E2 --> F
+```
+
+## §3b Dictado (propuesta — [SPEC_APP_DICTATION](../specify/SPEC_APP_DICTATION.md))
+
+```mermaid
+flowchart TD
+  A([Camino superado]) --> B{enabled + política tutor}
+  B -- NO --> Z([Pack siguiente])
+  B -- SI --> C[dictation_composer: teoría + canónico]
+  C --> T[TTS Gemini Flash · 1 WAV cacheado]
+  T --> Q{¿Audio?}
+  Q -- Cuota --> Skip[Sin dictado · seguir viaje]
+  Skip --> Z
+  Q -- SI --> Th[dictation_theory]
+  Th --> L[dictation_listen · replay ilimitado]
+  L --> P[Foto papel]
+  P --> G[dictation_grader visión]
+  G --> R{¿Aprobado o max intentos?}
+  R -- NO --> L
+  R -- SI --> W[weak_points ledger]
+  W --> Z
 ```
 
 ## §4 Niveles / rango — decisiones
@@ -145,6 +168,6 @@ flowchart TD
 | --- | --- |
 | Mundo / nombre / edad flags | Supabase `children` |
 | Personaje | `traveler.md` |
-| Cola examen / respuestas / path pack | `events.jsonl` (mundo) |
+| Cola examen / respuestas / path pack / dictados | `events.jsonl` (mundo) + WAV `/media/audio/` + fotos `/media/dictations/` (TTL) |
 | Niveles oficiales | Supabase por mundo |
 | Diálogo | `dialogue.jsonl` (mundo) |

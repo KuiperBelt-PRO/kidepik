@@ -20,6 +20,10 @@ def test_gemini_helpers_defaults() -> None:
     assert settings.gemini_model_list_lite()[0] == "gemini-2.5-flash-lite"
     assert settings.gemini_model_tier_for_purpose("placement_text_scorer") == "lite"
     assert settings.gemini_model_tier_for_purpose("dialogue") == "quality"
+    assert settings.gemini_tts_model_list()[0] == "gemini-3.1-flash-tts-preview"
+    assert settings.gemini_model_list_for_purpose("dictation_tts")[0].endswith("tts") or "tts" in settings.gemini_model_list_for_purpose("dictation_tts")[0]
+    assert "tts" in settings.gemini_model_list_for_purpose("dictation_tts")[0]
+    assert settings.gemini_model_list_for_purpose("dictation_composer")[0] == "gemini-3.1-flash-lite"
     assert settings.pydantic_google_model("gemini-test") == "google:gemini-test"
     assert settings.pydantic_google_model("google:gemini-test") == "google:gemini-test"
     assert settings.gemini_api_key_resolved() == (settings.google_api_key or settings.gemini_api_key).strip()

@@ -24,9 +24,10 @@ import {
   fetchPlayBaggage,
   fetchPlayBaggageOffers,
   usePlayBaggageItem,
+  uploadDictationPhoto,
   PLAY_DIALOGUE_TIMEOUT_MS,
   PLAY_DIALOGUE_COMPOSE_TIMEOUT_MS,
-} from "../lib/play-api.js?v=263";
+} from "../lib/play-api.js?v=264";
 import { renderDialogueMarkdown } from "../lib/markdown.js?v=2";
 import { applyPlayWorldTheme, isPlayWorldTheme } from "../lib/play-theme.js";
 import { historyErrorCopy, resolveHistoryCopy } from "../lib/play-history-copy.js?v=1";
@@ -35,7 +36,15 @@ import { mapPlayApiError, showGlassToast } from "../components/glass-toast.js";
 import {
   resolvePlayThinkingKind,
   resolveRewindThinkingKindForPhase,
-} from "../lib/play-thinking-kind.js?v=1";
+} from "../lib/play-thinking-kind.js?v=5";
+import {
+  startDictationLabel,
+  formatAudioClock,
+  formatAudioRemaining,
+  dictationWaitFallback,
+  dictationGradeFallback,
+  rewindDictationToStart,
+} from "../lib/play-dictation-ui.js?v=2";
 import {
   composeDebugChipLabel,
   shouldShowComposeDebugChip as shouldShowComposeDebugChipForTurn,
@@ -777,6 +786,8 @@ async function mountPlayPanel(root, ctx) {
   let progressEl = null;
 
   function clearChoices() {
+    stopDictationAudio();
+    revokeDictationPreview();
     choicesHost?.remove();
     choicesHost = null;
     optionsEl = null;
@@ -799,6 +810,235 @@ async function mountPlayPanel(root, ctx) {
     optionsEl = choicesHost.querySelector("[data-options]");
     logEl.appendChild(choicesHost);
     return choicesHost;
+  }
+
+  function stopDictationAudio() {
+    if (!dictationAudio) return;
+    dictationAudio.pause();
+    dictationAudio.removeAttribute("src");
+    dictationAudio.load();
+    dictationAudio = null;
+  }
+
+  function revokeDictationPreview() {
+    if (dictationPreviewUrl) {
+      URL.revokeObjectURL(dictationPreviewUrl);
+      dictationPreviewUrl = null;
+    }
+  }
+
+  /**
+   * @param {import('../components/shell-ui-icons.js').UiIconId} iconId
+   * @param {string} label
+   */
+  function dictationIconBtn(iconId, label) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "play-dictation__icon-btn";
+    btn.setAttribute("aria-label", label);
+    btn.appendChild(createGlassIconSvg(iconId, { size: 20 }));
+    return btn;
+  }
+
+  function dictationPanelHost(turn) {
+    if (logEl instanceof HTMLElement && turn?.id) {
+      const bubble = logEl.querySelector(
+        `.play-bubble[data-turn-id="${CSS.escape(String(turn.id))}"]`,
+      );
+      if (bubble instanceof HTMLElement) return bubble;
+    }
+    if (logEl instanceof HTMLElement) {
+      const bubbles = logEl.querySelectorAll(".play-bubble--mentor:not(.play-bubble--thinking)");
+      const last = bubbles[bubbles.length - 1];
+      if (last instanceof HTMLElement) return last;
+    }
+    return ensureChoicesHost();
+  }
+
+  /**
+   * @param {object} turn
+   * @param {string} mode
+   */
+  function renderDictationControls(turn, mode) {
+    const phase = typeof turn?.meta?.phase === "string" ? turn.meta.phase : "";
+    const audioUrl = typeof turn?.meta?.audio_url === "string" ? turn.meta.audio_url.trim() : "";
+    const dictationId = String(turn?.meta?.dictation_id || "");
+    const showAudio =
+      Boolean(audioUrl) &&
+      (phase === "dictation_listen" || phase === "dictation_result");
+    const showPhoto = mode === "photo" && phase === "dictation_listen";
+    if (!showAudio && !showPhoto) return;
+
+    const host = dictationPanelHost(turn);
+    if (!(host instanceof HTMLElement)) return;
+    logEl?.querySelectorAll("[data-play-dictation]").forEach((el) => el.remove());
+
+    const panel = document.createElement("div");
+    panel.className = host.classList.contains("play-bubble")
+      ? "play-dictation play-dictation--in-bubble"
+      : "play-dictation play-dictation--card";
+    panel.setAttribute("data-play-dictation", "");
+
+    if (showAudio) {
+      const audioRow = document.createElement("div");
+      audioRow.className = "play-dictation__transport";
+
+      const rewindBtn = dictationIconBtn("rewind", "Volver al principio");
+      const playBtn = dictationIconBtn("play", "Reproducir");
+
+      const times = document.createElement("div");
+      times.className = "play-dictation__times";
+      const elapsedEl = document.createElement("span");
+      elapsedEl.className = "play-dictation__clock";
+      elapsedEl.textContent = "0:00";
+      const remainEl = document.createElement("span");
+      remainEl.className = "play-dictation__clock play-dictation__clock--remain";
+      remainEl.textContent = "–:––";
+
+      const seek = document.createElement("input");
+      seek.type = "range";
+      seek.className = "play-dictation__seek glass-slider__range";
+      seek.min = "0";
+      seek.max = "0";
+      seek.step = "0.1";
+      seek.value = "0";
+      seek.setAttribute("aria-label", "Progreso de la locución");
+
+      const seekWrap = document.createElement("div");
+      seekWrap.className = "play-dictation__seek-wrap";
+      seekWrap.append(elapsedEl, seek, remainEl);
+
+      audioRow.append(rewindBtn, playBtn, seekWrap);
+      panel.appendChild(audioRow);
+
+      stopDictationAudio();
+      dictationAudio = new Audio(audioUrl);
+      dictationAudio.preload = "auto";
+      let seeking = false;
+
+      const syncTransport = () => {
+        if (!dictationAudio) return;
+        const playing = !dictationAudio.paused && !dictationAudio.ended;
+        playBtn.replaceChildren(createGlassIconSvg(playing ? "pause" : "play", { size: 20 }));
+        playBtn.setAttribute("aria-label", playing ? "Pausar" : "Reproducir");
+        const dur = Number.isFinite(dictationAudio.duration) ? dictationAudio.duration : 0;
+        const cur = Number.isFinite(dictationAudio.currentTime) ? dictationAudio.currentTime : 0;
+        if (dur > 0) {
+          seek.max = String(dur);
+          if (!seeking) seek.value = String(cur);
+        }
+        elapsedEl.textContent = formatAudioClock(cur);
+        remainEl.textContent = formatAudioRemaining(cur, dur);
+      };
+
+      dictationAudio.addEventListener("loadedmetadata", syncTransport);
+      dictationAudio.addEventListener("durationchange", syncTransport);
+      dictationAudio.addEventListener("timeupdate", syncTransport);
+      dictationAudio.addEventListener("ended", syncTransport);
+      dictationAudio.addEventListener("pause", syncTransport);
+      dictationAudio.addEventListener("play", syncTransport);
+
+      playBtn.addEventListener("click", () => {
+        if (!dictationAudio) return;
+        if (dictationAudio.paused) void dictationAudio.play();
+        else dictationAudio.pause();
+      });
+      rewindBtn.addEventListener("click", () => {
+        rewindDictationToStart(dictationAudio);
+        syncTransport();
+      });
+      seek.addEventListener("pointerdown", () => {
+        seeking = true;
+      });
+      seek.addEventListener("pointerup", () => {
+        seeking = false;
+      });
+      seek.addEventListener("input", () => {
+        if (!dictationAudio) return;
+        dictationAudio.currentTime = Number(seek.value) || 0;
+        syncTransport();
+      });
+    }
+
+    if (showPhoto) {
+      const photoRow = document.createElement("div");
+      photoRow.className = "play-dictation__capture";
+
+      const cameraInput = document.createElement("input");
+      cameraInput.type = "file";
+      cameraInput.accept = "image/jpeg,image/png,image/webp";
+      cameraInput.capture = "environment";
+      cameraInput.hidden = true;
+      const galleryInput = document.createElement("input");
+      galleryInput.type = "file";
+      galleryInput.accept = "image/jpeg,image/png,image/webp";
+      galleryInput.hidden = true;
+
+      const cameraBtn = dictationIconBtn("camera", "Hacer foto");
+      const galleryBtn = dictationIconBtn("gallery", "Elegir de la galería");
+
+      const preview = document.createElement("img");
+      preview.className = "play-dictation__preview";
+      preview.alt = "Vista previa del dictado";
+      preview.hidden = true;
+
+      const confirmBtn = document.createElement("button");
+      confirmBtn.type = "button";
+      confirmBtn.className = "crew-panel__btn crew-panel__btn--primary play-dictation__send";
+      confirmBtn.hidden = true;
+      setGlassButton(confirmBtn, "send", "Enviar foto");
+
+      /** @type {File | null} */
+      let pendingFile = null;
+
+      const onFile = (file) => {
+        if (!(file instanceof File)) return;
+        pendingFile = file;
+        revokeDictationPreview();
+        dictationPreviewUrl = URL.createObjectURL(file);
+        preview.src = dictationPreviewUrl;
+        preview.hidden = false;
+        confirmBtn.hidden = false;
+      };
+
+      cameraBtn.addEventListener("click", () => cameraInput.click());
+      galleryBtn.addEventListener("click", () => galleryInput.click());
+      cameraInput.addEventListener("change", () => {
+        const file = cameraInput.files?.[0];
+        if (file) onFile(file);
+        cameraInput.value = "";
+      });
+      galleryInput.addEventListener("change", () => {
+        const file = galleryInput.files?.[0];
+        if (file) onFile(file);
+        galleryInput.value = "";
+      });
+      confirmBtn.addEventListener("click", () => {
+        if (!pendingFile) return;
+        const file = pendingFile;
+        confirmBtn.disabled = true;
+        void (async () => {
+          const up = await uploadDictationPhoto(ctx.session, file);
+          if (!up.ok || !up.public_url) {
+            confirmBtn.disabled = false;
+            showGlassToast("No hemos podido subir la foto.", { variant: "error" });
+            return;
+          }
+          void sendReply({
+            kind: "photo",
+            dictation_id: dictationId,
+            photo_url: up.public_url,
+            displayLabel: "He enviado la foto",
+          });
+        })();
+      });
+
+      photoRow.append(cameraInput, galleryInput, cameraBtn, galleryBtn, confirmBtn);
+      panel.append(photoRow, preview);
+    }
+
+    host.appendChild(panel);
+    localCleanups.push(bindGlassIconTheme(panel));
   }
 
   if (baggageOfferEl instanceof HTMLElement) {
@@ -892,6 +1132,10 @@ async function mountPlayPanel(root, ctx) {
   let thinkingTextEl = null;
   /** @type {HTMLElement | null} */
   let optimisticExplorerBubble = null;
+  /** @type {HTMLAudioElement | null} */
+  let dictationAudio = null;
+  /** @type {string | null} */
+  let dictationPreviewUrl = null;
 
   /** Copy de sistema (no narrativa) cuando falla el compose de aventura. */
   const ADVENTURE_COMPOSE_FAILED_COPY =
@@ -910,12 +1154,17 @@ async function mountPlayPanel(root, ctx) {
     placement_feedback: "continue",
     choose_path: "options_or_text",
     path_intro: "options_or_text",
+    dictation_theory: "options_or_text",
+    dictation_listen: "photo",
+    dictation_result: "continue",
   });
 
   const PATH_INTRO_START_OPTION = Object.freeze({
     id: "start_challenges",
     label: "Empezar los retos",
   });
+
+  const START_DICTATION_OPTION_ID = "start_dictation";
 
   const DEFAULT_GENDER_OPTIONS = Object.freeze([
     { id: "male", label: "Chico" },
@@ -996,6 +1245,7 @@ async function mountPlayPanel(root, ctx) {
   function composePlaceholderForPhase(phase) {
     if (phase === "choose_path") return "Pregunta al mentor…";
     if (phase === "path_intro") return "¿Alguna duda sobre este tema?";
+    if (phase === "dictation_theory") return "¿Alguna duda sobre esta regla?";
     return "Escribe tu respuesta…";
   }
 
@@ -1087,6 +1337,8 @@ async function mountPlayPanel(root, ctx) {
 
   /** @type {string[]} */
   let sessionWaitingHints = [];
+  /** @type {string[]} */
+  let sessionDictationHints = [];
 
   /**
    * Prefer waiting_hints from last turn meta (JSONL waiting phrases) when present.
@@ -1096,6 +1348,10 @@ async function mountPlayPanel(root, ctx) {
     const hints = turn?.meta?.waiting_hints;
     if (Array.isArray(hints) && hints.length > 0) {
       sessionWaitingHints = hints.filter((l) => typeof l === "string" && l.trim());
+    }
+    const dictationHints = turn?.meta?.dictation_waiting_hints;
+    if (Array.isArray(dictationHints) && dictationHints.length > 0) {
+      sessionDictationHints = dictationHints.filter((l) => typeof l === "string" && l.trim());
     }
   }
 
@@ -1114,11 +1370,16 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
-   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'} kind
+   * @param {import('../lib/play-thinking-kind.js').PlayThinkingKind} kind
    * @returns {number}
    */
   function resolveTurnTimeoutMs(kind) {
-    if (kind === "preparing_exam" || kind === "adventure_compose") {
+    if (
+      kind === "preparing_exam" ||
+      kind === "adventure_compose" ||
+      kind === "dictation_compose" ||
+      kind === "dictation_grade"
+    ) {
       return PLAY_DIALOGUE_COMPOSE_TIMEOUT_MS;
     }
     if (kind === "evaluating_answer") {
@@ -1128,10 +1389,18 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
-   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'} kind
+   * @param {import('../lib/play-thinking-kind.js').PlayThinkingKind} kind
    * @returns {string[]}
    */
   function thinkingLines(kind) {
+    if (kind === "dictation_compose") {
+      if (sessionDictationHints.length > 0) return sessionDictationHints;
+      return dictationWaitFallback(playWorldTheme);
+    }
+    if (kind === "dictation_grade") {
+      if (sessionWaitingHints.length > 0) return sessionWaitingHints;
+      return dictationGradeFallback(playWorldTheme);
+    }
     if (
       (kind === "preparing_exam" || kind === "adventure_compose") &&
       sessionWaitingHints.length > 0
@@ -1146,7 +1415,7 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
-   * @param {'preparing_exam' | 'evaluating_answer' | 'adventure_compose' | 'general'} [kind]
+   * @param {import('../lib/play-thinking-kind.js').PlayThinkingKind} [kind]
    */
   function showThinking(kind = "general") {
     if (!(logEl instanceof HTMLElement)) return;
@@ -1737,6 +2006,8 @@ async function mountPlayPanel(root, ctx) {
       id: opt.id,
       label: opt.label || opt.id,
       description: opt.description || "Un camino del viaje.",
+      kind: opt.kind,
+      badge: opt.badge,
     }));
   }
 
@@ -1775,7 +2046,17 @@ async function mountPlayPanel(root, ctx) {
 
       const label = document.createElement("span");
       label.className = "play-world-hint__label";
-      label.textContent = hint.label;
+      if (hint.badge === "debug" || hint.kind === "debug_dictation") {
+        const title = document.createElement("span");
+        title.textContent = hint.label;
+        const badge = document.createElement("span");
+        badge.className = "play-world-hint__badge";
+        badge.textContent = "debug";
+        label.append(title, badge);
+        item.classList.add("play-world-hint--debug");
+      } else {
+        label.textContent = hint.label;
+      }
 
       const desc = document.createElement("span");
       desc.className = "play-world-hint__desc";
@@ -2124,6 +2405,13 @@ async function mountPlayPanel(root, ctx) {
     ) {
       opts = [...opts, { ...PATH_INTRO_START_OPTION }];
     }
+    if (
+      phase === "dictation_theory" &&
+      mode === "options_or_text" &&
+      !opts.some((o) => String(o.id || "") === START_DICTATION_OPTION_ID)
+    ) {
+      opts = [...opts, { id: START_DICTATION_OPTION_ID, label: startDictationLabel(playWorldTheme) }];
+    }
 
     const chooseWorld = isChooseWorldTurn(turn);
     const chooseZone = isChooseZoneTurn(turn);
@@ -2203,6 +2491,7 @@ async function mountPlayPanel(root, ctx) {
       formEl.hidden = true;
       syncFooterComposeMode(false);
     }
+    renderDictationControls(turn, mode);
     syncFooterChrome();
     lastPendingTurn = turn;
     baggageOffersRefreshedForTurn = null;
@@ -2524,13 +2813,14 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
-   * @param {{ kind: string, option_id?: string, text?: string, displayLabel?: string }} reply
+   * @param {{ kind: string, option_id?: string, text?: string, displayLabel?: string, dictation_id?: string, photo_url?: string }} reply
    */
   function explorerReplyShown(reply) {
     if (typeof reply.displayLabel === "string" && reply.displayLabel.trim()) {
       return reply.displayLabel.trim();
     }
     if (reply.kind === "text") return reply.text || "";
+    if (reply.kind === "photo") return "He enviado la foto";
     if (reply.kind === "option") {
       return resolveExplorerBubbleText(reply.option_id || "", { explorer_reply: reply });
     }
@@ -2538,7 +2828,7 @@ async function mountPlayPanel(root, ctx) {
   }
 
   /**
-   * @param {{ kind: string, option_id?: string, text?: string, displayLabel?: string }} reply
+   * @param {{ kind: string, option_id?: string, text?: string, displayLabel?: string, dictation_id?: string, photo_url?: string }} reply
    */
   async function sendReply(reply) {
     const sid = ctx.getSessionId();
@@ -2675,6 +2965,8 @@ async function mountPlayPanel(root, ctx) {
     destroy() {
       hideThinking();
       hideHistoryLoadingSkeleton();
+      stopDictationAudio();
+      revokeDictationPreview();
       applyPlayWorldTheme(null);
       footer.remove();
       localCleanups.forEach((fn) => fn());

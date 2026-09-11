@@ -11,6 +11,9 @@ def test_resolve_input_mode_by_phase_overrides_llm() -> None:
     assert resolve_input_mode("handoff_placement", "text_only") == "continue"
     assert resolve_input_mode("choose_path", "options_only") == "options_or_text"
     assert resolve_input_mode("path_intro", "continue") == "options_or_text"
+    assert resolve_input_mode("dictation_theory", "continue") == "options_or_text"
+    assert resolve_input_mode("dictation_listen", "continue") == "photo"
+    assert resolve_input_mode("dictation_result", "text_only") == "continue"
 
 
 def test_normalize_strips_continue_for_species_chips() -> None:

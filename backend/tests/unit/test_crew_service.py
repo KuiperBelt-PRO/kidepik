@@ -382,6 +382,38 @@ async def test_update_profile_learning_challenges_per_path_persists_and_keeps_su
 
 @pytest.mark.unit
 @pytest.mark.asyncio
+async def test_update_profile_learning_dictation_persists_and_keeps_subjects(
+    crew_svc, mocker
+) -> None:
+    svc, session = crew_svc
+    base = svc._detail(child_row())
+    base["settings"] = {
+        "learning": {
+            "active_subjects": ["math", "language"],
+            "subject_priorities": ["math"],
+        }
+    }
+    base["permissions"] = {"lock_world_theme": False}
+    mocker.patch.object(svc, "get_for_auth_user", new=AsyncMock(return_value=base))
+    session._results = [FakeExecuteResult(), FakeExecuteResult(rows=child_row())]
+    mocker.patch(
+        "app.services.crew_progress.CrewProgressService.build_for_child",
+        new=AsyncMock(return_value={"progress": {}, "journey": {}}),
+    )
+    await svc.update_profile_for_auth_user(
+        AUTH_USER_ID,
+        CHILD_ID,
+        {"learning": {"dictation": {"enabled": True, "every_n": 4}}},
+    )
+    settings = session.executed[0][1]["settings"]
+    assert settings["learning"]["dictation"]["enabled"] is True
+    assert settings["learning"]["dictation"]["every_n"] == 4
+    assert settings["learning"]["dictation"]["trigger"] == "every_n_paths"
+    assert settings["learning"]["active_subjects"] == ["math", "language"]
+
+
+@pytest.mark.unit
+@pytest.mark.asyncio
 async def test_update_profile_learning_weak_spots_legacy(crew_svc, mocker) -> None:
     svc, session = crew_svc
     base = svc._detail(child_row())
@@ -583,6 +615,8 @@ def test_to_self_view_includes_member_ui_settings() -> None:
     assert view["font_scale_play"] == "xl"
     assert view["ui_preferences"]["reduce_motion"] == "never"
     assert view["ui_preferences"]["ui_theme"] == "sci-fi"
+    assert "dictation" not in view
+    assert "settings" not in view or "dictation" not in (view.get("settings") or {})
 
 
 @pytest.mark.unit

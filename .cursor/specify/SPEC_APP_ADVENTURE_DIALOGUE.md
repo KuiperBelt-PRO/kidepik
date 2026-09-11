@@ -70,6 +70,7 @@ El compose de texto se ancla al **pie del marco glass** (`section-frame__footer`
 | `text_only` | Solo input texto |
 | `options_or_text` | Chips + «O escribe…» |
 | `continue` | Un CTA «Continuar» / «Siguiente» sin respuesta libre |
+| `photo` | Captura/galería; sin teclado — [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md) |
 | `blocked` | Esperando red / cuota; spinner + reintentar |
 
 #### 1.1b Claridad de elección (delta ago 2026)
@@ -85,9 +86,11 @@ Contrato normativo ampliado en [SPEC_APP_ADVENTURE_STORY_RICHNESS.md](SPEC_APP_A
 
 | Fase (`meta.phase`) | `input_mode` | Notas |
 | --- | --- | --- |
-| `choose_path` | `options_or_text` | Cartas + compose; texto = consulta (misma fase) |
+| `choose_path` | `options_or_text` | 3 cartas de camino + compose; **dictados on:** 4.ª carta producto; **debug tutor y producto off:** 4.ª carta debug ([SPEC_APP_DICTATION](SPEC_APP_DICTATION.md) §3) |
 | `path_intro` | `options_or_text` | CTA `start_challenges` + compose; texto = consulta del tema |
 | `path_intro` + `meta.retry` | `continue` | Excepción: sin teclado en reintento tras fallo |
+| `dictation_theory` | `options_or_text` | CTA `start_dictation`; consulta solo de la teoría |
+| `dictation_listen` | `photo` | Play/Replay + captura; [SPEC_APP_DICTATION](SPEC_APP_DICTATION.md) |
 
 Detalle de producto y anti-spoiler: [SPEC_APP_JOURNEY_MECHANICS](SPEC_APP_JOURNEY_MECHANICS.md) §5.1b.
 
@@ -128,7 +131,7 @@ interface DialogueTurn {
   role: DialogueRole;
   text: string;
   options?: { id: string; label: string }[];
-  input_mode: "options_only" | "text_only" | "options_or_text" | "continue" | "blocked";
+  input_mode: "options_only" | "text_only" | "options_or_text" | "continue" | "photo" | "blocked";
   explorer_reply?: { kind: "option" | "text"; option_id?: string; text?: string };
   meta?: Record<string, unknown>; // mentor_id, subject_id, …
   model_used?: string;

@@ -54,7 +54,10 @@ Cada línea:
 }
 ```
 
-Fases mínimas: `placement_compose`, `path_compose`, `challenge_compose`, `generic`.
+Fases mínimas: `placement_compose`, `path_compose`, `challenge_compose`, `generic`.  
+Dictado (no mezclar con caminos): `dictation_compose` (preparar teoría+TTS), `dictation_grade` (foto).
+
+Play en `choose_path` adjunta **además** `meta.dictation_waiting_hints` (fase `dictation_compose`) para que, al elegir la carta de dictado, la espera no reuse las frases de `path_compose`. El turno `dictation_listen` lleva `waiting_hints` de `dictation_grade`.
 
 ---
 
@@ -71,7 +74,7 @@ def pick_waiting_batch(
     """Lee JSONL world + neutral; filtra active/locale/phase/age_band; weight/random; dedupe."""
 ```
 
-Play adjunta `meta.waiting_hints` al iniciar compose largo (placement/path).
+Play adjunta `meta.waiting_hints` al iniciar compose largo (placement/path). Dictado: ver fases `dictation_*` arriba.
 
 ---
 

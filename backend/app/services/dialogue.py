@@ -84,6 +84,9 @@ class DialogueService:
         self.ledger = JourneyLedger(self.settings.journey_data_dir)
         self.orchestrator = Orchestrator(settings=self.settings, gateway=self.gateway)
         self._ledger_events_cache: dict[tuple[str, str, str, str | None], list[dict[str, Any]]] = {}
+        self._debug_allowed = False
+        self._session_role = ""
+        self._auth_user_id = ""
 
     @staticmethod
     def _world(child: dict[str, Any]) -> str | None:
@@ -223,7 +226,11 @@ class DialogueService:
         session_id: str,
         reply: dict[str, Any],
         attach_debug: bool = False,
+        session_role: str | None = None,
     ) -> dict[str, Any]:
+        self._debug_allowed = bool(attach_debug)
+        self._session_role = str(session_role or "")
+        self._auth_user_id = str(auth_user_id)
         child = await self._child(auth_user_id, child_id)
         session = (
             await self.session.execute(
@@ -236,32 +243,43 @@ class DialogueService:
         if not session:
             raise ValueError("session not found")
         kind = reply.get("kind")
-        if kind not in {"option", "text", "continue"}:
+        if kind not in {"option", "text", "continue", "photo"}:
             raise ValueError("reply invalid")
-        value = str(reply.get("text") or reply.get("option_id") or "").strip()
-        if kind != "continue" and not value:
-            raise ValueError("reply empty")
-        display_label = str(reply.get("displayLabel") or "").strip()
-        if kind == "continue":
-            bubble_text = display_label or "Continuar"
-        elif kind == "option" and display_label:
-            bubble_text = display_label
+        if kind == "photo":
+            value = str(reply.get("photo_url") or "").strip()
+            if not value:
+                raise ValueError("reply empty")
+            display_label = str(reply.get("displayLabel") or "").strip()
+            bubble_text = display_label or "Foto del dictado"
+            explorer_meta = {
+                "kind": "photo",
+                "dictation_id": str(reply.get("dictation_id") or ""),
+            }
         else:
-            bubble_text = value
+            value = str(reply.get("text") or reply.get("option_id") or "").strip()
+            if kind != "continue" and not value:
+                raise ValueError("reply empty")
+            display_label = str(reply.get("displayLabel") or "").strip()
+            if kind == "continue":
+                bubble_text = display_label or "Continuar"
+            elif kind == "option" and display_label:
+                bubble_text = display_label
+            else:
+                bubble_text = value
 
-        explorer_meta: dict[str, Any] = {}
-        if kind == "option":
-            last_mentor = await self._last_mentor(session_id)
-            scoring_item = await self._choice_echo_scoring_item(
-                last_mentor, child_id, session_id, child
-            )
-            explorer_meta = self._choice_echo_meta(
-                last_mentor,
-                selected_id=value,
-                display_label=display_label,
-                reply=reply,
-                scoring_item=scoring_item,
-            )
+            explorer_meta: dict[str, Any] = {}
+            if kind == "option":
+                last_mentor = await self._last_mentor(session_id)
+                scoring_item = await self._choice_echo_scoring_item(
+                    last_mentor, child_id, session_id, child
+                )
+                explorer_meta = self._choice_echo_meta(
+                    last_mentor,
+                    selected_id=value,
+                    display_label=display_label,
+                    reply=reply,
+                    scoring_item=scoring_item,
+                )
 
         sequence = int(
             (
@@ -532,6 +550,18 @@ class DialogueService:
             }
             for p in pack
         ]
+        options = self._with_debug_dictation_option(options, child, session_id)
+        from app.services.dictation_settings import effective_dictation_settings, is_offer_mandatory
+
+        learning = (child.get("settings") or {}).get("learning") if isinstance(child.get("settings"), dict) else {}
+        dictation = effective_dictation_settings(
+            learning.get("dictation") if isinstance(learning, dict) else None
+        )
+        if is_offer_mandatory(dictation):
+            intro_text = (
+                "Antes de elegir un camino nuevo, hay que copiar un recado al dictado. "
+                "Cuando termines, volverás a la encrucijada."
+            )
         return await self._mentor_turn(
             session_id,
             child_id,
@@ -543,6 +573,7 @@ class DialogueService:
             {
                 "phase": "choose_path",
                 "waiting_hints": waiting_hints,
+                "dictation_waiting_hints": await self._dictation_waiting_hints(child),
                 "path_ids": [p["path_id"] for p in pack],
             },
         )
@@ -766,6 +797,24 @@ class DialogueService:
                     effects, turns = await self._choose_path(
                         child_id, session_id, session, sequence, reply, value, child
                     )
+            elif phase == "dictation_theory":
+                from app.services.dictation_flow import handle_theory
+
+                effects, turns = await handle_theory(
+                    self, child, session_id, session, sequence, reply, last or {}
+                )
+            elif phase == "dictation_listen":
+                from app.services.dictation_flow import handle_listen
+
+                effects, turns = await handle_listen(
+                    self, child, session_id, session, sequence, reply, last or {}
+                )
+            elif phase == "dictation_result":
+                from app.services.dictation_flow import handle_result
+
+                effects, turns = await handle_result(
+                    self, child, session_id, session, sequence, reply, last or {}
+                )
             elif phase == "path_intro":
                 last_meta = (last or {}).get("meta") if isinstance((last or {}).get("meta"), dict) else {}
                 if kind == "text" and not last_meta.get("retry"):
@@ -2254,6 +2303,56 @@ class DialogueService:
             if p.get("path_id")
         ]
 
+    def _with_debug_dictation_option(
+        self,
+        options: list[dict[str, Any]],
+        child: dict[str, Any],
+        session_id: str,
+    ) -> list[dict[str, Any]]:
+        from app.services.dictation_cards import merge_choose_path_dictation_options
+        from app.services.dictation_settings import effective_dictation_settings
+
+        learning = (child.get("settings") or {}).get("learning") if isinstance(child.get("settings"), dict) else {}
+        dictation = effective_dictation_settings(
+            learning.get("dictation") if isinstance(learning, dict) else None
+        )
+        debug_enabled = bool(self._debug_allowed and self._session_role == "tutor")
+        return merge_choose_path_dictation_options(
+            options,
+            product_enabled=bool(dictation.get("enabled")),
+            debug_enabled=debug_enabled,
+            offer_skips=int(dictation.get("offer_skips") or 0),
+            every_n=int(dictation.get("every_n") or 3),
+            world=self._world(child) or "fantasy",
+            rotate_key=session_id,
+        )
+
+    async def _dictation_waiting_hints(self, child: dict[str, Any]) -> list[str]:
+        return await pick_waiting_batch(
+            self.session,
+            world_theme=self._world(child) or "fantasy",
+            age_band=child.get("age_band") or child.get("effective_age_band"),
+            phase="dictation_compose",
+        )
+
+    async def _note_dictation_offer_skipped(self, child: dict[str, Any]) -> None:
+        from app.services.dictation_flow import persist_dictation_runtime
+        from app.services.dictation_settings import MAX_EVERY_N, effective_dictation_settings
+
+        learning = (child.get("settings") or {}).get("learning") if isinstance(child.get("settings"), dict) else {}
+        dictation = effective_dictation_settings(
+            learning.get("dictation") if isinstance(learning, dict) else None
+        )
+        if not dictation.get("enabled"):
+            return
+        skips = int(dictation.get("offer_skips") or 0) + 1
+        if skips > MAX_EVERY_N:
+            skips = MAX_EVERY_N
+        try:
+            await persist_dictation_runtime(self.session, child, {"offer_skips": skips})
+        except Exception:
+            pass
+
     async def _path_phase_mentor_consult(
         self,
         child_id: str,
@@ -2274,7 +2373,9 @@ class DialogueService:
             str(parent_id) if parent_id else None, child_id, session_id, world
         )
         if phase == "choose_path":
-            force_options = DialogueService._choose_path_card_options(pack)
+            force_options = self._with_debug_dictation_option(
+                DialogueService._choose_path_card_options(pack), child, session_id
+            )
             context_lines = []
             for p in pack:
                 title = str(p.get("title") or p.get("path_id") or "Camino")
@@ -2301,6 +2402,8 @@ class DialogueService:
             }
             if meta.get("waiting_hints") is not None:
                 extra_meta["waiting_hints"] = meta.get("waiting_hints")
+            if meta.get("dictation_waiting_hints") is not None:
+                extra_meta["dictation_waiting_hints"] = meta.get("dictation_waiting_hints")
         else:
             progress = self._read_path_progress(
                 str(parent_id) if parent_id else None, child_id, session_id, world
@@ -3238,6 +3341,18 @@ class DialogueService:
             }
             for p in pack
         ]
+        options = self._with_debug_dictation_option(options, child, session_id)
+        from app.services.dictation_settings import effective_dictation_settings, is_offer_mandatory
+
+        learning = (child.get("settings") or {}).get("learning") if isinstance(child.get("settings"), dict) else {}
+        dictation = effective_dictation_settings(
+            learning.get("dictation") if isinstance(learning, dict) else None
+        )
+        if is_offer_mandatory(dictation):
+            intro_text = (
+                "Antes de elegir un camino nuevo, hay que copiar un recado al dictado. "
+                "Cuando termines, volverás a la encrucijada."
+            )
         turn = await self._mentor_turn(
             session_id,
             child_id,
@@ -3249,6 +3364,7 @@ class DialogueService:
             {
                 "phase": "choose_path",
                 "waiting_hints": waiting_hints,
+                "dictation_waiting_hints": await self._dictation_waiting_hints(child),
                 "path_ids": [p["path_id"] for p in pack],
             },
         )
@@ -4104,6 +4220,61 @@ class DialogueService:
             str(parent_id) if parent_id else None, child_id, session_id, world
         )
         path_id = str(reply.get("option_id") or value or "")
+        if path_id in {"debug_start_dictation", "start_path_dictation"}:
+            from app.services.dictation_flow import launch_dictation
+            from app.services.dictation_settings import effective_dictation_settings
+
+            learning = (child.get("settings") or {}).get("learning") if isinstance(child.get("settings"), dict) else {}
+            dictation = effective_dictation_settings(
+                learning.get("dictation") if isinstance(learning, dict) else None
+            )
+            debug_ok = bool(self._debug_allowed and self._session_role == "tutor")
+            product_ok = bool(dictation.get("enabled"))
+            if path_id == "debug_start_dictation" and not debug_ok:
+                raise ValueError("debug_start_dictation forbidden")
+            if path_id == "start_path_dictation" and not product_ok:
+                raise ValueError("start_path_dictation forbidden")
+            source = "debug_card" if path_id == "debug_start_dictation" else "path_offer"
+            result = await launch_dictation(
+                self,
+                child,
+                session_id,
+                session,
+                sequence,
+                source=source,
+                path_id="",
+            )
+            if result is None:
+                # D7: permanecer en choose_path; si era obligatorio, no dejar sin salida.
+                pack = self._read_path_pack(
+                    str(parent_id) if parent_id else None, child_id, session_id, world
+                )
+                from app.services.dictation_settings import is_offer_mandatory
+
+                if is_offer_mandatory(dictation):
+                    options = self._choose_path_card_options(pack)
+                    copy = "Ahora no hay voz para el dictado. Elige un camino; la práctica escrita se aplaza."
+                else:
+                    options = self._with_debug_dictation_option(
+                        self._choose_path_card_options(pack), child, session_id
+                    )
+                    copy = "Ahora no hay voz para el dictado. Elige un camino."
+                return [], [
+                    await self._mentor_turn(
+                        session_id,
+                        child_id,
+                        session["flow_id"],
+                        sequence + 1,
+                        copy,
+                        "options_or_text",
+                        options,
+                        {
+                            "phase": "choose_path",
+                            "dictation_waiting_hints": await self._dictation_waiting_hints(child),
+                        },
+                    )
+                ]
+            return result
         chosen = next((p for p in pack if p.get("path_id") == path_id), None)
         if not chosen:
             return [], [
@@ -4114,18 +4285,26 @@ class DialogueService:
                     sequence + 1,
                     "No encontré ese camino. Elige una de las rutas.",
                     "options_or_text",
-                    [
-                        {
-                            "id": p["path_id"],
-                            "label": p["title"],
-                            "description": DialogueService._path_pitch_description(p),
-                        }
-                        for p in pack
-                    ],
-                    {"phase": "choose_path"},
+                    self._with_debug_dictation_option(
+                        [
+                            {
+                                "id": p["path_id"],
+                                "label": p["title"],
+                                "description": DialogueService._path_pitch_description(p),
+                            }
+                            for p in pack
+                        ],
+                        child,
+                        session_id,
+                    ),
+                    {
+                        "phase": "choose_path",
+                        "dictation_waiting_hints": await self._dictation_waiting_hints(child),
+                    },
                 )
             ]
         path_id = str(chosen.get("path_id"))
+        await self._note_dictation_offer_skipped(child)
         if parent_id:
             try:
                 self._append_ledger_event(
@@ -4303,7 +4482,7 @@ class DialogueService:
                 recap,
                 "continue",
                 None,
-                {"phase": "adventure_ready", "path_completed": True, "path_recap": True},
+                {"phase": "adventure_ready", "path_completed": True, "path_recap": True, "path_id": path.get("path_id"), "subject_id": subject_id},
             )
             effects: list[dict[str, Any]] = [
                 {"type": "path_completed", "value": path.get("path_id")},

@@ -142,6 +142,8 @@ backend/app/ai/
 
 Gateway delgado: no juego, no skills, no ledger.
 
+TTS de producto (dictado): lista **aparte** `AI_GEMINI_TTS_MODEL_LIST` — [SPEC_AI_GEMINI_TTS.md](SPEC_AI_GEMINI_TTS.md). No mezclar ids TTS en `mentor_guide` / `path_composer`.
+
 ---
 
 ## 6. Criterios de aceptación

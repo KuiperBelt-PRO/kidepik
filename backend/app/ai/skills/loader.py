@@ -83,6 +83,17 @@ PURPOSE_SKILL_IDS: dict[str, list[str]] = {
     "waiting_copy_writer": ["waiting-copy", "audience-language"],
     "journey_summarizer": ["journey-summary"],
     "safety_rewriter": ["safety-tone", "audience-language"],
+    "dictation_composer": [
+        "dictation-orthography",
+        "audience-language",
+        "safety-tone",
+        "mentor-voice",
+    ],
+    "dictation_grader": [
+        "dictation-orthography",
+        "evaluation-rubric",
+        "audience-language",
+    ],
 }
 
 

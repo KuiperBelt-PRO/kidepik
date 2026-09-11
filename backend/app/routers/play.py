@@ -117,6 +117,7 @@ async def submit_turn(
                 session_id,
                 reply,
                 attach_debug,
+                session_role=str(claims.get("session_role") or ""),
             )
         # Refresh HUD when placement/levels may have changed
         try:

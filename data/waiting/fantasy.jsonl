@@ -5,3 +5,13 @@
 {"id":"wait_fantasy_challenge_01","world_theme":"fantasy","age_band":null,"phase":"challenge_compose","locale":"es","body":"El reto se forja en silencio…","weight":1,"active":true}
 {"id":"wait_fantasy_generic_01","world_theme":"fantasy","age_band":null,"phase":"generic","locale":"es","body":"La historia toma aire antes de continuar.","weight":1,"active":true}
 {"id":"wait_fantasy_generic_02","world_theme":"fantasy","age_band":null,"phase":"generic","locale":"es","body":"Las páginas del viaje aún se están escribiendo…","weight":1,"active":true}
+{"id":"wait_fantasy_dictation_01","world_theme":"fantasy","age_band":null,"phase":"dictation_compose","locale":"es","body":"El Guía sopla el pergamino antes de dictarlo…","weight":2,"active":true}
+{"id":"wait_fantasy_dictation_02","world_theme":"fantasy","age_band":null,"phase":"dictation_compose","locale":"es","body":"Las runas se ordenan para el recado escrito…","weight":1,"active":true}
+{"id":"wait_fantasy_dictation_03","world_theme":"fantasy","age_band":null,"phase":"dictation_compose","locale":"es","body":"Un susurro prepara las palabras que vas a copiar…","weight":2,"active":true}
+{"id":"wait_fantasy_dictation_04","world_theme":"fantasy","age_band":null,"phase":"dictation_compose","locale":"es","body":"La tinta del cronista aún se asienta…","weight":1,"active":true}
+{"id":"wait_fantasy_dictation_05","world_theme":"fantasy","age_band":null,"phase":"dictation_compose","locale":"es","body":"El eco del recado toma forma en el aire…","weight":1,"active":true}
+{"id":"wait_fantasy_dictation_06","world_theme":"fantasy","age_band":null,"phase":"dictation_compose","locale":"es","body":"La hermandad afina la voz del dictado…","weight":1,"active":true}
+{"id":"wait_fantasy_dictation_grade_01","world_theme":"fantasy","age_band":null,"phase":"dictation_grade","locale":"es","body":"El cronista lee tu letra con calma…","weight":2,"active":true}
+{"id":"wait_fantasy_dictation_grade_02","world_theme":"fantasy","age_band":null,"phase":"dictation_grade","locale":"es","body":"Las runas contrastan lo que has copiado…","weight":1,"active":true}
+{"id":"wait_fantasy_dictation_grade_03","world_theme":"fantasy","age_band":null,"phase":"dictation_grade","locale":"es","body":"El Guía revisa el pergamino que has escrito…","weight":1,"active":true}
+{"id":"wait_fantasy_dictation_grade_04","world_theme":"fantasy","age_band":null,"phase":"dictation_grade","locale":"es","body":"La tinta se compara con el recado original…","weight":1,"active":true}
